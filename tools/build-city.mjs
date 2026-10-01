@@ -374,6 +374,35 @@ for (const b of keep) {
   }
 }
 
+
+// ---------------------------------------------------------------- 地標（有名字的建築）
+// 有 building:part 的建築外框沒畫，但名字在外框上：名字、位置、最長那面牆照外框，高度取裡面最高的部件
+const places = [];
+{
+  const partInfo = parts.map((pt) => ({ c: centroid(pt.rings[0]), h: heightOf(pt.t, pt.id, true)[0] }));
+  for (const o of [...outlines, ...parts]) {
+    const nm = o.t.name;
+    if (!nm || !o.rings[0]) continue;
+    let r = o.rings[0];
+    if (Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 0.5) r = r.slice(0, -1);
+    if (r.length < 3) continue;
+    const c = centroid(r);
+    if (farFromTrack(c[0], c[1])) continue;
+    let h = heightOf(o.t, o.id, !!o.t['building:part'])[0];
+    for (const pi of partInfo) if (inside(pi.c, r)) h = Math.max(h, pi.h);
+    const a = area(r);
+    if (h < 18 && a < 800) continue;
+    let bi = 0, bl = 0;
+    for (let i = 0; i < r.length; i++) {
+      const j = (i + 1) % r.length, l = Math.hypot(r[j][0] - r[i][0], r[j][1] - r[i][1]);
+      if (l > bl) { bl = l; bi = i; }
+    }
+    const j = (bi + 1) % r.length;
+    const rad = Math.max(...r.map((q) => Math.hypot(q[0] - c[0], q[1] - c[1])));
+    places.push({ nm, x: r1(c[0]), z: r1(c[1]), r: r1(rad), h: r1(h), e: [r1(r[bi][0]), r1(r[bi][1]), r1(r[j][0]), r1(r[j][1])] });
+  }
+}
+
 // ---------------------------------------------------------------- 周邊道路（畫路面用）＋ 路網（車流、路名、紅綠燈用）
 const RW = { trunk: 12, primary: 11, secondary: 10, tertiary: 8, unclassified: 7, residential: 6, living_street: 5, service: 4.5, primary_link: 7, secondary_link: 7, tertiary_link: 6 };
 // 道路等級代碼：0 主要幹道、1 次要、2 一般、3 巷弄、4 服務道路
@@ -543,10 +572,10 @@ for (const g of greens) {
   delete g.a;
 }
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs };
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places };
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);
 console.log(`建築 ${buildings.length}（外框改畫部件 ${skippedOutline}、壓到賽道刪掉 ${droppedTrack}）、道路 ${roads.length}、綠地 ${greens.length}、樹 ${trees.length / 2}`);
-console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、有名字的建築 ${buildings.filter((b) => b.n).length}`);
+console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、地標 ${places.length}`);
 console.log(`city.json ${(json.length / 1024).toFixed(0)} KB`);

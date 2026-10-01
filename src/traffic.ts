@@ -72,6 +72,7 @@ export class Traffic {
   private lampAcc = 1;
   private rand = rng(2026);
   private grid = new Map<number, Agent[]>();
+  private extras: { x: number; z: number; v: number }[] = [];
   readonly max: number;
 
   constructor(scene: THREE.Scene, d: CityData, mobile: boolean) {
@@ -248,10 +249,17 @@ export class Traffic {
       }
     }
     consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2);
+    for (const o of this.extras) consider(o.x, o.z, 4.6, Math.max(0, o.v), 2.0);
     return { gap, lv };
   }
 
-  update(dt: number, player: { x: number; z: number; h: number; v: number }) {
+  /** 附近的車（給街頭飆車的對手閃車用） */
+  near(x: number, z: number, r: number) {
+    return this.agents.filter((a) => a.alive && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
+  }
+
+  update(dt: number, player: { x: number; z: number; h: number; v: number }, extras: { x: number; z: number; v: number }[] = []) {
+    this.extras = extras;
     this.t += dt;
     // 生成／回收：保持在玩家周圍
     let alive = 0;

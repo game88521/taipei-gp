@@ -11,13 +11,14 @@ import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
 import { RaceField, LAPS } from './rivals';
+import { StreetRace, type Challenge } from './streetrace';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
 
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean> }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number> }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -45,6 +46,7 @@ let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: M
 let landmarks: Landmark[] = [];
 let traffic: Traffic | null = null;
 let peds: Pedestrians | null = null;
+let sr: StreetRace | null = null;
 const MOBILE = matchMedia('(pointer: coarse)').matches;
 const cityLoad = loadCity(scene, track).then((c) => {
   collider = new Collider(c.data);
@@ -53,6 +55,7 @@ const cityLoad = loadCity(scene, track).then((c) => {
   landmarks = c.landmarks;
   traffic = new Traffic(scene, c.data, MOBILE);
   peds = new Pedestrians(scene, c.data, collider, MOBILE);
+  sr = new StreetRace(scene, c.data, c.landmarks);
   cityReady = true;
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
@@ -289,6 +292,7 @@ function updateVisuals(dt: number) {
     if (mode === 'free') traffic.render(dt);
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
+  if (sr && mode === 'free') sr.render(dt);
   if (peds) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
@@ -546,6 +550,82 @@ $('btn-reset-best').addEventListener('click', () => {
   showMenu(state === 'paused');
 });
 
+// ---------------------------------------------------------------- 街頭飆車
+let srShown = false, bigUntil = 0, offerFor: Challenge | null = null;
+function bigMsg(text: string) {
+  const el = $('big');
+  el.textContent = text;
+  el.className = 'show';
+  bigUntil = performance.now() + (text.length <= 3 ? 900 : 1800);
+}
+function updateOffer(c: Challenge | null) {
+  if (c === offerFor) return;
+  offerFor = c;
+  const el = $('sr-offer');
+  if (!c) { el.classList.add('hidden'); return; }
+  const best = save.street?.[c.def.id];
+  $('sr-offer-title').textContent = `🏁 ${c.def.title}`;
+  $('sr-offer-sub').textContent = `對手：${c.def.rival} ｜ 約 ${(c.length / 1000).toFixed(1)} km ｜ ${c.checkpoints.length} 個檢查點` + (best ? ` ｜ 你的最佳 ${fmt(best)}` : '');
+  el.classList.remove('hidden');
+}
+function acceptChallenge(c: Challenge) {
+  if (!sr) return;
+  updateOffer(null);
+  srShown = false;
+  sr.begin(c, (x, z, h) => fcar.place(x, z, h));
+  camSnap = true;
+}
+$('sr-accept').addEventListener('click', () => { if (offerFor) acceptChallenge(offerFor); });
+addEventListener('keydown', (e) => { if (e.code === 'Enter' && offerFor && state === 'free') acceptChallenge(offerFor); });
+function updateSrHud() {
+  const el = $('sr-hud');
+  if (!sr || !sr.active || (sr.phase !== 'race' && sr.phase !== 'count')) { el.classList.add('hidden'); return; }
+  const lead = sr.lead(fcar.x, fcar.z);
+  el.innerHTML = '';
+  const add = (t: string, cls = '') => { const s = document.createElement('span'); s.textContent = t; if (cls) s.className = cls; el.appendChild(s); };
+  add(`vs ${sr.active.def.rival}`);
+  add(`檢查點 ${Math.min(sr.next + 1, sr.active.checkpoints.length)}/${sr.active.checkpoints.length}`);
+  add(fmt(sr.time));
+  add(sr.rivalDone != null ? '對手已到終點' : lead >= 0 ? `領先 ${lead.toFixed(0)} m` : `落後 ${(-lead).toFixed(0)} m`, lead >= 0 ? 'good' : 'bad');
+  el.classList.remove('hidden');
+}
+function showStreetResult() {
+  if (!sr?.active) return;
+  srShown = true;
+  const c = sr.active, me = sr.playerDone, rv = sr.rivalDone;
+  const win = me != null && isFinite(me) && (rv == null || me < rv);
+  if (win && me != null) {
+    save.street = save.street || {};
+    if (!save.street[c.def.id] || me < save.street[c.def.id]) save.street[c.def.id] = me;
+    writeSave();
+  }
+  $('sr-res-title').textContent = win ? `🏆 你贏了 ${c.def.rival}！` : `${c.def.rival} 贏了`;
+  $('sr-res-sub').textContent = `你 ${me != null && isFinite(me) ? fmt(me) : '未完成'} ｜ ${c.def.rival} ${rv != null ? fmt(rv) : '未完成'}` + (save.street?.[c.def.id] ? ` ｜ 最佳 ${fmt(save.street[c.def.id])}` : '');
+  $('sr-result').classList.remove('hidden');
+}
+$('sr-ok').addEventListener('click', () => { $('sr-result').classList.add('hidden'); sr?.cancel(); });
+/** 測試用：玩家照挑戰路線開（純追蹤，最高約 80 km/h） */
+function srBot() {
+  const c = sr?.active;
+  if (!c || sr!.phase !== 'race') return { steer: 0, brake: true, throttle: false };
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < c.path.length; i++) { const d = (c.path[i][0] - fcar.x) ** 2 + (c.path[i][1] - fcar.z) ** 2; if (d < bd) { bd = d; bi = i; } }
+  const target = c.cum[bi] + 9 + Math.abs(fcar.v) * 0.5;
+  const j = Math.max(0, c.cum.findIndex((q) => q >= target));
+  const p = c.path[j < 0 ? c.path.length - 1 : j], q = c.path[Math.min(c.path.length - 1, (j < 0 ? c.path.length - 1 : j) + 1)];
+  const th = Math.atan2(q[0] - p[0], q[1] - p[1]), off = c.twoWay ? 1.8 : 0; // 走右側車道
+  let err = Math.atan2(p[0] - Math.cos(th) * off - fcar.x, p[1] + Math.sin(th) * off - fcar.z) - fcar.h;
+  err = Math.atan2(Math.sin(err), Math.cos(err));
+  let want = Math.min(22, c.vmax[bi] * 0.95);
+  // 前面有車就停（測試用的駕駛不會鑽車縫）
+  const fx = Math.sin(fcar.h), fz = Math.cos(fcar.h);
+  for (const o of traffic?.near(fcar.x, fcar.z, 20) ?? []) {
+    const dx = o.x - fcar.x, dz = o.z - fcar.z, ahead = dx * fx + dz * fz;
+    if (ahead > 0 && ahead < 12 && Math.abs(-dx * fz + dz * fx) < 1.8) want = Math.min(want, o.v);
+  }
+  return { steer: Math.max(-1, Math.min(1, -err * 2)), brake: fcar.v > want + 1, throttle: fcar.v < want };
+}
+
 // ---------------------------------------------------------------- 自由駕駛
 let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
 function beginFree() {
@@ -583,10 +663,18 @@ function carGear(v: number) {
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
 function freeStep(dt: number) {
-  const inp = FREE_SIM ? { steer: 0, brake: false, throttle: !IDLE } : input.read();
+  let inp = FREE_SIM ? (SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
+  if (sr?.phase === 'count') inp = { steer: 0, brake: true, throttle: false }; // 倒數時踩住煞車
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
-  if (traffic) {
-    traffic.update(dt, fcar);
+  if (sr) {
+    const msg = sr.update(dt, fcar, traffic);
+    if (msg) { bigMsg(msg); if (msg.length <= 3) sound.beep(msg === 'GO!' ? 880 : 520, 0.25); }
+    impact = Math.max(impact, sr.collide(fcar));
+    if (sr.phase === 'done' && !srShown) showStreetResult();
+    if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(sr.checkOffer(fcar.x, fcar.z, fcar.v));
+  }
+  if (traffic && !NO_TRAFFIC) {
+    traffic.update(dt, fcar, sr?.obstacle() ?? []);
     impact = Math.max(impact, traffic.collidePlayer(fcar));
   }
   if (peds && peds.update(dt, fcar)) {
@@ -602,6 +690,7 @@ function updateFreeHud(dt: number) {
   $('gear').textContent = v < -0.3 ? 'R' : Math.abs(v) < 0.3 ? 'N' : String(carGear(Math.abs(v)).n);
   const now = performance.now();
   if (toastUntil && now > toastUntil) { $('toast').className = ''; toastUntil = 0; }
+  if (bigUntil && now > bigUntil) { $('big').className = ''; bigUntil = 0; }
   roadAcc += dt;
   if (roadAcc > 0.25 && roadNet) {
     roadAcc = 0;
@@ -619,7 +708,8 @@ function updateFreeHud(dt: number) {
       }
       el.className = w ? 'show' : '';
     }
-    minimap?.draw(fcar.x, fcar.z, fcar.h);
+    minimap?.draw(fcar.x, fcar.z, fcar.h, sr?.mapInfo);
+    updateSrHud();
   }
   // 接近地標時跳出名稱（同一個地標 60 秒內不重複）
   lmAcc += dt;
@@ -645,6 +735,8 @@ showMenu(false);
 const FREE = new URLSearchParams(location.search).has('free');
 const FREE_SIM = FREE && BOT;
 const IDLE = new URLSearchParams(location.search).has('idle'); // 測車流：玩家停在原地
+const NO_TRAFFIC = new URLSearchParams(location.search).has('notraffic'); // 測路線用：關掉車流
+const SR_TEST = new URLSearchParams(location.search).get('sr'); // 測街頭飆車：?free&bot&sr=0&sim=N 自動接受第 0 個挑戰，玩家照路線開
 if (BOT && !FREE) void cityLoad.then(() => {
   mode = 'race';
   raceKind = new URLSearchParams(location.search).has('gp') ? 'gp' : 'tt';
@@ -657,7 +749,9 @@ if (FREE) void cityLoad.then(() => {
   hideMenu();
   beginFree();
   if (FREE_SIM) {
+    if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST]);
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
+    if (SR_TEST != null && sr) { document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length}`; return; }
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;

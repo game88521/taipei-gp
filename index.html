@@ -45,6 +45,13 @@
       <button id="gas">油門</button>
       <div id="road"></div>
       <canvas id="minimap"></canvas>
+      <div id="sr-hud" class="hidden"></div>
+      <div id="big"></div>
+      <div id="sr-offer" class="hidden">
+        <b id="sr-offer-title"></b>
+        <small id="sr-offer-sub"></small>
+        <button id="sr-accept">接受挑戰</button>
+      </div>
     </div>
 
     <div id="menu" class="overlay">
@@ -74,6 +81,14 @@
         <table id="res-table"></table>
         <button id="btn-again" class="primary">再比一次</button>
         <button id="btn-menu" class="ghost-btn">回選單</button>
+      </div>
+    </div>
+
+    <div id="sr-result" class="overlay hidden">
+      <div class="card">
+        <h1 id="sr-res-title"></h1>
+        <p class="sub" id="sr-res-sub"></p>
+        <button id="sr-ok" class="primary">好</button>
       </div>
     </div>
 

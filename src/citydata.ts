@@ -21,7 +21,9 @@ export interface CityData {
   signals: number[];
   crossings: number[];
   signs: StreetSign[];
+  places: Place[];
 }
+export interface Place { nm: string; x: number; z: number; r: number; h: number; e: [number, number, number, number] }
 
 /** 格狀空間索引：線段與圓 */
 export class Grid<T> {

@@ -367,3 +367,56 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
   #board li { padding: 1px 6px; }
   #res-table { font-size: 12px; margin: 6px 0 8px; }
 }
+
+/* ---------------- 街頭飆車 */
+#sr-hud {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 62px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  font: 700 15px var(--mono);
+  white-space: nowrap;
+}
+#sr-hud .good { color: var(--green); }
+#sr-hud .bad { color: #ff5a5a; }
+#big {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  font: 900 64px var(--mono);
+  color: #fff;
+  text-shadow: 0 4px 16px #000;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+}
+#big.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#sr-offer {
+  position: absolute;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 80px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 70vw);
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(12, 14, 22, 0.88);
+  border: 2px solid #ff8a1a;
+  text-align: center;
+  pointer-events: auto;
+}
+#sr-offer b { display: block; font-size: 20px; }
+#sr-offer small { display: block; color: var(--muted); margin: 4px 0 10px; }
+#sr-offer button { width: 100%; padding: 10px; border: 0; border-radius: 10px; background: #ff8a1a; font-size: 18px; font-weight: 800; letter-spacing: 3px; }
+#hud[data-mode='race'] #sr-hud, #hud[data-mode='race'] #sr-offer { display: none; }
+@media (max-height: 480px) {
+  #sr-hud { font-size: 12px; gap: 8px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); }
+  #big { font-size: 44px; }
+  #sr-offer { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 60px); padding: 8px 12px; }
+  #sr-offer b { font-size: 16px; }
+}

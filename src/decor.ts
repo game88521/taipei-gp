@@ -206,14 +206,8 @@ export interface Landmark { nm: string; x: number; z: number; r: number }
 
 /** 地標：屋頂招牌（最長那面牆上方）＋ 回傳接近提示用的清單 */
 export function buildLandmarks(scene: THREE.Scene, d: CityData): Landmark[] {
-  const list: { b: CityData['buildings'][number]; nm: string }[] = [];
-  for (const b of d.buildings) {
-    if (!b.n || b.h < 18) continue;
-    const nm = b.n.trim();
-    if (NOT_LANDMARK.test(nm) && !LANDMARK_HINT.test(nm)) continue;
-    list.push({ b, nm });
-  }
-  const names = [...new Set(list.map((x) => x.nm))];
+  const list = d.places.filter((p) => !(NOT_LANDMARK.test(p.nm.trim()) && !LANDMARK_HINT.test(p.nm)));
+  const names = [...new Set(list.map((p) => p.nm.trim()))];
   const colors = ['#ffffff', '#ff4b4b', '#ffd84a', '#7fd8ff'];
   const { mats, slots } = textAtlas(names.map((n) => [n]), (g, x, y, [nm]) => {
     g.font = `900 72px ${FONT}`;
@@ -228,27 +222,15 @@ export function buildLandmarks(scene: THREE.Scene, d: CityData): Landmark[] {
   const buckets = mats.map(() => ({ pos: [] as number[], uv: [] as number[] }));
   const done = new Set<string>();
   const out: Landmark[] = [];
-  for (const { b, nm } of list) {
-    const p = b.p, n = p.length / 2;
-    let cx = 0, cz = 0;
-    for (let i = 0; i < n; i++) { cx += p[i * 2]; cz += p[i * 2 + 1]; }
-    cx /= n; cz /= n;
-    let r = 0;
-    for (let i = 0; i < n; i++) r = Math.max(r, Math.hypot(p[i * 2] - cx, p[i * 2 + 1] - cz));
-    out.push({ nm, x: cx, z: cz, r });
-    if (done.has(nm)) continue; // 同名的多個部件只掛一塊
+  for (const p of list) {
+    const nm = p.nm.trim();
+    out.push({ nm, x: p.x, z: p.z, r: p.r });
+    if (done.has(nm) || p.h > 300) continue; // 同名只掛一塊；101 不掛（塔身本身就是招牌）
     done.add(nm);
-    // 最長的一面牆
-    let bi = 0, bl = 0;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n, l = Math.hypot(p[j * 2] - p[i * 2], p[j * 2 + 1] - p[i * 2 + 1]);
-      if (l > bl) { bl = l; bi = i; }
-    }
-    const j = (bi + 1) % n;
-    const mx = (p[bi * 2] + p[j * 2]) / 2, mz = (p[bi * 2 + 1] + p[j * 2 + 1]) / 2;
-    const ang = Math.atan2(p[j * 2] - p[bi * 2], p[j * 2 + 1] - p[bi * 2 + 1]) + Math.PI / 2;
-    const w = Math.min(bl * 0.9, nm.length * 3.2 + 2), h = (w / 4) * (128 / 512) * 4 * 0.9;
-    addBoard(buckets, slots[names.indexOf(nm)], mx, b.h + h / 2 + 0.6, mz, ang, w, h);
+    const [x1, z1, x2, z2] = p.e, bl = Math.hypot(x2 - x1, z2 - z1);
+    const ang = Math.atan2(x2 - x1, z2 - z1) + Math.PI / 2;
+    const w = Math.min(bl * 0.9, nm.length * 3.2 + 2), h = (w / 4) * 0.9;
+    addBoard(buckets, slots[names.indexOf(nm)], (x1 + x2) / 2, p.h + h / 2 + 0.6, (z1 + z2) / 2, ang, w, h);
   }
   flush(scene, mats, buckets);
   return out;
