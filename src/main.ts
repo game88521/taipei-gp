@@ -9,6 +9,7 @@ import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
+import { Pedestrians } from './peds';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -42,6 +43,7 @@ let cityReady = false;
 let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: Minimap | null = null;
 let landmarks: Landmark[] = [];
 let traffic: Traffic | null = null;
+let peds: Pedestrians | null = null;
 const MOBILE = matchMedia('(pointer: coarse)').matches;
 const cityLoad = loadCity(scene, track).then((c) => {
   collider = new Collider(c.data);
@@ -49,6 +51,7 @@ const cityLoad = loadCity(scene, track).then((c) => {
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
   traffic = new Traffic(scene, c.data, MOBILE);
+  peds = new Pedestrians(scene, c.data, collider, MOBILE);
   cityReady = true;
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
@@ -275,6 +278,10 @@ function updateVisuals(dt: number) {
     traffic.visible = mode === 'free';
     if (mode === 'free') traffic.render(dt);
   }
+  if (peds) {
+    peds.visible = mode === 'free';
+    if (mode === 'free') peds.render();
+  }
   model.root.position.set(vc.x, 0, vc.z);
   model.root.rotation.y = vc.h;
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
@@ -489,6 +496,10 @@ function freeStep(dt: number) {
     traffic.update(dt, fcar);
     impact = Math.max(impact, traffic.collidePlayer(fcar));
   }
+  if (peds && peds.update(dt, fcar)) {
+    fcar.v *= 0.7; // 碰到行人：車子也被擋一下
+    sound.hit(6);
+  }
   if (impact) sound.hit(impact * 2.5);
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
 }
@@ -550,7 +561,7 @@ if (FREE) void cityLoad.then(() => {
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
-    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()}`;
+    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
