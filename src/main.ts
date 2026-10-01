@@ -409,9 +409,11 @@ function showMenu(paused: boolean) {
   $('btn-resume').style.display = paused ? '' : 'none';
   free.textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
   race.style.display = cityReady ? '' : 'none';
-  const gp = $<HTMLButtonElement>('btn-gp');
-  gp.disabled = !cityReady;
-  gp.style.display = cityReady ? '' : 'none';
+  for (const id of ['btn-gp', 'btn-duel']) {
+    const b = $<HTMLButtonElement>(id);
+    b.disabled = !cityReady;
+    b.style.display = cityReady ? '' : 'none';
+  }
   menu.classList.remove('hidden');
   hud.classList.add('hidden');
 }
@@ -568,11 +570,11 @@ function updateOffer(c: Challenge | null) {
   $('sr-offer-sub').textContent = `對手：${c.def.rival} ｜ 約 ${(c.length / 1000).toFixed(1)} km ｜ ${c.checkpoints.length} 個檢查點` + (best ? ` ｜ 你的最佳 ${fmt(best)}` : '');
   el.classList.remove('hidden');
 }
-function acceptChallenge(c: Challenge) {
+function acceptChallenge(c: Challenge, duel = false) {
   if (!sr) return;
   updateOffer(null);
   srShown = false;
-  sr.begin(c, (x, z, h) => fcar.place(x, z, h));
+  sr.begin(c, (x, z, h) => fcar.place(x, z, h), duel);
   camSnap = true;
 }
 $('sr-accept').addEventListener('click', () => { if (offerFor) acceptChallenge(offerFor); });
@@ -583,27 +585,83 @@ function updateSrHud() {
   const lead = sr.lead(fcar.x, fcar.z);
   el.innerHTML = '';
   const add = (t: string, cls = '') => { const s = document.createElement('span'); s.textContent = t; if (cls) s.className = cls; el.appendChild(s); };
-  add(`vs ${sr.active.def.rival}`);
+  if (sr.duel) {
+    const st = sr.standings();
+    add(`P${st.findIndex((r) => r.isPlayer) + 1}/${st.length}`, 'pos');
+  } else add(`vs ${sr.active.def.rival}`);
   add(`檢查點 ${Math.min(sr.next + 1, sr.active.checkpoints.length)}/${sr.active.checkpoints.length}`);
   add(fmt(sr.time));
-  add(sr.rivalDone != null ? '對手已到終點' : lead >= 0 ? `領先 ${lead.toFixed(0)} m` : `落後 ${(-lead).toFixed(0)} m`, lead >= 0 ? 'good' : 'bad');
+  const anyDone = sr.rivals.some((r) => r.done != null);
+  add(anyDone ? '已有對手到終點' : lead >= 0 ? `領先 ${lead.toFixed(0)} m` : `落後第一名 ${(-lead).toFixed(0)} m`, lead >= 0 ? 'good' : 'bad');
   el.classList.remove('hidden');
 }
 function showStreetResult() {
   if (!sr?.active) return;
   srShown = true;
   const c = sr.active, me = sr.playerDone, rv = sr.rivalDone;
-  const win = me != null && isFinite(me) && (rv == null || me < rv);
+  const st = sr.standings(), place = st.findIndex((r) => r.isPlayer) + 1;
+  const win = me != null && isFinite(me) && (sr.duel ? place === 1 : rv == null || me < rv);
+  const tb = $('sr-res-table');
+  tb.innerHTML = '';
+  $('sr-again').style.display = sr.duel ? '' : 'none';
+  if (sr.duel) {
+    tb.innerHTML = '<tr><th>名次</th><th>車手</th><th>成績</th></tr>';
+    const first = st[0].done;
+    st.forEach((r, k) => {
+      const tr = document.createElement('tr');
+      if (r.isPlayer) tr.className = 'me';
+      const fin = r.done != null && isFinite(r.done);
+      const time = fin ? (k === 0 ? fmt(r.done) : `+${(r.done! - (first ?? 0)).toFixed(2)}`) : '未完成';
+      for (const v of [String(k + 1), r.name, time]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+      tb.appendChild(tr);
+    });
+  }
+  if (BOT) document.title = `DUEL ${c.def.title} P${place} ` + st.map((r) => `${r.name}:${r.done != null && isFinite(r.done) ? r.done.toFixed(1) : '-'}`).join(' ');
   if (win && me != null) {
     save.street = save.street || {};
     if (!save.street[c.def.id] || me < save.street[c.def.id]) save.street[c.def.id] = me;
     writeSave();
   }
-  $('sr-res-title').textContent = win ? `🏆 你贏了 ${c.def.rival}！` : `${c.def.rival} 贏了`;
-  $('sr-res-sub').textContent = `你 ${me != null && isFinite(me) ? fmt(me) : '未完成'} ｜ ${c.def.rival} ${rv != null ? fmt(rv) : '未完成'}` + (save.street?.[c.def.id] ? ` ｜ 最佳 ${fmt(save.street[c.def.id])}` : '');
+  $('sr-res-title').textContent = sr.duel ? (place === 1 ? '🏆 街頭之王！' : `第 ${place} 名`) : win ? `🏆 你贏了 ${c.def.rival}！` : `${c.def.rival} 贏了`;
+  $('sr-res-sub').textContent = (sr.duel ? `${c.def.title} ｜ 你 ${me != null && isFinite(me) ? fmt(me) : '未完成'}` : `你 ${me != null && isFinite(me) ? fmt(me) : '未完成'} ｜ ${c.def.rival} ${rv != null ? fmt(rv) : '未完成'}`) + (save.street?.[c.def.id] ? ` ｜ 最佳 ${fmt(save.street[c.def.id])}` : '');
   $('sr-result').classList.remove('hidden');
 }
 $('sr-ok').addEventListener('click', () => { $('sr-result').classList.add('hidden'); sr?.cancel(); });
+$('sr-again').addEventListener('click', () => {
+  const c = sr?.active;
+  $('sr-result').classList.add('hidden');
+  if (c) { sr!.cancel(); acceptChallenge(c, true); }
+});
+// 選單的「街頭對決」：先選路線
+$('btn-duel').addEventListener('click', () => {
+  if (!sr) return;
+  const list = $('duel-list');
+  list.innerHTML = '';
+  for (const c of sr.challenges) {
+    const b = document.createElement('button');
+    b.className = 'ghost-btn';
+    const best = save.street?.[c.def.id];
+    b.innerHTML = '';
+    const t = document.createElement('b');
+    t.textContent = c.def.title;
+    const s = document.createElement('small');
+    s.textContent = `${(c.length / 1000).toFixed(1)} km ｜ ${c.checkpoints.length} 個檢查點` + (best ? ` ｜ 最佳 ${fmt(best)}` : '');
+    b.append(t, s);
+    b.addEventListener('click', async () => {
+      await userStart();
+      $('duel-pick').classList.add('hidden');
+      mode = 'free';
+      field.hide();
+      hideMenu();
+      beginFree();
+      acceptChallenge(c, true);
+    });
+    list.appendChild(b);
+  }
+  menu.classList.add('hidden');
+  $('duel-pick').classList.remove('hidden');
+});
+$('duel-back').addEventListener('click', () => { $('duel-pick').classList.add('hidden'); showMenu(false); });
 /** 測試用：玩家照挑戰路線開（純追蹤，最高約 80 km/h） */
 function srBot() {
   const c = sr?.active;
@@ -664,7 +722,7 @@ function carGear(v: number) {
 }
 function freeStep(dt: number) {
   let inp = FREE_SIM ? (SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
-  if (sr?.phase === 'count') inp = { steer: 0, brake: true, throttle: false }; // 倒數時踩住煞車
+  if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.v = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   if (sr) {
     const msg = sr.update(dt, fcar, traffic);
@@ -749,9 +807,9 @@ if (FREE) void cityLoad.then(() => {
   hideMenu();
   beginFree();
   if (FREE_SIM) {
-    if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST]);
+    if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
-    if (SR_TEST != null && sr) { document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length}`; return; }
+    if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length}`; return; }
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;

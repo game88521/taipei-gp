@@ -61,6 +61,7 @@
         <div id="menu-best"></div>
         <button id="btn-resume" class="primary" style="display: none">繼續</button>
         <button id="btn-free" class="primary">自由駕駛</button>
+        <button id="btn-duel" class="ghost-btn">街頭對決：開放街道 vs 4 台 AI</button>
         <button id="btn-gp" class="ghost-btn">街道賽：對決 7 台 AI（3 圈）</button>
         <button id="btn-start" class="ghost-btn">計時賽</button>
         <div class="opts">
@@ -88,7 +89,18 @@
       <div class="card">
         <h1 id="sr-res-title"></h1>
         <p class="sub" id="sr-res-sub"></p>
-        <button id="sr-ok" class="primary">好</button>
+        <table id="sr-res-table"></table>
+        <button id="sr-again" class="primary" style="display: none">再比一次</button>
+        <button id="sr-ok" class="ghost-btn">繼續自由駕駛</button>
+      </div>
+    </div>
+
+    <div id="duel-pick" class="overlay hidden">
+      <div class="card">
+        <h1>街頭對決<small>CHOOSE A ROUTE</small></h1>
+        <p class="sub">開放街道、照常有車流和紅綠燈；4 位對手會鑽車縫、闖紅燈。依序穿過黃色光圈，先到終點的贏。</p>
+        <div id="duel-list"></div>
+        <button id="duel-back" class="link">返回</button>
       </div>
     </div>
 

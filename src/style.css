@@ -420,3 +420,16 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
   #sr-offer { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 60px); padding: 8px 12px; }
   #sr-offer b { font-size: 16px; }
 }
+
+/* ---------------- 街頭對決：選路線、名次 */
+#duel-list { display: grid; gap: 8px; margin: 12px 0 8px; }
+#duel-list button { text-align: left; padding: 10px 14px; }
+#duel-list b { display: block; font-size: 17px; }
+#duel-list small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+#sr-hud .pos { color: #ffd400; font-size: 17px; }
+#sr-res-table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 15px; }
+#sr-res-table:empty { display: none; }
+#sr-res-table th { color: var(--muted); font-size: 12px; text-align: left; padding: 4px 6px; }
+#sr-res-table td { padding: 5px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+#sr-res-table tr.me td { background: rgba(225, 6, 0, 0.35); }
+#sr-ok { margin-top: 8px; }
