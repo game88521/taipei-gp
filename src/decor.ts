@@ -14,7 +14,7 @@ export function shortEn(en: string) {
     .replace(/\bNorth\b/g, 'N.').replace(/\bSouth\b/g, 'S.').replace(/\bEast\b/g, 'E.').replace(/\bWest\b/g, 'W.');
 }
 
-const lanesOf = (w: NetWay) => {
+export const lanesOf = (w: NetWay) => {
   if (w.l) return Math.max(1, Math.round(w.l));
   return w.o ? Math.max(1, Math.round(w.w / 3.4)) : Math.max(2, Math.round(w.w / 3.4 / 2) * 2);
 };

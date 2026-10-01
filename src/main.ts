@@ -8,6 +8,7 @@ import { FreeCar, CAR_VMAX } from './freecar';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
+import { Traffic } from './traffic';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -40,11 +41,14 @@ const world = buildWorld(scene, track);
 let cityReady = false;
 let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: Minimap | null = null;
 let landmarks: Landmark[] = [];
+let traffic: Traffic | null = null;
+const MOBILE = matchMedia('(pointer: coarse)').matches;
 const cityLoad = loadCity(scene, track).then((c) => {
   collider = new Collider(c.data);
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
+  traffic = new Traffic(scene, c.data, MOBILE);
   cityReady = true;
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
@@ -267,6 +271,10 @@ function updateVisuals(dt: number) {
   carModel.root.visible = mode === 'race';
   sedanModel.root.visible = mode === 'free';
   world.race.visible = mode === 'race';
+  if (traffic) {
+    traffic.visible = mode === 'free';
+    if (mode === 'free') traffic.render(dt);
+  }
   model.root.position.set(vc.x, 0, vc.z);
   model.root.rotation.y = vc.h;
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
@@ -475,8 +483,12 @@ function carGear(v: number) {
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
 function freeStep(dt: number) {
-  const inp = FREE_SIM ? { steer: 0, brake: false, throttle: true } : input.read();
-  const impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
+  const inp = FREE_SIM ? { steer: 0, brake: false, throttle: !IDLE } : input.read();
+  let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
+  if (traffic) {
+    traffic.update(dt, fcar);
+    impact = Math.max(impact, traffic.collidePlayer(fcar));
+  }
   if (impact) sound.hit(impact * 2.5);
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
 }
@@ -528,6 +540,7 @@ showMenu(false);
 // ?free：直接進自由駕駛（加 &bot&sim=N 會油門全開直行 N 秒，測碰撞用）
 const FREE = new URLSearchParams(location.search).has('free');
 const FREE_SIM = FREE && BOT;
+const IDLE = new URLSearchParams(location.search).has('idle'); // 測車流：玩家停在原地
 if (BOT && !FREE) void cityLoad.then(() => { mode = 'race'; hideMenu(); beginCountdown(); runSim(); });
 if (FREE) void cityLoad.then(() => {
   mode = 'free';
@@ -537,7 +550,7 @@ if (FREE) void cityLoad.then(() => {
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
-    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h`;
+    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()}`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
