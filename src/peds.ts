@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { CityData, Collider } from './citydata';
+import { pedParts } from './models';
 
 // 行人：沿真實道路兩側的人行道來回走；車子靠近會閃開，被碰到會被推開、坐在地上一下再站起來
 
@@ -10,13 +11,18 @@ interface Ped {
   phase: number; // 走路擺腿的相位
   dodge: number; // 閃避時的橫向位移
   sit: number; // 坐在地上的剩餘秒數
-  shirt: THREE.Color; pants: THREE.Color; skin: THREE.Color;
+  shirt: THREE.Color; pants: THREE.Color; skin: THREE.Color; hair: THREE.Color; sleeve: THREE.Color; shoe: THREE.Color;
+  scale: number; bag: boolean;
   alive: boolean;
 }
 
 const SHIRTS = ['#e8e8e8', '#2a2f3a', '#c8102e', '#1f5fa8', '#f0c040', '#3f8f5a', '#f2a0b8', '#7a5a3a', '#8a8f96', '#ff7a30'];
 const PANTS = ['#2a2f3a', '#1d2e4a', '#4a4a4a', '#c8b89a', '#1a1a1a', '#5a6a7a'];
 const SKIN = ['#f1d2b6', '#e3b994', '#c99a74', '#a8795a', '#f6dcc6'];
+const HAIR = ['#1a1612', '#2a2018', '#3a2a1c', '#5a3a22', '#8a6a4a', '#b8b0a8'];
+const SHOES = ['#f2f2f2', '#1a1a1a', '#5a3a22', '#c8102e', '#3a4a6a'];
+const PARTS = ['torso', 'pelvis', 'head', 'hair', 'neck', 'armL', 'armR', 'legL', 'legR', 'shoeL', 'shoeR', 'bag'] as const;
+type Part = (typeof PARTS)[number];
 
 function rng(seed: number) {
   return () => {
@@ -29,10 +35,7 @@ export class Pedestrians {
   private walks: Walk[] = [];
   private peds: Ped[] = [];
   private rand = rng(88);
-  private torso: THREE.InstancedMesh;
-  private head: THREE.InstancedMesh;
-  private legL: THREE.InstancedMesh;
-  private legR: THREE.InstancedMesh;
+  private mesh = {} as Record<Part, THREE.InstancedMesh>;
   readonly max: number;
 
   constructor(scene: THREE.Scene, d: CityData, col: Collider, mobile: boolean) {
@@ -69,18 +72,19 @@ export class Pedestrians {
       }
     }
 
-    // 簡單的人形：身體、頭、兩條腿（腿以髖關節為軸擺動）
-    const lam = (vc = false) => new THREE.MeshLambertMaterial({ vertexColors: vc });
-    this.torso = new THREE.InstancedMesh(new THREE.BoxGeometry(0.44, 0.62, 0.26).translate(0, 1.18, 0), lam(), this.max);
-    this.head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.24, 0.22).translate(0, 1.64, 0), lam(), this.max);
-    const leg = new THREE.BoxGeometry(0.15, 0.86, 0.17).translate(0, -0.43, 0);
-    this.legL = new THREE.InstancedMesh(leg, lam(), this.max);
-    this.legR = new THREE.InstancedMesh(leg.clone(), lam(), this.max);
-    for (const m of [this.torso, this.head, this.legL, this.legR]) {
+    // 人形：身體、骨盆、脖子、頭、頭髮、雙手雙腿（以關節為軸擺動）、鞋子、背包
+    const geo: Record<Part, THREE.BufferGeometry> = {
+      torso: pedParts.torso(), pelvis: pedParts.pelvis(), head: pedParts.head(), hair: pedParts.hair(), neck: pedParts.neck(),
+      armL: pedParts.arm(), armR: pedParts.arm(), legL: pedParts.leg(), legR: pedParts.leg(), shoeL: pedParts.shoe(), shoeR: pedParts.shoe(), bag: pedParts.bag(),
+    };
+    const mat = new THREE.MeshLambertMaterial();
+    for (const k of PARTS) {
+      const m = new THREE.InstancedMesh(geo[k], mat, this.max);
       m.count = 0;
       m.frustumCulled = false;
       m.setColorAt(0, new THREE.Color());
       scene.add(m);
+      this.mesh[k] = m;
     }
   }
 
@@ -93,8 +97,11 @@ export class Pedestrians {
       const pick = <T,>(a: T[]) => a[Math.floor(this.rand() * a.length)];
       const p: Ped = {
         w, s, dir: this.rand() < 0.5 ? 1 : -1, v: 1.1 + this.rand() * 0.5, x, z, h: 0, phase: this.rand() * 6,
-        dodge: 0, sit: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)), alive: true,
+        dodge: 0, sit: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)),
+        hair: new THREE.Color(pick(HAIR)), sleeve: new THREE.Color(), shoe: new THREE.Color(pick(SHOES)),
+        scale: 0.9 + this.rand() * 0.18, bag: this.rand() < 0.4, alive: true,
       };
+      p.sleeve.copy(this.rand() < 0.55 ? p.skin : p.shirt); // 短袖露出手臂，長袖就是衣服的顏色
       const dead = this.peds.findIndex((q) => !q.alive);
       if (dead >= 0) this.peds[dead] = p; else this.peds.push(p);
       return;
@@ -159,34 +166,42 @@ export class Pedestrians {
   }
 
   render() {
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
-    const hip = new THREE.Matrix4(), swing = new THREE.Matrix4(), sitM = new THREE.Matrix4();
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), sc = new THREE.Vector3();
+    const j = new THREE.Matrix4(), t = new THREE.Matrix4(), r = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
     let n = 0;
+    const put = (k: Part, mat: THREE.Matrix4, c: THREE.Color) => { this.mesh[k].setMatrixAt(n, mat); this.mesh[k].setColorAt(n, c); };
     for (const p of this.peds) {
       if (!p.alive) continue;
       q.setFromAxisAngle(up, p.h);
-      m.compose(pos.set(p.x, -0.25, p.z), q, one);
-      if (p.sit > 0) m.multiply(sitM.makeTranslation(0, -0.55, 0)); // 坐在地上
-      this.torso.setMatrixAt(n, m);
-      this.head.setMatrixAt(n, m);
-      const a = p.sit > 0 ? -1.4 : Math.sin(p.phase) * 0.5;
-      for (const [leg, side, sgn] of [[this.legL, -0.11, 1], [this.legR, 0.11, -1]] as const) {
-        hip.copy(m).multiply(swing.makeTranslation(side, 0.88, 0)).multiply(new THREE.Matrix4().makeRotationX(p.sit > 0 ? a : a * sgn));
-        leg.setMatrixAt(n, hip);
-        leg.setColorAt(n, p.pants);
+      const sitting = p.sit > 0;
+      const bob = sitting ? 0 : Math.abs(Math.sin(p.phase)) * 0.03;
+      m.compose(pos.set(p.x, -0.25 + bob - (sitting ? 0.5 : 0), p.z), q, sc.setScalar(p.scale));
+      for (const k of ['torso', 'pelvis', 'neck', 'head'] as const) put(k, m, k === 'torso' ? p.shirt : k === 'pelvis' ? p.pants : p.skin);
+      put('hair', m, p.hair);
+      put('bag', p.bag ? m : zero, p.shirt.clone().multiplyScalar(0.55));
+      const swing = sitting ? 0 : Math.sin(p.phase) * 0.5;
+      // 腿：髖關節 (±0.09, 0.9)；坐著時往前伸直
+      for (const [leg, shoe, side, sgn] of [['legL', 'shoeL', -0.09, 1], ['legR', 'shoeR', 0.09, -1]] as const) {
+        j.copy(m).multiply(t.makeTranslation(side, 0.9, 0)).multiply(r.makeRotationX(sitting ? -1.45 : swing * sgn));
+        put(leg, j, p.pants);
+        put(shoe, j, p.shoe);
       }
-      this.torso.setColorAt(n, p.shirt);
-      this.head.setColorAt(n, p.skin);
+      // 手：肩關節 (±0.23, 1.44)，跟同側的腿反向擺
+      for (const [arm, side, sgn] of [['armL', -0.23, -1], ['armR', 0.23, 1]] as const) {
+        j.copy(m).multiply(t.makeTranslation(side, 1.44, 0)).multiply(r.makeRotationX(sitting ? -0.3 : swing * sgn * 0.8)).multiply(r.makeRotationZ(side * 0.25));
+        put(arm, j, p.sleeve);
+      }
       n++;
     }
-    for (const mesh of [this.torso, this.head, this.legL, this.legR]) {
+    for (const k of PARTS) {
+      const mesh = this.mesh[k];
       mesh.count = n;
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }
 
-  set visible(v: boolean) { for (const m of [this.torso, this.head, this.legL, this.legR]) m.visible = v; }
+  set visible(v: boolean) { for (const k of PARTS) this.mesh[k].visible = v; }
   get count() { return this.peds.filter((p) => p.alive).length; }
   get sidewalks() { return this.walks.length; }
 }

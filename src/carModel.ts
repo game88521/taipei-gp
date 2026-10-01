@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sedanGeo } from './models';
 
 export interface CarModel {
   root: THREE.Group;
@@ -58,43 +59,32 @@ export function makeCar(color: string, ghost = false): CarModel {
   return { root, body, steer, spin };
 }
 
-/** 一般轎車／計程車：車頭朝 +z，長約 4.6 m */
+/** 一般轎車／計程車（玩家開的那台）：外型與車流共用 models.ts，車輪另外做才能轉向、滾動 */
 export function makeSedan(color: string, taxi = false): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const paint = new THREE.MeshLambertMaterial({ color });
-  const glass = new THREE.MeshLambertMaterial({ color: '#1d2733' });
-  const trim = new THREE.MeshLambertMaterial({ color: '#222326' });
-  const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z);
-    body.add(mesh);
-    return mesh;
-  };
-  box(1.8, 0.62, 4.5, paint, 0, 0.62, 0); // 下車身
-  box(1.62, 0.5, 2.3, paint, 0, 1.18, -0.25); // 車頂
-  box(1.64, 0.4, 2.1, glass, 0, 1.15, -0.25); // 車窗（比車頂寬一點點，看起來是一圈玻璃）
-  box(1.84, 0.18, 4.56, trim, 0, 0.36, 0); // 下緣保險桿
-  const head = new THREE.MeshBasicMaterial({ color: '#fff6d8', toneMapped: false });
-  const tail = new THREE.MeshBasicMaterial({ color: '#ff2a2a', toneMapped: false });
-  for (const s of [-1, 1]) {
-    box(0.42, 0.14, 0.05, head, s * 0.62, 0.72, 2.26);
-    box(0.36, 0.14, 0.05, tail, s * 0.66, 0.76, -2.26);
-  }
-  if (taxi) {
-    box(0.7, 0.22, 0.32, new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#555544' }), 0, 1.55, -0.1);
-  }
+  const g = sedanGeo({ taxi, noWheels: true });
+  body.add(new THREE.Mesh(g.paint, new THREE.MeshLambertMaterial({ color })));
+  body.add(new THREE.Mesh(g.fixed, new THREE.MeshLambertMaterial({ vertexColors: true })));
   const steer: THREE.Group[] = [], spin: THREE.Mesh[] = [];
-  const tyre = new THREE.MeshLambertMaterial({ color: '#151515' });
-  for (const s of [-1, 1]) for (const z of [1.45, -1.45]) {
-    const g = new THREE.Group();
-    g.position.set(s * 0.82, 0.33, z);
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.26, 12).rotateZ(Math.PI / 2), tyre);
-    g.add(m);
-    root.add(g);
-    spin.push(m);
-    if (z > 0) steer.push(g);
+  const tyre = new THREE.MeshLambertMaterial({ color: '#151515' }), rim = new THREE.MeshLambertMaterial({ color: '#c4c8ce' });
+  for (const [x, y, z, r] of g.wheels) {
+    const w = new THREE.Group();
+    w.position.set(x, y, z);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.24, 16).rotateZ(Math.PI / 2), tyre);
+    // 輪框上加五根輻條，轉動時看得出來
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 10).rotateZ(Math.PI / 2).translate(Math.sign(x) * 0.12, 0, 0), rim);
+    for (let k = 0; k < 5; k++) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.035, r * 1.15, 0.06).translate(Math.sign(x) * 0.135, 0, 0), tyre);
+      sp.rotation.x = (k / 5) * Math.PI;
+      hub.add(sp);
+    }
+    t.add(hub);
+    w.add(t);
+    root.add(w);
+    spin.push(t);
+    if (z > 0) steer.push(w);
   }
   return { root, body, steer, spin };
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CityData, NetWay } from './citydata';
 import { lanesOf } from './decor';
+import { sedanGeo, busGeo, scooterGeo } from './models';
 
 // 車流與紅綠燈：沿真實路網的車道行駛，路口隨機轉彎，跟車用 IDM（智慧駕駛模型），紅燈停在停止線前
 
@@ -18,9 +18,9 @@ interface DEdge {
 
 interface Cluster { cx: number; cz: number; nodes: Set<number>; axis: number; offset: number }
 
-type Kind = 0 | 1 | 2 | 3; // 轎車、計程車、公車、機車
-const KIND_LEN = [4.6, 4.6, 11, 1.9];
-const KIND_V = [13, 13.5, 10, 12]; // 期望車速 m/s（市區約 45~50 km/h）
+type Kind = 0 | 1 | 2 | 3 | 4; // 轎車、計程車、公車、機車、掀背車
+const KIND_LEN = [4.6, 4.6, 11, 1.9, 4.3];
+const KIND_V = [13, 13.5, 10, 12, 12.5]; // 期望車速 m/s（市區約 45~50 km/h）
 
 interface Agent {
   e: DEdge; s: number; lane: number; v: number; v0: number;
@@ -50,39 +50,9 @@ function rng(seed: number) {
   };
 }
 
-/** 交通工具外型：車身（吃 instanceColor）＋ 固定顏色的部分（玻璃、輪胎、燈） */
+/** 交通工具外型（models.ts）：轎車、計程車、公車、機車、掀背車 */
 function kindGeometry(kind: Kind) {
-  const paint: THREE.BufferGeometry[] = [], fixed: THREE.BufferGeometry[] = [];
-  const box = (list: THREE.BufferGeometry[], w: number, h: number, d: number, x: number, y: number, z: number, color?: string) => {
-    const g = new THREE.BoxGeometry(w, h, d).translate(x, y, z);
-    if (color) {
-      const c = new THREE.Color(color), n = g.attributes.position.count, a = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3);
-      g.setAttribute('color', new THREE.BufferAttribute(a, 3));
-    }
-    list.push(g);
-  };
-  if (kind === 2) { // 公車
-    box(paint, 2.5, 2.4, 11, 0, 1.75, 0);
-    box(fixed, 2.54, 0.9, 10.2, 0, 2.15, 0.1, '#1d2733');
-    box(fixed, 2.5, 0.5, 11.04, 0, 0.45, 0, '#1a1a1a');
-    box(fixed, 1.6, 0.25, 0.05, 0, 2.7, 5.52, '#ffb000');
-  } else if (kind === 3) { // 機車＋騎士
-    box(paint, 0.5, 0.45, 1.6, 0, 0.55, 0);
-    box(fixed, 0.12, 0.6, 0.12, 0, 0.35, 0.65, '#1a1a1a');
-    box(fixed, 0.12, 0.6, 0.12, 0, 0.35, -0.65, '#1a1a1a');
-    box(fixed, 0.42, 0.62, 0.32, 0, 1.15, -0.15, '#3a3f4a');
-    box(fixed, 0.3, 0.3, 0.3, 0, 1.62, -0.1, '#f2f2f2');
-  } else { // 轎車／計程車
-    box(paint, 1.8, 0.62, 4.5, 0, 0.62, 0);
-    box(paint, 1.62, 0.5, 2.3, 0, 1.18, -0.25);
-    box(fixed, 1.64, 0.4, 2.1, 0, 1.15, -0.25, '#1d2733');
-    box(fixed, 1.84, 0.3, 4.56, 0, 0.3, 0, '#1a1a1a');
-    box(fixed, 1.3, 0.12, 0.05, 0, 0.74, -2.27, '#ff2a2a');
-    box(fixed, 1.2, 0.12, 0.05, 0, 0.74, 2.27, '#fff2c8');
-    if (kind === 1) box(fixed, 0.7, 0.22, 0.32, 0, 1.55, -0.1, '#fdfdf5');
-  }
-  return { paint: mergeGeometries(paint), fixed: mergeGeometries(fixed) };
+  return kind === 2 ? busGeo() : kind === 3 ? scooterGeo() : sedanGeo({ taxi: kind === 1, hatch: kind === 4 });
 }
 
 const CAR_COLORS = ['#f2f2f0', '#1c1c1e', '#8a8f96', '#c0c4c8', '#7a1c22', '#1f3a6b', '#e8e2d0', '#3b3f45'];
@@ -153,7 +123,7 @@ export class Traffic {
 
     // ---- 車輛外型
     const mats = [new THREE.MeshLambertMaterial(), new THREE.MeshLambertMaterial({ vertexColors: true })];
-    for (let k = 0 as Kind; k < 4; k = (k + 1) as Kind) {
+    for (let k = 0 as Kind; k < 5; k = (k + 1) as Kind) {
       const g = kindGeometry(k);
       const cap = this.max;
       const paint = new THREE.InstancedMesh(g.paint, mats[0], cap), fixed = new THREE.InstancedMesh(g.fixed, mats[1], cap);
@@ -235,7 +205,7 @@ export class Traffic {
       const lane = Math.floor(this.rand() * e.lanes);
       if (this.agents.some((a) => a.alive && a.e === e && a.lane === lane && Math.abs(a.s - s) < 12)) continue;
       const r = this.rand();
-      const kind: Kind = e.way.c <= 1 && r < 0.06 ? 2 : r < 0.36 ? 3 : r < 0.52 ? 1 : 0;
+      const kind: Kind = e.way.c <= 1 && r < 0.06 ? 2 : r < 0.36 ? 3 : r < 0.52 ? 1 : r < 0.66 ? 4 : 0;
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
         e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
@@ -364,7 +334,7 @@ export class Traffic {
   }
 
   render(dt: number) {
-    const counts = [0, 0, 0, 0];
+    const counts = [0, 0, 0, 0, 0];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
     for (const a of this.agents) {
       if (!a.alive) continue;
@@ -391,7 +361,7 @@ export class Traffic {
   stats() {
     const al = this.agents.filter((a) => a.alive);
     const avg = al.reduce((s, a) => s + a.v, 0) / (al.length || 1);
-    const kinds = [0, 0, 0, 0];
+    const kinds = [0, 0, 0, 0, 0];
     al.forEach((a) => kinds[a.kind]++);
     return `${al.length}台 平均${(avg * 3.6).toFixed(0)}km/h 停著${al.filter((a) => a.v < 0.5).length} 種類${kinds.join('/')} 號誌路口${this.clusters.length} 燈${this.heads.length / 3}`;
   }
