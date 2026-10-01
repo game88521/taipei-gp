@@ -10,6 +10,7 @@ import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
+import { RaceField, LAPS } from './rivals';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -71,6 +72,8 @@ sedanModel.root.visible = false;
 scene.add(sedanModel.root);
 
 const car = new Car(); // 街道賽的 F1
+const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
+let raceKind: 'gp' | 'tt' = 'tt'; // 正賽 or 計時賽
 const fcar = new FreeCar(); // 自由駕駛的汽車
 type Mode = 'free' | 'race';
 let mode: Mode = 'free';
@@ -104,7 +107,7 @@ function applyOpts() {
 applyOpts();
 
 // ---------------------------------------------------------------- 比賽狀態
-type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused';
+type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results';
 let state: State = 'menu';
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
@@ -200,6 +203,7 @@ const STEP = 1 / 120;
 // ?bot：自動駕駛，給截圖與調整手感用（照建議速度開、看前方一點轉向）
 const BOT = new URLSearchParams(location.search).has('bot');
 let botHits = 0;
+let lastHitSound = 0; // 碰撞音效冷卻：接觸期間每一步都會回報撞擊
 function botInput() {
   const i = car.pos.i, N = track.N;
   const j = (i + Math.round((8 + car.v * 0.45) / track.ds)) % N;
@@ -211,8 +215,14 @@ function botInput() {
 function step(dt: number) {
   const inp = BOT ? botInput() : input.read();
   const prevS = car.pos.s;
-  const impact = car.update(dt, track, inp.steer, inp.brake);
-  if (impact) { sound.hit(impact); botHits++; }
+  let impact = car.update(dt, track, inp.steer, inp.brake);
+  if (raceKind === 'gp') {
+    impact = Math.max(impact, field.update(dt, true));
+    field.playerLap(prevS);
+    const me = field.racers.find((r) => r.isPlayer)!;
+    if (me.finish != null && state === 'race') { showResults(); return; }
+  }
+  if (impact && performance.now() - lastHitSound > 250) { sound.hit(impact); lastHitSound = performance.now(); botHits++; }
   lapTime += dt;
 
   const s = car.pos.s, L = track.length;
@@ -278,6 +288,7 @@ function updateVisuals(dt: number) {
     traffic.visible = mode === 'free';
     if (mode === 'free') traffic.render(dt);
   }
+  if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (peds) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
@@ -290,7 +301,7 @@ function updateVisuals(dt: number) {
 
   // 影子車
   const g = save.ghost;
-  const showGhost = opts.ghost && g && g.t.length > 1 && state === 'race';
+  const showGhost = opts.ghost && g && g.t.length > 1 && state === 'race' && raceKind === 'tt';
   ghostModel.root.visible = !!showGhost;
   if (showGhost && g) {
     while (ghostPtr < g.t.length - 2 && g.t[ghostPtr + 1] < lapTime) ghostPtr++;
@@ -326,6 +337,7 @@ function updateVisuals(dt: number) {
   if (state === 'free') updateFreeHud(dt);
   if (state === 'race' || state === 'countdown') {
     $('time').textContent = fmt(lapTime);
+    if (raceKind === 'gp') updateGpHud();
     $('speed').textContent = String(Math.round(car.v * 3.6));
     $('gear').textContent = car.v < 0.5 ? 'N' : String(gearOf(car.v).n);
     const w = $('warn');
@@ -373,6 +385,11 @@ function updateCountdown(dt: number) {
 
 function beginCountdown() {
   resetRace();
+  if (raceKind === 'gp') {
+    field.setup(5); // 玩家從第 6 格起跑
+    $('lap').textContent = `0/${LAPS}`;
+  } else field.hide();
+  hud.dataset.kind = raceKind;
   countdown = 0;
   litShown = 0;
   lightsOutAt = 5.4 + Math.random() * 1.2; // 五燈全亮後隨機停一下才熄，跟真的一樣
@@ -388,6 +405,9 @@ function showMenu(paused: boolean) {
   $('btn-resume').style.display = paused ? '' : 'none';
   free.textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
   race.style.display = cityReady ? '' : 'none';
+  const gp = $<HTMLButtonElement>('btn-gp');
+  gp.disabled = !cityReady;
+  gp.style.display = cityReady ? '' : 'none';
   menu.classList.remove('hidden');
   hud.classList.add('hidden');
 }
@@ -413,12 +433,85 @@ async function userStart() {
 $('btn-start').addEventListener('click', async () => {
   await userStart();
   mode = 'race';
+  raceKind = 'tt';
   hideMenu();
   beginCountdown();
 });
+$('btn-gp').addEventListener('click', async () => {
+  await userStart();
+  mode = 'race';
+  raceKind = 'gp';
+  hideMenu();
+  beginCountdown();
+});
+$('btn-again').addEventListener('click', async () => {
+  await userStart();
+  $('results').classList.add('hidden');
+  hideMenu();
+  beginCountdown();
+});
+$('btn-menu').addEventListener('click', () => {
+  $('results').classList.add('hidden');
+  state = 'menu';
+  sound.engine(0, 0, false);
+  showMenu(false);
+});
+
+// ---------------------------------------------------------------- 正賽：名次、排行榜、成績表
+let boardAcc = 0;
+function updateGpHud() {
+  boardAcc += 1;
+  if (boardAcc % 6) return; // 每 6 幀更新一次就夠了
+  const st = field.standings();
+  const me = st.findIndex((r) => r.isPlayer);
+  const mine = st[me];
+  $('pos').textContent = `P${me + 1}`;
+  $('pos').dataset.of = `/${st.length}`;
+  $('lap').textContent = `${Math.min(LAPS, Math.max(1, mine.laps))}/${LAPS}`;
+  const lead = field.progress(st[0]);
+  const ol = $('board');
+  ol.innerHTML = '';
+  st.forEach((r, k) => {
+    const li = document.createElement('li');
+    if (r.isPlayer) li.className = 'me';
+    const sw = document.createElement('i');
+    sw.style.background = r.color;
+    const nm = document.createElement('span');
+    nm.textContent = `${k + 1} ${r.name}`;
+    const gap = document.createElement('em');
+    // 差距：用距離換算成大約的秒數（以 60 m/s 估）
+    gap.textContent = k === 0 ? (r.finish != null ? '完賽' : '領先') : `+${((lead - field.progress(r)) / 60).toFixed(1)}`;
+    li.append(sw, nm, gap);
+    ol.appendChild(li);
+  });
+}
+function showResults() {
+  state = 'results';
+  sound.engine(0, 0, false);
+  const st = field.standings();
+  const winner = st[0].finish ?? field.raceTime;
+  const tb = $('res-table');
+  tb.innerHTML = '<tr><th>名次</th><th>車手</th><th>車隊</th><th>成績</th><th>最快圈</th></tr>';
+  st.forEach((r, k) => {
+    const tr = document.createElement('tr');
+    if (r.isPlayer) tr.className = 'me';
+    const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : `差 ${Math.max(1, LAPS + 1 - r.laps)} 圈內`;
+    for (const v of [String(k + 1), r.name, r.team, time, fmt(r.bestLap)]) {
+      const td = document.createElement('td');
+      td.textContent = v;
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  });
+  const me = st.findIndex((r) => r.isPlayer) + 1;
+  $('res-title').textContent = me === 1 ? '🏆 冠軍！' : me <= 3 ? `第 ${me} 名，上頒獎台！` : `第 ${me} 名`;
+  $('results').classList.remove('hidden');
+  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-')).join(' ')}`;
+}
 $('btn-free').addEventListener('click', async () => {
   await userStart();
   mode = 'free';
+  field.hide();
   hideMenu();
   beginFree();
 });
@@ -552,7 +645,13 @@ showMenu(false);
 const FREE = new URLSearchParams(location.search).has('free');
 const FREE_SIM = FREE && BOT;
 const IDLE = new URLSearchParams(location.search).has('idle'); // 測車流：玩家停在原地
-if (BOT && !FREE) void cityLoad.then(() => { mode = 'race'; hideMenu(); beginCountdown(); runSim(); });
+if (BOT && !FREE) void cityLoad.then(() => {
+  mode = 'race';
+  raceKind = new URLSearchParams(location.search).has('gp') ? 'gp' : 'tt';
+  hideMenu();
+  beginCountdown();
+  runSim();
+});
 if (FREE) void cityLoad.then(() => {
   mode = 'free';
   hideMenu();
@@ -570,7 +669,7 @@ function runSim() {
   if (!SIM) return;
   state = 'race';
   for (let n = 0; n < SIM / STEP; n++) step(STEP);
-  if (!document.title.startsWith('BOT')) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;
+  if (!/^(BOT|GP)/.test(document.title)) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);

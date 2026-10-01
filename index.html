@@ -24,6 +24,10 @@
         <div class="row"><span class="k">上圈</span><span id="last">--</span></div>
         <div class="row"><span class="k">最快</span><span id="best">--</span></div>
       </div>
+      <div class="gp-panel">
+        <div id="pos"></div>
+        <ol id="board"></ol>
+      </div>
       <div class="tc">
         <div class="sectors"><i id="s0"></i><i id="s1"></i><i id="s2"></i></div>
         <div id="delta"></div>
@@ -50,7 +54,8 @@
         <div id="menu-best"></div>
         <button id="btn-resume" class="primary" style="display: none">繼續</button>
         <button id="btn-free" class="primary">自由駕駛</button>
-        <button id="btn-start" class="ghost-btn">街道賽（計時）</button>
+        <button id="btn-gp" class="ghost-btn">街道賽：對決 7 台 AI（3 圈）</button>
+        <button id="btn-start" class="ghost-btn">計時賽</button>
         <div class="opts">
           <label><input type="checkbox" id="opt-tilt" /> 傾斜手機轉向</label>
           <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
@@ -60,6 +65,15 @@
         <p class="help">自由駕駛：左下拖曳轉向，右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Esc 暫停。</p>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
         <p class="credit">地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
+      </div>
+    </div>
+
+    <div id="results" class="overlay hidden">
+      <div class="card wide">
+        <h1 id="res-title">比賽結果</h1>
+        <table id="res-table"></table>
+        <button id="btn-again" class="primary">再比一次</button>
+        <button id="btn-menu" class="ghost-btn">回選單</button>
       </div>
     </div>
 

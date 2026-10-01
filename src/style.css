@@ -336,3 +336,34 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
   #minimap { width: 120px; height: 120px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); }
   #road b { font-size: 18px; }
 }
+
+/* ---------------- 正賽：名次與排行榜 */
+.gp-panel {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 118px);
+  left: max(10px, env(safe-area-inset-left));
+  width: 170px;
+  display: none;
+}
+#hud[data-mode='race'][data-kind='gp'] .gp-panel { display: block; }
+#pos { font: 900 40px var(--mono); line-height: 1; text-shadow: 0 2px 8px #000; }
+#pos::after { content: attr(data-of); font-size: 18px; color: var(--muted); margin-left: 2px; }
+#board { list-style: none; margin: 6px 0 0; padding: 4px 0; background: var(--panel); border-radius: 8px; font-size: 12px; }
+#board li { display: flex; align-items: center; gap: 6px; padding: 2px 8px; }
+#board li i { width: 4px; height: 14px; border-radius: 2px; }
+#board li span { flex: 1; white-space: nowrap; overflow: hidden; }
+#board li em { font: 700 11px var(--mono); color: var(--muted); font-style: normal; }
+#board li.me { background: rgba(225, 6, 0, 0.45); }
+#results .card.wide { width: min(620px, 100%); }
+#res-table { width: 100%; border-collapse: collapse; margin: 12px 0 14px; font-size: 14px; }
+#res-table th { color: var(--muted); font-weight: 600; font-size: 12px; text-align: left; padding: 4px 6px; }
+#res-table td { padding: 5px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+#res-table td:nth-child(4), #res-table td:nth-child(5) { font-family: var(--mono); }
+#res-table tr.me td { background: rgba(225, 6, 0, 0.35); }
+@media (max-height: 480px) {
+  .gp-panel { top: calc(max(10px, env(safe-area-inset-top)) + 104px); }
+  #pos { font-size: 30px; }
+  #board { font-size: 11px; }
+  #board li { padding: 1px 6px; }
+  #res-table { font-size: 12px; margin: 6px 0 8px; }
+}

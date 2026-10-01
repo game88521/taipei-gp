@@ -13,6 +13,8 @@ export class Car {
   h = 0; // 車頭方向：前進向量 = (sin h, cos h)
   v = 0;
   steer = 0; // -1 左 … +1 右（已平滑）
+  power = 1; // 引擎力（AI 對手各自不同）
+  boost = 0; // 尾流加成
   pos: Locate = { i: 0, lat: 0, s: 0 };
   private hitCool = 0;
 
@@ -32,7 +34,8 @@ export class Car {
     this.steer += (steerIn - this.steer) * Math.min(1, dt * rate);
 
     const v = this.v;
-    let a = brake ? -BRAKE * Math.min(1, v / 2) : ENGINE * (1 - (v / VMAX) ** 2);
+    const p = this.power + this.boost;
+    let a = brake ? -BRAKE * Math.min(1, v / 2) : ENGINE * p * (1 - (v / (VMAX * p)) ** 2);
     a -= 0.4; // 滾動阻力
     a -= Math.abs(this.steer) * (v / VMAX) * 5; // 打滿方向會磨胎掉速
     this.v = Math.max(0, v + a * dt);
