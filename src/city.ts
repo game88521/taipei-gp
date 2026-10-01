@@ -5,14 +5,8 @@ import { TOWER_101, type Track } from './track';
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
 
-interface Building { p: number[]; h: number; m?: number; s: number; c?: string; n?: string }
-interface CityData {
-  attribution: string;
-  buildings: Building[];
-  roads: { p: number[]; w: number }[];
-  greens: { p: number[]; k: number }[];
-  trees: number[];
-}
+import type { CityData } from './citydata';
+import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 const FLOOR = 3.3; // 一層樓高
@@ -192,7 +186,7 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ attribution: string }> {
+export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: CityData; landmarks: Landmark[] }> {
   const data = (await (await fetch('/data/city.json')).json()) as CityData;
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
@@ -223,24 +217,11 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ attribut
   }
   scene.add(new THREE.Mesh(green.build(), new THREE.MeshLambertMaterial({ vertexColors: true })));
 
-  // ---- 周邊道路：每段一個長方形，兩端各延伸半個路寬蓋住接縫
-  const road = new Geo();
-  const asphalt = new THREE.Color('#3a3c41');
-  for (const rd of data.roads) {
-    const r = toRing(rd.p), hw = rd.w / 2;
-    for (let k = 0; k + 1 < r.length; k++) {
-      const [a, b] = [r[k], r[k + 1]];
-      const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz);
-      if (l < 0.2) continue;
-      const ux = dx / l, uz = dz / l, nx = -uz * hw, nz = ux * hw;
-      const a0 = [a[0] - ux * hw, a[1] - uz * hw], b0 = [b[0] + ux * hw, b[1] + uz * hw];
-      const p1 = [a0[0] + nx, -0.25, a0[1] + nz], p2 = [a0[0] - nx, -0.25, a0[1] - nz];
-      const p3 = [b0[0] + nx, -0.25, b0[1] + nz], p4 = [b0[0] - nx, -0.25, b0[1] - nz];
-      road.tri(p2, p1, p3, [0, 1, 0], [0, 0], [0, 0], [0, 0], asphalt);
-      road.tri(p2, p3, p4, [0, 1, 0], [0, 0], [0, 0], [0, 0], asphalt);
-    }
-  }
-  scene.add(new THREE.Mesh(road.build(), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+  // ---- 道路（有標線）、斑馬線、路名牌、地標招牌
+  buildRoads(scene, data);
+  buildCrossings(scene, data);
+  buildStreetSigns(scene, data);
+  const landmarks = buildLandmarks(scene, data);
 
   // ---- 建築
   const geos = [new Geo(), new Geo(), new Geo(), new Geo()]; // 依樣式：住宅、玻璃、商店（同住宅貼圖）、公家
@@ -337,7 +318,7 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ attribut
   });
   scene.add(trunk, crown);
 
-  return { attribution: data.attribution };
+  return { data, landmarks };
 }
 
 /** 台北 101：照真實比例的竹節造型（總高 508 m）。方形錐台 = 4 邊的圓柱轉 45°，邊對齊街道 */

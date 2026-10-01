@@ -369,14 +369,27 @@ for (const b of keep) {
     if (mh > 0) o.m = r1(mh);
     const col = colour(b.t['building:colour']);
     if (col) o.c = col;
-    if (b.t.name && h > 40) o.n = b.t.name;
+    if (b.t.name && (h > 25 || area(r) > 1500)) o.n = b.t.name; // 地標名稱：屋頂招牌與接近提示用
     buildings.push(o);
   }
 }
 
-// ---------------------------------------------------------------- 周邊道路（賽道那幾條也畫：當作對向車道與路口）
+// ---------------------------------------------------------------- 周邊道路（畫路面用）＋ 路網（車流、路名、紅綠燈用）
 const RW = { trunk: 12, primary: 11, secondary: 10, tertiary: 8, unclassified: 7, residential: 6, living_street: 5, service: 4.5, primary_link: 7, secondary_link: 7, tertiary_link: 6 };
+// 道路等級代碼：0 主要幹道、1 次要、2 一般、3 巷弄、4 服務道路
+const CLS = { trunk: 0, primary: 0, primary_link: 0, secondary: 1, secondary_link: 1, tertiary: 2, tertiary_link: 2, unclassified: 2, residential: 3, living_street: 3, service: 4 };
 const roads = [];
+const netIndex = new Map(); // OSM node id → 路網節點編號
+const netNodes = [];
+const netWays = [];
+const nodeOf = (id, g) => {
+  if (!netIndex.has(id)) {
+    const [x, z] = proj(g.lat, g.lon);
+    netIndex.set(id, netNodes.length / 2);
+    netNodes.push(r1(x), r1(z));
+  }
+  return netIndex.get(id);
+};
 for (const e of roadWays) {
   const t = e.tags;
   let w = RW[t.highway];
@@ -385,6 +398,56 @@ for (const e of roadWays) {
   const r = ring(e.geometry);
   if (r.every((p) => farFromTrack(p[0], p[1]))) continue;
   roads.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]), w });
+  const way = { n: e.nodes.map((id, k) => nodeOf(id, e.geometry[k])), w, c: CLS[t.highway] ?? 4 };
+  const ow = t.oneway === 'yes' ? 1 : t.oneway === '-1' ? -1 : 0;
+  if (ow) way.o = ow;
+  const lanes = num(t.lanes);
+  if (lanes) way.l = lanes;
+  if (t.name) way.nm = t.name;
+  if (t['name:en']) way.en = t['name:en'];
+  netWays.push(way);
+}
+
+// 紅綠燈與斑馬線：只要落在車道上的
+const signals = [];
+const crossings = [];
+for (const e of E) {
+  if (e.type !== 'node' || !netIndex.has(e.id)) continue;
+  if (e.tags?.highway === 'traffic_signals') signals.push(netIndex.get(e.id));
+  if (e.tags?.highway === 'crossing') crossings.push(netIndex.get(e.id));
+}
+
+// 路名牌：兩條以上「不同名字」的道路交會的路口；雙向分隔道路會有好幾個交點，45 m 內同一組路名合成一面
+const baseName = (n) => n.replace(/[一二三四五六七八九十]+段$/, '');
+const byNode = new Map();
+for (const w of netWays) {
+  if (!w.nm || w.c > 2 || /巷|弄/.test(w.nm)) continue;
+  w.n.forEach((ni, k) => {
+    if (!byNode.has(ni)) byNode.set(ni, []);
+    const a = w.n[Math.max(0, k - 1)], b = w.n[Math.min(w.n.length - 1, k + 1)];
+    const ang = Math.atan2(netNodes[b * 2] - netNodes[a * 2], netNodes[b * 2 + 1] - netNodes[a * 2 + 1]);
+    byNode.get(ni).push({ nm: w.nm, en: w.en, ang, w: w.w });
+  });
+}
+const signs = [];
+const signClusters = [];
+for (const [ni, list] of byNode) {
+  const names = [...new Map(list.map((r) => [baseName(r.nm), r])).values()];
+  if (names.length < 2) continue;
+  const key = names.map((r) => r.nm).sort().join('|');
+  const x = netNodes[ni * 2], z = netNodes[ni * 2 + 1];
+  const c = signClusters.find((s) => s.key === key && Math.hypot(s.x - x, s.z - z) < 45);
+  if (c) { c.pts.push([x, z]); continue; }
+  signClusters.push({ key, x, z, pts: [[x, z]], roads: names.slice(0, 2) });
+}
+for (const c of signClusters) {
+  const cx = c.pts.reduce((s, p) => s + p[0], 0) / c.pts.length, cz = c.pts.reduce((s, p) => s + p[1], 0) / c.pts.length;
+  const [A, B] = c.roads;
+  // 立在路口的一角：沿 A 路走 B 路寬一半＋3 m，再沿 B 路走 A 路寬一半＋3 m
+  const da = (B.w * (c.pts.length > 1 ? 1.4 : 0.7)) / 2 + 3, db = (A.w * (c.pts.length > 1 ? 1.4 : 0.7)) / 2 + 3;
+  const x = cx + Math.sin(A.ang) * da + Math.sin(B.ang) * db, z = cz + Math.cos(A.ang) * da + Math.cos(B.ang) * db;
+  if (distToTrack(x, z) < 3) continue;
+  signs.push({ x: r1(x), z: r1(z), b: c.roads.map((r) => ({ nm: r.nm, en: r.en || '', a: +r.ang.toFixed(3) })) });
 }
 
 // ---------------------------------------------------------------- 綠地
@@ -416,9 +479,33 @@ rings2.forEach((r, i) => {
     }
 });
 const inBuilding = (x, z) => (bgrid.get(`${Math.floor(x / BG)},${Math.floor(z / BG)}`) || []).some((i) => !buildings[i].m && inside([x, z], rings2[i]));
+// 車道的空間索引：樹不能種在任何車道上（雙向分開畫的道路，一側的路邊常常是另一側的車道）
+const RG = 25, rgrid = new Map();
+for (const w of netWays) {
+  if (w.c > 3) continue;
+  for (let k = 0; k + 1 < w.n.length; k++) {
+    const s = [netNodes[w.n[k] * 2], netNodes[w.n[k] * 2 + 1], netNodes[w.n[k + 1] * 2], netNodes[w.n[k + 1] * 2 + 1], w.w / 2 + 1];
+    for (let gx = Math.floor(Math.min(s[0], s[2]) / RG); gx <= Math.floor(Math.max(s[0], s[2]) / RG); gx++)
+      for (let gz = Math.floor(Math.min(s[1], s[3]) / RG); gz <= Math.floor(Math.max(s[1], s[3]) / RG); gz++) {
+        const k2 = `${gx},${gz}`;
+        if (!rgrid.has(k2)) rgrid.set(k2, []);
+        rgrid.get(k2).push(s);
+      }
+  }
+}
+const onRoad = (x, z) => {
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+    for (const s of rgrid.get(`${Math.floor(x / RG) + a},${Math.floor(z / RG) + b}`) || []) {
+      const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - s[0]) * dx + (z - s[1]) * dz) / l2));
+      if (Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t) < s[4]) return true;
+    }
+  }
+  return false;
+};
 const trees = [];
 const tryTree = (x, z) => {
-  if (farFromTrack(x, z) || distToTrack(x, z) < TRACK_CLEAR + 0.5 || inBuilding(x, z)) return;
+  if (farFromTrack(x, z) || distToTrack(x, z) < TRACK_CLEAR + 0.5 || inBuilding(x, z) || onRoad(x, z)) return;
   trees.push(r1(x), r1(z));
 };
 for (const e of E) if (e.type === 'node' && e.tags?.natural === 'tree') { const p = proj(e.lat, e.lon); tryTree(p[0], p[1]); }
@@ -456,9 +543,10 @@ for (const g of greens) {
   delete g.a;
 }
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees };
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs };
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);
 console.log(`建築 ${buildings.length}（外框改畫部件 ${skippedOutline}、壓到賽道刪掉 ${droppedTrack}）、道路 ${roads.length}、綠地 ${greens.length}、樹 ${trees.length / 2}`);
+console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、有名字的建築 ${buildings.filter((b) => b.n).length}`);
 console.log(`city.json ${(json.length / 1024).toFixed(0)} KB`);

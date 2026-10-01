@@ -17,6 +17,7 @@ const query = `[out:json][timeout:120];
   way["landuse"~"grass|park|recreation_ground"](${bb});
   relation["leisure"="park"](${bb});
   node["natural"="tree"](${bb});
+  node["highway"~"traffic_signals|crossing"](${bb});
 );
 out geom;`;
 

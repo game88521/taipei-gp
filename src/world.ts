@@ -61,6 +61,7 @@ function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
 export interface World {
   sky: THREE.Mesh;
   assist: THREE.Mesh;
+  race: THREE.Group;
 }
 
 export function buildWorld(scene: THREE.Scene, t: Track): World {
@@ -94,6 +95,10 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   ground.position.set(200, -0.6, 50); // 各層高度拉開，手機的深度精度才不會讓地面蓋過路面
   scene.add(ground);
 
+  // 以下是街道賽才有的東西（封路的護牆、路緣、門架、輔助線…），自由駕駛時整組隱藏
+  const race = new THREE.Group();
+  scene.add(race);
+
   // ---- 路面：柏油 + 兩側白線
   const asphalt = canvasTex(256, 512, (g) => {
     g.fillStyle = '#3d3f44';
@@ -107,14 +112,14 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     g.fillRect(5, 0, 7, 512);
     g.fillRect(244, 0, 7, 512);
   });
-  scene.add(new THREE.Mesh(
+  race.add(new THREE.Mesh(
     ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }),
     new THREE.MeshLambertMaterial({ map: asphalt }),
   ));
   // 路肩（路緣外到護牆外 3 m，路燈立在上面）
   const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52' });
   for (const s of [-1, 1]) {
-    scene.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
   }
 
   // ---- 紅白路緣：只鋪在彎道
@@ -125,7 +130,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   const kerbMat = new THREE.MeshLambertMaterial({ map: kerbTex, polygonOffset: true, polygonOffsetFactor: -1 });
   const inCorner = (i: number) => Math.abs(t.curv[i]) > 1 / 200;
   for (const s of [-1, 1]) {
-    scene.add(new THREE.Mesh(ribbon(t, { a: s * (HALF_WIDTH - 0.6), b: s * (HALF_WIDTH + 1.2), ya: 0.02, yb: 0.02, along: 4, mask: inCorner }), kerbMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * (HALF_WIDTH - 0.6), b: s * (HALF_WIDTH + 1.2), ya: 0.02, yb: 0.02, along: 4, mask: inCorner }), kerbMat));
   }
 
   // ---- 行車輔助線：綠 = 可以全油門，黃 = 彎中，紅 = 該煞車
@@ -142,7 +147,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     }),
     new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
   );
-  scene.add(assist);
+  race.add(assist);
 
   // ---- 起跑線（棋盤格）
   const checker = canvasTex(64, 16, (g) => {
@@ -151,7 +156,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
       g.fillRect(x * 8, y * 8, 8, 8);
     }
   });
-  scene.add(new THREE.Mesh(
+  race.add(new THREE.Mesh(
     ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0.03, yb: 0.03, along: 2, mask: (i) => i === 0 }),
     new THREE.MeshLambertMaterial({ map: checker, polygonOffset: true, polygonOffsetFactor: -3 }),
   ));
@@ -175,12 +180,12 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, side: THREE.DoubleSide });
   for (const s of [-1, 1]) {
     // 右側牆要把文字翻過來，從賽道上看才是正的
-    scene.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 0, yb: 1.2, along: s * -38, alongIsU: true }), wallMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 0, yb: 1.2, along: s * -38, alongIsU: true }), wallMat));
   }
   // 牆頂的鐵絲網（半透明灰）
   const fenceMat = new THREE.MeshBasicMaterial({ color: '#9aa0a8', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
   for (const s of [-1, 1]) {
-    scene.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10 }), fenceMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10 }), fenceMat));
   }
 
   // ---- 起點門架
@@ -206,7 +211,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     g.add(beam);
     g.position.set(t.px[i], 0, t.pz[i]);
     g.rotation.y = ang;
-    scene.add(g);
+    race.add(g);
   }
 
   // ---- 路燈（InstancedMesh：幾百支只要兩次繪製）
@@ -228,8 +233,8 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
       m.compose(new THREE.Vector3(l.x, 9, l.z), q, one);
       head.setMatrixAt(n, m);
     });
-    scene.add(pole, head);
+    race.add(pole, head);
   }
 
-  return { sky, assist };
+  return { sky, assist, race };
 }

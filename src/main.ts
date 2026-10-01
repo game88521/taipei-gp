@@ -3,7 +3,11 @@ import * as THREE from 'three';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { loadCity } from './city';
-import { makeCar } from './carModel';
+import { makeCar, makeSedan } from './carModel';
+import { FreeCar, CAR_VMAX } from './freecar';
+import { Collider, RoadNet } from './citydata';
+import { shortEn, type Landmark } from './decor';
+import { Minimap } from './minimap';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -34,7 +38,13 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 50
 const track = buildTrack();
 const world = buildWorld(scene, track);
 let cityReady = false;
-const cityLoad = loadCity(scene, track).then(() => {
+let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: Minimap | null = null;
+let landmarks: Landmark[] = [];
+const cityLoad = loadCity(scene, track).then((c) => {
+  collider = new Collider(c.data);
+  roadNet = new RoadNet(c.data);
+  minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
+  landmarks = c.landmarks;
   cityReady = true;
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
@@ -49,8 +59,16 @@ const ghostModel = makeCar('#7fe8ff', true);
 ghostModel.root.visible = false;
 scene.add(ghostModel.root);
 
-const car = new Car();
-const input = new Input($('pad'), $('pad-dot'), $('brake'));
+const sedanModel = makeSedan('#f2f2f0');
+sedanModel.root.visible = false;
+scene.add(sedanModel.root);
+
+const car = new Car(); // 街道賽的 F1
+const fcar = new FreeCar(); // 自由駕駛的汽車
+type Mode = 'free' | 'race';
+let mode: Mode = 'free';
+const veh = () => (mode === 'race' ? car : fcar);
+const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'));
 const sound = new Sound();
 
 addEventListener('resize', () => {
@@ -79,7 +97,7 @@ function applyOpts() {
 applyOpts();
 
 // ---------------------------------------------------------------- 比賽狀態
-type State = 'menu' | 'countdown' | 'race' | 'paused';
+type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused';
 let state: State = 'menu';
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
@@ -245,11 +263,15 @@ let camH = 0;
 
 function updateVisuals(dt: number) {
   // 車子
-  carModel.root.position.set(car.x, 0, car.z);
-  carModel.root.rotation.y = car.h;
-  carModel.body.rotation.z = car.steer * Math.min(1, car.v / 40) * 0.04;
-  for (const w of carModel.steer) w.rotation.y = -car.steer * 0.35;
-  for (const w of carModel.spin) w.rotation.x += (car.v / 0.36) * dt;
+  const vc = veh(), model = mode === 'race' ? carModel : sedanModel;
+  carModel.root.visible = mode === 'race';
+  sedanModel.root.visible = mode === 'free';
+  world.race.visible = mode === 'race';
+  model.root.position.set(vc.x, 0, vc.z);
+  model.root.rotation.y = vc.h;
+  model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
+  for (const w of model.steer) w.rotation.y = -vc.steer * 0.45;
+  for (const w of model.spin) w.rotation.x += (vc.v / 0.35) * dt;
 
   // 影子車
   const g = save.ghost;
@@ -267,24 +289,26 @@ function updateVisuals(dt: number) {
   }
 
   // 追蹤鏡頭：車頭方向平滑跟隨，速度越快視野越寬
-  let d = car.h - camH;
+  let d = vc.h - camH;
   d = Math.atan2(Math.sin(d), Math.cos(d));
   camH += camSnap ? d : d * Math.min(1, dt * 7);
   const fx = Math.sin(camH), fz = Math.cos(camH);
-  const target = new THREE.Vector3(car.x - fx * 8, 2.9, car.z - fz * 8);
-  const look = new THREE.Vector3(car.x + fx * 6, 1.1, car.z + fz * 6);
+  const back = mode === 'race' ? 8 : 7.5, up = mode === 'race' ? 2.9 : 3.3;
+  const target = new THREE.Vector3(vc.x - fx * back, up, vc.z - fz * back);
+  const look = new THREE.Vector3(vc.x + fx * 6, 1.2, vc.z + fz * 6);
   if (camSnap) { camPos.copy(target); camLook.copy(look); camSnap = false; }
   const k = Math.min(1, dt * 10);
   camPos.lerp(target, k);
   camLook.lerp(look, k);
   camera.position.copy(camPos);
   camera.lookAt(camLook);
-  const fov = 62 + (car.v / VMAX) * 16;
+  const fov = 62 + (Math.abs(vc.v) / (mode === 'race' ? VMAX : CAR_VMAX)) * 14;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   world.sky.position.copy(camera.position);
 
   // HUD
+  if (state === 'free') updateFreeHud(dt);
   if (state === 'race' || state === 'countdown') {
     $('time').textContent = fmt(lapTime);
     $('speed').textContent = String(Math.round(car.v * 3.6));
@@ -343,17 +367,19 @@ function beginCountdown() {
 // ---------------------------------------------------------------- 選單
 const menu = $('menu'), hud = $('hud');
 function showMenu(paused: boolean) {
-  $('menu-best').textContent = save.best != null ? `最快圈 ${fmt(save.best)}` : '還沒有紀錄';
-  const btn = $<HTMLButtonElement>('btn-start');
-  btn.disabled = !cityReady;
-  btn.textContent = !cityReady ? '載入台北街景中…' : paused ? '繼續' : '開始';
-  $('btn-restart').style.display = paused ? '' : 'none';
+  $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
+  const free = $<HTMLButtonElement>('btn-free'), race = $<HTMLButtonElement>('btn-start');
+  free.disabled = race.disabled = !cityReady;
+  $('btn-resume').style.display = paused ? '' : 'none';
+  free.textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
+  race.style.display = cityReady ? '' : 'none';
   menu.classList.remove('hidden');
   hud.classList.add('hidden');
 }
 function hideMenu() {
   menu.classList.add('hidden');
   hud.classList.remove('hidden');
+  hud.dataset.mode = mode;
 }
 async function userStart() {
   sound.start();
@@ -371,25 +397,35 @@ async function userStart() {
 }
 $('btn-start').addEventListener('click', async () => {
   await userStart();
-  hideMenu();
-  if (state === 'paused') { state = pausedFrom; clock.getDelta(); }
-  else beginCountdown();
-});
-$('btn-restart').addEventListener('click', async () => {
-  await userStart();
+  mode = 'race';
   hideMenu();
   beginCountdown();
 });
+$('btn-free').addEventListener('click', async () => {
+  await userStart();
+  mode = 'free';
+  hideMenu();
+  beginFree();
+});
+$('btn-resume').addEventListener('click', async () => {
+  await userStart();
+  hideMenu();
+  state = pausedFrom;
+  clock.getDelta();
+});
 let pausedFrom: State = 'race';
 function pause() {
-  if (state !== 'race' && state !== 'countdown') return;
+  if (state !== 'race' && state !== 'countdown' && state !== 'free') return;
   pausedFrom = state;
   state = 'paused';
   sound.engine(0, 0, false);
   showMenu(true);
 }
 $('btn-pause').addEventListener('click', pause);
-$('btn-reset').addEventListener('click', () => { if (state === 'race') car.placeAt(track, car.pos.i); });
+$('btn-reset').addEventListener('click', () => {
+  if (state === 'race') car.placeAt(track, car.pos.i);
+  if (state === 'free') unstick();
+});
 addEventListener('keydown', (e) => { if (e.code === 'Escape' || e.code === 'KeyP') pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -402,12 +438,108 @@ $('btn-reset-best').addEventListener('click', () => {
   showMenu(state === 'paused');
 });
 
+// ---------------------------------------------------------------- 自由駕駛
+let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
+function beginFree() {
+  // 從 101 前的信義路出發
+  fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
+  unstick(); // 對齊到真實車道中心
+  camSnap = true;
+  state = 'free';
+  roadShown = '';
+  lmLast = '';
+}
+/** 卡住時：移到最近道路的中心，車頭順著道路 */
+function unstick() {
+  if (!roadNet) return;
+  let best: { x: number; z: number; h: number } | null = null, bd = Infinity;
+  for (const s of roadNet.segGrid.query(fcar.x, fcar.z, 60)) {
+    if (s.way.c > 3) continue;
+    const dx = s.x2 - s.x1, dz = s.z2 - s.z1, l2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((fcar.x - s.x1) * dx + (fcar.z - s.z1) * dz) / l2));
+    const x = s.x1 + dx * t, z = s.z1 + dz * t, d = Math.hypot(fcar.x - x, fcar.z - z);
+    if (d >= bd) continue;
+    bd = d;
+    let h = Math.atan2(dx, dz);
+    if (s.way.o === -1) h += Math.PI;
+    else if (!s.way.o && Math.cos(h - fcar.h) < 0) h += Math.PI; // 雙向道就照原本大致的方向
+    best = { x, z, h };
+  }
+  if (best) fcar.place(best.x, best.z, best.h);
+}
+const CAR_GEARS = [0, 7, 14, 22, 31];
+function carGear(v: number) {
+  let g = 0;
+  while (g < CAR_GEARS.length - 1 && v >= CAR_GEARS[g + 1]) g++;
+  const lo = CAR_GEARS[g], hi = g === CAR_GEARS.length - 1 ? CAR_VMAX : CAR_GEARS[g + 1];
+  return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
+}
+function freeStep(dt: number) {
+  const inp = FREE_SIM ? { steer: 0, brake: false, throttle: true } : input.read();
+  const impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
+  if (impact) sound.hit(impact * 2.5);
+  sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
+}
+function updateFreeHud(dt: number) {
+  const v = fcar.v;
+  $('speed').textContent = String(Math.round(Math.abs(v) * 3.6));
+  $('gear').textContent = v < -0.3 ? 'R' : Math.abs(v) < 0.3 ? 'N' : String(carGear(Math.abs(v)).n);
+  const now = performance.now();
+  if (toastUntil && now > toastUntil) { $('toast').className = ''; toastUntil = 0; }
+  roadAcc += dt;
+  if (roadAcc > 0.25 && roadNet) {
+    roadAcc = 0;
+    const w = roadNet.nearestNamed(fcar.x, fcar.z);
+    const key = w ? w.nm + '|' + (w.en || '') : '';
+    if (key !== roadShown) {
+      roadShown = key;
+      const el = $('road');
+      el.innerHTML = '';
+      if (w?.nm) {
+        const b = document.createElement('b');
+        b.textContent = w.nm;
+        el.appendChild(b);
+        if (w.en) { const sm = document.createElement('small'); sm.textContent = shortEn(w.en); el.appendChild(sm); }
+      }
+      el.className = w ? 'show' : '';
+    }
+    minimap?.draw(fcar.x, fcar.z, fcar.h);
+  }
+  // 接近地標時跳出名稱（同一個地標 60 秒內不重複）
+  lmAcc += dt;
+  if (lmAcc > 0.5) {
+    lmAcc = 0;
+    for (const l of landmarks) {
+      if (Math.hypot(l.x - fcar.x, l.z - fcar.z) > l.r + 30) continue;
+      if (l.nm === lmLast && now - lmAt < 60000) break;
+      lmLast = l.nm;
+      lmAt = now;
+      toast('📍 ' + l.nm, '');
+      break;
+    }
+  }
+}
+
 // ---------------------------------------------------------------- 主迴圈
 const clock = new THREE.Clock();
 let acc = 0;
 car.placeAt(track, 1);
 showMenu(false);
-if (BOT) void cityLoad.then(() => { hideMenu(); beginCountdown(); runSim(); });
+// ?free：直接進自由駕駛（加 &bot&sim=N 會油門全開直行 N 秒，測碰撞用）
+const FREE = new URLSearchParams(location.search).has('free');
+const FREE_SIM = FREE && BOT;
+if (BOT && !FREE) void cityLoad.then(() => { mode = 'race'; hideMenu(); beginCountdown(); runSim(); });
+if (FREE) void cityLoad.then(() => {
+  mode = 'free';
+  hideMenu();
+  beginFree();
+  if (FREE_SIM) {
+    for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
+    roadAcc = lmAcc = 1;
+    updateFreeHud(0);
+    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h`;
+  }
+});
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
 const SIM = Number(new URLSearchParams(location.search).get('sim')) || 0;
 function runSim() {
@@ -418,9 +550,9 @@ function runSim() {
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (state === 'race') {
+  if (state === 'race' || state === 'free') {
     acc += dt;
-    while (acc >= STEP) { step(STEP); acc -= STEP; }
+    while (acc >= STEP) { if (state === 'race') step(STEP); else freeStep(STEP); acc -= STEP; }
   } else {
     acc = 0;
     if (state === 'countdown') updateCountdown(dt);

@@ -282,3 +282,57 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
   #brake { width: 104px; height: 104px; }
   .speedo b { font-size: 38px; }
 }
+
+/* ---------------- 自由駕駛 */
+#gas {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 132px);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid rgba(90, 230, 140, 0.7);
+  background: rgba(30, 180, 90, 0.28);
+  font-size: 22px;
+  font-weight: 800;
+  touch-action: none;
+}
+#gas.on { background: rgba(30, 180, 90, 0.75); transform: scale(0.96); }
+#road {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 18px 7px;
+  border-radius: 8px;
+  background: #0b6b3c;
+  border: 2px solid #fff;
+  text-align: center;
+  line-height: 1.15;
+  opacity: 0;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+#road.show { opacity: 1; }
+#road b { display: block; font-size: 22px; letter-spacing: 2px; }
+#road small { display: block; font: 700 12px Arial, sans-serif; }
+#minimap {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 54px);
+  right: max(10px, env(safe-area-inset-right));
+  width: 150px;
+  height: 150px;
+}
+/* 兩種模式各自要顯示的 HUD */
+#hud[data-mode='free'] .tl, #hud[data-mode='free'] .tc, #hud[data-mode='free'] #lights { display: none; }
+#hud[data-mode='race'] #gas, #hud[data-mode='race'] #road, #hud[data-mode='race'] #minimap { display: none; }
+#hud[data-mode='free'] #brake { width: 104px; height: 104px; font-size: 18px; }
+@media (pointer: fine) {
+  #gas { display: none; }
+}
+@media (max-height: 480px) {
+  #gas { width: 96px; height: 96px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 108px); }
+  #hud[data-mode='free'] #brake { width: 92px; height: 92px; }
+  #minimap { width: 120px; height: 120px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); }
+  #road b { font-size: 18px; }
+}

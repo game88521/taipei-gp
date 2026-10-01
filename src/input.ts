@@ -7,10 +7,11 @@ export class Input {
   private padSteer = 0;
   private padId = -1;
   private brakeIds = new Set<number>();
+  private gasIds = new Set<number>();
   private keys = new Set<string>();
   private tiltSteer = 0;
 
-  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement) {
+  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement) {
     const padMove = (e: PointerEvent) => {
       const r = pad.getBoundingClientRect();
       let s = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.38);
@@ -46,10 +47,23 @@ export class Input {
     };
     brakeBtn.addEventListener('pointerup', brakeEnd);
     brakeBtn.addEventListener('pointercancel', brakeEnd);
+    // 油門（只有自由駕駛會顯示；街道賽油門自動）
+    gasBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      gasBtn.setPointerCapture(e.pointerId);
+      this.gasIds.add(e.pointerId);
+      gasBtn.classList.add('on');
+    });
+    const gasEnd = (e: PointerEvent) => {
+      this.gasIds.delete(e.pointerId);
+      if (!this.gasIds.size) gasBtn.classList.remove('on');
+    };
+    gasBtn.addEventListener('pointerup', gasEnd);
+    gasBtn.addEventListener('pointercancel', gasEnd);
 
     addEventListener('keydown', (e) => { this.keys.add(e.code); if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
-    addEventListener('blur', () => { this.keys.clear(); this.brakeIds.clear(); brakeBtn.classList.remove('on'); });
+    addEventListener('blur', () => { this.keys.clear(); this.brakeIds.clear(); this.gasIds.clear(); brakeBtn.classList.remove('on'); gasBtn.classList.remove('on'); });
 
     // 橫向握手機像握方向盤：左右轉動手機就是 beta 的變化。
     // 方向在不同手機上可能相反，相反的話把下面 sign 對調即可。
@@ -80,6 +94,7 @@ export class Input {
     if (this.padId >= 0) steer = this.padSteer;
     else if (this.tilt && steer === 0) steer = this.tiltSteer;
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
-    return { steer, brake };
+    const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
+    return { steer, brake, throttle };
   }
 }
