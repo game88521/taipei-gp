@@ -7,6 +7,8 @@ import { TOWER_101, type Track } from './track';
 
 import type { CityData } from './citydata';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
+import type { Quality } from './quality';
+import { scooterParkedGeo } from './models';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 const FLOOR = 3.3; // 一層樓高
@@ -186,7 +188,7 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: CityData; landmarks: Landmark[] }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[] }> {
   const data = (await (await fetch('/data/city.json')).json()) as CityData;
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
@@ -215,7 +217,9 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: Ci
     const r = toRing(g.p);
     try { flatPoly(green, r, -0.45, true, gcol[g.k] ?? gcol[0], () => [0, 0]); } catch { /* 少數畸形多邊形跳過 */ }
   }
-  scene.add(new THREE.Mesh(green.build(), new THREE.MeshLambertMaterial({ vertexColors: true })));
+  const greenMesh = new THREE.Mesh(green.build(), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  greenMesh.userData.flat = true; // 平面：只接受陰影、不投射
+  scene.add(greenMesh);
 
   // ---- 道路（有標線）、斑馬線、路名牌、地標招牌
   buildRoads(scene, data);
@@ -224,12 +228,54 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: Ci
   const landmarks = buildLandmarks(scene, data);
 
   // ---- 建築
-  const geos = [new Geo(), new Geo(), new Geo(), new Geo()]; // 依樣式：住宅、玻璃、商店（同住宅貼圖）、公家
-  const roofs = new Geo(), shopsGeo = new Geo(), signsGeo = new Geo();
+  // 依 300 m 分區塊：鏡頭（和陰影）看不到的區塊整塊不畫
+  const TILE = 300;
+  const tiles = new Map<string, Geo>();
+  const tileGeo = (kind: string, x: number, z: number) => {
+    const key = `${kind}|${Math.floor(x / TILE)},${Math.floor(z / TILE)}`;
+    let g = tiles.get(key);
+    if (!g) tiles.set(key, (g = new Geo()));
+    return g;
+  };
+  // 頂樓：水塔（圓柱）、鐵皮加蓋（方塊），台北公寓的標準配備
+  const tanks: [number, number, number, number][] = [], sheds: [number, number, number, number, number, number, number][] = [];
   const resTint = ['#e8e1d5', '#d9d0c3', '#cfc8bd', '#e3d6c8', '#c9cdd1', '#d8cbbd', '#bfb7aa', '#e6d9cf'].map((c) => new THREE.Color(c));
   const roofCol = [new THREE.Color('#8b8883'), new THREE.Color('#7d8288'), new THREE.Color('#96918a')];
   const white = new THREE.Color('#ffffff'), civic = new THREE.Color('#ddd7cc');
   const r = rng(101);
+  const roofDetails = (ring: [number, number][], y: number) => {
+    const A = Math.abs(signedArea(ring));
+    if (A < 80) return;
+    let cx = 0, cz = 0;
+    for (const p of ring) { cx += p[0]; cz += p[1]; }
+    cx /= ring.length; cz /= ring.length;
+    const inside = (x: number, z: number) => {
+      let c = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, zi] = ring[i], [xj, zj] = ring[j];
+        if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+      }
+      return c;
+    };
+    const span = Math.sqrt(A) * 0.3;
+    const n = A > 300 ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const x = cx + (r() - 0.5) * span, z = cz + (r() - 0.5) * span;
+      if (inside(x, z)) tanks.push([x, y, z, 0.9 + r() * 0.5]);
+    }
+    if (r() < 0.35) {
+      // 鐵皮加蓋：大約占屋頂中間的一塊，順著最長的牆
+      let bi = 0, bl = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const j = (i + 1) % ring.length, l = Math.hypot(ring[j][0] - ring[i][0], ring[j][1] - ring[i][1]);
+        if (l > bl) { bl = l; bi = i; }
+      }
+      const j = (bi + 1) % ring.length;
+      const ang = Math.atan2(ring[j][0] - ring[bi][0], ring[j][1] - ring[bi][1]);
+      const w = Math.min(bl * 0.5, 9), d = Math.min(Math.sqrt(A) * 0.45, 7);
+      if (inside(cx, cz)) sheds.push([cx, y, cz, w, d, ang, Math.floor(r() * 4)]);
+    }
+  };
   for (const b of data.buildings) {
     // 101 塔身：OSM 只有一根方柱，改用下面手工的竹節造型（裙樓購物中心照 OSM）
     if (b.h > 100) {
@@ -243,7 +289,11 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: Ci
     const y0 = b.m ?? -0.6, y1 = b.h; // 落地的樓從地面（-0.6）長起
     const tint = b.c ? new THREE.Color(b.c) : b.s === 1 ? white : b.s === 3 ? civic : resTint[Math.floor(r() * resTint.length)];
     if (b.c && b.s === 1) tint.lerp(white, 0.5); // 玻璃帷幕不要染太重
-    const geo = geos[b.s === 2 ? 0 : b.s] ?? geos[0];
+    const style = b.s === 2 ? 0 : b.s;
+    const geo = tileGeo('f' + style, ring[0][0], ring[0][1]);
+    const roofs = tileGeo('roof', ring[0][0], ring[0][1]);
+    const shopsGeo = tileGeo('shop', ring[0][0], ring[0][1]), signsGeo = tileGeo('sign', ring[0][0], ring[0][1]);
+    if (q.rooftops && style === 0 && y0 < 0 && y1 < 45) roofDetails(ring, y1);
     let u = 0;
     const streetLevel = y0 < 0 && (b.s === 0 || b.s === 2) && y1 < 70;
     for (let i = 0; i < ring.length; i++) {
@@ -284,39 +334,122 @@ export async function loadCity(scene: THREE.Scene, t: Track): Promise<{ data: Ci
       if (y0 > 3) flatPoly(roofs, ring, y0, false, roofCol[0], () => [0, 0]); // 懸空的部件（101 的竹節）要有底面
     } catch { /* 畸形多邊形就不加屋頂 */ }
   }
-  const mats = [facade('res', 1), facade('glass', 2), facade('res', 3), facade('civic', 4)];
-  geos.forEach((g, k) => { if (g.pos.length) scene.add(new THREE.Mesh(g.build(), mats[k])); });
-  scene.add(new THREE.Mesh(roofs.build(), new THREE.MeshLambertMaterial({ vertexColors: true })));
-  if (shopsGeo.pos.length) {
-    const m = storefrontMat();
-    m.map!.wrapS = THREE.RepeatWrapping;
-    scene.add(new THREE.Mesh(shopsGeo.build(), m));
+  const mats: Record<string, THREE.Material> = {
+    f0: facade('res', 1), f1: facade('glass', 2), f3: facade('civic', 4),
+    roof: new THREE.MeshLambertMaterial({ vertexColors: true }), shop: storefrontMat(), sign: signMat(),
+  };
+  (mats.shop as THREE.MeshBasicMaterial).map!.wrapS = THREE.RepeatWrapping;
+  for (const [key, g] of tiles) {
+    if (!g.pos.length) continue;
+    scene.add(new THREE.Mesh(g.build(), mats[key.split('|')[0]]));
   }
-  if (signsGeo.pos.length) scene.add(new THREE.Mesh(signsGeo.build(), signMat()));
+
+  // ---- 頂樓水塔與鐵皮加蓋
+  if (tanks.length) {
+    const tank = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 12).translate(0, 1.6, 0), new THREE.MeshLambertMaterial({ color: '#c9ced3' }), tanks.length);
+    const leg = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.8, 1.4).translate(0, 0.4, 0), new THREE.MeshLambertMaterial({ color: '#6a6f75' }), tanks.length);
+    const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
+    tanks.forEach(([x, y, z, k], i) => {
+      m4.compose(pos.set(x, y, z), qq, sc.setScalar(k));
+      tank.setMatrixAt(i, m4);
+      leg.setMatrixAt(i, m4);
+    });
+    tank.computeBoundingSphere();
+    leg.computeBoundingSphere();
+    scene.add(tank, leg);
+  }
+  if (sheds.length) {
+    const tin = ['#5f8fb0', '#6aa07a', '#d8d8d0', '#b06a4a'].map((c) => new THREE.Color(c));
+    // 單斜屋頂：一邊高 2.8 m、一邊 2.2 m
+    const g = new THREE.BoxGeometry(1, 2.5, 1).translate(0, 1.25, 0);
+    const shed = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial(), sheds.length);
+    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    sheds.forEach(([x, y, z, w, d, ang, c], i) => {
+      qq.setFromAxisAngle(up, ang);
+      m4.compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(d, 1, w));
+      shed.setMatrixAt(i, m4);
+      shed.setColorAt(i, tin[c]);
+    });
+    shed.computeBoundingSphere();
+    scene.add(shed);
+  }
+
+  // ---- 路燈（燈頭會發光，開了光暈效果特別明顯）
+  const L = data.lamps ?? [];
+  if (L.length) {
+    const n = L.length / 3;
+    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 8.5, 6).translate(0, 4.25 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
+    const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.8).translate(0, 7.8, 0.9), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.14, 0.75).translate(0, 7.72, 1.7), new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false }), n);
+    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (let i = 0; i < n; i++) {
+      qq.setFromAxisAngle(up, L[i * 3 + 2]);
+      m4.compose(new THREE.Vector3(L[i * 3], 0, L[i * 3 + 1]), qq, one);
+      pole.setMatrixAt(i, m4);
+      arm.setMatrixAt(i, m4);
+      head.setMatrixAt(i, m4);
+    }
+    for (const m of [pole, arm, head]) { m.computeBoundingSphere(); scene.add(m); }
+  }
+
+  // ---- 路邊停的機車（簡化外型，數量多）
+  const P = data.parked ?? [];
+  if (q.parked && P.length) {
+    // 四千多台：依區塊分組，看不到的區塊不畫
+    const geo = scooterParkedGeo(), mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const colors = ['#e8e8e8', '#2a2a2a', '#c8102e', '#1f5fa8', '#e8c840', '#7fb8d8', '#f0a0b0'].map((c) => new THREE.Color(c));
+    const groups = new Map<string, number[]>();
+    for (let i = 0; i < P.length / 4; i++) {
+      const key = `${Math.floor(P[i * 4] / TILE)},${Math.floor(P[i * 4 + 1] / TILE)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(i);
+    }
+    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (const ids of groups.values()) {
+      const body = new THREE.InstancedMesh(geo, mat, ids.length);
+      ids.forEach((i, n) => {
+        qq.setFromAxisAngle(up, P[i * 4 + 2]);
+        m4.compose(new THREE.Vector3(P[i * 4], -0.25, P[i * 4 + 1]), qq, one);
+        body.setMatrixAt(n, m4);
+        body.setColorAt(n, colors[P[i * 4 + 3] % colors.length]);
+      });
+      body.computeBoundingSphere();
+      scene.add(body);
+    }
+  }
 
   scene.add(build101());
 
-  // ---- 行道樹（InstancedMesh：上萬棵只要兩次繪製）
+  // ---- 行道樹：依區塊分成多組 InstancedMesh（看不到的區塊不畫）；離賽道遠的依畫質抽掉一些
   const tr = data.trees;
-  const pts: [number, number][] = [];
+  const byTile = new Map<string, [number, number][]>();
   for (let k = 0; k < tr.length; k += 2) {
     const [, d] = nearest(tr[k], tr[k + 1]);
-    if (d < 90 || r() < 0.35) pts.push([tr[k], tr[k + 1]]); // 遠處的樹抽掉一些，省效能
+    if (d >= 90 && r() > q.treeKeep) continue;
+    const key = `${Math.floor(tr[k] / TILE)},${Math.floor(tr[k + 1] / TILE)}`;
+    if (!byTile.has(key)) byTile.set(key, []);
+    byTile.get(key)!.push([tr[k], tr[k + 1]]);
   }
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.24, 3, 5, 1, true).translate(0, 1.5, 0), new THREE.MeshLambertMaterial({ color: '#5a4636' }), pts.length);
-  const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.9, 0).translate(0, 4.4, 0), new THREE.MeshLambertMaterial({ flatShading: true }), pts.length);
+  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 3, 5, 1, true).translate(0, 1.5, 0);
+  const crownGeo = new THREE.IcosahedronGeometry(1.9, q.level === 'high' ? 1 : 0).translate(0, 4.4, 0); // 高畫質：樹冠比較圓
+  const trunkMat = new THREE.MeshLambertMaterial({ color: '#5a4636' }), crownMat = new THREE.MeshLambertMaterial({ flatShading: true });
   const leaf = ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45', '#44703a'].map((c) => new THREE.Color(c));
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3();
-  pts.forEach(([x, z], n) => {
-    const k = 0.75 + r() * 0.6;
-    q.setFromAxisAngle(up, r() * Math.PI * 2);
-    s.set(k, k * (0.9 + r() * 0.3), k);
-    m.compose(new THREE.Vector3(x, -0.3, z), q, s);
-    trunk.setMatrixAt(n, m);
-    crown.setMatrixAt(n, m);
-    crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
-  });
-  scene.add(trunk, crown);
+  const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3();
+  for (const pts of byTile.values()) {
+    const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, pts.length), crown = new THREE.InstancedMesh(crownGeo, crownMat, pts.length);
+    pts.forEach(([x, z], n) => {
+      const k = 0.75 + r() * 0.6;
+      qt.setFromAxisAngle(up, r() * Math.PI * 2);
+      s.set(k, k * (0.9 + r() * 0.3), k);
+      m.compose(new THREE.Vector3(x, -0.3, z), qt, s);
+      trunk.setMatrixAt(n, m);
+      crown.setMatrixAt(n, m);
+      crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
+    });
+    trunk.computeBoundingSphere();
+    crown.computeBoundingSphere();
+    scene.add(trunk, crown);
+  }
 
   return { data, landmarks };
 }

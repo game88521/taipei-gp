@@ -38,8 +38,8 @@ export class Pedestrians {
   private mesh = {} as Record<Part, THREE.InstancedMesh>;
   readonly max: number;
 
-  constructor(scene: THREE.Scene, d: CityData, col: Collider, mobile: boolean) {
-    this.max = mobile ? 70 : 130;
+  constructor(scene: THREE.Scene, d: CityData, col: Collider, max: number) {
+    this.max = max; // 依畫質（quality.ts）
     const N = d.net.nodes;
     // 人行道：道路兩側、路緣外 2 m；壓到建築或別的車道的段落不要
     const tmp = [0, 0];

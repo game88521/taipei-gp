@@ -62,6 +62,8 @@ export interface World {
   sky: THREE.Mesh;
   assist: THREE.Mesh;
   race: THREE.Group;
+  sun: THREE.DirectionalLight;
+  sunDir: THREE.Vector3;
 }
 
 export function buildWorld(scene: THREE.Scene, t: Track): World {
@@ -84,9 +86,25 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   scene.fog = new THREE.Fog('#d98a6c', 300, 2400); // 拉遠一點，整圈都看得到 101
 
   scene.add(new THREE.HemisphereLight('#b8c6ff', '#4a3428', 1.6));
+  // 夕陽：低角度的平行光（main.ts 會讓它跟著玩家，陰影才夠細）
+  const sunDir = new THREE.Vector3(-600, 220, 300).normalize();
   const sun = new THREE.DirectionalLight('#ffb47a', 2.2);
-  sun.position.set(-600, 220, 300);
-  scene.add(sun);
+  sun.position.copy(sunDir).multiplyScalar(400);
+  scene.add(sun, sun.target);
+  // 太陽本體：天空上一個發光的圓（開了光暈會暈開），跟天空一起跟著鏡頭
+  const sunTex = canvasTex(128, 128, (g) => {
+    const grd = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,248,225,1)');
+    grd.addColorStop(0.25, 'rgba(255,214,150,0.95)');
+    grd.addColorStop(0.6, 'rgba(255,150,80,0.25)');
+    grd.addColorStop(1, 'rgba(255,120,60,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 128);
+  }, false);
+  const sunDisc = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, toneMapped: false, transparent: true }));
+  sunDisc.scale.setScalar(420);
+  sunDisc.position.copy(sunDir).multiplyScalar(2300);
+  sky.add(sunDisc);
 
   // ---- 地面
   // 人行道、廣場的顏色（真實道路、綠地另外鋪在上面）
@@ -236,5 +254,5 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     race.add(pole, head);
   }
 
-  return { sky, assist, race };
+  return { sky, assist, race, sun, sunDir };
 }

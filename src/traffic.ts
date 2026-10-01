@@ -75,8 +75,8 @@ export class Traffic {
   private extras: { x: number; z: number; v: number }[] = [];
   readonly max: number;
 
-  constructor(scene: THREE.Scene, d: CityData, mobile: boolean) {
-    this.max = mobile ? 55 : 90;
+  constructor(scene: THREE.Scene, d: CityData, max: number) {
+    this.max = max; // 依畫質（quality.ts）
     const N = d.net.nodes;
     // ---- 有方向的車道
     const outOf = new Map<number, DEdge[]>();

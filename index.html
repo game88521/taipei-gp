@@ -69,6 +69,15 @@
           <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
           <label><input type="checkbox" id="opt-ghost" /> 影子車</label>
           <label><input type="checkbox" id="opt-sound" /> 音效</label>
+          <label class="q">畫質
+            <select id="opt-quality">
+              <option value="auto">自動</option>
+              <option value="high">高（陰影＋光暈）</option>
+              <option value="medium">中</option>
+              <option value="low">低（最順）</option>
+            </select>
+            <small id="quality-now"></small>
+          </label>
         </div>
         <p class="help">自由駕駛：左下拖曳轉向，右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Esc 暫停。</p>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>

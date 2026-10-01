@@ -22,6 +22,8 @@ export interface CityData {
   crossings: number[];
   signs: StreetSign[];
   places: Place[];
+  lamps?: number[]; // [x, z, 燈臂方向, ...]
+  parked?: number[]; // [x, z, 車頭方向, 顏色, ...]
 }
 export interface Place { nm: string; x: number; z: number; r: number; h: number; e: [number, number, number, number] }
 

@@ -433,3 +433,8 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 #sr-res-table td { padding: 5px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
 #sr-res-table tr.me td { background: rgba(225, 6, 0, 0.35); }
 #sr-ok { margin-top: 8px; }
+
+/* 畫質選單 */
+.opts label.q { grid-column: 1 / -1; flex-wrap: wrap; }
+.opts select { margin-left: auto; background: #1b1e28; color: var(--fg); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.opts label.q small { width: 100%; color: var(--muted); font-size: 11px; }

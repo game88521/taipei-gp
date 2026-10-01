@@ -1,5 +1,10 @@
 import './style.css';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { loadCity } from './city';
@@ -18,7 +23,7 @@ import { Sound } from './audio';
 
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number> }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number>; quality?: Level | 'auto' }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -31,8 +36,14 @@ const save = loadSave();
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+const MOBILE = matchMedia('(pointer: coarse)').matches; // 觸控裝置（手機、平板）
+const qPref = save.quality ?? 'auto';
+let level: Level = qPref === 'auto' ? defaultLevel(MOBILE) : qPref;
+const Q = qualityFor(level);
+const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2 && !Q.bloom, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pixelRatio));
+renderer.shadowMap.enabled = Q.shadows;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 $('app').appendChild(renderer.domElement);
@@ -41,21 +52,58 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
 const track = buildTrack();
 const world = buildWorld(scene, track);
+(scene.fog as THREE.Fog).far = Q.fogFar;
+// 陰影：只涵蓋玩家周圍（每幀跟著移動），範圍越小越清楚
+{
+  const sc = world.sun.shadow;
+  world.sun.castShadow = Q.shadows;
+  sc.mapSize.set(Q.shadowSize, Q.shadowSize);
+  const R = Q.shadowRange;
+  Object.assign(sc.camera, { left: -R, right: R, top: R, bottom: -R, near: 10, far: 1200 });
+  sc.camera.updateProjectionMatrix();
+  sc.bias = -0.0004;
+  sc.normalBias = 0.6;
+}
+// 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開
+let composer: EffectComposer | null = null, bloom: UnrealBloomPass | null = null;
+function setupBloom() {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale), 0.55, 0.45, 0.82);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
+/** 平面（路面、綠地、地面）只接受陰影；有厚度的東西（建築、樹、車、人）才投射 */
+function applyShadowFlags() {
+  if (!Q.shadows) return;
+  const box = new THREE.Box3(), size = new THREE.Vector3();
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || o.userData.shadowDone) return;
+    o.userData.shadowDone = true;
+    const lambert = (Array.isArray(m.material) ? m.material[0] : m.material) instanceof THREE.MeshLambertMaterial;
+    if (!lambert) return;
+    m.receiveShadow = true;
+    if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = true; return; }
+    box.setFromObject(m).getSize(size);
+    m.castShadow = size.y > 0.3 && size.y < 1000;
+  });
+}
 let cityReady = false;
 let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: Minimap | null = null;
 let landmarks: Landmark[] = [];
 let traffic: Traffic | null = null;
 let peds: Pedestrians | null = null;
 let sr: StreetRace | null = null;
-const MOBILE = matchMedia('(pointer: coarse)').matches;
-const cityLoad = loadCity(scene, track).then((c) => {
+const cityLoad = loadCity(scene, track, Q).then((c) => {
   collider = new Collider(c.data);
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
-  traffic = new Traffic(scene, c.data, MOBILE);
-  peds = new Pedestrians(scene, c.data, collider, MOBILE);
+  traffic = new Traffic(scene, c.data, Q.traffic);
+  peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
+  applyShadowFlags();
   cityReady = true;
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
@@ -86,6 +134,8 @@ const sound = new Sound();
 
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
+  composer?.setSize(innerWidth, innerHeight);
+  bloom?.resolution.set(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 });
@@ -336,6 +386,14 @@ function updateVisuals(dt: number) {
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   world.sky.position.copy(camera.position);
+  if (Q.shadows && world.sun.castShadow) {
+    // 陰影範圍的中心在車子前方一點；對齊陰影貼圖的格子，移動時陰影邊緣才不會閃
+    const step = (Q.shadowRange * 2) / Q.shadowSize;
+    const cx = Math.round((vc.x + Math.sin(vc.h) * 25) / step) * step, cz = Math.round((vc.z + Math.cos(vc.h) * 25) / step) * step;
+    world.sun.target.position.set(cx, 0, cz);
+    world.sun.position.set(cx, 0, cz).addScaledVector(world.sunDir, 500);
+    world.sun.target.updateMatrixWorld();
+  }
 
   // HUD
   if (state === 'free') updateFreeHud(dt);
@@ -784,6 +842,56 @@ function updateFreeHud(dt: number) {
   }
 }
 
+// ---------------------------------------------------------------- 畫質：選單設定、開局太卡自動降一級
+let fpsT = 0, fpsN = 0, fpsChecked = false;
+function watchFps(dt: number) {
+  if (fpsChecked || BOT || (state !== 'free' && state !== 'race')) return;
+  fpsT += dt;
+  fpsN++;
+  if (fpsT < 6) return;
+  fpsChecked = true;
+  const fps = fpsN / fpsT;
+  if (fps >= 32 || level === 'low' || qPref !== 'auto') return;
+  // 先做不用重新載入就能生效的：關光暈、降解析度、關陰影
+  level = LOWER[level];
+  const nq = qualityFor(level);
+  if (!nq.bloom) { composer = null; bloom = null; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, nq.pixelRatio));
+  if (!nq.shadows) { world.sun.castShadow = false; renderer.shadowMap.enabled = false; }
+  save.quality = 'auto';
+  save.opts = { ...opts };
+  try { localStorage.setItem(KEY + '-auto-level', level); } catch { /* 不重要 */ }
+  toast(`畫面有點卡（${fps.toFixed(0)} fps），已自動調成「${LEVEL_NAME[level]}」畫質`, '');
+}
+{
+  // 上次自動降過級就沿用
+  try {
+    const autoLv = localStorage.getItem(KEY + '-auto-level') as Level | null;
+    if (qPref === 'auto' && autoLv && autoLv !== level && ['high', 'medium', 'low'].includes(autoLv)) {
+      const order: Level[] = ['high', 'medium', 'low'];
+      if (order.indexOf(autoLv) > order.indexOf(level)) {
+        level = autoLv;
+        const nq = qualityFor(level);
+        Object.assign(Q, nq);
+        renderer.setPixelRatio(Math.min(devicePixelRatio, nq.pixelRatio));
+        renderer.shadowMap.enabled = nq.shadows;
+        world.sun.castShadow = nq.shadows;
+        (scene.fog as THREE.Fog).far = nq.fogFar;
+      }
+    }
+  } catch { /* 不重要 */ }
+}
+if (Q.bloom) setupBloom();
+const qSel = $<HTMLSelectElement>('opt-quality');
+qSel.value = qPref;
+$('quality-now').textContent = `目前：${LEVEL_NAME[level]}`;
+qSel.addEventListener('change', () => {
+  save.quality = qSel.value as Level | 'auto';
+  try { localStorage.removeItem(KEY + '-auto-level'); } catch { /* 不重要 */ }
+  writeSave();
+  location.reload(); // 陰影、車流數量要重新建立，直接重新載入最單純
+});
+
 // ---------------------------------------------------------------- 主迴圈
 const clock = new THREE.Clock();
 let acc = 0;
@@ -833,7 +941,8 @@ renderer.setAnimationLoop(() => {
     if (state === 'countdown') updateCountdown(dt);
   }
   updateVisuals(dt);
-  renderer.render(scene, camera);
+  if (composer) composer.render(); else renderer.render(scene, camera);
+  watchFps(dt);
 });
 
 // 離線快取：只在正式版註冊（npm run dev 時不要，否則改了程式碼看不到）

@@ -117,6 +117,17 @@ export function scooterGeo(): VehicleGeo {
   return { paint: mergeGeometries(paint.map(clean)), fixed: mergeGeometries(fixed.map(clean)), wheels: [], length: 1.9 };
 }
 
+/** 路邊停的機車：簡化外型（數量多），車殼白色給 instanceColor 染色，座墊輪胎是深色 */
+export function scooterParkedGeo(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(tint(profile([[0.55, 0.3], [0.7, 0.35], [0.72, 1.0], [0.6, 1.08], [0.48, 0.5]], 0.44, 0), '#ffffff'));
+  parts.push(tint(profile([[-0.75, 0.35], [0.5, 0.3], [0.5, 0.4], [-0.15, 0.42], [-0.3, 0.72], [-0.82, 0.74], [-0.88, 0.5]], 0.4, 0), '#ffffff'));
+  parts.push(tint(box(0.3, 0.1, 0.6, 0, 0.8, -0.5), '#1a1a1a'));
+  parts.push(tint(box(0.58, 0.05, 0.05, 0, 1.12, 0.6), '#2a2a2a'));
+  for (const z of [0.62, -0.62]) parts.push(tint(cyl(0.24, 0.12, 0, 0.24, z, 8), '#151515'));
+  return mergeGeometries(parts.map(clean));
+}
+
 /** 行人各部位（以腳底為原點；四肢的原點在關節，方便擺動） */
 export const pedParts = {
   torso: () => new THREE.CylinderGeometry(0.2, 0.16, 0.56, 10).scale(1, 1, 0.62).translate(0, 1.2, 0),
