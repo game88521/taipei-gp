@@ -7,7 +7,10 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
-    "check-track": "node tools/check-track.mjs"
+    "check-track": "node tools/check-track.mjs",
+    "fetch-osm": "node tools/fetch-osm.mjs",
+    "build-city": "node tools/build-city.mjs",
+    "plan": "node tools/plan-svg.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

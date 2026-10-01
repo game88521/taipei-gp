@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
+import { loadCity } from './city';
 import { makeCar } from './carModel';
 import { Car } from './car';
 import { Input } from './input';
@@ -10,7 +11,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean> }
-const KEY = 'taipei-gp-v1';
+const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
   try { return { ...empty, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return empty; }
@@ -29,9 +30,18 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 $('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 5000);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
 const track = buildTrack();
 const world = buildWorld(scene, track);
+let cityReady = false;
+const cityLoad = loadCity(scene, track).then(() => {
+  cityReady = true;
+  if (state === 'menu') showMenu(false);
+}).catch((e) => {
+  console.error(e);
+  cityReady = true; // 街景載入失敗也讓人能玩（只剩賽道）
+  $('menu-best').textContent = '街景載入失敗，請檢查網路後重新整理';
+});
 
 const carModel = makeCar('#d81e2a');
 scene.add(carModel.root);
@@ -228,6 +238,8 @@ function gearOf(v: number) {
 
 // ---------------------------------------------------------------- 畫面
 let camSnap = true;
+// ?cam=x,y,z,看向x,y,z：固定鏡頭（截圖檢查街景用）
+const CAM = new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let camH = 0;
 
@@ -269,6 +281,7 @@ function updateVisuals(dt: number) {
   camera.lookAt(camLook);
   const fov = 62 + (car.v / VMAX) * 16;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   world.sky.position.copy(camera.position);
 
   // HUD
@@ -331,7 +344,9 @@ function beginCountdown() {
 const menu = $('menu'), hud = $('hud');
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `最快圈 ${fmt(save.best)}` : '還沒有紀錄';
-  $('btn-start').textContent = paused ? '繼續' : '開始';
+  const btn = $<HTMLButtonElement>('btn-start');
+  btn.disabled = !cityReady;
+  btn.textContent = !cityReady ? '載入台北街景中…' : paused ? '繼續' : '開始';
   $('btn-restart').style.display = paused ? '' : 'none';
   menu.classList.remove('hidden');
   hud.classList.add('hidden');
@@ -392,10 +407,11 @@ const clock = new THREE.Clock();
 let acc = 0;
 car.placeAt(track, 1);
 showMenu(false);
-if (BOT) { hideMenu(); beginCountdown(); }
+if (BOT) void cityLoad.then(() => { hideMenu(); beginCountdown(); runSim(); });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
 const SIM = Number(new URLSearchParams(location.search).get('sim')) || 0;
-if (BOT && SIM) {
+function runSim() {
+  if (!SIM) return;
   state = 'race';
   for (let n = 0; n < SIM / STEP; n++) step(STEP);
   if (!document.title.startsWith('BOT')) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;

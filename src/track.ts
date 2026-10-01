@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import trackData from './data/track.json' with { type: 'json' };
 
 // 車子性能與「建議速度曲線」共用同一組數字，輔助線才會跟手感一致
 export const VMAX = 84; // m/s ≈ 302 km/h
@@ -12,22 +13,11 @@ export function gripAt(v: number): number {
   return Math.min(50, 20 + 0.004 * v * v);
 }
 
-// 信義區街道賽：x 向東、z 向南（公尺），順時針一圈。
-// 起點在忠孝東路往東 → T1 右轉基隆路 → T2 右轉信義路 → 減速彎 → 松智路髮夾彎 → 松高路 → 回到忠孝東路
-const CONTROL: [number, number][] = [
-  [0, 0], [250, 0], [520, -5], [680, 0],
-  [760, 40], [780, 130],
-  [785, 300], [780, 420],
-  [740, 480], [650, 495],
-  [560, 480], [520, 520], [470, 500],
-  [360, 500], [250, 505],
-  [190, 470], [185, 400], [230, 360],
-  [240, 250],
-  [120, 200], [20, 210],
-  [-60, 170], [-80, 90], [-50, 25],
-];
+// 真實台北街道：由 tools/build-city.mjs 從 OpenStreetMap 產生（x 向東、z 向南，單位公尺）
+// 順時針：信義路往西 → 基隆路往北 → 忠孝東路往東 → 松仁路往南，起跑線在 101 前的信義路上
+const CONTROL = trackData.points as [number, number][];
 
-export const TOWER_101 = { x: 560, z: 290 };
+export const TOWER_101 = { x: trackData.tower101[0], z: trackData.tower101[1] };
 
 export interface Track {
   N: number;

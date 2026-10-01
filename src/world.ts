@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { HALF_WIDTH, WALL_OFF, VMAX, TOWER_101, type Track } from './track';
+import { HALF_WIDTH, WALL_OFF, VMAX, type Track } from './track';
 
-// 整座城市都在這裡用程式產生：沒有外部模型、沒有圖片檔，貼圖全用 canvas 畫
+// 賽道本身（路面、路緣、護牆、門架、路燈）與天空光線；城市建築在 city.ts（真實 OpenStreetMap 資料）
+// 沒有外部模型、沒有圖片檔，貼圖全用 canvas 畫
 
 function rng(seed: number) {
   return () => {
@@ -11,7 +11,7 @@ function rng(seed: number) {
   };
 }
 
-function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void, repeat = true) {
+export function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -80,7 +80,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -1;
   scene.add(sky);
-  scene.fog = new THREE.Fog('#d98a6c', 180, 1500);
+  scene.fog = new THREE.Fog('#d98a6c', 300, 2400); // 拉遠一點，整圈都看得到 101
 
   scene.add(new THREE.HemisphereLight('#b8c6ff', '#4a3428', 1.6));
   const sun = new THREE.DirectionalLight('#ffb47a', 2.2);
@@ -88,9 +88,10 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   scene.add(sun);
 
   // ---- 地面
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: '#34363b' }));
+  // 人行道、廣場的顏色（真實道路、綠地另外鋪在上面）
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: '#77746e' }));
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(350, -0.05, 250);
+  ground.position.set(200, -0.6, 50); // 各層高度拉開，手機的深度精度才不會讓地面蓋過路面
   scene.add(ground);
 
   // ---- 路面：柏油 + 兩側白線
@@ -110,10 +111,10 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }),
     new THREE.MeshLambertMaterial({ map: asphalt }),
   ));
-  // 路肩（路緣外到護牆之間）
+  // 路肩（路緣外到護牆外 3 m，路燈立在上面）
   const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52' });
   for (const s of [-1, 1]) {
-    scene.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * WALL_OFF, ya: -0.01, yb: -0.01, along: 10 }), shoulder));
+    scene.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
   }
 
   // ---- 紅白路緣：只鋪在彎道
@@ -230,153 +231,5 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     scene.add(pole, head);
   }
 
-  // ---- 大樓：全部合併成一個網格，一次繪製
-  const winTex = canvasTex(256, 256, (g) => {
-    g.fillStyle = '#2b303b';
-    g.fillRect(0, 0, 256, 256);
-    for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
-      const lit = Math.random() < 0.45;
-      g.fillStyle = lit ? ['#ffd88a', '#fff0c8', '#ffc070'][Math.floor(Math.random() * 3)] : '#1a2233';
-      g.fillRect(c * 64 + 10, r * 128 + 26, 44, 78);
-    }
-  });
-  winTex.anisotropy = 8;
-  const minDistToTrack = (x: number, z: number) => {
-    let d = Infinity;
-    for (let i = 0; i < t.N; i += 3) d = Math.min(d, (x - t.px[i]) ** 2 + (z - t.pz[i]) ** 2);
-    return Math.sqrt(d);
-  };
-  // 大樓四個角與中心都要離賽道夠遠（只看中心會漏掉彎道內側）
-  const clearOfTrack = (x: number, z: number, w: number, d: number, ang: number, gap: number) => {
-    const c = Math.cos(ang), s = Math.sin(ang);
-    for (const [lx, lz] of [[0, 0], [-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) {
-      if (minDistToTrack(x + lx * c + lz * s, z - lx * s + lz * c) < gap) return false;
-    }
-    return true;
-  };
-  const boxes: THREE.BufferGeometry[] = [];
-  const tints = ['#ffffff', '#e8e0d4', '#d4dce8', '#f0d8c8', '#c8d4c8', '#e0d0e8'].map((c) => new THREE.Color(c));
-  const addBuilding = (x: number, z: number, w: number, h: number, d: number, ang: number) => {
-    const g = new THREE.BoxGeometry(w, h, d);
-    const uv = g.attributes.uv as THREE.BufferAttribute;
-    for (let v = 0; v < uv.count; v++) {
-      const face = Math.floor(v / 4);
-      if (face === 2 || face === 3) { uv.setXY(v, 0.01, 0.01); continue; } // 屋頂用牆色
-      const span = face < 2 ? d : w;
-      uv.setXY(v, uv.getX(v) * Math.max(1, Math.round(span / 8)), uv.getY(v) * Math.max(1, Math.round(h / 7)));
-    }
-    const tint = tints[Math.floor(rand() * tints.length)];
-    const col = new Float32Array(uv.count * 3);
-    for (let v = 0; v < uv.count; v++) col.set([tint.r, tint.g, tint.b], v * 3);
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.rotateY(ang);
-    g.translate(x, h / 2, z);
-    boxes.push(g);
-  };
-
-  // 招牌：一張 8 格的圖集，台灣街頭那種直式霓虹招牌
-  const signWords = ['珍珠奶茶', '鹹酥雞', '牛肉麵', '臭豆腐', '卡拉OK', '滷肉飯', '小籠包', '豆花'];
-  const signBg = ['#c8102e', '#0b3d91', '#006b3f', '#6a1b9a', '#e65100', '#1a1a1a', '#ad1457', '#00695c'];
-  const signTex = canvasTex(1024, 512, (g) => {
-    signWords.forEach((w, k) => {
-      const x0 = k * 128;
-      g.fillStyle = signBg[k];
-      g.fillRect(x0, 0, 128, 512);
-      g.strokeStyle = '#ffe9a8';
-      g.lineWidth = 6;
-      g.strokeRect(x0 + 8, 8, 112, 496);
-      g.fillStyle = '#ffffff';
-      g.font = 'bold 84px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      const chars = w === '卡拉OK' ? ['卡', '拉', 'O', 'K'] : [...w];
-      const step = 470 / chars.length;
-      chars.forEach((ch, n) => g.fillText(ch, x0 + 64, 22 + step * (n + 0.5)));
-    });
-  }, false);
-  const signs: THREE.BufferGeometry[] = [];
-  const addSign = (x: number, y: number, z: number, faceAng: number, slot: number) => {
-    const g = new THREE.PlaneGeometry(1.8, 7.2);
-    const uv = g.attributes.uv as THREE.BufferAttribute;
-    for (let v = 0; v < uv.count; v++) uv.setX(v, (slot + uv.getX(v)) / 8);
-    g.rotateY(faceAng);
-    g.translate(x, y, z);
-    signs.push(g);
-  };
-
-  // 沿賽道兩側一排街屋
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < t.N; i += 8) {
-      const along = 12 + rand() * 8, depth = 14 + rand() * 12;
-      const setback = WALL_OFF + 5 + rand() * 4;
-      const off = side * (setback + depth / 2);
-      const cx = t.px[i] - t.tz[i] * off, cz = t.pz[i] + t.tx[i] * off;
-      if (!clearOfTrack(cx, cz, depth, along, Math.atan2(t.tx[i], t.tz[i]), WALL_OFF + 1.5)) continue;
-      if (Math.hypot(cx - TOWER_101.x, cz - TOWER_101.z) < 70) continue;
-      const near101 = Math.hypot(cx - TOWER_101.x, cz - TOWER_101.z) < 320;
-      const h = near101 ? 30 + rand() * 70 : 12 + rand() * 30;
-      const ang = Math.atan2(t.tx[i], t.tz[i]);
-      addBuilding(cx, cz, depth, h, along, ang);
-      if (rand() < 0.45) {
-        const sOff = side * (setback - 1.2);
-        const a = (rand() - 0.5) * along * 0.7;
-        addSign(
-          t.px[i] - t.tz[i] * sOff + t.tx[i] * a, 5 + rand() * 6, t.pz[i] + t.tx[i] * sOff + t.tz[i] * a,
-          Math.atan2(-t.tx[i], -t.tz[i]), Math.floor(rand() * 8),
-        );
-      }
-    }
-  }
-  // 遠處的街廓：棋盤格隨機大樓
-  for (let gx = -500; gx <= 1300; gx += 46) {
-    for (let gz = -450; gz <= 950; gz += 46) {
-      const x = gx + (rand() - 0.5) * 14, z = gz + (rand() - 0.5) * 14;
-      const w = 16 + rand() * 18, d = 16 + rand() * 18;
-      if (!clearOfTrack(x, z, w, d, 0, WALL_OFF + 6)) continue;
-      const d101 = Math.hypot(x - TOWER_101.x, z - TOWER_101.z);
-      if (d101 < 80) continue;
-      if (rand() < 0.25) continue; // 留一些空地、公園
-      const h = d101 < 300 ? 40 + rand() * 110 : 14 + rand() * 45;
-      addBuilding(x, z, w, h, d, 0);
-    }
-  }
-  scene.add(new THREE.Mesh(
-    mergeGeometries(boxes),
-    new THREE.MeshLambertMaterial({ map: winTex, vertexColors: true, emissiveMap: winTex, emissive: '#ffffff', emissiveIntensity: 0.55 }),
-  ));
-  if (signs.length) {
-    scene.add(new THREE.Mesh(mergeGeometries(signs), new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide, toneMapped: false })));
-  }
-
-  // ---- 台北 101
-  scene.add(build101());
-
   return { sky, assist };
-}
-
-function build101(): THREE.Group {
-  const g = new THREE.Group();
-  const glass = new THREE.MeshLambertMaterial({ color: '#5d8f86', emissive: '#1b3a35' });
-  const glow = new THREE.MeshBasicMaterial({ color: '#b8fff0' });
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, y: number) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.y = y;
-    g.add(m);
-  };
-  // CylinderGeometry 只給 4 個邊 = 方形的錐台，轉 45° 讓邊對齊街道
-  const frustum = (rTop: number, rBot: number, h: number) => new THREE.CylinderGeometry(rTop, rBot, h, 4).rotateY(Math.PI / 4);
-  add(new THREE.BoxGeometry(80, 24, 80), new THREE.MeshLambertMaterial({ color: '#6f7d80' }), 12);
-  add(frustum(22, 30, 64), glass, 24 + 32);
-  let y = 88;
-  // 八節「竹節」，每節上寬下窄
-  for (let k = 0; k < 8; k++) {
-    add(frustum(23, 17.5, 25), glass, y + 12.5);
-    add(frustum(23.4, 23.4, 0.8), glow, y + 25);
-    y += 25.8;
-  }
-  add(frustum(12, 15, 22), glass, y + 11);
-  add(new THREE.CylinderGeometry(0.8, 2.2, 60, 6), new THREE.MeshLambertMaterial({ color: '#c8d0d4' }), y + 22 + 30);
-  add(new THREE.SphereGeometry(1.4, 8, 6), glow, y + 22 + 60);
-  g.position.set(TOWER_101.x, 0, TOWER_101.z);
-  return g;
 }
