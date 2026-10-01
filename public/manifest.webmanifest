@@ -1,0 +1,17 @@
+{
+  "name": "台北街道賽 Taipei Street GP",
+  "short_name": "台北GP",
+  "description": "手機就能玩的台北信義區街道賽車計時賽。",
+  "lang": "zh-Hant-TW",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0b0d14",
+  "theme_color": "#0b0d14",
+  "categories": ["games"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

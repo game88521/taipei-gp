@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>台北街道賽</title>
+    <meta name="description" content="手機就能玩的台北信義區街道賽車計時賽。" />
+    <meta name="theme-color" content="#0b0d14" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="台北GP" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" class="hidden">
+      <div class="panel tl">
+        <div class="row"><span class="k">圈</span><b id="lap">1</b></div>
+        <div class="row"><b id="time" class="time">0:00.000</b></div>
+        <div class="row"><span class="k">上圈</span><span id="last">--</span></div>
+        <div class="row"><span class="k">最快</span><span id="best">--</span></div>
+      </div>
+      <div class="tc">
+        <div class="sectors"><i id="s0"></i><i id="s1"></i><i id="s2"></i></div>
+        <div id="delta"></div>
+      </div>
+      <div class="tr">
+        <button id="btn-reset" class="small" aria-label="扶正">⟲</button>
+        <button id="btn-pause" class="small" aria-label="暫停">❚❚</button>
+      </div>
+      <div id="lights"><i></i><i></i><i></i><i></i><i></i></div>
+      <div id="toast"></div>
+      <div id="warn"></div>
+      <div class="speedo"><b id="speed">0</b><small>km/h</small><span id="gear">N</span></div>
+      <div id="pad"><span>◀</span><i id="pad-dot"></i><span>▶</span></div>
+      <button id="brake">煞車</button>
+    </div>
+
+    <div id="menu" class="overlay">
+      <div class="card">
+        <h1>台北街道賽<small>TAIPEI STREET GP</small></h1>
+        <p class="sub">信義區 · 黃昏計時賽 · 2.6 km</p>
+        <div id="menu-best"></div>
+        <button id="btn-start" class="primary">開始</button>
+        <button id="btn-restart" class="ghost-btn" style="display: none">重新開始</button>
+        <div class="opts">
+          <label><input type="checkbox" id="opt-tilt" /> 傾斜手機轉向</label>
+          <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
+          <label><input type="checkbox" id="opt-ghost" /> 影子車</label>
+          <label><input type="checkbox" id="opt-sound" /> 音效</label>
+        </div>
+        <p class="help">左下拖曳轉向、右下按住煞車，油門自動。<br />地上的線：綠＝全油門、紅＝該煞車、黃＝彎中。<br />電腦：← → 轉向，↓ 或空白鍵煞車，Esc 暫停。</p>
+        <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
+      </div>
+    </div>
+
+    <div id="rotate">橫向握持比較好玩 ↻</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
