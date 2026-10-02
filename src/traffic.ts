@@ -76,6 +76,7 @@ export class Traffic {
   private rand = rng(2026);
   private grid = new Map<number, Agent[]>();
   private extras: { x: number; z: number; v: number }[] = [];
+  private signalMeshes: THREE.Object3D[] = [];
   readonly max: number;
 
   constructor(scene: THREE.Scene, d: CityData, max: number, private breakables: Breakables | null = null) {
@@ -183,6 +184,7 @@ export class Traffic {
     lampM.forEach((m, i) => { this.lamps.setMatrixAt(i, m); this.lamps.setColorAt(i, new THREE.Color('#222')); });
     this.lampState = new Array(lampM.length).fill('');
     scene.add(pole, arm, housing, this.lamps);
+    this.signalMeshes = [pole, arm, housing, this.lamps];
     // 號誌桿也撞得倒：桿、橫桿、燈箱、三顆燈一起倒（以桿子底部為支點）
     if (this.breakables) {
       const p = new THREE.Vector3();
@@ -406,4 +408,6 @@ export class Traffic {
 
   /** 街道賽封路：車流不顯示 */
   set visible(v: boolean) { for (const m of this.meshes) m.paint.visible = m.fixed.visible = v; }
+  /** 紅綠燈（街道賽封路時隱藏，橫桿會擋到賽車的視線） */
+  set signalsVisible(v: boolean) { for (const m of this.signalMeshes) m.visible = v; }
 }

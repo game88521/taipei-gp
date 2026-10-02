@@ -204,7 +204,7 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[] }> {
   const breakables = new Breakables();
   const data = (await (await fetch('/data/city.json')).json()) as CityData;
 
@@ -273,7 +273,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   // ---- 道路（有標線）、斑馬線、路名牌、地標招牌
   buildRoads(scene, data);
   buildCrossings(scene, data);
-  buildStreetSigns(scene, data, breakables);
+  const raceHide = buildStreetSigns(scene, data, breakables, (x, z) => nearest(x, z)[1] < 16);
   const landmarks = buildLandmarks(scene, data);
 
   // ---- 建築
@@ -507,7 +507,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     scene.add(trunk, crown);
   }
 
-  return { data, landmarks, breakables };
+  return { data, landmarks, breakables, raceHide };
 }
 
 /** 台北 101：照真實比例的竹節造型（總高 508 m）。方形錐台 = 4 邊的圓柱轉 45°，邊對齊街道 */

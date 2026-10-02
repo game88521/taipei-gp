@@ -251,6 +251,12 @@ export class StreetRace {
     for (const m of this.markers) m.visible = false;
   }
 
+  /** 挑戰點光柱只在自由駕駛、沒在比賽時出現（街道賽封路時不能擋在賽道上） */
+  showMarkers(on: boolean) {
+    const v = on && (this.phase === 'idle' || this.phase === 'offer');
+    for (const m of this.markers) m.visible = v;
+  }
+
   cancel() {
     this.phase = 'idle';
     this.active = null;

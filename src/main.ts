@@ -131,12 +131,14 @@ let traffic: Traffic | null = null;
 let peds: Pedestrians | null = null;
 let sr: StreetRace | null = null;
 let breakables: Breakables | null = null;
+let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 const cityLoad = loadCity(scene, track, Q).then((c) => {
   collider = new Collider(c.data);
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
   breakables = c.breakables;
+  raceHide = c.raceHide;
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
@@ -383,6 +385,10 @@ function updateVisuals(dt: number) {
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (sr && mode === 'free') sr.render(dt);
+  // 街道賽封路：挑戰光柱、紅綠燈、賽道旁的路名牌都不出現（會擋視線）
+  sr?.showMarkers(mode === 'free');
+  if (traffic) traffic.signalsVisible = mode === 'free';
+  for (const o of raceHide) o.visible = mode === 'free';
   breakables?.update(dt, vc.x, vc.z);
   if (peds) {
     peds.visible = mode === 'free';
