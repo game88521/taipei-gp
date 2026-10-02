@@ -9,14 +9,15 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { loadCity } from './city';
-import { makeCar, makeSedan } from './carModel';
+import { makeSedan } from './carModel';
+import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX } from './freecar';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
-import { RaceField, LAPS } from './rivals';
+import { RaceField, LAPS, PLAYER_LIVERY } from './rivals';
 import { StreetRace, type Challenge } from './streetrace';
 import { Car } from './car';
 import { Input } from './input';
@@ -145,9 +146,9 @@ const cityLoad = loadCity(scene, track, Q).then((c) => {
   $('menu-best').textContent = '街景載入失敗，請檢查網路後重新整理';
 });
 
-const carModel = makeCar('#d81e2a');
+const carModel = makeF1(PLAYER_LIVERY); // 玩家：躍馬紅（紅白黑）
 scene.add(carModel.root);
-const ghostModel = makeCar('#7fe8ff', true);
+const ghostModel = makeF1(PLAYER_LIVERY, true);
 ghostModel.root.visible = false;
 scene.add(ghostModel.root);
 
@@ -757,6 +758,16 @@ $('duel-back').addEventListener('click', () => { $('duel-pick').classList.add('h
 function srBot() {
   const c = sr?.active;
   if (!c || sr!.phase !== 'race') return { steer: 0, brake: true, throttle: false };
+  // ?ram：測撞擊——油門全開衝向最近的對手
+  if (new URLSearchParams(location.search).has('ram')) {
+    let tgt: { x: number; z: number } | null = null, td = Infinity;
+    for (const r of sr!.rivals) { const d = Math.hypot(r.pos.x - fcar.x, r.pos.z - fcar.z); if (r.done == null && d < td) { td = d; tgt = r.pos; } }
+    if (tgt) {
+      let e = Math.atan2(tgt.x - fcar.x, tgt.z - fcar.z) - fcar.h;
+      e = Math.atan2(Math.sin(e), Math.cos(e));
+      return { steer: Math.max(-1, Math.min(1, -e * 3)), brake: false, throttle: true };
+    }
+  }
   let bi = 0, bd = Infinity;
   for (let i = 0; i < c.path.length; i++) { const d = (c.path[i][0] - fcar.x) ** 2 + (c.path[i][1] - fcar.z) ** 2; if (d < bd) { bd = d; bi = i; } }
   const target = c.cum[bi] + 9 + Math.abs(fcar.v) * 0.5;
@@ -990,7 +1001,7 @@ if (FREE) void cityLoad.then(() => {
   if (FREE_SIM) {
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
-    if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length}`; return; }
+    if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length} 對手最大被撞開${sr.maxKnock.toFixed(1)}m`; return; }
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;
@@ -1001,8 +1012,22 @@ const SIM = Number(new URLSearchParams(location.search).get('sim')) || 0;
 function runSim() {
   if (!SIM) return;
   state = 'race';
-  for (let n = 0; n < SIM / STEP; n++) step(STEP);
-  if (!/^(BOT|GP)/.test(document.title)) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;
+  // ?bot&gp&solo：只留第一台 AI 在賽道上（其他車移走），量它自己一個人的圈速
+  if (raceKind === 'gp' && new URLSearchParams(location.search).has('solo')) {
+    field.racers.forEach((r, k) => { if (k > 0) { r.car.x = 1e5 + k * 100; r.car.z = 1e5; } });
+    for (let n = 0; n < SIM / STEP; n++) field.update(STEP, true);
+    const r0 = field.racers[0];
+    const pr = r0.profile!;
+    let pmin = Infinity, tmin = Infinity;
+    for (let i = 0; i < pr.length; i++) { pmin = Math.min(pmin, pr[i]); tmin = Math.min(tmin, track.vTarget[i]); }
+    document.title = `SOLO ${r0.name} 圈${r0.laps} 最快${r0.bestLap?.toFixed(2)} 撞牆${field.aiHits} 曲線最低${(pmin * 3.6).toFixed(0)} 建議最低${(tmin * 3.6).toFixed(0)} 曲線長${pr.length}/${track.N}`;
+    return;
+  }
+  for (let n = 0; n < SIM / STEP && state === 'race'; n++) step(STEP); // 完賽就停（不然計時賽的計圈會覆寫結果）
+  if (raceKind === 'gp' && !document.title.startsWith('GP')) {
+    // 正賽還沒跑完：印出每台車跑了幾圈、最快圈，方便找問題
+    document.title = 'GP-RUN ' + field.standings().map((r) => `${r.name}:${r.laps}圈/${r.bestLap?.toFixed(1) ?? '-'}`).join(' ') + ` hits=${botHits}`;
+  } else if (!/^(BOT|GP)/.test(document.title)) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);

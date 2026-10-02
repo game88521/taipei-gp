@@ -20,12 +20,14 @@ const DEFS: ChallengeDef[] = [
 ];
 
 // 街頭對決的對手：最高速（m/s）與過彎能力（相對值）
+// （過彎能力是相對「橫向 7 m/s²」的倍數：1.3 ≈ 12 m/s²，跟玩家的車差不多）
 const DUEL_FIELD: [string, string, number, number][] = [
-  ['阿翔', '#e8e8e8', 27, 1.06],
-  ['小美', '#ff6fa8', 25.5, 1.0],
-  ['黑豹', '#1c1c1e', 24.5, 0.97],
-  ['老K', '#ff8a1a', 23.5, 0.94],
+  ['阿翔', '#e8e8e8', 37, 1.33],
+  ['小美', '#ff6fa8', 35.5, 1.3],
+  ['黑豹', '#1c1c1e', 34, 1.27],
+  ['老K', '#ff8a1a', 32.5, 1.24],
 ];
+const SOLO_TOP = 33, SOLO_CORNER = 1.25; // 自由駕駛單挑的對手
 
 export interface Challenge {
   def: ChallengeDef;
@@ -51,10 +53,12 @@ export interface Rival {
   done: number | null;
   pos: { x: number; z: number; h: number; v: number };
   model: CarModel;
+  // 被撞開：偏離路線的位移與速度、車頭偏轉與轉速（輪胎摩擦會讓它停下，之後慢慢開回路線）
+  ox: number; oz: number; ovx: number; ovz: number; oh: number; ow: number;
 }
 
 type Phase = 'idle' | 'offer' | 'count' | 'race' | 'done';
-const PROFILE_TOP = 30;
+const PROFILE_TOP = 42;
 
 export class StreetRace {
   challenges: Challenge[] = [];
@@ -72,6 +76,7 @@ export class StreetRace {
   private rings: THREE.Mesh[] = [];
   private finishRing: THREE.Mesh;
   private playerProg = 0;
+  maxKnock = 0; // 測試用：對手被撞離路線的最大距離（m）
 
   constructor(private scene: THREE.Scene, d: CityData, landmarks: Landmark[]) {
     // ---- 路網（照單行方向）
@@ -153,8 +158,8 @@ export class StreetRace {
         const k = dh / ((cum[i + 1] - cum[i - 1]) / 2 || 1);
         return k < 1e-4 ? PROFILE_TOP : Math.min(PROFILE_TOP, Math.sqrt(7 / k));
       });
-      // 往回推煞車點（6 m/s²）
-      for (let i = path.length - 2; i >= 0; i--) vmax[i] = Math.min(vmax[i], Math.sqrt(vmax[i + 1] ** 2 + 2 * 6 * (cum[i + 1] - cum[i])));
+      // 往回推煞車點（10 m/s²）
+      for (let i = path.length - 2; i >= 0; i--) vmax[i] = Math.min(vmax[i], Math.sqrt(vmax[i + 1] ** 2 + 2 * 10 * (cum[i + 1] - cum[i])));
       const length = cum[cum.length - 1];
       const checkpoints: number[] = [];
       for (let s = 140; s < length - 60; s += 140) checkpoints.push(cum.findIndex((c) => c >= s));
@@ -220,13 +225,13 @@ export class StreetRace {
     this.playerDone = null;
     this.playerProg = 0;
     const A = c.twoWay ? 1.8 : -1.8, B = c.twoWay ? 5.1 : 1.8;
-    const field: [string, string, number, number][] = duel ? DUEL_FIELD : [[c.def.rival, c.def.color, 25, 1.0]];
+    const field: [string, string, number, number][] = duel ? DUEL_FIELD : [[c.def.rival, c.def.color, SOLO_TOP, SOLO_CORNER]];
     const slots = duel ? [[24, A], [24, B], [15, A], [15, B]] : [[6, B]];
     this.rivals = field.map(([name, color, top, corner], k) => {
       const model = this.pool[k];
       (model.body.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>).material.color.set(color);
       model.root.visible = true;
-      const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, h: 0, v: 0 }, model };
+      const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
       this.placeRival(r);
       return r;
     });
@@ -258,10 +263,27 @@ export class StreetRace {
   }
   private placeRival(r: Rival) {
     const [x, z, h] = this.at(r.s);
-    r.pos.x = x - Math.cos(h) * r.lat;
-    r.pos.z = z + Math.sin(h) * r.lat;
-    r.pos.h = h;
+    r.pos.x = x - Math.cos(h) * r.lat + r.ox;
+    r.pos.z = z + Math.sin(h) * r.lat + r.oz;
+    r.pos.h = h + r.oh;
     r.pos.v = r.v;
+  }
+
+  /** 被撞開的動態：位移照速度走、輪胎摩擦讓它停下；停下後 1~2 秒內開回路線 */
+  private knock(r: Rival, dt: number) {
+    if (!(r.ox || r.oz || r.ovx || r.ovz || r.oh || r.ow)) return;
+    this.maxKnock = Math.max(this.maxKnock, Math.hypot(r.ox, r.oz));
+    r.ox += r.ovx * dt;
+    r.oz += r.ovz * dt;
+    r.oh += r.ow * dt;
+    const sp = Math.hypot(r.ovx, r.ovz);
+    if (sp > 0) { const k = Math.max(0, sp - 11 * dt) / sp; r.ovx *= k; r.ovz *= k; } // 側滑摩擦約 1.1 g
+    r.ow *= Math.exp(-dt * 3.5);
+    if (sp < 0.5) {
+      const back = Math.exp(-dt * 1.4);
+      r.ox *= back; r.oz *= back; r.oh *= back;
+    }
+    if (Math.abs(r.ox) + Math.abs(r.oz) + Math.abs(r.oh) + sp + Math.abs(r.ow) < 0.01) r.ox = r.oz = r.ovx = r.ovz = r.oh = r.ow = 0;
   }
 
   /** 每一步；回傳要顯示的事件文字（倒數、檢查點、勝負），沒有就回傳 null */
@@ -314,13 +336,14 @@ export class StreetRace {
     const fi = c.cum.findIndex((q) => q >= r.s + r.v * 1.2);
     let want = Math.min(r.top, c.vmax[fi < 0 ? c.vmax.length - 1 : fi] * r.corner);
     const fx = Math.sin(r.pos.h), fz = Math.cos(r.pos.h);
-    const others = traffic?.near(r.pos.x, r.pos.z, 30) ?? [];
+    const look = 14 + r.v * 1.1; // 看前方的距離隨車速拉長，快的時候才來得及閃
+    const others = traffic?.near(r.pos.x, r.pos.z, look + 6) ?? [];
     const blocked = (lat: number) => {
       let gap = Infinity, v = 0;
       const check = (x: number, z: number, ov: number) => {
         const dx = x - r.pos.x, dz = z - r.pos.z, ahead = dx * fx + dz * fz;
         const side = -dx * fz + dz * fx; // 右正
-        if (ahead > 0 && ahead < 26 && Math.abs(side - (lat - r.lat)) < 1.6 && ahead < gap) { gap = ahead; v = ov; }
+        if (ahead > 0 && ahead < look && Math.abs(side - (lat - r.lat)) < 1.6 && ahead < gap) { gap = ahead; v = ov; }
       };
       for (const o of others) check(o.x, o.z, o.v);
       check(player.x, player.z, player.v);
@@ -328,18 +351,19 @@ export class StreetRace {
       return { gap, v };
     };
     const cur = blocked(r.lat);
-    if (cur.gap < 26 && r.blockedFor < 6) {
-      // 換到比較空的車道；被擋超過 2.5 秒就連對向、路肩也看（街頭飆車不守規矩）
-      const steps = r.blockedFor > 2.5 ? [-3.3, 3.3, -6.6, 6.6] : [-3.3, 3.3];
-      const free = steps.map((d) => r.lat + d).filter((l) => l > -8 && l < 8).find((l) => blocked(l).gap > 30);
+    if (cur.gap < look && r.blockedFor < 6) {
+      // 換到比較空的車道；被擋超過 2 秒就連對向、路肩也看（街頭飆車不守規矩）
+      const steps = r.blockedFor > 2 ? [-3.3, 3.3, -6.6, 6.6] : [-3.3, 3.3];
+      const free = steps.map((d) => r.lat + d).filter((l) => l > -8 && l < 8).find((l) => blocked(l).gap > look);
       if (free != null) r.lat = free;
-      else if (cur.gap < 12) want = Math.min(want, cur.v);
+      else if (cur.gap < 8 + r.v * 0.5) want = Math.min(want, cur.v);
     }
     // 卡住太久（前後左右都是車）就硬擠過去
     r.blockedFor = r.v < 2 ? r.blockedFor + dt : Math.max(0, r.blockedFor - dt * 2);
-    if (r.stunned > 0) { r.stunned -= dt; want = 0; }
-    // 加速 4.5 m/s²、減速 8 m/s²
-    r.v = want > r.v ? Math.min(want, r.v + 4.5 * dt) : Math.max(want, r.v - 8 * dt);
+    if (r.stunned > 0) { r.stunned -= dt; want = Math.min(want, r.v * 0.98); }
+    this.knock(r, dt);
+    // 加速 7.5 m/s²、減速 12 m/s²
+    r.v = want > r.v ? Math.min(want, r.v + 7.5 * dt) : Math.max(want, r.v - 12 * dt);
     r.s += r.v * dt;
     this.placeRival(r);
   }
@@ -357,13 +381,22 @@ export class StreetRace {
         const dx = px - qx, dz = pz - qz, d = Math.hypot(dx, dz), R = FreeCar.RADIUS * 2;
         if (d >= R || d < 1e-4) continue;
         const nx = dx / d, nz = dz / d;
-        const h = p.contact(nx, nz, (R - d) * 0.6, qx + nx * FreeCar.RADIUS, qz + nz * FreeCar.RADIUS, fx * r.v, fz * r.v, 0.4, 0.4);
+        // 兩台同質量：玩家的衝量（other = 1 → 只吃一半），對手吃反方向的另一半
+        const rvx = fx * r.v + r.ovx, rvz = fz * r.v + r.ovz;
+        const vxBefore = p.vx, vzBefore = p.vz;
+        const h = p.contact(nx, nz, (R - d) * 0.5, qx + nx * FreeCar.RADIUS, qz + nz * FreeCar.RADIUS, rvx, rvz, 0.35, 0.4, 1);
         hit = Math.max(hit, h);
-        // 對手：橫向被推開（換到旁邊的位置）、速度掉一些
-        const side = nx * fz - nz * fx; // 推力（−n）在對手右手方向 (−fz, fx) 的分量
-        r.lat += side * (R - d) * 0.4 + Math.sign(side) * Math.min(1, h * 0.05);
-        r.v *= h > 0 ? 0.75 : 0.98;
-        if (h > 4) r.stunned = Math.max(r.stunned, 0.5);
+        // 動量守恆：玩家的速度改變多少，對手就反方向改變多少
+        const dvx = -(p.vx - vxBefore), dvz = -(p.vz - vzBefore);
+        r.ox -= nx * (R - d) * 0.5;
+        r.oz -= nz * (R - d) * 0.5;
+        const along = dvx * fx + dvz * fz; // 沿路線方向：從後面頂會被推得往前衝
+        r.v = Math.max(0, r.v + along);
+        r.ovx += dvx - fx * along;
+        r.ovz += dvz - fz * along;
+        // 撞在車頭或車尾 → 車頭被撞歪
+        r.ow += (o / 1.45) * (dvx * -fz + dvz * fx) * 0.35;
+        if (h > 5) r.stunned = Math.max(r.stunned, 0.35 + h * 0.02);
       }
     }
     return hit;

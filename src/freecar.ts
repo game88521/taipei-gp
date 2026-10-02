@@ -44,7 +44,7 @@ export class FreeCar {
    * 與另一個物體接觸：n 從對方指向自己、depth 為重疊深度、(cx, cz) 接觸點、(ovx, ovz) 對方速度（當作質量無限大）。
    * 回傳撞擊力道（接觸點的法向相對速度）。
    */
-  contact(nx: number, nz: number, depth: number, cx: number, cz: number, ovx = 0, ovz = 0, e = 0.35, mu = 0.45): number {
+  contact(nx: number, nz: number, depth: number, cx: number, cz: number, ovx = 0, ovz = 0, e = 0.35, mu = 0.45, otherInvMass = 0): number {
     // 先把車推出重疊（多推一點點，下一步才不會又黏住）
     this.x += nx * (depth + 0.01);
     this.z += nz * (depth + 0.01);
@@ -54,13 +54,14 @@ export class FreeCar {
     const vn = pvx * nx + pvz * nz;
     if (vn >= 0) return 0;
     const k = rz * nx - rx * nz; // 法向衝量對角速度的力臂
-    const J = (-(1 + e) * vn) / (1 + (k * k) / INERTIA);
+    // otherInvMass：對方的「質量倒數 ÷ 我的」；牆＝0（推不動）、同樣的車＝1（兩邊各吃一半）
+    const J = (-(1 + e) * vn) / (1 + (k * k) / INERTIA + otherInvMass);
     this.vx += J * nx;
     this.vz += J * nz;
     this.w += (J * k) / INERTIA;
     // 摩擦：沿接觸面的相對速度往 0 拉，上限 μ·J
     const tx = -nz, tz = nx, vt = pvx * tx + pvz * tz, kt = rz * tx - rx * tz;
-    let Jt = -vt / (1 + (kt * kt) / INERTIA);
+    let Jt = -vt / (1 + (kt * kt) / INERTIA + otherInvMass);
     Jt = Math.max(-mu * J, Math.min(mu * J, Jt));
     this.vx += Jt * tx;
     this.vz += Jt * tz;

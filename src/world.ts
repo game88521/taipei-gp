@@ -154,10 +154,11 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   });
   race.add(new THREE.Mesh(
     ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }),
-    new THREE.MeshLambertMaterial({ map: asphalt }),
+    // 城市道路的標線有往鏡頭偏移（避免閃爍），賽道路面要偏移得更多，才不會被底下的雙黃線透出來
+    new THREE.MeshLambertMaterial({ map: asphalt, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 }),
   ));
   // 路肩（路緣外到護牆外 3 m，路燈立在上面）
-  const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52' });
+  const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
   }
@@ -167,7 +168,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     g.fillStyle = '#d81e2a'; g.fillRect(0, 0, 16, 32);
     g.fillStyle = '#f2f2f2'; g.fillRect(0, 32, 16, 32);
   });
-  const kerbMat = new THREE.MeshLambertMaterial({ map: kerbTex, polygonOffset: true, polygonOffsetFactor: -1 });
+  const kerbMat = new THREE.MeshLambertMaterial({ map: kerbTex, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -70 });
   const inCorner = (i: number) => Math.abs(t.curv[i]) > 1 / 200;
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * (HALF_WIDTH - 0.6), b: s * (HALF_WIDTH + 1.2), ya: 0.02, yb: 0.02, along: 4, mask: inCorner }), kerbMat));
@@ -185,7 +186,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
         return green;
       },
     }),
-    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 }),
   );
   race.add(assist);
 
@@ -198,7 +199,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   });
   race.add(new THREE.Mesh(
     ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0.03, yb: 0.03, along: 2, mask: (i) => i === 0 }),
-    new THREE.MeshLambertMaterial({ map: checker, polygonOffset: true, polygonOffsetFactor: -3 }),
+    new THREE.MeshLambertMaterial({ map: checker, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 }),
   ));
 
   // ---- 護牆 + 廣告看板
