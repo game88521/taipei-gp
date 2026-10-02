@@ -2,6 +2,7 @@
   "name": "taipei-gp",
   "private": true,
   "version": "0.1.0",
+  "author": "Rex Chiu",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

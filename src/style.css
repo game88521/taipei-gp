@@ -438,3 +438,4 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 .opts label.q { grid-column: 1 / -1; flex-wrap: wrap; }
 .opts select { margin-left: auto; background: #1b1e28; color: var(--fg); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; padding: 4px 6px; font: inherit; }
 .opts label.q small { width: 100%; color: var(--muted); font-size: 11px; }
+.credit .author { color: var(--fg); font-weight: 700; }

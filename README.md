@@ -10,6 +10,8 @@
 
 Vite + TypeScript + Three.js；道路、5,000 多棟建築、紅綠燈、斑馬線、路名來自 OpenStreetMap，貼圖、車子、音效全部用程式產生，沒有素材檔。
 
+作者：**Rex Chiu**
+
 地圖資料 © [OpenStreetMap](https://www.openstreetmap.org/copyright) 貢獻者，以 ODbL 授權。
 
 ## 跑起來
