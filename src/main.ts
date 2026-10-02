@@ -21,13 +21,15 @@ import { RaceField, PLAYER_LIVERY, TYRES } from './rivals';
 import { WALL_OFF } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
+import { Router } from './router';
+import { TaxiJob } from './taxi';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
 
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number>; quality?: Level | 'auto' }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -132,6 +134,8 @@ let traffic: Traffic | null = null;
 let peds: Pedestrians | null = null;
 let sr: StreetRace | null = null;
 let breakables: Breakables | null = null;
+let taxi: TaxiJob | null = null;
+const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 const cityLoad = loadCity(scene, track, Q).then((c) => {
   collider = new Collider(c.data);
@@ -143,6 +147,9 @@ const cityLoad = loadCity(scene, track, Q).then((c) => {
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
+  taxi = new TaxiJob(scene, c.landmarks, new Router(c.data));
+  taxi.money = save.taxi?.money ?? 0;
+  taxi.trips = save.taxi?.trips ?? 0;
   applyShadowFlags();
   cityReady = true;
   if (state === 'menu') showMenu(false);
@@ -161,6 +168,9 @@ scene.add(ghostModel.root);
 const sedanModel = makeSedan('#f2f2f0');
 sedanModel.root.visible = false;
 scene.add(sedanModel.root);
+const taxiModel = makeSedan('#f5c518', true); // 計程車任務開的小黃
+taxiModel.root.visible = false;
+scene.add(taxiModel.root);
 
 const car = new Car(); // 街道賽的 F1
 const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
@@ -395,9 +405,10 @@ function updateVisuals(dt: number) {
   // 街道賽、街頭比賽都開 F1；平常自由駕駛開一般汽車
   const streetRacing = mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
   const f1Look = mode === 'race' || streetRacing;
-  const vc = veh(), model = f1Look ? carModel : sedanModel;
+  const vc = veh(), model = f1Look ? carModel : taxiOn() ? taxiModel : sedanModel;
   carModel.root.visible = f1Look;
-  sedanModel.root.visible = !f1Look;
+  sedanModel.root.visible = !f1Look && !taxiOn();
+  taxiModel.root.visible = !f1Look && taxiOn();
   world.race.visible = mode === 'race';
   if (traffic) {
     traffic.visible = mode === 'free';
@@ -406,7 +417,8 @@ function updateVisuals(dt: number) {
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (sr && mode === 'free') sr.render(dt);
   // 街道賽封路：挑戰光柱、紅綠燈、賽道旁的路名牌都不出現（會擋視線）
-  sr?.showMarkers(mode === 'free');
+  sr?.showMarkers(mode === 'free' && !taxiOn());
+  taxi?.render(performance.now() / 1000);
   if (traffic) traffic.signalsVisible = mode === 'free';
   for (const o of raceHide) o.visible = mode === 'free';
   breakables?.update(dt, vc.x, vc.z);
@@ -537,7 +549,7 @@ function showMenu(paused: boolean) {
   $('btn-resume').style.display = paused ? '' : 'none';
   free.textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
   race.style.display = cityReady ? '' : 'none';
-  for (const id of ['btn-gp', 'btn-duel']) {
+  for (const id of ['btn-gp', 'btn-duel', 'btn-taxi']) {
     const b = $<HTMLButtonElement>(id);
     b.disabled = !cityReady;
     b.style.display = cityReady ? '' : 'none';
@@ -566,6 +578,7 @@ async function userStart() {
 }
 $('btn-start').addEventListener('click', async () => {
   await userStart();
+  taxi?.stop();
   mode = 'race';
   raceKind = 'tt';
   hideMenu();
@@ -573,6 +586,7 @@ $('btn-start').addEventListener('click', async () => {
 });
 $('btn-gp').addEventListener('click', async () => {
   await userStart();
+  taxi?.stop();
   mode = 'race';
   raceKind = 'gp';
   hideMenu();
@@ -738,8 +752,42 @@ function updateDrsButton() {
   el.className = car.drs ? 'on' : ready ? 'ready' : '';
 }
 
+// ---------------------------------------------------------------- 計程車任務
+let rerouteAcc = 0;
+function updateTaxiHud() {
+  const el = $('taxi-hud');
+  if (!taxi || !taxiOn() || !taxi.target) { el.classList.add('hidden'); return; }
+  const d = Math.hypot(fcar.x - taxi.target.x, fcar.z - taxi.target.z);
+  // 每 5 秒照目前位置重算一次路線（開錯路也會導回來）
+  rerouteAcc += 0.25;
+  if (rerouteAcc > 5) { rerouteAcc = 0; taxi.reroute(fcar.x, fcar.z); }
+  el.innerHTML = '';
+  const add = (t: string, cls = '') => { const s = document.createElement('span'); s.textContent = t; if (cls) s.className = cls; el.appendChild(s); };
+  if (taxi.phase === 'seek') {
+    add(`🙋 載客：${taxi.target.nm}`);
+    add(`${Math.round(d)} m`);
+  } else {
+    add(`🚕 → ${taxi.target.nm}`);
+    add(`${Math.round(d)} m`);
+    add(`⏱ ${Math.ceil(taxi.timeLeft)} 秒`, taxi.timeLeft < 15 ? 'bad' : 'good');
+  }
+  add(`💰 NT$ ${taxi.money.toLocaleString()}`, 'money');
+  el.classList.remove('hidden');
+}
+$('btn-taxi').addEventListener('click', async () => {
+  await userStart();
+  mode = 'free';
+  field.hide();
+  sr?.cancel();
+  hideMenu();
+  beginFree();
+  taxi?.start(fcar.x, fcar.z);
+  toast('🚕 出車囉！到綠色光柱載乘客', '');
+});
+
 $('btn-free').addEventListener('click', async () => {
   await userStart();
+  taxi?.stop();
   mode = 'free';
   field.hide();
   hideMenu();
@@ -874,6 +922,7 @@ $('btn-duel').addEventListener('click', () => {
     b.addEventListener('click', async () => {
       await userStart();
       $('duel-pick').classList.add('hidden');
+      taxi?.stop();
       mode = 'free';
       field.hide();
       hideMenu();
@@ -955,7 +1004,7 @@ function carGear(v: number) {
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
 function freeStep(dt: number) {
-  let inp = FREE_SIM ? (SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
+  let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   if (breakables) impact = Math.max(impact, breakables.hit(fcar)); // 樹、路燈：撞倒過去
@@ -964,7 +1013,7 @@ function freeStep(dt: number) {
     if (msg) { bigMsg(msg); if (msg.length <= 3) sound.beep(msg === 'GO!' ? 880 : 520, 0.25); }
     impact = Math.max(impact, sr.collide(fcar));
     if (sr.phase === 'done' && !srShown) showStreetResult();
-    if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(sr.checkOffer(fcar.x, fcar.z, fcar.v));
+    if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(taxiOn() ? null : sr.checkOffer(fcar.x, fcar.z, fcar.v)); // 載客時不接街頭挑戰
   }
   if (traffic && !NO_TRAFFIC) {
     traffic.update(dt, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? [])]); // 車流會讓對手與過馬路的行人
@@ -975,6 +1024,14 @@ function freeStep(dt: number) {
     sound.hit(6);
   }
   if (impact) sound.hit(impact * 2.5);
+  if (taxi && taxiOn()) {
+    if (impact) taxi.onHit(impact);
+    const msg = taxi.update(dt, fcar);
+    if (msg) {
+      toast(msg, msg.startsWith('💰') ? 'purple' : '');
+      if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); sound.beep(990, 0.3); }
+    }
+  }
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
 }
 function updateFreeHud(dt: number) {
@@ -1001,7 +1058,8 @@ function updateFreeHud(dt: number) {
       }
       el.className = w ? 'show' : '';
     }
-    minimap?.draw(fcar.x, fcar.z, fcar.h, sr?.mapInfo);
+    minimap?.draw(fcar.x, fcar.z, fcar.h, taxiOn() ? { ...taxi!.mapInfo, rivals: [], flags: [] } : sr?.mapInfo);
+    updateTaxiHud();
     updateSrHud();
   }
   // 接近地標時跳出名稱（同一個地標 60 秒內不重複）
@@ -1130,7 +1188,21 @@ const FREE = new URLSearchParams(location.search).has('free');
 const FREE_SIM = FREE && BOT;
 const IDLE = new URLSearchParams(location.search).has('idle'); // 測車流：玩家停在原地
 const NO_TRAFFIC = new URLSearchParams(location.search).has('notraffic'); // 測路線用：關掉車流
-const SR_TEST = new URLSearchParams(location.search).get('sr'); // 測街頭飆車：?free&bot&sr=0&sim=N 自動接受第 0 個挑戰，玩家照路線開
+const SR_TEST = new URLSearchParams(location.search).get('sr');
+const TAXI_TEST = new URLSearchParams(location.search).has('taxi'); // ?free&bot&taxi&sim=N：自動跑計程車任務
+/** 測試用：照計程車導航路線開，快到目標就減速停下 */
+function taxiBot() {
+  const path = taxi?.route, tg = taxi?.target;
+  if (!path || !tg || path.length < 2) return { steer: 0, brake: true, throttle: false };
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < path.length; i++) { const d = (path[i][0] - fcar.x) ** 2 + (path[i][1] - fcar.z) ** 2; if (d < bd) { bd = d; bi = i; } }
+  const j = Math.min(path.length - 1, bi + 4 + Math.round(Math.abs(fcar.v) * 0.25));
+  let e = Math.atan2(path[j][0] - fcar.x, path[j][1] - fcar.z) - fcar.h;
+  e = Math.atan2(Math.sin(e), Math.cos(e));
+  const dist = Math.hypot(tg.x - fcar.x, tg.z - fcar.z);
+  const want = dist < 14 ? 0 : Math.min(16, 4 + dist * 0.25) * (Math.abs(e) > 0.6 ? 0.5 : 1);
+  return { steer: Math.max(-1, Math.min(1, -e * 2.2)), brake: fcar.v > want + 1, throttle: fcar.v < want };
+} // 測街頭飆車：?free&bot&sr=0&sim=N 自動接受第 0 個挑戰，玩家照路線開
 if (BOT && !FREE) void cityLoad.then(() => {
   mode = 'race';
   raceKind = new URLSearchParams(location.search).has('gp') ? 'gp' : 'tt';
@@ -1145,8 +1217,10 @@ if (FREE) void cityLoad.then(() => {
   hideMenu();
   beginFree();
   if (FREE_SIM) {
+    if (TAXI_TEST) taxi?.start(fcar.x, fcar.z);
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
+    if (TAXI_TEST && taxi) { roadAcc = lmAcc = 1; updateFreeHud(0); document.title = `TAXI 趟數${taxi.trips} 收入${taxi.money} 狀態${taxi.phase} 目標${taxi.target?.nm} 剩${Math.round(taxi.timeLeft)}s 地點數${(taxi as unknown as { places: unknown[] }).places.length}`; return; }
     if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length} 對手最大被撞開${sr.maxKnock.toFixed(1)}m`; return; }
     breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
