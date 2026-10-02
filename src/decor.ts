@@ -164,7 +164,7 @@ function flush(scene: THREE.Object3D, mats: THREE.Material[], buckets: { pos: nu
 
 /** 路口的綠色路名牌（中文大字＋英文小字），兩片各自跟所標示的道路平行 */
 /** 回傳離賽道很近的那幾支（街道賽時要隱藏，招牌會伸到賽道上方擋視線） */
-export function buildStreetSigns(scene: THREE.Scene, d: CityData, breakables?: Breakables, nearTrack?: (x: number, z: number) => boolean): THREE.Object3D[] {
+export function buildStreetSigns(scene: THREE.Scene, d: CityData, breakables?: Breakables, nearTrack?: (x: number, z: number) => boolean, onSign?: (g: THREE.Object3D, x: number, z: number) => void): THREE.Object3D[] {
   const hideInRace: THREE.Object3D[] = [];
   const blades: string[][] = [];
   const index = new Map<string, number>();
@@ -202,6 +202,7 @@ export function buildStreetSigns(scene: THREE.Scene, d: CityData, breakables?: B
     scene.add(g);
     breakables?.addObject(s.x, s.z, 0.12, 0.93, g); // 撞到會倒，車速剩 93%
     if (nearTrack?.(s.x, s.z)) hideInRace.push(g);
+    onSign?.(g, s.x, s.z);
   }
   return hideInRace;
 }
@@ -215,7 +216,9 @@ export interface Landmark { nm: string; x: number; z: number; r: number }
 /** 地標：屋頂招牌（最長那面牆上方）＋ 回傳接近提示用的清單 */
 export function buildLandmarks(scene: THREE.Scene, d: CityData): Landmark[] {
   const list = d.places.filter((p) => !(NOT_LANDMARK.test(p.nm.trim()) && !LANDMARK_HINT.test(p.nm)));
-  const names = [...new Set(list.map((p) => p.nm.trim()))];
+  // 屋頂招牌只掛最高的 160 棟（地圖變大後地標上千個，全部掛會吃掉太多記憶體）；接近提示照樣全部都有
+  const signed = new Set([...list].sort((a, b) => b.h - a.h).slice(0, 160).map((p) => p.nm.trim()));
+  const names = [...signed];
   const colors = ['#ffffff', '#ff4b4b', '#ffd84a', '#7fd8ff'];
   const { mats, slots } = textAtlas(names.map((n) => [n]), (g, x, y, [nm]) => {
     g.font = `900 72px ${FONT}`;
@@ -233,7 +236,7 @@ export function buildLandmarks(scene: THREE.Scene, d: CityData): Landmark[] {
   for (const p of list) {
     const nm = p.nm.trim();
     out.push({ nm, x: p.x, z: p.z, r: p.r });
-    if (done.has(nm) || p.h > 300) continue; // 同名只掛一塊；101 不掛（塔身本身就是招牌）
+    if (done.has(nm) || p.h > 300 || !signed.has(nm)) continue; // 同名只掛一塊；101 不掛（塔身本身就是招牌）
     done.add(nm);
     const [x1, z1, x2, z2] = p.e, bl = Math.hypot(x2 - x1, z2 - z1);
     const ang = Math.atan2(x2 - x1, z2 - z1) + Math.PI / 2;

@@ -13,15 +13,16 @@ export interface Quality {
   traffic: number; // 車流台數
   peds: number; // 行人數
   fogFar: number;
+  viewDist: number; // 離鏡頭多遠以內的城市區塊才畫
   treeKeep: number; // 離賽道遠的樹保留比例
   parked: boolean; // 路邊停的機車
   rooftops: boolean; // 頂樓水塔、鐵皮加蓋
 }
 
 const TABLE: Record<Level, Omit<Quality, 'level'>> = {
-  high: { shadows: true, shadowSize: 2048, shadowRange: 140, bloom: true, bloomScale: 1, pixelRatio: 1.75, traffic: 90, peds: 130, fogFar: 2400, treeKeep: 0.6, parked: true, rooftops: true },
-  medium: { shadows: true, shadowSize: 1024, shadowRange: 100, bloom: true, bloomScale: 0.5, pixelRatio: 1.3, traffic: 55, peds: 70, fogFar: 1900, treeKeep: 0.35, parked: true, rooftops: true },
-  low: { shadows: false, shadowSize: 512, shadowRange: 80, bloom: false, bloomScale: 0.5, pixelRatio: 1, traffic: 35, peds: 40, fogFar: 1300, treeKeep: 0.15, parked: false, rooftops: false },
+  high: { shadows: true, shadowSize: 2048, shadowRange: 140, bloom: true, bloomScale: 1, pixelRatio: 1.75, traffic: 90, peds: 130, fogFar: 2400, viewDist: 1900, treeKeep: 0.6, parked: true, rooftops: true },
+  medium: { shadows: true, shadowSize: 1024, shadowRange: 100, bloom: true, bloomScale: 0.5, pixelRatio: 1.3, traffic: 55, peds: 70, fogFar: 1900, viewDist: 1450, treeKeep: 0.35, parked: true, rooftops: true },
+  low: { shadows: false, shadowSize: 512, shadowRange: 80, bloom: false, bloomScale: 0.5, pixelRatio: 1, traffic: 35, peds: 40, fogFar: 1300, viewDist: 1000, treeKeep: 0.15, parked: false, rooftops: false },
 };
 
 export function qualityFor(level: Level): Quality {

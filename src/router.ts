@@ -11,6 +11,7 @@ export class Router {
   constructor(d: CityData) {
     this.N = d.net.nodes;
     const N = this.N;
+    const snap = new Set<number>();
     for (const w of d.net.ways) {
       if (w.c > 3) continue;
       for (let k = 0; k + 1 < w.n.length; k++) {
@@ -20,9 +21,26 @@ export class Router {
         const add = (u: number, v: number) => { let list = this.adj.get(u); if (!list) this.adj.set(u, (list = [])); list.push([v, cost]); };
         if (w.o !== -1) add(a, b);
         if (w.o !== 1) add(b, a);
-        if (w.c <= 2) { this.grid.addBox(N[a * 2], N[a * 2 + 1], N[a * 2], N[a * 2 + 1], a); this.grid.addBox(N[b * 2], N[b * 2 + 1], N[b * 2], N[b * 2 + 1], b); }
+        if (w.c <= 2) { snap.add(a); snap.add(b); }
       }
     }
+    // 只吸附到「主路網」上：從市中心開得到、也開得回市中心的節點（單行道算進去）。
+    // 地圖邊緣被切斷的路段、單向進不去的死巷不收，否則起點或終點落在那裡就找不到路線
+    const reach = (start: number, back: boolean) => {
+      const rev = new Map<number, number[]>();
+      if (back) for (const [u, list] of this.adj) for (const [v] of list) { let r = rev.get(v); if (!r) rev.set(v, (r = [])); r.push(u); }
+      const seen = new Set<number>([start]), stack = [start];
+      while (stack.length) {
+        const u = stack.pop()!;
+        const next = back ? rev.get(u) || [] : (this.adj.get(u) || []).map((e) => e[0]);
+        for (const v of next) if (!seen.has(v)) { seen.add(v); stack.push(v); }
+      }
+      return seen;
+    };
+    let hub = -1, hd = Infinity;
+    for (const n of snap) { const d = N[n * 2] ** 2 + N[n * 2 + 1] ** 2; if (d < hd) { hd = d; hub = n; } }
+    const fwd = hub >= 0 ? reach(hub, false) : new Set<number>(), bwd = hub >= 0 ? reach(hub, true) : new Set<number>();
+    for (const n of snap) if (fwd.has(n) && bwd.has(n)) this.grid.addBox(N[n * 2], N[n * 2 + 1], N[n * 2], N[n * 2 + 1], n);
   }
 
   /** 最近的主要道路節點 */

@@ -227,7 +227,7 @@ writeFileSync(here('../src/data/track.json'), JSON.stringify({ origin: [LAT0, LO
 
 // ================================================================ 城市
 const TRACK_CLEAR = 11; // 建築／樹離賽道中心線至少這麼遠（護牆 9.5 m + 1.5 m）
-const VIEW = 900; // 離賽道超過這距離的東西不要（霧裡也看不到）
+const VIEW = 1e9; // 整個下載範圍都保留（執行時依距離只顯示附近的區塊）
 
 // 賽道的空間索引：每 40 m 一格，查「離賽道多遠」
 const TG = 40, tgrid = new Map();
@@ -483,7 +483,7 @@ for (const c of signClusters) {
 const greens = [];
 for (const e of E) {
   const t = e.tags || {};
-  const kind = /pitch/.test(t.leisure || '') ? 2 : /park|garden|recreation_ground/.test(t.leisure || t.landuse || '') ? 1 : t.landuse === 'grass' ? 0 : -1;
+  const kind = /pitch/.test(t.leisure || '') ? 2 : /park|garden|recreation_ground/.test(t.leisure || t.landuse || '') ? 1 : t.landuse === 'grass' ? 0 : t.landuse === 'forest' || /wood|scrub/.test(t.natural || '') ? 3 : -1;
   if (kind < 0 || t.building) continue;
   const rings = e.type === 'relation' ? outerRings(e) : e.geometry ? [ring(e.geometry)] : [];
   for (let r of rings) {
@@ -559,11 +559,11 @@ for (const e of roadWays) {
 let seed = 7;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 for (const g of greens) {
-  if (g.k === 1) {
+  if (g.k === 1 || g.k === 3) {
     const r = [];
     for (let k = 0; k < g.p.length; k += 2) r.push([g.p[k], g.p[k + 1]]);
     const xs = r.map((p) => p[0]), zs = r.map((p) => p[1]);
-    const n = Math.min(400, Math.floor(g.a / 140));
+    const n = g.k === 3 ? Math.min(2500, Math.floor(g.a / 90)) : Math.min(400, Math.floor(g.a / 140)); // 森林種得比較密
     for (let k = 0, got = 0; k < n * 3 && got < n; k++) {
       const x = Math.min(...xs) + rnd() * (Math.max(...xs) - Math.min(...xs)), z = Math.min(...zs) + rnd() * (Math.max(...zs) - Math.min(...zs));
       if (inside([x, z], r)) { tryTree(x, z); got++; }
@@ -633,7 +633,78 @@ const parked = [];
   }
 }
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked };
+
+// ---------------------------------------------------------------- 地形：象山、四獸山一帶（只在 OSM 的森林裡隆起，不會蓋到道路和建築）
+// 山頭（緯度、經度、高度 m、範圍 m）
+const PEAKS = [
+  [25.0272, 121.5766, 183, 330], // 象山
+  [25.0240, 121.5836, 210, 380], // 拇指山一帶
+  [25.0338, 121.5871, 150, 300], // 虎山
+  [25.0300, 121.5855, 170, 260], // 豹山／獅山
+  [25.0208, 121.5790, 160, 380], // 南側稜線
+];
+let terrain = null;
+{
+  const forests = greens.filter((g) => g.k === 3);
+  if (forests.length) {
+    const rings3 = forests.map((g) => { const r = []; for (let k = 0; k < g.p.length; k += 2) r.push([g.p[k], g.p[k + 1]]); return r; });
+    const peaks = PEAKS.map(([la, lo, h, rad]) => { const [x, z] = proj(la, lo); return { x, z, h, rad }; });
+    // 範圍：所有山頭外擴 600 m
+    const x0 = Math.min(...peaks.map((p) => p.x)) - 600, x1 = Math.max(...peaks.map((p) => p.x)) + 600;
+    const z0 = Math.min(...peaks.map((p) => p.z)) - 600, z1 = Math.max(...peaks.map((p) => p.z)) + 600;
+    const STEP = 15, nx = Math.ceil((x1 - x0) / STEP) + 1, nz = Math.ceil((z1 - z0) / STEP) + 1;
+    // 山的遮罩：格點在森林裡、或在山頭的核心範圍（等高線 > 25 m，OSM 不一定有畫森林）；
+    // 離車道與建築夠遠 → 1，再模糊幾次讓邊緣是緩坡
+    const core = (x, z) => peaks.reduce((v, p) => v + p.h * Math.exp(-(((x - p.x) ** 2 + (z - p.z) ** 2) / (p.rad * p.rad))), 0);
+    const inForest = new Uint8Array(nx * nz);
+    let mask = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const x = x0 + i * STEP, z = z0 + j * STEP;
+      inForest[j * nx + i] = rings3.some((r) => inside([x, z], r)) ? 1 : 0;
+      if (!inForest[j * nx + i] && core(x, z) < 25) continue;
+      if (onRoad(x, z) || inBuilding(x, z) || distToTrack(x, z) < 30) continue;
+      mask[j * nx + i] = 1;
+    }
+    for (let pass = 0; pass < 4; pass++) {
+      const m2 = new Float32Array(nx * nz);
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        if (!mask[j * nx + i]) continue; // 只往內收，不往外擴（邊緣維持 0，不會蓋到路）
+        let s = 0, c = 0;
+        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+          const ii = i + a, jj = j + b;
+          if (ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue;
+          s += mask[jj * nx + ii]; c++;
+        }
+        m2[j * nx + i] = s / c;
+      }
+      mask = m2;
+    }
+    const h = new Array(nx * nz).fill(0);
+    let maxH = 0;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const m = mask[j * nx + i];
+      if (!m) continue;
+      const x = x0 + i * STEP, z = z0 + j * STEP;
+      let v = 0;
+      for (const p of peaks) v += p.h * Math.exp(-(((x - p.x) ** 2 + (z - p.z) ** 2) / (p.rad * p.rad)));
+      // 一點起伏：讓山坡不是光滑的饅頭
+      v += 6 * Math.sin(x * 0.021) * Math.cos(z * 0.017) + 3 * Math.sin(x * 0.053 + z * 0.041);
+      const y = Math.max(0, v) * m ** 1.5;
+      h[j * nx + i] = Math.round(y * 2) / 2;
+      maxH = Math.max(maxH, y);
+    }
+    terrain = { x0: r1(x0), z0: r1(z0), step: STEP, nx, nz, h };
+    // 不在 OSM 森林裡的山坡也種樹（森林裡的前面已經種過）
+    const before = trees.length / 2;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      if (inForest[j * nx + i] || h[j * nx + i] < 3 || rnd() > 0.75) continue;
+      tryTree(x0 + (i + rnd() - 0.5) * STEP, z0 + (j + rnd() - 0.5) * STEP);
+    }
+    console.log(`地形：${nx}×${nz} 格，最高 ${maxH.toFixed(0)} m，山坡補種 ${trees.length / 2 - before} 棵樹`);
+  }
+}
+
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain };
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);

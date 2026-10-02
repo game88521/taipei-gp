@@ -24,6 +24,18 @@ export interface CityData {
   places: Place[];
   lamps?: number[]; // [x, z, 燈臂方向, ...]
   parked?: number[]; // [x, z, 車頭方向, 顏色, ...]
+  terrain?: Terrain | null; // 象山一帶的山
+}
+export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
+
+/** 地形高度（雙線性內插）；範圍外是 0 */
+export function terrainHeight(t: Terrain | null | undefined, x: number, z: number): number {
+  if (!t) return 0;
+  const fx = (x - t.x0) / t.step, fz = (z - t.z0) / t.step;
+  const i = Math.floor(fx), j = Math.floor(fz);
+  if (i < 0 || j < 0 || i >= t.nx - 1 || j >= t.nz - 1) return 0;
+  const a = fx - i, b = fz - j, H = t.h, n = t.nx;
+  return (H[j * n + i] * (1 - a) + H[j * n + i + 1] * a) * (1 - b) + (H[(j + 1) * n + i] * (1 - a) + H[(j + 1) * n + i + 1] * a) * b;
 }
 export interface Place { nm: string; x: number; z: number; r: number; h: number; e: [number, number, number, number] }
 
@@ -100,7 +112,9 @@ export class Collider {
   private posts = new Grid<Post>(16);
   private te: Edge[] = [];
   private tp: Post[] = [];
+  private terrain: Terrain | null;
   constructor(d: CityData) {
+    this.terrain = d.terrain ?? null;
     for (const b of d.buildings) {
       if ((b.m ?? 0) > 2) continue; // 懸空的部件不擋車
       const p = b.p, n = p.length / 2;
@@ -113,6 +127,11 @@ export class Collider {
     // 行道樹、路燈不在這裡：它們會被撞倒（breakables.ts），不是固定的障礙物
   }
   addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
+  /** 軸對齊的方塊建築（地圖外圍的遠景城市） */
+  addRect(cx: number, cz: number, w: number, d: number) {
+    const a = cx - w / 2, b = cz - d / 2, c = cx + w / 2, e = cz + d / 2;
+    for (const [x1, z1, x2, z2] of [[a, b, c, b], [c, b, c, e], [c, e, a, e], [a, e, a, b]]) this.edges.addBox(x1, z1, x2, z2, { x1, z1, x2, z2 });
+  }
 
   /** 圓碰到的每一個接觸：法向量（從牆指向圓心）與重疊深度；給剛體逐一施加衝量用 */
   contacts(x: number, z: number, r: number, out: { nx: number; nz: number; depth: number }[]) {
@@ -126,6 +145,16 @@ export class Collider {
     for (const p of this.posts.query(x, z, r + 0.5, this.tp)) {
       const ox = x - p.x, oz = z - p.z, d = Math.hypot(ox, oz), rr = r + p.r;
       if (d < rr && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: rr - d });
+    }
+    // 山坡：太陡（離地超過 1.2 m）就當成牆，從往下坡的方向推回來
+    if (this.terrain) {
+      const h0 = terrainHeight(this.terrain, x, z);
+      if (h0 > 1.2) {
+        const gx = terrainHeight(this.terrain, x + 2, z) - terrainHeight(this.terrain, x - 2, z);
+        const gz = terrainHeight(this.terrain, x, z + 2) - terrainHeight(this.terrain, x, z - 2);
+        const gl = Math.hypot(gx, gz) || 1;
+        out.push({ nx: -gx / gl, nz: -gz / gl, depth: Math.min(0.5, (h0 - 1.2) * 0.2) });
+      }
     }
     // 同一面牆被兩條相鄰的邊各算一次時，只留最深的那個（避免推兩倍）
     if (out.length > 1) {

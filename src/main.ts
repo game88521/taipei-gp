@@ -43,7 +43,7 @@ const save = loadSave();
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const MOBILE = matchMedia('(pointer: coarse)').matches; // 觸控裝置（手機、平板）
-const qPref = save.quality ?? 'auto';
+const qPref = (new URLSearchParams(location.search).get('q') as Level | null) ?? save.quality ?? 'auto'; // ?q=medium 給測試用
 let level: Level = qPref === 'auto' ? defaultLevel(MOBILE) : qPref;
 const Q = qualityFor(level);
 const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2 && !Q.bloom, powerPreference: 'high-performance', stencil: true });
@@ -140,13 +140,16 @@ let breakables: Breakables | null = null;
 let taxi: TaxiJob | null = null;
 const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
+let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 const cityLoad = loadCity(scene, track, Q).then((c) => {
   collider = new Collider(c.data);
+  for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
   breakables = c.breakables;
   raceHide = c.raceHide;
+  cityCull = c.cull;
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
@@ -427,7 +430,7 @@ function updateVisuals(dt: number) {
   sr?.showMarkers(mode === 'free' && !taxiOn());
   taxi?.render(performance.now() / 1000);
   if (traffic) traffic.signalsVisible = mode === 'free';
-  for (const o of raceHide) o.visible = mode === 'free';
+  for (const o of raceHide) { o.userData.off = mode !== 'free'; o.visible = !o.userData.off && o.userData.inRange !== false; }
   breakables?.update(dt, vc.x, vc.z);
   if (peds) {
     peds.visible = mode === 'free';
@@ -472,6 +475,7 @@ function updateVisuals(dt: number) {
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   world.sky.position.copy(camera.position);
+  world.mountains.position.y = -camera.position.y;
   if (Q.shadows && world.sun.castShadow) {
     // 陰影範圍的中心在車子前方一點；對齊陰影貼圖的格子，移動時陰影邊緣才不會閃
     const step = (Q.shadowRange * 2) / Q.shadowSize;
@@ -704,7 +708,7 @@ function replayFrame(dt: number) {
   if (traffic) { traffic.visible = false; traffic.signalsVisible = false; }
   if (peds) peds.visible = false;
   sedanModel.root.visible = false;
-  for (const o of raceHide) o.visible = false;
+  for (const o of raceHide) { o.userData.off = true; o.visible = false; }
   replayT += dt * replaySpeed;
   if (replayT >= len) { endReplay(); return; }
   field.replayAt(replayT, (r, x, z, h, steer, v) => {
@@ -736,6 +740,7 @@ function replayFrame(dt: number) {
   }
   camera.updateProjectionMatrix();
   world.sky.position.copy(camera.position);
+  world.mountains.position.y = -camera.position.y;
   $('replay-time').textContent = `▶ 回放 ${fmt(replayT)} / ${fmt(len)}`;
 }
 $('btn-replay').addEventListener('click', startReplay);
@@ -895,7 +900,7 @@ function showStreetResult() {
       tb.appendChild(tr);
     });
   }
-  if (BOT) document.title = `DUEL ${c.def.title} P${place} ` + st.map((r) => `${r.name}:${r.done != null && isFinite(r.done) ? r.done.toFixed(1) : '-'}`).join(' ');
+  if (BOT) document.title = `DUEL ${c.def.title} P${place} ` + st.map((r) => `${r.name}:${r.done != null && isFinite(r.done) ? r.done.toFixed(1) : '-'}`).join(' ') + ` 檢查點${sr.next}/${c.checkpoints.length} 車${fcar.x.toFixed(0)},${fcar.z.toFixed(0)}`;
   if (win && me != null) {
     save.street = save.street || {};
     if (!save.street[c.def.id] || me < save.street[c.def.id]) save.street[c.def.id] = me;
@@ -1142,7 +1147,7 @@ qSel.addEventListener('change', () => {
 
 // ---------------------------------------------------------------- 主迴圈
 const clock = new THREE.Clock();
-let fpsN2 = 0, fpsT2 = 0;
+let fpsN2 = 0, fpsT2 = 0, cullAcc = 1;
 let acc = 0; // （保留給同步模擬用）
 void acc;
 car.placeAt(track, 1);
@@ -1166,9 +1171,17 @@ function physicsTest() {
   while (c.v < 33.3) c.update(STEP, 0, true, false, null);
   for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 33.3, false, null);
   out.push(`R120:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
-  // 4) 撞牆：從起點直衝，記錄撞擊、反彈後速度，再倒車 1.5 秒、打方向加油 3 秒看能不能脫困
+  // 4) 撞牆：朝起點附近 60~250 m 最近的一面牆直衝，記錄撞擊、反彈後速度，再倒車 1.5 秒、打方向加油 3 秒看能不能脫困
+  //    （地圖變大後，從起點照原方向直衝 40 秒可能一路都沒牆）
   if (collider) {
-    c.place(fcar.x, fcar.z, fcar.h);
+    const probe: { nx: number; nz: number; depth: number }[] = [];
+    let wallH = fcar.h, wallD = Infinity;
+    for (let a = 0; a < 72; a++) {
+      const h = (a / 72) * Math.PI * 2;
+      for (let d = 60; d < Math.min(250, wallD); d += 2)
+        if (collider.contacts(fcar.x + Math.sin(h) * d, fcar.z + Math.cos(h) * d, 1, probe).length) { wallD = d; wallH = h; break; }
+    }
+    c.place(fcar.x, fcar.z, wallH);
     let hitAt = -1, maxImpact = 0, bounce = 0;
     for (let k = 0; k < 120 * 40 && hitAt < 0; k++) {
       const imp = c.update(STEP, 0, true, false, collider);
@@ -1235,7 +1248,7 @@ if (FREE) void cityLoad.then(() => {
     if (TAXI_TEST) taxi?.start(fcar.x, fcar.z);
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
-    if (TAXI_TEST && taxi) { roadAcc = lmAcc = 1; updateFreeHud(0); document.title = `TAXI 趟數${taxi.trips} 收入${taxi.money} 狀態${taxi.phase} 目標${taxi.target?.nm} 剩${Math.round(taxi.timeLeft)}s 地點數${(taxi as unknown as { places: unknown[] }).places.length}`; return; }
+    if (TAXI_TEST && taxi) { roadAcc = lmAcc = 1; updateFreeHud(0); document.title = `TAXI 趟數${taxi.trips} 收入${taxi.money} 狀態${taxi.phase} 目標${taxi.target?.nm} 剩${Math.round(taxi.timeLeft)}s 地點數${(taxi as unknown as { places: unknown[] }).places.length} 車${fcar.x.toFixed(0)},${fcar.z.toFixed(0)} 速${(fcar.v * 3.6).toFixed(0)} 路線${taxi.route?.length ?? 0}點 距目標${taxi.target ? Math.hypot(taxi.target.x - fcar.x, taxi.target.z - fcar.z).toFixed(0) : "-"}m`; return; }
     if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length} 對手最大被撞開${sr.maxKnock.toFixed(1)}m`; return; }
     breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
@@ -1281,6 +1294,8 @@ renderer.setAnimationLoop(() => {
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
   // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
   fpsN2++; fpsT2 += dt;
+  cullAcc += dt;
+  if (cullAcc > 0.4 && cityCull) { cullAcc = 0; cityCull(camera.position.x, camera.position.z, Q.viewDist); } // 遠的城市區塊不畫
   if (fpsT2 >= 0.5) {
     const el = $('fps');
     el.style.display = opts.fps ? '' : 'none';
@@ -1298,4 +1313,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, get state() { return state; } };

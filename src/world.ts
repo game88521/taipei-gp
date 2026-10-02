@@ -11,6 +11,53 @@ function rng(seed: number) {
   };
 }
 
+/**
+ * 台北盆地四周的遠山（天空的一部分，跟著鏡頭走、沒有視差）：
+ * 依方位（從北順時針）給「仰角」——陽明山在北、觀音山在西北、四獸山／南港山在東、新店山區在南
+ * 兩層：遠的淡（大氣透視）、近的深
+ */
+function farMountains(): THREE.Group {
+  const g = new THREE.Group();
+  const R = 2250;
+  const layers: [number, [number, number][], string, string][] = [
+    // 遠層：仰角（度）
+    [R, [[0, 3.9], [20, 3.2], [40, 2.5], [60, 2.9], [80, 3.6], [100, 3.4], [125, 3.0], [150, 2.4], [175, 2.7], [200, 2.2], [225, 1.5], [250, 0.9], [270, 0.7], [290, 1.8], [305, 2.2], [320, 3.0], [340, 4.4], [360, 3.9]], '#8a7a98', '#d9a88a'],
+    // 近層：比較低、比較深（東邊的南港山、南邊的山麓）
+    [R * 0.97, [[0, 1.6], [30, 1.1], [60, 1.9], [85, 3.2], [105, 2.9], [130, 2.2], [160, 1.6], [190, 1.4], [220, 0.8], [260, 0.4], [300, 0.9], [330, 1.6], [360, 1.6]], '#5e4e6e', '#c48a7a'],
+  ];
+  layers.forEach(([rad, prof, top, bottom], li) => {
+    const pos: number[] = [], col: number[] = [];
+    const cTop = new THREE.Color(top), cBot = new THREE.Color(bottom);
+    const at = (deg: number) => {
+      let k = 0;
+      while (k < prof.length - 2 && prof[k + 1][0] < deg) k++;
+      const [a0, h0] = prof[k], [a1, h1] = prof[k + 1];
+      const f = (deg - a0) / (a1 - a0 || 1);
+      const base = h0 + (h1 - h0) * (f * f * (3 - 2 * f));
+      // 稜線起伏：幾個頻率疊起來
+      const r = deg * (Math.PI / 180);
+      return Math.max(0.2, base + 0.35 * Math.sin(r * 23 + li) + 0.2 * Math.sin(r * 61 + li * 3) + 0.12 * Math.sin(r * 137));
+    };
+    for (let d = 0; d < 360; d += 1) {
+      const b0 = (d * Math.PI) / 180, b1 = ((d + 1) * Math.PI) / 180;
+      const e0 = (at(d) * Math.PI) / 180, e1 = (at(d + 1) * Math.PI) / 180;
+      // 方位 b（從北順時針）→ 方向 (sin b, -cos b)：x 向東、z 向南
+      const p = (b: number, y: number) => [Math.sin(b) * rad, y, -Math.cos(b) * rad];
+      const A = p(b0, -120), B = p(b1, -120), C = p(b1, Math.tan(e1) * rad), D = p(b0, Math.tan(e0) * rad);
+      pos.push(...A, ...C, ...B, ...A, ...D, ...C);
+      for (const c of [cBot, cTop, cBot, cBot, cTop, cTop]) col.push(c.r, c.g, c.b);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    // 會寫入深度：山後面那片（霧色的）遠方地面被山擋住，從高空看山腳才不會跟地面之間空出一條天空
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
+    m.renderOrder = -0.5 + li * 0.1; // 天空（-1）之後、城市之前
+    g.add(m);
+  });
+  return g;
+}
+
 /** 太陽方向（從地面指向太陽）：夕陽在西北偏西、仰角約 18° */
 export const SUN_DIR = new THREE.Vector3(-600, 220, 300).normalize();
 /** 地面影子：每 1 m 高度往哪個方向延伸多遠（太陽的反方向） */
@@ -91,6 +138,8 @@ function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
 
 export interface World {
   sky: THREE.Mesh;
+  /** 遠山：跟著天空水平移動，但山腳固定在地面高度（每格由 main 設 y = -鏡頭高度） */
+  mountains: THREE.Group;
   assist: THREE.Mesh;
   race: THREE.Group;
   sun: THREE.DirectionalLight;
@@ -158,10 +207,12 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   );
   clouds.rotation.y = Math.atan2(sunDir.x, sunDir.z) - Math.PI * 0.62 * 2;
   sky.add(clouds);
+  const mountains = farMountains();
+  sky.add(mountains);
 
   // ---- 地面
   // 人行道、廣場的顏色（真實道路、綠地另外鋪在上面）
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: '#77746e' }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 12000), new THREE.MeshLambertMaterial({ color: '#77746e' })); // 地圖擴大後要更大
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(200, -0.6, 50); // 各層高度拉開，手機的深度精度才不會讓地面蓋過路面
   scene.add(ground);
@@ -308,5 +359,5 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     race.add(pole, head);
   }
 
-  return { sky, assist, race, sun, sunDir };
+  return { sky, mountains, assist, race, sun, sunDir };
 }

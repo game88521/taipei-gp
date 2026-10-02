@@ -61,8 +61,11 @@ export class Pedestrians {
     for (const w of d.net.ways) if (w.c <= 3) for (let k = 0; k + 1 < w.n.length; k++) {
       roadSegs.push([N[w.n[k] * 2], N[w.n[k] * 2 + 1], N[w.n[k + 1] * 2], N[w.n[k + 1] * 2 + 1], w.w / 2 + 0.6]);
     }
-    const onRoad = (x: number, z: number) => roadSegs.some(([x1, z1, x2, z2, r]) => {
-      if (Math.min(x1, x2) - r > x || Math.max(x1, x2) + r < x || Math.min(z1, z2) - r > z || Math.max(z1, z2) + r < z) return false;
+    // 用格子索引查「在不在車道上」：地圖大了以後，逐條比對所有道路會讓載入卡好幾秒
+    const segGrid = new Grid<number[]>(30);
+    for (const sg of roadSegs) segGrid.addBox(Math.min(sg[0], sg[2]) - sg[4], Math.min(sg[1], sg[3]) - sg[4], Math.max(sg[0], sg[2]) + sg[4], Math.max(sg[1], sg[3]) + sg[4], sg);
+    const segTmp: number[][] = [];
+    const onRoad = (x: number, z: number) => segGrid.query(x, z, 0, segTmp).some(([x1, z1, x2, z2, r]) => {
       const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1;
       const t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / l2));
       return Math.hypot(x - x1 - dx * t, z - z1 - dz * t) < r;
