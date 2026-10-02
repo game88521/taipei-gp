@@ -1,11 +1,19 @@
 import * as THREE from 'three';
-import type { CityData, Collider } from './citydata';
+import { Grid, type CityData, type Collider } from './citydata';
+import type { Traffic } from './traffic';
 import { pedParts } from './models';
 
 // 行人：沿真實道路兩側的人行道來回走；車子靠近會閃開，被碰到會被推開、坐在地上一下再站起來
 
 interface Walk { x1: number; z1: number; x2: number; z2: number; len: number; next: Walk[] }
+/** 斑馬線：路口中心、道路方向、兩端（在兩側人行道上） */
+interface Crossing { cx: number; cz: number; ux: number; uz: number; w: number; ends: [number, number][] }
 interface Ped {
+  mode: 'walk' | 'wait' | 'cross';
+  cw: Crossing | null; // 正在等或正在過的斑馬線
+  from: number; // 從斑馬線的哪一端出發（0/1）
+  ct: number; // 過馬路進度 0..1；等待時是已經等了幾秒
+  cool: number; // 剛過完馬路，暫時不再過
   w: Walk; s: number; dir: 1 | -1; v: number;
   x: number; z: number; h: number;
   phase: number; // 走路擺腿的相位
@@ -34,6 +42,11 @@ function rng(seed: number) {
 export class Pedestrians {
   private walks: Walk[] = [];
   private peds: Ped[] = [];
+  private crossings: Crossing[] = [];
+  private endGrid = new Grid<Crossing>(15);
+  private walkGrid = new Grid<Walk>(15);
+  private tmpC: Crossing[] = [];
+  private tmpW: Walk[] = [];
   private rand = rng(88);
   private mesh = {} as Record<Part, THREE.InstancedMesh>;
   readonly max: number;
@@ -72,6 +85,26 @@ export class Pedestrians {
       }
     }
 
+    // 斑馬線：路網上的穿越道節點，兩端各在路緣外 2 m（落到別的車道上的不要）
+    const wayAt = new Map<number, { w: CityData['net']['ways'][number]; k: number }>();
+    for (const w of d.net.ways) if (w.c <= 3) w.n.forEach((ni, k) => { if (!wayAt.has(ni)) wayAt.set(ni, { w, k }); });
+    for (const ni of d.crossings) {
+      const at = wayAt.get(ni);
+      if (!at) continue;
+      const { w, k } = at;
+      const a = w.n[Math.max(0, k - 1)], b = w.n[Math.min(w.n.length - 1, k + 1)];
+      let ux = N[b * 2] - N[a * 2], uz = N[b * 2 + 1] - N[a * 2 + 1];
+      const l = Math.hypot(ux, uz) || 1;
+      ux /= l; uz /= l;
+      const cx = N[ni * 2], cz = N[ni * 2 + 1], off = w.w / 2 + 2;
+      const ends: [number, number][] = [[cx - uz * off, cz + ux * off], [cx + uz * off, cz - ux * off]];
+      if (ends.some(([x, z]) => onRoad(x, z) || col.push(x, z, 0.5, tmp))) continue;
+      const c: Crossing = { cx, cz, ux, uz, w: w.w, ends };
+      this.crossings.push(c);
+      for (const [x, z] of ends) this.endGrid.addBox(x, z, x, z, c);
+    }
+    for (const wk of this.walks) this.walkGrid.addBox(wk.x1, wk.z1, wk.x2, wk.z2, wk);
+
     // 人形：身體、骨盆、脖子、頭、頭髮、雙手雙腿（以關節為軸擺動）、鞋子、背包
     const geo: Record<Part, THREE.BufferGeometry> = {
       torso: pedParts.torso(), pelvis: pedParts.pelvis(), head: pedParts.head(), hair: pedParts.hair(), neck: pedParts.neck(),
@@ -96,6 +129,7 @@ export class Pedestrians {
       if (d < minR || d > 240) continue;
       const pick = <T,>(a: T[]) => a[Math.floor(this.rand() * a.length)];
       const p: Ped = {
+        mode: 'walk', cw: null, from: 0, ct: 0, cool: this.rand() * 10,
         w, s, dir: this.rand() < 0.5 ? 1 : -1, v: 1.1 + this.rand() * 0.5, x, z, h: 0, phase: this.rand() * 6,
         dodge: 0, sit: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)),
         hair: new THREE.Color(pick(HAIR)), sleeve: new THREE.Color(), shoe: new THREE.Color(pick(SHOES)),
@@ -109,7 +143,7 @@ export class Pedestrians {
   }
 
   /** 回傳被碰到的行人數（給音效用） */
-  update(dt: number, car: { x: number; z: number; h: number; v: number }): number {
+  update(dt: number, car: { x: number; z: number; h: number; v: number }, traffic: Traffic | null = null): number {
     let alive = 0, bumped = 0;
     for (const p of this.peds) {
       if (!p.alive) continue;
@@ -120,7 +154,43 @@ export class Pedestrians {
     const fx = Math.sin(car.h), fz = Math.cos(car.h);
     for (const p of this.peds) {
       if (!p.alive) continue;
+      p.cool -= dt;
+      // ---- 等紅燈／過馬路
+      if (p.mode !== 'walk' && p.cw) {
+        const c = p.cw, [ax, az] = c.ends[p.from], [bx, bz] = c.ends[1 - p.from];
+        if (p.sit > 0) { p.sit -= dt; continue; }
+        if (p.mode === 'wait') {
+          p.ct += dt;
+          p.x = ax; p.z = az;
+          p.h = Math.atan2(bx - ax, bz - az);
+          if (this.mayCross(c, traffic)) { p.mode = 'cross'; p.ct = 0; }
+          else if (p.ct > 45) { p.mode = 'walk'; p.cool = 30; } // 等太久就不過了
+          continue;
+        }
+        // 過馬路：走到對面，再接上那一側的人行道
+        const len = Math.hypot(bx - ax, bz - az) || 1;
+        p.ct += (p.v * 1.15 * dt) / len;
+        p.phase += p.v * dt * 5.6;
+        p.x = ax + (bx - ax) * p.ct;
+        p.z = az + (bz - az) * p.ct;
+        p.h = Math.atan2(bx - ax, bz - az);
+        const cdx = p.x - car.x, cdz = p.z - car.z;
+        if (Math.hypot(cdx, cdz) < 1.6 && Math.abs(car.v) > 0.5 && p.sit <= 0) { p.sit = 2.5; bumped++; }
+        if (p.ct >= 1) this.landOn(p, bx, bz);
+        continue;
+      }
       const w = p.w;
+      // 走到斑馬線那一端：一半的人會過馬路
+      if (p.cool <= 0 && p.sit <= 0) {
+        for (const c of this.endGrid.query(p.x, p.z, 3, this.tmpC)) {
+          const e = c.ends.findIndex(([x, z]) => Math.hypot(x - p.x, z - p.z) < 1.6);
+          if (e < 0) continue;
+          p.cool = 25;
+          if (this.rand() < 0.55) { p.mode = 'wait'; p.cw = c; p.from = e; p.ct = 0; }
+          break;
+        }
+        if (p.mode !== 'walk') continue;
+      }
       if (p.sit > 0) {
         p.sit -= dt;
       } else {
@@ -165,6 +235,47 @@ export class Pedestrians {
     return bumped;
   }
 
+  /** 可以過馬路嗎：有號誌的路口看這條路的車是不是紅燈；沒號誌就看附近有沒有車開過來 */
+  private mayCross(c: Crossing, traffic: Traffic | null): boolean {
+    if (!traffic) return true;
+    const sig = traffic.pedGreen(c.cx, c.cz, c.ux, c.uz);
+    if (sig !== null) return sig;
+    for (const a of traffic.near(c.cx, c.cz, 30)) {
+      if (a.v < 1) continue;
+      const dx = c.cx - a.x, dz = c.cz - a.z, hx = Math.sin(a.h), hz = Math.cos(a.h);
+      const ahead = dx * hx + dz * hz;
+      if (ahead > -3 && ahead < 26 && Math.abs(-dx * hz + dz * hx) < c.w / 2 + 3) return false;
+    }
+    return true;
+  }
+
+  /** 過完馬路：接到對面最近的人行道；找不到就讓這個人消失（之後會在別處重新出現） */
+  private landOn(p: Ped, x: number, z: number) {
+    let best: Walk | null = null, bs = 0, bd = 4;
+    for (const w of this.walkGrid.query(x, z, 4, this.tmpW)) {
+      const dx = w.x2 - w.x1, dz = w.z2 - w.z1;
+      const t = Math.max(0, Math.min(w.len, ((x - w.x1) * dx + (z - w.z1) * dz) / w.len));
+      const d = Math.hypot(w.x1 + (dx * t) / w.len - x, w.z1 + (dz * t) / w.len - z);
+      if (d < bd) { bd = d; best = w; bs = t; }
+    }
+    p.mode = 'walk';
+    p.cw = null;
+    p.cool = 20;
+    if (!best) { p.alive = false; return; }
+    p.w = best;
+    p.s = bs;
+    p.dir = this.rand() < 0.5 ? 1 : -1;
+    p.dodge = 0;
+  }
+
+  /** 正在過馬路的人：給車流當障礙物（車子會停下來讓） */
+  crossers(): { x: number; z: number; v: number }[] {
+    return this.peds.filter((p) => p.alive && p.mode === 'cross').map((p) => ({ x: p.x, z: p.z, v: 0 }));
+  }
+  get crossingCount() { return this.crossings.length; }
+  get crossingNow() { return this.peds.filter((p) => p.alive && p.mode === 'cross').length; }
+  get waitingNow() { return this.peds.filter((p) => p.alive && p.mode === 'wait').length; }
+
   render() {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), sc = new THREE.Vector3();
     const j = new THREE.Matrix4(), t = new THREE.Matrix4(), r = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -179,7 +290,7 @@ export class Pedestrians {
       for (const k of ['torso', 'pelvis', 'neck', 'head'] as const) put(k, m, k === 'torso' ? p.shirt : k === 'pelvis' ? p.pants : p.skin);
       put('hair', m, p.hair);
       put('bag', p.bag ? m : zero, p.shirt.clone().multiplyScalar(0.55));
-      const swing = sitting ? 0 : Math.sin(p.phase) * 0.5;
+      const swing = sitting || p.mode === 'wait' ? 0 : Math.sin(p.phase) * 0.5; // 等紅燈時站好
       // 腿：髖關節 (±0.09, 0.9)；坐著時往前伸直
       for (const [leg, shoe, side, sgn] of [['legL', 'shoeL', -0.09, 1], ['legR', 'shoeR', 0.09, -1]] as const) {
         j.copy(m).multiply(t.makeTranslation(side, 0.9, 0)).multiply(r.makeRotationX(sitting ? -1.45 : swing * sgn));

@@ -273,6 +273,17 @@ export class Traffic {
     return { gap, lv };
   }
 
+  /**
+   * 行人號誌：(x, z) 附近 30 m 內有號誌路口時，沿 (ux, uz) 方向這條路的車是紅燈 → 行人可以過（true）；
+   * 沒有號誌路口回傳 null（行人自己看車）
+   */
+  pedGreen(x: number, z: number, ux: number, uz: number): boolean | null {
+    let best: Cluster | null = null, bd = 30;
+    for (const c of this.clusters) { const d = Math.hypot(c.cx - x, c.cz - z); if (d < bd) { bd = d; best = c; } }
+    if (!best) return null;
+    return lightOf(best, groupOf(best, ux, uz), this.t) === 'r';
+  }
+
   /** 附近的車（給街頭飆車的對手閃車用） */
   near(x: number, z: number, r: number) {
     return this.agents.filter((a) => a.alive && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);

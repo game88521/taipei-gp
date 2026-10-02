@@ -848,10 +848,10 @@ function freeStep(dt: number) {
     if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(sr.checkOffer(fcar.x, fcar.z, fcar.v));
   }
   if (traffic && !NO_TRAFFIC) {
-    traffic.update(dt, fcar, sr?.obstacle() ?? []);
+    traffic.update(dt, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? [])]); // 車流會讓對手與過馬路的行人
     impact = Math.max(impact, traffic.collidePlayer(fcar));
   }
-  if (peds && peds.update(dt, fcar)) {
+  if (peds && peds.update(dt, fcar, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
     sound.hit(6);
   }
@@ -1030,7 +1030,7 @@ if (FREE) void cityLoad.then(() => {
     breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
-    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;
+    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
