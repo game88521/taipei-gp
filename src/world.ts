@@ -105,6 +105,28 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   sunDisc.scale.setScalar(420);
   sunDisc.position.copy(sunDir).multiplyScalar(2300);
   sky.add(sunDisc);
+  // 晚霞雲層：上半球一圈半透明的雲（canvas 隨機畫柔邊雲團），靠太陽那側偏橘、另一側偏粉紫
+  const cloudTex = canvasTex(1024, 256, (g) => {
+    g.clearRect(0, 0, 1024, 256);
+    const rr = rng(77);
+    for (let k = 0; k < 140; k++) {
+      const x = rr() * 1024, y = 40 + rr() * 170, rad = 20 + rr() * 70;
+      const warm = Math.abs(x / 1024 - 0.62) < 0.2;
+      const grd = g.createRadialGradient(x, y, 0, x, y, rad);
+      const c = warm ? '255,190,140' : '230,160,190';
+      grd.addColorStop(0, `rgba(${c},${0.22 + rr() * 0.2})`);
+      grd.addColorStop(1, `rgba(${c},0)`);
+      g.fillStyle = grd;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+  });
+  cloudTex.wrapT = THREE.ClampToEdgeWrapping;
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(2400, 48, 12, 0, Math.PI * 2, Math.PI * 0.18, Math.PI * 0.3),
+    new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
+  clouds.rotation.y = Math.atan2(sunDir.x, sunDir.z) - Math.PI * 0.62 * 2;
+  sky.add(clouds);
 
   // ---- 地面
   // 人行道、廣場的顏色（真實道路、綠地另外鋪在上面）

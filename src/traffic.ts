@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CityData, NetWay } from './citydata';
 import { lanesOf } from './decor';
 import { sedanGeo, busGeo, scooterGeo } from './models';
+import { FreeCar } from './freecar';
 
 // 車流與紅綠燈：沿真實路網的車道行駛，路口隨機轉彎，跟車用 IDM（智慧駕駛模型），紅燈停在停止線前
 
@@ -28,6 +29,7 @@ interface Agent {
   x: number; z: number; h: number; vh: number; // vh = 畫面上平滑過的車頭方向
   inC: Cluster | null; // 已經進入的路口（同一個路口其他號誌節點不再停）
   stunned: number; // 被撞後停住的秒數
+  kx: number; kz: number; kh: number; // 被撞開的位移與車頭偏轉（慢慢回到車道）
   alive: boolean;
 }
 
@@ -123,7 +125,7 @@ export class Traffic {
     this.buildSignals(scene, d);
 
     // ---- 車輛外型
-    const mats = [new THREE.MeshLambertMaterial(), new THREE.MeshLambertMaterial({ vertexColors: true })];
+    const mats = [new THREE.MeshStandardMaterial({ metalness: 0.4, roughness: 0.32 }), new THREE.MeshLambertMaterial({ vertexColors: true })]; // 車身烤漆會反光
     for (let k = 0 as Kind; k < 5; k = (k + 1) as Kind) {
       const g = kindGeometry(k);
       const cap = this.max;
@@ -210,7 +212,7 @@ export class Traffic {
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
         e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
-        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, alive: true,
+        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, alive: true,
       };
       const dead = this.agents.findIndex((q) => !q.alive);
       if (dead >= 0) this.agents[dead] = a; else this.agents.push(a);
@@ -280,6 +282,12 @@ export class Traffic {
 
     for (const a of this.agents) {
       if (!a.alive) continue;
+      // 被撞開的位移：停住時不動，之後 1~2 秒內滑回車道
+      if (a.stunned <= 0 && (a.kx || a.kz || a.kh)) {
+        const k = Math.exp(-dt * 1.6);
+        a.kx *= k; a.kz *= k; a.kh *= k;
+        if (Math.abs(a.kx) + Math.abs(a.kz) + Math.abs(a.kh) < 0.01) a.kx = a.kz = a.kh = 0;
+      }
       if (a.stunned > 0) { a.stunned -= dt; a.v = 0; continue; }
       let { gap, lv } = this.leader(a, player);
       // 紅綠燈：這段路的終點是號誌路口，而且還沒進那個路口
@@ -320,21 +328,27 @@ export class Traffic {
   }
 
   /** 玩家的車撞到車流：把玩家推開，被撞的車停一下；回傳撞擊力道 */
-  collidePlayer(p: { x: number; z: number; h: number; v: number }): number {
+  /** 玩家的車撞到車流：玩家照剛體彈開；被撞的車被推開、歪一下、停 1.5 秒再回到車道 */
+  collidePlayer(p: FreeCar): number {
     let impact = 0;
-    const fx = Math.sin(p.h), fz = Math.cos(p.h);
+    const pr = FreeCar.RADIUS;
     for (const a of this.agents) {
-      if (!a.alive || Math.abs(a.x - p.x) > 8 || Math.abs(a.z - p.z) > 8) continue;
-      const ax = Math.sin(a.h), az = Math.cos(a.h), half = KIND_LEN[a.kind] / 2 - 0.9, ar = a.kind === 3 ? 0.5 : a.kind === 2 ? 1.3 : 1.0;
-      for (const po of [1.3, -1.3]) for (const ao of [-half, 0, half]) {
-        const px = p.x + fx * po, pz = p.z + fz * po, qx = a.x + ax * ao, qz = a.z + az * ao;
-        const dx = px - qx, dz = pz - qz, d = Math.hypot(dx, dz), r = 1.05 + ar;
+      if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9) continue;
+      const ax = Math.sin(a.h + a.kh), az = Math.cos(a.h + a.kh), half = KIND_LEN[a.kind] / 2 - 0.9, ar = a.kind === 3 ? 0.5 : a.kind === 2 ? 1.3 : 1.0;
+      // 越重越推不動：公車幾乎不動、機車會被推很遠
+      const give = a.kind === 2 ? 0.1 : a.kind === 3 ? 1.0 : 0.5;
+      for (const [px, pz] of p.circles()) for (const ao of [-half, 0, half]) {
+        const qx = a.x + a.kx + ax * ao, qz = a.z + a.kz + az * ao;
+        const dx = px - qx, dz = pz - qz, d = Math.hypot(dx, dz), r = pr + ar;
         if (d >= r || d < 1e-4) continue;
         const nx = dx / d, nz = dz / d;
-        p.x += nx * (r - d);
-        p.z += nz * (r - d);
-        const vn = (fx * nx + fz * nz) * p.v;
-        if (vn < 0) { impact = Math.max(impact, -vn); p.v *= 0.55; }
+        const hit = p.contact(nx, nz, (r - d) * (1 - give * 0.5), qx + nx * ar, qz + nz * ar, ax * a.v, az * a.v, 0.4, 0.4);
+        impact = Math.max(impact, hit);
+        // 被撞的車往反方向被推、車頭被撞歪
+        const push = (r - d) * give * 0.5 + Math.min(1.2, hit * 0.06) * give;
+        a.kx -= nx * push;
+        a.kz -= nz * push;
+        a.kh += (ao >= 0 ? 1 : -1) * (nx * az - nz * ax) * Math.min(0.5, hit * 0.03) * give;
         a.stunned = Math.max(a.stunned, 1.5);
       }
     }
@@ -350,8 +364,8 @@ export class Traffic {
       d = Math.atan2(Math.sin(d), Math.cos(d));
       a.vh += d * Math.min(1, dt * 8);
       const i = counts[a.kind]++;
-      q.setFromAxisAngle(up, a.vh);
-      m.compose(pos.set(a.x, -0.25, a.z), q, one);
+      q.setFromAxisAngle(up, a.vh + a.kh);
+      m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
       const mm = this.meshes[a.kind];
       mm.paint.setMatrixAt(i, m);
       mm.fixed.setMatrixAt(i, m);

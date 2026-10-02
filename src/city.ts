@@ -24,8 +24,9 @@ function rng(seed: number) {
 }
 
 /** 外牆貼圖：顏色圖 + 只有亮燈窗戶的發光圖（發光不受牆面染色影響） */
-function facade(kind: 'res' | 'glass' | 'civic', seed: number) {
+function facade(kind: 'res' | 'glass' | 'civic', seed: number, reflective = false) {
   const r = rng(seed);
+  const look = seed % 3; // 公寓的三種長相：0 鐵窗冷氣、1 陽台欄杆、2 大窗＋遮雨棚
   const lit: [number, number, number, number][] = [];
   const map = canvasTex(256, 256, (g) => {
     if (kind === 'glass') {
@@ -62,13 +63,25 @@ function facade(kind: 'res' | 'glass' | 'civic', seed: number) {
       g.strokeStyle = 'rgba(0,0,0,0.06)';
       for (let y = 0; y < 256; y += 8) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
       for (let row = 0; row < 2; row++) {
+        if (look === 1) { // 陽台：一條水泥樓板帶＋欄杆
+          g.fillStyle = 'rgba(0,0,0,0.12)';
+          g.fillRect(0, row * 128 + 104, 256, 14);
+          g.fillStyle = 'rgba(60,60,60,0.7)';
+          for (let x = 0; x < 256; x += 9) g.fillRect(x, row * 128 + 92, 2, 14);
+          g.fillRect(0, row * 128 + 90, 256, 3);
+        }
         for (let col = 0; col < 2; col++) {
-          const x = col * 128 + 22, y = row * 128 + 30, w = 84, h = 62;
+          const big = look === 2;
+          const x = col * 128 + (big ? 12 : 22), y = row * 128 + (big ? 22 : 30), w = big ? 104 : 84, h = big ? 74 : 62;
           const on = r() < 0.4;
           g.fillStyle = on ? '#ffd88a' : '#2c3542';
           g.fillRect(x, y, w, h);
           if (on) lit.push([x, y, w, h]);
-          if (r() < 0.6) { // 鐵窗
+          if (big) { // 遮雨棚
+            g.fillStyle = ['#3f7fae', '#4f9a5a', '#b8b0a0'][(row + col + seed) % 3];
+            g.fillRect(x - 6, y - 12, w + 12, 9);
+          }
+          if (look === 0 && r() < 0.75) { // 鐵窗
             g.strokeStyle = 'rgba(70,70,70,0.85)';
             g.lineWidth = 2;
             g.strokeRect(x - 4, y - 4, w + 8, h + 8);
@@ -86,6 +99,8 @@ function facade(kind: 'res' | 'glass' | 'civic', seed: number) {
     for (const [x, y, w, h] of lit) g.fillRect(x, y, w, h);
   });
   map.anisotropy = emissive.anisotropy = 8;
+  // 高畫質：玻璃帷幕用會反射天空的材質（夕陽時整面樓映出晚霞）
+  if (reflective) return new THREE.MeshStandardMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true, metalness: 0.55, roughness: 0.22, envMapIntensity: 1.1 });
   return new THREE.MeshLambertMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true });
 }
 
@@ -210,6 +225,38 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     return [bi, Math.sqrt(bd)];
   };
 
+  // 主要道路（幹道～一般道路）的格狀索引：給騎樓店面與招牌找「面向哪條路」
+  const RG = 30, rgrid = new Map<string, [number, number, number, number, number][]>();
+  {
+    const NN = data.net.nodes;
+    for (const w of data.net.ways) {
+      if (w.c > 2) continue;
+      for (let k = 0; k + 1 < w.n.length; k++) {
+        const s: [number, number, number, number, number] = [NN[w.n[k] * 2], NN[w.n[k] * 2 + 1], NN[w.n[k + 1] * 2], NN[w.n[k + 1] * 2 + 1], w.w / 2];
+        for (let gx = Math.floor(Math.min(s[0], s[2]) / RG); gx <= Math.floor(Math.max(s[0], s[2]) / RG); gx++)
+          for (let gz = Math.floor(Math.min(s[1], s[3]) / RG); gz <= Math.floor(Math.max(s[1], s[3]) / RG); gz++) {
+            const key = `${gx},${gz}`;
+            if (!rgrid.has(key)) rgrid.set(key, []);
+            rgrid.get(key)!.push(s);
+          }
+      }
+    }
+  }
+  /** 最近的主要道路：路面邊緣的距離、道路方向、最近點 */
+  const nearestRoad = (x: number, z: number) => {
+    let best: { edge: number; ux: number; uz: number; px: number; pz: number } | null = null;
+    const cx = Math.floor(x / RG), cz = Math.floor(z / RG);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      for (const [x1, z1, x2, z2, hw] of rgrid.get(`${cx + a},${cz + b}`) || []) {
+        const dx = x2 - x1, dz = z2 - z1, l = Math.hypot(dx, dz) || 1;
+        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / (l * l)));
+        const px = x1 + dx * t, pz = z1 + dz * t, edge = Math.hypot(x - px, z - pz) - hw;
+        if (!best || edge < best.edge) best = { edge, ux: dx / l, uz: dz / l, px, pz };
+      }
+    }
+    return best;
+  };
+
   // ---- 綠地
   const green = new Geo();
   const gcol = [new THREE.Color('#5d7f45'), new THREE.Color('#557a40'), new THREE.Color('#4f8048')];
@@ -290,7 +337,9 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     const tint = b.c ? new THREE.Color(b.c) : b.s === 1 ? white : b.s === 3 ? civic : resTint[Math.floor(r() * resTint.length)];
     if (b.c && b.s === 1) tint.lerp(white, 0.5); // 玻璃帷幕不要染太重
     const style = b.s === 2 ? 0 : b.s;
-    const geo = tileGeo('f' + style, ring[0][0], ring[0][1]);
+    // 外牆變化：公寓 3 款、玻璃帷幕 2 款，同一區不會整片長一樣
+    const variant = style === 0 ? Math.floor(r() * 3) : style === 1 ? Math.floor(r() * 2) : 0;
+    const geo = tileGeo(`f${style}${variant}`, ring[0][0], ring[0][1]);
     const roofs = tileGeo('roof', ring[0][0], ring[0][1]);
     const shopsGeo = tileGeo('shop', ring[0][0], ring[0][1]), signsGeo = tileGeo('sign', ring[0][0], ring[0][1]);
     if (q.rooftops && style === 0 && y0 < 0 && y1 < 45) roofDetails(ring, y1);
@@ -306,12 +355,12 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       geo.tri([a[0], y0, a[1]], [c[0], y1, c[1]], [a[0], y1, a[1]], n, [u0, y0 / TILE_V], [u1, y1 / TILE_V], [u0, y1 / TILE_V], tint);
       u += l;
 
-      // 面向賽道的騎樓店面與直式招牌
+      // 面向主要道路的騎樓店面與直式招牌（整個城市的大馬路兩側都有）
       if (!streetLevel || l < 5) continue;
       const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
-      const [ti, d] = nearest(mx, mz);
-      if (ti < 0 || d > 40) continue;
-      const toT = [t.px[ti] - mx, t.pz[ti] - mz], tl = Math.hypot(toT[0], toT[1]) || 1;
+      const rd = nearestRoad(mx, mz);
+      if (!rd || rd.edge > 14) continue;
+      const toT = [rd.px - mx, rd.pz - mz], tl = Math.hypot(toT[0], toT[1]) || 1;
       if ((n[0] * toT[0] + n[2] * toT[1]) / tl < 0.5) continue;
       const o = 0.06, sh = Math.min(4.4, y1 - 0.5);
       const A = [a[0] + n[0] * o, a[1] + n[2] * o], C = [c[0] + n[0] * o, c[1] + n[2] * o];
@@ -321,7 +370,9 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       if (y1 > 10 && l > 7 && r() < 0.55) {
         const f = 0.2 + r() * 0.6, sx = a[0] + dx * f + n[0] * 1.1, sz = a[1] + dz * f + n[2] * 1.1;
         const hgt = Math.min(7, y1 - 5), yc = 5 + hgt / 2 + r() * Math.max(0, y1 - 12 - hgt) * 0.3;
-        const slot = Math.floor(r() * 8), fx = -t.tx[ti], fz = -t.tz[ti]; // 面對迎面而來的車
+        // 招牌垂直於騎樓、面向道路其中一個方向（雙面材質，兩邊來的車都看得到）
+        const flip = r() < 0.5 ? 1 : -1;
+        const slot = Math.floor(r() * 8), fx = rd.ux * flip, fz = rd.uz * flip;
         const px = fz * 0.9, pz = -fx * 0.9; // 招牌寬度方向（從迎面看過去由左到右）
         const nn = [fx, 0, fz];
         const p1 = [sx - px, yc - hgt / 2, sz - pz], p2 = [sx + px, yc - hgt / 2, sz + pz], p3 = [sx + px, yc + hgt / 2, sz + pz], p4 = [sx - px, yc + hgt / 2, sz - pz];
@@ -335,7 +386,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     } catch { /* 畸形多邊形就不加屋頂 */ }
   }
   const mats: Record<string, THREE.Material> = {
-    f0: facade('res', 1), f1: facade('glass', 2), f3: facade('civic', 4),
+    f00: facade('res', 1), f01: facade('res', 5), f02: facade('res', 9),
+    f10: facade('glass', 2, q.level === 'high'), f11: facade('glass', 7, q.level === 'high'), f30: facade('civic', 4),
     roof: new THREE.MeshLambertMaterial({ vertexColors: true }), shop: storefrontMat(), sign: signMat(),
   };
   (mats.shop as THREE.MeshBasicMaterial).map!.wrapS = THREE.RepeatWrapping;

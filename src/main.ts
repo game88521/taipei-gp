@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
@@ -64,13 +65,44 @@ const world = buildWorld(scene, track);
   sc.bias = -0.0004;
   sc.normalBias = 0.6;
 }
-// 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開
+// 環境反射：用天空漸層＋夕陽做一張反射貼圖，車漆、玻璃帷幕會映出晚霞
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(world.sky.geometry, world.sky.material));
+  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(160, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 4.2, 2.6) }));
+  sunBall.position.copy(world.sunDir).multiplyScalar(2000);
+  env.add(sunBall);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color: '#2e2b29' }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -20;
+  env.add(floor);
+  scene.environment = pmrem.fromScene(env, 0.03, 0.1, 6000).texture;
+  scene.environmentIntensity = 0.75; // 不要讓反光蓋過原本的顏色
+  pmrem.dispose();
+}
+// 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開；最後加一點暗角與暖色調
 let composer: EffectComposer | null = null, bloom: UnrealBloomPass | null = null;
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, vignette: { value: 0.42 }, saturation: { value: 1.1 } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb = mix(vec3(l), c.rgb, saturation) * vec3(1.03, 1.0, 0.96);
+      float d = length((vUv - 0.5) * vec2(1.0, 0.8));
+      c.rgb *= mix(1.0, smoothstep(0.85, 0.25, d), vignette);
+      gl_FragColor = c;
+    }`,
+};
 function setupBloom() {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale), 0.55, 0.45, 0.82);
   composer.addPass(bloom);
+  composer.addPass(new ShaderPass(GradeShader));
   composer.addPass(new OutputPass());
 }
 /** 平面（路面、綠地、地面）只接受陰影；有厚度的東西（建築、樹、車、人）才投射 */
@@ -81,7 +113,8 @@ function applyShadowFlags() {
     const m = o as THREE.Mesh;
     if (!m.isMesh || o.userData.shadowDone) return;
     o.userData.shadowDone = true;
-    const lambert = (Array.isArray(m.material) ? m.material[0] : m.material) instanceof THREE.MeshLambertMaterial;
+    const mat0 = Array.isArray(m.material) ? m.material[0] : m.material;
+    const lambert = mat0 instanceof THREE.MeshLambertMaterial || mat0 instanceof THREE.MeshStandardMaterial; // 有打光的材質
     if (!lambert) return;
     m.receiveShadow = true;
     if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = true; return; }
@@ -780,7 +813,7 @@ function carGear(v: number) {
 }
 function freeStep(dt: number) {
   let inp = FREE_SIM ? (SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
-  if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.v = 0; } // 倒數時原地不動（按煞車會變倒車）
+  if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   if (sr) {
     const msg = sr.update(dt, fcar, traffic);
@@ -897,6 +930,46 @@ const clock = new THREE.Clock();
 let acc = 0;
 car.placeAt(track, 1);
 showMenu(false);
+// ?phys：汽車物理測試（加速、轉彎半徑、撞牆後能不能脫困），結果寫在標題
+function physicsTest() {
+  const out: string[] = [];
+  const c = new FreeCar();
+  // 1) 0→100 km/h
+  c.place(0, 0, 0);
+  let t = 0;
+  while (c.v < 27.8 && t < 30) { c.update(STEP, 0, true, false, null); t += STEP; }
+  out.push(`0-100:${t.toFixed(1)}s`);
+  // 2) 60 km/h 方向盤打滿的迴轉半徑
+  c.place(0, 0, 0);
+  while (c.v < 16.7) c.update(STEP, 0, true, false, null);
+  for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 16.7, false, null);
+  out.push(`R60:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
+  // 3) 120 km/h 打滿
+  c.place(0, 0, 0);
+  while (c.v < 33.3) c.update(STEP, 0, true, false, null);
+  for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 33.3, false, null);
+  out.push(`R120:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
+  // 4) 撞牆：從起點直衝，記錄撞擊、反彈後速度，再倒車 1.5 秒、打方向加油 3 秒看能不能脫困
+  if (collider) {
+    c.place(fcar.x, fcar.z, fcar.h);
+    let hitAt = -1, maxImpact = 0, bounce = 0;
+    for (let k = 0; k < 120 * 40 && hitAt < 0; k++) {
+      const imp = c.update(STEP, 0, true, false, collider);
+      if (imp > 0) { hitAt = k; maxImpact = imp; }
+    }
+    for (let k = 0; k < 30; k++) { c.update(STEP, 0, false, false, collider); bounce = Math.min(bounce, c.v); }
+    const x0 = c.x, z0 = c.z;
+    for (let k = 0; k < 180; k++) c.update(STEP, 0, false, true, collider);
+    const back = Math.hypot(c.x - x0, c.z - z0);
+    const x1 = c.x, z1 = c.z;
+    for (let k = 0; k < 360; k++) c.update(STEP, 1, true, false, collider);
+    const away = Math.hypot(c.x - x1, c.z - z1);
+    out.push(`撞擊:${(maxImpact * 3.6).toFixed(0)}km/h 反彈:${(bounce * 3.6).toFixed(1)}km/h 倒車退:${back.toFixed(1)}m 轉向開走:${away.toFixed(1)}m`);
+  }
+  document.title = 'PHYS ' + out.join(' ');
+}
+if (new URLSearchParams(location.search).has('phys')) void cityLoad.then(() => { mode = 'free'; hideMenu(); beginFree(); physicsTest(); });
+
 // ?free：直接進自由駕駛（加 &bot&sim=N 會油門全開直行 N 秒，測碰撞用）
 const FREE = new URLSearchParams(location.search).has('free');
 const FREE_SIM = FREE && BOT;

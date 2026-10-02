@@ -117,6 +117,30 @@ export class Collider {
   }
   addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
 
+  /** 圓碰到的每一個接觸：法向量（從牆指向圓心）與重疊深度；給剛體逐一施加衝量用 */
+  contacts(x: number, z: number, r: number, out: { nx: number; nz: number; depth: number }[]) {
+    out.length = 0;
+    for (const e of this.edges.query(x, z, r, this.te)) {
+      const dx = e.x2 - e.x1, dz = e.z2 - e.z1, l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - e.x1) * dx + (z - e.z1) * dz) / l2));
+      const ox = x - e.x1 - dx * t, oz = z - e.z1 - dz * t, d = Math.hypot(ox, oz);
+      if (d < r && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: r - d });
+    }
+    for (const p of this.posts.query(x, z, r + 0.5, this.tp)) {
+      const ox = x - p.x, oz = z - p.z, d = Math.hypot(ox, oz), rr = r + p.r;
+      if (d < rr && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: rr - d });
+    }
+    // 同一面牆被兩條相鄰的邊各算一次時，只留最深的那個（避免推兩倍）
+    if (out.length > 1) {
+      out.sort((a, b) => b.depth - a.depth);
+      const kept: typeof out = [];
+      for (const c of out) if (!kept.some((k) => k.nx * c.nx + k.nz * c.nz > 0.95)) kept.push(c);
+      out.length = 0;
+      out.push(...kept);
+    }
+    return out;
+  }
+
   /** 圓與牆面／柱子重疊時，回傳要推開的量（out[0], out[1]）與是否有碰到 */
   push(x: number, z: number, r: number, out: number[]): boolean {
     out[0] = 0; out[1] = 0;

@@ -14,10 +14,11 @@ export class Input {
   constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement) {
     const padMove = (e: PointerEvent) => {
       const r = pad.getBoundingClientRect();
-      let s = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.38);
-      if (Math.abs(s) < 0.08) s = 0;
+      // 拖到 30% 寬就打滿；中間有一點死區，小幅修正比較穩
+      let s = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.3);
+      if (Math.abs(s) < 0.06) s = 0;
       this.padSteer = clamp(s);
-      dot.style.transform = `translateX(${this.padSteer * r.width * 0.38}px)`;
+      dot.style.transform = `translateX(${this.padSteer * r.width * 0.3}px)`;
     };
     const padEnd = (e: PointerEvent) => {
       if (e.pointerId !== this.padId) return;
@@ -73,7 +74,7 @@ export class Input {
       let s = gamma;
       if (angle === 90) s = beta;
       else if (angle === 270 || angle === -90) s = -beta;
-      this.tiltSteer = clamp(s / 22);
+      this.tiltSteer = clamp(s / 17); // 手機轉 17° 就打滿
     });
   }
 

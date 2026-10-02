@@ -3,6 +3,7 @@ import type { CityData } from './citydata';
 import type { Landmark } from './decor';
 import { makeSedan, type CarModel } from './carModel';
 import type { Traffic } from './traffic';
+import { FreeCar } from './freecar';
 import { TOWER_101 } from './track';
 
 // 開放街道上的比賽：照真實道路規劃路線，沿路要依序穿過檢查點，路上照樣有車流和紅綠燈
@@ -344,19 +345,26 @@ export class StreetRace {
   }
 
   /** 玩家跟對手的碰撞：推開玩家，對手停一下 */
-  collide(p: { x: number; z: number; h: number; v: number }): number {
+  collide(p: FreeCar): number {
     if (!this.active || this.phase !== 'race') return 0;
     let hit = 0;
     for (const r of this.rivals) {
-      if (r.done != null) continue;
-      const dx = p.x - r.pos.x, dz = p.z - r.pos.z, d = Math.hypot(dx, dz);
-      if (d > 2.6 || d < 1e-3) continue;
-      p.x += (dx / d) * (2.6 - d);
-      p.z += (dz / d) * (2.6 - d);
-      hit = Math.max(hit, Math.abs(p.v - r.v));
-      p.v *= 0.7;
-      r.v *= 0.6;
-      r.stunned = 0.6;
+      if (r.done != null || Math.abs(p.x - r.pos.x) > 8 || Math.abs(p.z - r.pos.z) > 8) continue;
+      const fx = Math.sin(r.pos.h), fz = Math.cos(r.pos.h);
+      // 兩台車各用三個圓：玩家照剛體彈開，對手被推往旁邊、掉速
+      for (const [px, pz] of p.circles()) for (const o of [1.45, 0, -1.45]) {
+        const qx = r.pos.x + fx * o, qz = r.pos.z + fz * o;
+        const dx = px - qx, dz = pz - qz, d = Math.hypot(dx, dz), R = FreeCar.RADIUS * 2;
+        if (d >= R || d < 1e-4) continue;
+        const nx = dx / d, nz = dz / d;
+        const h = p.contact(nx, nz, (R - d) * 0.6, qx + nx * FreeCar.RADIUS, qz + nz * FreeCar.RADIUS, fx * r.v, fz * r.v, 0.4, 0.4);
+        hit = Math.max(hit, h);
+        // 對手：橫向被推開（換到旁邊的位置）、速度掉一些
+        const side = nx * fz - nz * fx; // 推力（−n）在對手右手方向 (−fz, fx) 的分量
+        r.lat += side * (R - d) * 0.4 + Math.sign(side) * Math.min(1, h * 0.05);
+        r.v *= h > 0 ? 0.75 : 0.98;
+        if (h > 4) r.stunned = Math.max(r.stunned, 0.5);
+      }
     }
     return hit;
   }

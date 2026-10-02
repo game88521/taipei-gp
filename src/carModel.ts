@@ -16,7 +16,7 @@ export function makeCar(color: string, ghost = false): CarModel {
 
   const mk = (c: string) => ghost
     ? new THREE.MeshBasicMaterial({ color: '#7fe8ff', transparent: true, opacity: 0.28, depthWrite: false })
-    : new THREE.MeshLambertMaterial({ color: c });
+    : new THREE.MeshStandardMaterial({ color: c, metalness: 0.35, roughness: 0.35 }); // 烤漆：會映出天空
   const paint = mk(color), white = mk('#f2f2f2'), carbon = mk('#1b1c20'), helmet = mk('#ffd400');
 
   const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
@@ -65,7 +65,7 @@ export function makeSedan(color: string, taxi = false): CarModel {
   const body = new THREE.Group();
   root.add(body);
   const g = sedanGeo({ taxi, noWheels: true });
-  body.add(new THREE.Mesh(g.paint, new THREE.MeshLambertMaterial({ color })));
+  body.add(new THREE.Mesh(g.paint, new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.28 }))); // 烤漆：會映出天空
   body.add(new THREE.Mesh(g.fixed, new THREE.MeshLambertMaterial({ vertexColors: true })));
   const steer: THREE.Group[] = [], spin: THREE.Mesh[] = [];
   const tyre = new THREE.MeshLambertMaterial({ color: '#151515' }), rim = new THREE.MeshLambertMaterial({ color: '#c4c8ce' });
