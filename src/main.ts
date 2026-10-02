@@ -17,7 +17,8 @@ import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
-import { RaceField, LAPS, PLAYER_LIVERY } from './rivals';
+import { RaceField, PLAYER_LIVERY, TYRES } from './rivals';
+import { WALL_OFF } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
 import { Car } from './car';
@@ -197,9 +198,16 @@ function applyOpts() {
   input.tilt = opts.tilt;
 }
 applyOpts();
+// 正賽的圈數與起跑胎（記在存檔裡）
+for (const id of ['opt-laps', 'opt-tyre'] as const) {
+  const el = $<HTMLSelectElement>(id);
+  const v = (save.opts as Record<string, unknown>)[id];
+  if (typeof v === 'string') el.value = v;
+  el.addEventListener('change', () => { (save.opts as Record<string, unknown>)[id] = el.value; writeSave(); });
+}
 
 // ---------------------------------------------------------------- 比賽狀態
-type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results';
+type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results' | 'replay';
 let state: State = 'menu';
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
@@ -307,7 +315,19 @@ function botInput() {
 function step(dt: number) {
   const inp = BOT ? botInput() : input.read();
   const prevS = car.pos.s;
-  let impact = car.update(dt, track, inp.steer, inp.brake);
+  // DRS：計時賽在 DRS 區隨時可開；正賽要在偵測點落後前車 1 秒內
+  const zone = field.drsZoneAt(car.pos.s);
+  if (zone < 0) car.drs = false;
+  if (BOT) { drsPress = true; if (raceKind === 'gp' && field.me.wear > 0.7 && !field.me.pitReq && field.laps - field.me.laps >= 1) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
+  if (drsPress) {
+    drsPress = false;
+    if (raceKind === 'tt' && zone >= 0) car.drs = true;
+    else if (raceKind === 'gp') field.playerDrs();
+  }
+  if (pitPress) { pitPress = false; if (raceKind === 'gp') toast(field.playerPit() ? '🔧 這圈結束進站' : '取消進站', ''); }
+  const inPit = raceKind === 'gp' && field.me.pitTimer > 0;
+  let impact = inPit ? 0 : car.update(dt, track, inp.steer, inp.brake);
+  if (inPit) car.v = 0;
   if (raceKind === 'gp') {
     impact = Math.max(impact, field.update(dt, true));
     field.playerLap(prevS);
@@ -495,9 +515,12 @@ function updateCountdown(dt: number) {
 function beginCountdown() {
   resetRace();
   if (raceKind === 'gp') {
-    field.setup(5); // 玩家從第 6 格起跑
-    $('lap').textContent = `0/${LAPS}`;
-  } else field.hide();
+    field.setup(5, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value); // 玩家從第 6 格起跑
+    field.ttMode = false;
+    $('lap').textContent = `0/${field.laps}`;
+  } else { field.hide(); field.ttMode = true; }
+  car.drs = false;
+  car.gripMul = 1;
   hud.dataset.kind = raceKind;
   countdown = 0;
   litShown = 0;
@@ -578,7 +601,14 @@ function updateGpHud() {
   const mine = st[me];
   $('pos').textContent = `P${me + 1}`;
   $('pos').dataset.of = `/${st.length}`;
-  $('lap').textContent = `${Math.min(LAPS, Math.max(1, mine.laps))}/${LAPS}`;
+  $('lap').textContent = `${Math.min(field.laps, Math.max(1, mine.laps))}/${field.laps}`;
+  // 胎況：胎種＋剩幾成
+  const ty = TYRES[mine.compound], tyEl = $('tyre');
+  tyEl.textContent = mine.pitTimer > 0 ? `🔧 換胎中 ${mine.pitTimer.toFixed(1)}` : `${ty.short}胎 ${Math.round((1 - mine.wear) * 100)}%`;
+  tyEl.style.borderColor = ty.color;
+  tyEl.classList.toggle('worn', mine.wear > 0.6);
+  $('pit').classList.toggle('on', mine.pitReq);
+  $('pit').textContent = mine.pitReq ? '進站 ✓' : '進站';
   const lead = field.progress(st[0]);
   const ol = $('board');
   ol.innerHTML = '';
@@ -602,12 +632,12 @@ function showResults() {
   const st = field.standings();
   const winner = st[0].finish ?? field.raceTime;
   const tb = $('res-table');
-  tb.innerHTML = '<tr><th>名次</th><th>車手</th><th>車隊</th><th>成績</th><th>最快圈</th></tr>';
+  tb.innerHTML = '<tr><th>名次</th><th>車手</th><th>車隊</th><th>成績</th><th>最快圈</th><th>進站</th></tr>';
   st.forEach((r, k) => {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
-    const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : `差 ${Math.max(1, LAPS + 1 - r.laps)} 圈內`;
-    for (const v of [String(k + 1), r.name, r.team, time, fmt(r.bestLap)]) {
+    const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : `差 ${Math.max(1, field.laps + 1 - r.laps)} 圈內`;
+    for (const v of [String(k + 1), r.name, r.team, time, fmt(r.bestLap), `${r.pits} 次`]) {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
@@ -617,8 +647,97 @@ function showResults() {
   const me = st.findIndex((r) => r.isPlayer) + 1;
   $('res-title').textContent = me === 1 ? '🏆 冠軍！' : me <= 3 ? `第 ${me} 名，上頒獎台！` : `第 ${me} 名`;
   $('results').classList.remove('hidden');
-  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-')).join(' ')}`;
+  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s`;
 }
+// ---------------------------------------------------------------- 回放：轉播機位（賽道外側每 220 m 一台）與追車鏡頭輪流
+let replayT = 0, replaySpeed = 1, camCut = 0, camMode: 'tv' | 'chase' | 'heli' = 'tv';
+const tvCams: THREE.Vector3[] = [];
+{
+  const stepN = Math.round(220 / track.ds);
+  for (let i = 0, k = 0; i < track.N; i += stepN, k++) {
+    // 就架在護牆外 2 m、10 m 高：比行道樹更靠賽道，往下拍不會被樹擋住
+    const off = (k % 2 ? 1 : -1) * (WALL_OFF + 2);
+    tvCams.push(new THREE.Vector3(track.px[i] - track.tz[i] * off, 10, track.pz[i] + track.tx[i] * off));
+  }
+}
+function startReplay() {
+  state = 'replay';
+  replayT = 0;
+  replaySpeed = 1;
+  camCut = 0;
+  $('results').classList.add('hidden');
+  hud.classList.add('hidden');
+  $('replay-ui').classList.remove('hidden');
+  $('replay-speed').textContent = '2×';
+  ghostModel.root.visible = false;
+}
+function endReplay() {
+  state = 'results';
+  $('replay-ui').classList.add('hidden');
+  $('results').classList.remove('hidden');
+}
+function replayFrame(dt: number) {
+  const len = field.replayLength;
+  // 回放的是街道賽：護牆在、車流行人紅綠燈都不在
+  world.race.visible = true;
+  if (traffic) { traffic.visible = false; traffic.signalsVisible = false; }
+  if (peds) peds.visible = false;
+  sedanModel.root.visible = false;
+  for (const o of raceHide) o.visible = false;
+  replayT += dt * replaySpeed;
+  if (replayT >= len) { endReplay(); return; }
+  field.replayAt(replayT, (r, x, z, h, steer, v) => {
+    const m = r.isPlayer ? carModel : r.model!;
+    m.root.visible = true;
+    m.root.position.set(x, 0, z);
+    m.root.rotation.y = h;
+    for (const w of m.steer) w.rotation.y = -steer * 0.35;
+    for (const w of m.spin) w.rotation.x += (v / 0.36) * dt * replaySpeed;
+  });
+  const p = carModel.root.position, h = carModel.root.rotation.y;
+  // 每 7 秒換一種鏡頭：轉播機位 → 追車 → 空拍
+  camCut -= dt * replaySpeed;
+  if (camCut <= 0) { camCut = 7; camMode = camMode === 'tv' ? 'chase' : camMode === 'chase' ? 'heli' : 'tv'; }
+  if (camMode === 'tv') {
+    let best = tvCams[0], bd = Infinity;
+    for (const c of tvCams) { const d = c.distanceTo(p); if (d < bd) { bd = d; best = c; } }
+    camera.position.copy(best);
+    camera.lookAt(p.x, 0.8, p.z);
+    camera.fov = Math.max(18, Math.min(55, 900 / Math.max(bd, 10))); // 遠的時候拉近（長焦）
+  } else if (camMode === 'chase') {
+    camera.position.set(p.x - Math.sin(h) * 7, 2.4, p.z - Math.cos(h) * 7);
+    camera.lookAt(p.x + Math.sin(h) * 8, 1, p.z + Math.cos(h) * 8);
+    camera.fov = 65;
+  } else {
+    camera.position.set(p.x - Math.sin(h) * 25 + 10, 38, p.z - Math.cos(h) * 25);
+    camera.lookAt(p.x, 0, p.z);
+    camera.fov = 50;
+  }
+  camera.updateProjectionMatrix();
+  world.sky.position.copy(camera.position);
+  $('replay-time').textContent = `▶ 回放 ${fmt(replayT)} / ${fmt(len)}`;
+}
+$('btn-replay').addEventListener('click', startReplay);
+$('replay-end').addEventListener('click', endReplay);
+$('replay-speed').addEventListener('click', () => {
+  replaySpeed = replaySpeed === 1 ? 2 : replaySpeed === 2 ? 4 : 1;
+  $('replay-speed').textContent = replaySpeed === 4 ? '1×' : `${replaySpeed * 2}×`;
+});
+// DRS、進站按鈕（電腦：E 開 DRS、B 進站）
+let drsPress = false, pitPress = false;
+$('drs').addEventListener('pointerdown', (e) => { e.preventDefault(); drsPress = true; });
+$('pit').addEventListener('pointerdown', (e) => { e.preventDefault(); pitPress = true; });
+addEventListener('keydown', (e) => {
+  if (state !== 'race') return;
+  if (e.code === 'KeyE') drsPress = true;
+  if (e.code === 'KeyB') pitPress = true;
+});
+function updateDrsButton() {
+  const el = $('drs'), zone = field.drsZoneAt(car.pos.s) >= 0;
+  const ready = zone && (raceKind === 'tt' || field.me.drsOk);
+  el.className = car.drs ? 'on' : ready ? 'ready' : '';
+}
+
 $('btn-free').addEventListener('click', async () => {
   await userStart();
   mode = 'free';
@@ -1015,6 +1134,8 @@ const SR_TEST = new URLSearchParams(location.search).get('sr'); // 測街頭飆�
 if (BOT && !FREE) void cityLoad.then(() => {
   mode = 'race';
   raceKind = new URLSearchParams(location.search).has('gp') ? 'gp' : 'tt';
+  const lapQ = new URLSearchParams(location.search).get('laps'); // 測試：?bot&gp&laps=6
+  if (lapQ) $<HTMLSelectElement>('opt-laps').value = lapQ;
   hideMenu();
   beginCountdown();
   runSim();
@@ -1050,6 +1171,9 @@ function runSim() {
     return;
   }
   for (let n = 0; n < SIM / STEP && state === 'race'; n++) step(STEP); // 完賽就停（不然計時賽的計圈會覆寫結果）
+  // ?…&replay=秒數：直接進回放並停在那一刻（截圖檢查回放鏡頭）
+  const rq = new URLSearchParams(location.search).get('replay');
+  if (rq && (state as State) === 'results') { startReplay(); replaySpeed = 0; replayT = +rq; camMode = (new URLSearchParams(location.search).get('cam2') as 'tv' | 'chase' | 'heli') ?? 'tv'; camCut = 99; replayFrame(0); }
   if (raceKind === 'gp' && !document.title.startsWith('GP')) {
     // 正賽還沒跑完：印出每台車跑了幾圈、最快圈，方便找問題
     document.title = 'GP-RUN ' + field.standings().map((r) => `${r.name}:${r.laps}圈/${r.bestLap?.toFixed(1) ?? '-'}`).join(' ') + ` hits=${botHits}`;
@@ -1064,7 +1188,8 @@ renderer.setAnimationLoop(() => {
     acc = 0;
     if (state === 'countdown') updateCountdown(dt);
   }
-  updateVisuals(dt);
+  if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
+  if (state === 'race' || state === 'countdown') updateDrsButton();
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);
 });

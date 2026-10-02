@@ -439,3 +439,70 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 .opts select { margin-left: auto; background: #1b1e28; color: var(--fg); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; padding: 4px 6px; font: inherit; }
 .opts label.q small { width: 100%; color: var(--muted); font-size: 11px; }
 .credit .author { color: var(--fg); font-weight: 700; }
+
+/* ---------------- 正賽：DRS、進站、胎況、回放 */
+#drs {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 132px);
+  width: 86px;
+  height: 52px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 12, 20, 0.55);
+  color: rgba(255, 255, 255, 0.35);
+  font: 900 20px var(--mono);
+  letter-spacing: 2px;
+  touch-action: none;
+}
+#drs.ready { color: #fff; border-color: #fff; background: rgba(40, 160, 90, 0.45); }
+#drs.on { color: #fff; border-color: #2fe07a; background: rgba(47, 224, 122, 0.85); }
+#pit {
+  position: absolute;
+  right: calc(max(14px, env(safe-area-inset-right)) + 96px);
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 132px);
+  width: 72px;
+  height: 52px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 12, 20, 0.55);
+  font-size: 15px;
+  font-weight: 800;
+  touch-action: none;
+}
+#pit.on { background: rgba(255, 180, 0, 0.75); border-color: #ffd400; color: #111; }
+#tyre {
+  position: absolute;
+  left: calc(max(10px, env(safe-area-inset-left)) + 180px);
+  top: calc(max(10px, env(safe-area-inset-top)) + 122px);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 3px solid #ffd400;
+  background: var(--panel);
+  font: 700 13px var(--mono);
+}
+#tyre.worn { animation: blink 0.8s steps(2) infinite; }
+#hud[data-mode='free'] #drs, #hud[data-mode='free'] #pit, #hud[data-mode='free'] #tyre { display: none; }
+#hud[data-kind='tt'] #pit, #hud[data-kind='tt'] #tyre { display: none; }
+@media (pointer: fine) {
+  #drs, #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 20px); }
+}
+@media (max-height: 480px) {
+  #drs, #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px); height: 44px; }
+  #tyre { top: calc(max(10px, env(safe-area-inset-top)) + 106px); left: calc(max(10px, env(safe-area-inset-left)) + 150px); }
+}
+#replay-ui {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(10, 12, 20, 0.75);
+  font: 700 15px var(--mono);
+  z-index: 6;
+}
+#replay-ui button { border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 12px; font-weight: 800; }

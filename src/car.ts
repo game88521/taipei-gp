@@ -15,6 +15,8 @@ export class Car {
   steer = 0; // -1 左 … +1 右（已平滑）
   power = 1; // 引擎力（AI 對手各自不同）
   boost = 0; // 尾流加成
+  drs = false; // DRS 打開：尾翼襟翼放平、極速提高
+  gripMul = 1; // 輪胎抓地力（胎種 × 磨耗）
   pos: Locate = { i: 0, lat: 0, s: 0 };
   private hitCool = 0;
 
@@ -34,13 +36,14 @@ export class Car {
     this.steer += (steerIn - this.steer) * Math.min(1, dt * rate);
 
     const v = this.v;
-    const p = this.power + this.boost;
+    if (brake) this.drs = false; // 一踩煞車 DRS 就關
+    const p = this.power + this.boost + (this.drs ? 0.08 : 0);
     let a = brake ? -BRAKE * Math.min(1, v / 2) : ENGINE * p * (1 - (v / (VMAX * p)) ** 2);
     a -= 0.4; // 滾動阻力
     a -= Math.abs(this.steer) * (v / VMAX) * 5; // 打滿方向會磨胎掉速
     this.v = Math.max(0, v + a * dt);
 
-    const yawMax = Math.min(1.5, gripAt(v) / Math.max(v, 3)) * Math.min(1, v / 4);
+    const yawMax = Math.min(1.5, (gripAt(v) * this.gripMul) / Math.max(v, 3)) * Math.min(1, v / 4);
     this.h -= this.steer * yawMax * dt;
     this.x += Math.sin(this.h) * this.v * dt;
     this.z += Math.cos(this.h) * this.v * dt;
