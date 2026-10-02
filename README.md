@@ -86,6 +86,7 @@ npm run plan         # 輸出 tools/plan.svg 平面圖，檢查賽道有沒有�
 | `src/citydata.ts` | city.json 型別、路網查詢（最近路名）、建築與樹幹碰撞 |
 | `src/freecar.ts` | 自由駕駛的汽車物理（油門、煞車、倒車、碰撞） |
 | `src/traffic.ts` | 車流（IDM 跟車、路口轉彎）與紅綠燈（號誌路口分群、週期、燈號顯示） |
+| `src/breakables.ts` | 撞得倒的東西：行道樹、路燈、號誌桿、路名牌（倒下動畫、車子只減速不卡住、開遠後復原） |
 | `src/peds.ts` | 行人（人行道來回走、閃避車子） |
 | `src/quality.ts` | 畫質等級表 |
 | `src/minimap.ts` | 隨車頭旋轉的小地圖（含飆車路線、檢查點、對手、挑戰點） |

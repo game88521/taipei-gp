@@ -9,6 +9,7 @@ import type { CityData } from './citydata';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
 import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
+import { Breakables } from './breakables';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 const FLOOR = 3.3; // 一層樓高
@@ -203,7 +204,8 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[] }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables }> {
+  const breakables = new Breakables();
   const data = (await (await fetch('/data/city.json')).json()) as CityData;
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
@@ -271,7 +273,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   // ---- 道路（有標線）、斑馬線、路名牌、地標招牌
   buildRoads(scene, data);
   buildCrossings(scene, data);
-  buildStreetSigns(scene, data);
+  buildStreetSigns(scene, data, breakables);
   const landmarks = buildLandmarks(scene, data);
 
   // ---- 建築
@@ -440,6 +442,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       pole.setMatrixAt(i, m4);
       arm.setMatrixAt(i, m4);
       head.setMatrixAt(i, m4);
+      breakables.add(L[i * 3], L[i * 3 + 1], 0.2, 0.9, [pole, arm, head], i, m4); // 撞到會倒，車速剩 90%
     }
     for (const m of [pole, arm, head]) { m.computeBoundingSphere(); scene.add(m); }
   }
@@ -496,6 +499,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       m.compose(new THREE.Vector3(x, -0.3, z), qt, s);
       trunk.setMatrixAt(n, m);
       crown.setMatrixAt(n, m);
+      breakables.add(x, z, 0.35, 0.82, [trunk, crown], n, m); // 撞到會倒，車速剩 82%
       crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
     });
     trunk.computeBoundingSphere();
@@ -503,7 +507,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     scene.add(trunk, crown);
   }
 
-  return { data, landmarks };
+  return { data, landmarks, breakables };
 }
 
 /** 台北 101：照真實比例的竹節造型（總高 508 m）。方形錐台 = 4 邊的圓柱轉 45°，邊對齊街道 */

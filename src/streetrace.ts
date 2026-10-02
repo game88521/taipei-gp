@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import type { CityData } from './citydata';
 import type { Landmark } from './decor';
-import { makeSedan, type CarModel } from './carModel';
+import type { CarModel } from './carModel';
+import { makeF1, TEAMS } from './f1model';
+
+// 街頭比賽的對手也開 F1：每位車手固定一支車隊塗裝（TEAMS 的索引）
+const RIVAL_TEAM: Record<string, number> = { 阿翔: 1, 小美: 5, 黑豹: 7, 老K: 2, 阿凱: 3 };
 import type { Traffic } from './traffic';
 import { FreeCar } from './freecar';
 import { TOWER_101 } from './track';
@@ -71,7 +75,7 @@ export class StreetRace {
   countdown = 0;
   playerDone: number | null = null;
   rivals: Rival[] = [];
-  private pool: CarModel[] = [];
+  private models = new Map<string, CarModel>(); // 車手 → F1 模型
   private markers: THREE.Mesh[] = [];
   private rings: THREE.Mesh[] = [];
   private finishRing: THREE.Mesh;
@@ -190,12 +194,18 @@ export class StreetRace {
     this.finishRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, toneMapped: false }));
     this.finishRing.visible = false;
     scene.add(this.finishRing);
-    for (let k = 0; k < DUEL_FIELD.length; k++) {
-      const m = makeSedan('#e8e8e8');
+  }
+
+  /** 依車手取得（第一次才建立）他的 F1 模型 */
+  private modelFor(name: string): CarModel {
+    let m = this.models.get(name);
+    if (!m) {
+      m = makeF1(TEAMS[RIVAL_TEAM[name] ?? 1].livery);
       m.root.visible = false;
-      scene.add(m.root);
-      this.pool.push(m);
+      this.scene.add(m.root);
+      this.models.set(name, m);
     }
+    return m;
   }
 
   // 舊介面（單挑時只有一位對手）
@@ -227,15 +237,15 @@ export class StreetRace {
     const A = c.twoWay ? 1.8 : -1.8, B = c.twoWay ? 5.1 : 1.8;
     const field: [string, string, number, number][] = duel ? DUEL_FIELD : [[c.def.rival, c.def.color, SOLO_TOP, SOLO_CORNER]];
     const slots = duel ? [[24, A], [24, B], [15, A], [15, B]] : [[6, B]];
-    this.rivals = field.map(([name, color, top, corner], k) => {
-      const model = this.pool[k];
-      (model.body.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>).material.color.set(color);
+    for (const m of this.models.values()) m.root.visible = false;
+    this.rivals = field.map(([name, , top, corner], k) => {
+      const model = this.modelFor(name);
+      const color = TEAMS[RIVAL_TEAM[name] ?? 1].livery.main;
       model.root.visible = true;
       const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
       this.placeRival(r);
       return r;
     });
-    for (let k = this.rivals.length; k < this.pool.length; k++) this.pool[k].root.visible = false;
     const [x, z, h] = this.at(6);
     place(x - Math.cos(h) * A, z + Math.sin(h) * A, h);
     for (const m of this.markers) m.visible = false;
@@ -246,7 +256,7 @@ export class StreetRace {
     this.active = null;
     this.duel = false;
     this.rivals = [];
-    for (const m of this.pool) m.root.visible = false;
+    for (const m of this.models.values()) m.root.visible = false;
     for (const r of this.rings) r.visible = false;
     this.finishRing.visible = false;
     for (const m of this.markers) m.visible = true;

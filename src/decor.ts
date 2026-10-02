@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { canvasTex } from './world';
 import type { CityData, NetWay } from './citydata';
+import type { Breakables } from './breakables';
 
 // 街道細節：有標線的路面、斑馬線、路口的綠色路名牌、地標屋頂招牌
 
@@ -151,7 +152,7 @@ function addBoard(buckets: { pos: number[]; uv: number[] }[], slot: { mat: numbe
     b.uv.push(slot.u0, slot.v0, slot.u1, slot.v0, slot.u1, slot.v1, slot.u0, slot.v0, slot.u1, slot.v1, slot.u0, slot.v1);
   }
 }
-function flush(scene: THREE.Scene, mats: THREE.Material[], buckets: { pos: number[]; uv: number[] }[]) {
+function flush(scene: THREE.Object3D, mats: THREE.Material[], buckets: { pos: number[]; uv: number[] }[]) {
   buckets.forEach((b, k) => {
     if (!b.pos.length) return;
     const g = new THREE.BufferGeometry();
@@ -162,7 +163,7 @@ function flush(scene: THREE.Scene, mats: THREE.Material[], buckets: { pos: numbe
 }
 
 /** 路口的綠色路名牌（中文大字＋英文小字），兩片各自跟所標示的道路平行 */
-export function buildStreetSigns(scene: THREE.Scene, d: CityData) {
+export function buildStreetSigns(scene: THREE.Scene, d: CityData, breakables?: Breakables) {
   const blades: string[][] = [];
   const index = new Map<string, number>();
   for (const s of d.signs) for (const b of s.b) {
@@ -182,20 +183,23 @@ export function buildStreetSigns(scene: THREE.Scene, d: CityData) {
     g.fillText(nm, x + 256, y + (en ? 50 : 64), 460);
     if (en) { g.font = `bold 24px Arial, sans-serif`; g.fillText(en, x + 256, y + 94, 460); }
   }, { side: THREE.FrontSide });
-  const buckets = mats.map(() => ({ pos: [] as number[], uv: [] as number[] }));
-  const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.1, 5.2, 6).translate(0, 2.6 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#7d848c' }), d.signs.length);
-  const m = new THREE.Matrix4();
-  d.signs.forEach((s, n) => {
-    m.makeTranslation(s.x, 0, s.z);
-    poles.setMatrixAt(n, m);
+  // 每一支路名牌是獨立的物件（柱子＋招牌），才能單獨被撞倒
+  const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 5.2, 6).translate(0, 2.6 - 0.6, 0), poleMat = new THREE.MeshLambertMaterial({ color: '#7d848c' });
+  for (const s of d.signs) {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(s.x, 0, s.z);
+    g.add(pole);
+    const buckets = mats.map(() => ({ pos: [] as number[], uv: [] as number[] }));
     s.b.forEach((b, k) => {
       const dx = Math.sin(b.a), dz = Math.cos(b.a);
       // 招牌面朝向與道路垂直；從柱子往道路方向伸出 1.35 m
       addBoard(buckets, slots[index.get(b.nm + '|' + b.en)!], s.x + dx * 1.35, 4.4 - k * 0.75, s.z + dz * 1.35, b.a + Math.PI / 2, 2.6, 0.65);
     });
-  });
-  scene.add(poles);
-  flush(scene, mats, buckets);
+    flush(g, mats, buckets);
+    scene.add(g);
+    breakables?.addObject(s.x, s.z, 0.12, 0.93, g); // 撞到會倒，車速剩 93%
+  }
 }
 
 // 不當地標的名字：附屬建物、太通用的

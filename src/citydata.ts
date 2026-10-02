@@ -110,10 +110,7 @@ export class Collider {
         this.edges.addBox(e.x1, e.z1, e.x2, e.z2, e);
       }
     }
-    for (let k = 0; k < d.trees.length; k += 2) {
-      const t = { x: d.trees[k], z: d.trees[k + 1], r: 0.35 };
-      this.posts.addBox(t.x, t.z, t.x, t.z, t);
-    }
+    // 行道樹、路燈不在這裡：它們會被撞倒（breakables.ts），不是固定的障礙物
   }
   addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
 

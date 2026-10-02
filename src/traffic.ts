@@ -3,6 +3,7 @@ import type { CityData, NetWay } from './citydata';
 import { lanesOf } from './decor';
 import { sedanGeo, busGeo, scooterGeo } from './models';
 import { FreeCar } from './freecar';
+import type { Breakables } from './breakables';
 
 // 車流與紅綠燈：沿真實路網的車道行駛，路口隨機轉彎，跟車用 IDM（智慧駕駛模型），紅燈停在停止線前
 
@@ -77,7 +78,7 @@ export class Traffic {
   private extras: { x: number; z: number; v: number }[] = [];
   readonly max: number;
 
-  constructor(scene: THREE.Scene, d: CityData, max: number) {
+  constructor(scene: THREE.Scene, d: CityData, max: number, private breakables: Breakables | null = null) {
     this.max = max; // 依畫質（quality.ts）
     const N = d.net.nodes;
     // ---- 有方向的車道
@@ -182,6 +183,21 @@ export class Traffic {
     lampM.forEach((m, i) => { this.lamps.setMatrixAt(i, m); this.lamps.setColorAt(i, new THREE.Color('#222')); });
     this.lampState = new Array(lampM.length).fill('');
     scene.add(pole, arm, housing, this.lamps);
+    // 號誌桿也撞得倒：桿、橫桿、燈箱、三顆燈一起倒（以桿子底部為支點）
+    if (this.breakables) {
+      const p = new THREE.Vector3();
+      poles.forEach((m, i) => {
+        p.setFromMatrixPosition(m);
+        const housingM = new THREE.Matrix4();
+        housing.getMatrixAt(i, housingM);
+        this.breakables!.addParts(p.x, p.z, 0.2, 0.88, [
+          { mesh: pole, idx: i, base: m },
+          { mesh: arm, idx: i, base: arms[i] },
+          { mesh: housing, idx: i, base: housingM },
+          ...[0, 1, 2].map((k) => ({ mesh: this.lamps, idx: i * 3 + k, base: lampM[i * 3 + k] })),
+        ]);
+      });
+    }
   }
 
   private updateLamps() {

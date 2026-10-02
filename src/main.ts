@@ -19,6 +19,7 @@ import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
 import { RaceField, LAPS, PLAYER_LIVERY } from './rivals';
 import { StreetRace, type Challenge } from './streetrace';
+import type { Breakables } from './breakables';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -129,12 +130,14 @@ let landmarks: Landmark[] = [];
 let traffic: Traffic | null = null;
 let peds: Pedestrians | null = null;
 let sr: StreetRace | null = null;
+let breakables: Breakables | null = null;
 const cityLoad = loadCity(scene, track, Q).then((c) => {
   collider = new Collider(c.data);
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
-  traffic = new Traffic(scene, c.data, Q.traffic);
+  breakables = c.breakables;
+  traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
   applyShadowFlags();
@@ -367,9 +370,12 @@ let camH = 0;
 
 function updateVisuals(dt: number) {
   // 車子
-  const vc = veh(), model = mode === 'race' ? carModel : sedanModel;
-  carModel.root.visible = mode === 'race';
-  sedanModel.root.visible = mode === 'free';
+  // 街道賽、街頭比賽都開 F1；平常自由駕駛開一般汽車
+  const streetRacing = mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
+  const f1Look = mode === 'race' || streetRacing;
+  const vc = veh(), model = f1Look ? carModel : sedanModel;
+  carModel.root.visible = f1Look;
+  sedanModel.root.visible = !f1Look;
   world.race.visible = mode === 'race';
   if (traffic) {
     traffic.visible = mode === 'free';
@@ -377,11 +383,12 @@ function updateVisuals(dt: number) {
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (sr && mode === 'free') sr.render(dt);
+  breakables?.update(dt, vc.x, vc.z);
   if (peds) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
   }
-  model.root.position.set(vc.x, 0, vc.z);
+  model.root.position.set(vc.x, mode === 'free' ? -0.25 : 0, vc.z); // 城市道路比賽道路面低 0.25 m
   model.root.rotation.y = vc.h;
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
   for (const w of model.steer) w.rotation.y = -vc.steer * 0.45;
@@ -407,7 +414,7 @@ function updateVisuals(dt: number) {
   d = Math.atan2(Math.sin(d), Math.cos(d));
   camH += camSnap ? d : d * Math.min(1, dt * 7);
   const fx = Math.sin(camH), fz = Math.cos(camH);
-  const back = mode === 'race' ? 8 : 7.5, up = mode === 'race' ? 2.9 : 3.3;
+  const back = f1Look ? 8 : 7.5, up = f1Look ? 2.9 : 3.3;
   const target = new THREE.Vector3(vc.x - fx * back, up, vc.z - fz * back);
   const look = new THREE.Vector3(vc.x + fx * 6, 1.2, vc.z + fz * 6);
   if (camSnap) { camPos.copy(target); camLook.copy(look); camSnap = false; }
@@ -826,6 +833,7 @@ function freeStep(dt: number) {
   let inp = FREE_SIM ? (SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
+  if (breakables) impact = Math.max(impact, breakables.hit(fcar)); // 樹、路燈：撞倒過去
   if (sr) {
     const msg = sr.update(dt, fcar, traffic);
     if (msg) { bigMsg(msg); if (msg.length <= 3) sound.beep(msg === 'GO!' ? 880 : 520, 0.25); }
@@ -976,6 +984,17 @@ function physicsTest() {
     for (let k = 0; k < 360; k++) c.update(STEP, 1, true, false, collider);
     const away = Math.hypot(c.x - x1, c.z - z1);
     out.push(`撞擊:${(maxImpact * 3.6).toFixed(0)}km/h 反彈:${(bounce * 3.6).toFixed(1)}km/h 倒車退:${back.toFixed(1)}m 轉向開走:${away.toFixed(1)}m`);
+    // 5) 撞倒測試：從起點全油門直衝 25 秒，路上的樹／路燈會被撞倒，看能跑多遠、撞倒幾個
+    c.place(fcar.x, fcar.z, fcar.h);
+    const before = breakables?.knocked ?? 0, x0b = c.x, z0b = c.z;
+    let minV = Infinity, started = false;
+    for (let k = 0; k < 120 * 25; k++) {
+      c.update(STEP, 0, true, false, collider);
+      breakables?.hit(c);
+      if (c.v > 20) started = true;
+      if (started) minV = Math.min(minV, c.v);
+    }
+    out.push(`直衝25秒:${Math.hypot(c.x - x0b, c.z - z0b).toFixed(0)}m 撞倒:${(breakables?.knocked ?? 0) - before} 期間最低速:${(minV * 3.6).toFixed(0)}km/h`);
   }
   document.title = 'PHYS ' + out.join(' ');
 }
@@ -1002,6 +1021,7 @@ if (FREE) void cityLoad.then(() => {
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
     if (SR_TEST != null && sr) { if (!document.title.startsWith('DUEL')) document.title = `SR ${sr.active?.def.title} 長${sr.active?.length.toFixed(0)}m 檢查點${sr.next}/${sr.active?.checkpoints.length} 玩家${sr.playerDone?.toFixed(1)} 對手${sr.rivalDone?.toFixed(1)} 對手進度${sr.rivalS.toFixed(0)} 挑戰數${sr.challenges.length} 對手最大被撞開${sr.maxKnock.toFixed(1)}m`; return; }
+    breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段）`;
