@@ -75,6 +75,7 @@ export class RaceField {
       const grip = k === 0 && gOv ? Number(gOv) : grip0, brake = k === 0 && bOv ? Number(bOv) : brake0;
       const { team, livery } = TEAMS[k + 1];
       const model = makeF1(livery);
+      model.root.userData.dynamic = true; // 投射即時陰影
       model.root.visible = false;
       scene.add(model.root);
       const car = new Car();

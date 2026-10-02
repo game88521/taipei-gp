@@ -75,6 +75,7 @@
           <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
           <label><input type="checkbox" id="opt-ghost" /> 影子車</label>
           <label><input type="checkbox" id="opt-sound" /> 音效</label>
+          <label><input type="checkbox" id="opt-fps" /> 顯示 FPS</label>
           <label class="q">正賽
             <select id="opt-laps"><option value="3">3 圈</option><option value="6">6 圈</option></select>
             <select id="opt-tyre"><option value="0">起跑：軟胎</option><option value="1" selected>起跑：中性胎</option><option value="2">起跑：硬胎</option></select>
@@ -130,6 +131,7 @@
       <button id="replay-end">結束回放</button>
     </div>
 
+    <div id="fps" style="display: none"></div>
     <div id="rotate">橫向握持比較好玩 ↻</div>
     <script type="module" src="/src/main.ts"></script>
   </body>

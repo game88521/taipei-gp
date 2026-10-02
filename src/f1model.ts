@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { CarModel } from './carModel';
+import { carBlob, type CarModel } from './carModel';
 
 // 精緻的現代 F1 賽車（地面效應世代）：車頭朝 +z、長約 5.6 m、寬 2.0 m，原點在車底中心
 // 機身用「放樣」：沿車長每一站給半寬、半高、中心高度，截面是圓角方形（超橢圓），連成平滑曲面
@@ -107,6 +107,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
+  if (!ghost) root.add(carBlob(2.4, 6.4));
   const parts: Record<string, THREE.BufferGeometry[]> = { main: [], accent: [], accent2: [], carbon: [], dark: [], helmet: [], visor: [] };
   const P = (k: keyof typeof parts, g: THREE.BufferGeometry) => parts[k].push(g);
 

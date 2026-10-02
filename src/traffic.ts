@@ -4,6 +4,7 @@ import { lanesOf } from './decor';
 import { sedanGeo, busGeo, scooterGeo } from './models';
 import { FreeCar } from './freecar';
 import type { Breakables } from './breakables';
+import { bakedShadowMaterial, blobTexture } from './world';
 
 // 車流與紅綠燈：沿真實路網的車道行駛，路口隨機轉彎，跟車用 IDM（智慧駕駛模型），紅燈停在停止線前
 
@@ -77,6 +78,7 @@ export class Traffic {
   private grid = new Map<number, Agent[]>();
   private extras: { x: number; z: number; v: number }[] = [];
   private signalMeshes: THREE.Object3D[] = [];
+  private blob!: THREE.InstancedMesh;
   readonly max: number;
 
   constructor(scene: THREE.Scene, d: CityData, max: number, private breakables: Breakables | null = null) {
@@ -126,6 +128,11 @@ export class Traffic {
     }
     this.buildSignals(scene, d);
 
+    // ---- 車底影子（一個 InstancedMesh 給所有車）
+    this.blob = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), bakedShadowMaterial(blobTexture()), this.max);
+    this.blob.count = 0;
+    this.blob.frustumCulled = false;
+    scene.add(this.blob);
     // ---- 車輛外型
     const mats = [new THREE.MeshStandardMaterial({ metalness: 0.4, roughness: 0.32 }), new THREE.MeshLambertMaterial({ vertexColors: true })]; // 車身烤漆會反光
     for (let k = 0 as Kind; k < 5; k = (k + 1) as Kind) {
@@ -133,6 +140,7 @@ export class Traffic {
       const cap = this.max;
       const paint = new THREE.InstancedMesh(g.paint, mats[0], cap), fixed = new THREE.InstancedMesh(g.fixed, mats[1], cap);
       paint.count = fixed.count = 0;
+      paint.userData.dynamic = fixed.userData.dynamic = true; // 投射即時陰影
       paint.frustumCulled = fixed.frustumCulled = false;
       paint.setColorAt(0, new THREE.Color());
       scene.add(paint, fixed);
@@ -400,6 +408,17 @@ export class Traffic {
       mm.fixed.setMatrixAt(i, m);
       mm.paint.setColorAt(i, a.color);
     }
+    let nb = 0;
+    const bs = new THREE.Vector3();
+    for (const a of this.agents) {
+      if (!a.alive) continue;
+      const wide = a.kind === 3 ? 0.9 : a.kind === 2 ? 3.2 : 2.4;
+      q.setFromAxisAngle(up, a.vh + a.kh);
+      m.compose(pos.set(a.x + a.kx, -0.21, a.z + a.kz), q, bs.set(wide, 1, KIND_LEN[a.kind] + 1));
+      this.blob.setMatrixAt(nb++, m);
+    }
+    this.blob.count = nb;
+    this.blob.instanceMatrix.needsUpdate = true;
     this.meshes.forEach((mm, k) => {
       mm.paint.count = mm.fixed.count = counts[k];
       mm.paint.instanceMatrix.needsUpdate = mm.fixed.instanceMatrix.needsUpdate = true;
@@ -418,7 +437,7 @@ export class Traffic {
   }
 
   /** 街道賽封路：車流不顯示 */
-  set visible(v: boolean) { for (const m of this.meshes) m.paint.visible = m.fixed.visible = v; }
+  set visible(v: boolean) { for (const m of this.meshes) m.paint.visible = m.fixed.visible = v; this.blob.visible = v; }
   /** 紅綠燈（街道賽封路時隱藏，橫桿會擋到賽車的視線） */
   set signalsVisible(v: boolean) { for (const m of this.signalMeshes) m.visible = v; }
 }

@@ -11,6 +11,37 @@ function rng(seed: number) {
   };
 }
 
+/** 太陽方向（從地面指向太陽）：夕陽在西北偏西、仰角約 18° */
+export const SUN_DIR = new THREE.Vector3(-600, 220, 300).normalize();
+/** 地面影子：每 1 m 高度往哪個方向延伸多遠（太陽的反方向） */
+export const SHADOW_PER_M = { x: -SUN_DIR.x / SUN_DIR.y, z: -SUN_DIR.z / SUN_DIR.y };
+
+/** 預先算好的影子共用材質：半透明深色、用 stencil 讓重疊的影子不會疊得更黑 */
+let shadowMat: THREE.MeshBasicMaterial | null = null;
+export function bakedShadowMaterial(map?: THREE.Texture) {
+  const m = new THREE.MeshBasicMaterial({
+    color: '#1b1530', transparent: true, opacity: 0.42, depthWrite: false, fog: true, map: map ?? null, alphaTest: map ? 0.04 : 0,
+    polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -150,
+    stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
+  });
+  if (!map) shadowMat ??= m;
+  return map ? m : shadowMat!;
+}
+/** 柔邊的橢圓影子貼圖（樹、車、人） */
+let blobTex: THREE.Texture | null = null;
+export function blobTexture() {
+  if (blobTex) return blobTex;
+  blobTex = canvasTex(64, 64, (g) => {
+    const grd = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.55, 'rgba(255,255,255,0.75)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+  }, false);
+  return blobTex;
+}
+
 export function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w;
@@ -87,7 +118,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
 
   scene.add(new THREE.HemisphereLight('#b8c6ff', '#4a3428', 1.6));
   // 夕陽：低角度的平行光（main.ts 會讓它跟著玩家，陰影才夠細）
-  const sunDir = new THREE.Vector3(-600, 220, 300).normalize();
+  const sunDir = SUN_DIR.clone();
   const sun = new THREE.DirectionalLight('#ffb47a', 2.2);
   sun.position.copy(sunDir).multiplyScalar(400);
   scene.add(sun, sun.target);

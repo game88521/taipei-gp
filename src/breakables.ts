@@ -10,7 +10,8 @@ interface Item {
   z: number;
   r: number; // 碰撞半徑
   slow: number; // 撞倒時車速保留比例
-  parts: { mesh: THREE.InstancedMesh; idx: number; base: THREE.Matrix4 }[]; // 各部位（樹幹＋樹冠、燈桿＋燈臂＋燈頭、號誌桿＋燈…）
+  parts: { mesh: THREE.InstancedMesh; idx: number; base: THREE.Matrix4; hide?: boolean }[]; // 各部位（hide：倒下就消失，例如地上的影子）
+  // （樹幹＋樹冠、燈桿＋燈臂＋燈頭、號誌桿＋燈…）
   obj?: THREE.Object3D; // 或是一整個物件（路名牌：柱子＋兩片招牌）
   state: 0 | 1 | 2; // 0 立著、1 倒下中、2 倒在地上
   t: number; // 倒下的進度（秒）
@@ -19,6 +20,7 @@ interface Item {
 }
 
 const FALL_TIME = 0.8;
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const FALL_ANGLE = 1.48; // 約 85°（倒在地上）
 
 export class Breakables {
@@ -45,7 +47,7 @@ export class Breakables {
     this.grid.addBox(x, z, x, z, it);
   }
   /** 各部位各自的 index 與矩陣（紅綠燈：桿、橫桿、燈箱、三顆燈） */
-  addParts(x: number, z: number, r: number, slow: number, parts: { mesh: THREE.InstancedMesh; idx: number; base: THREE.Matrix4 }[]) {
+  addParts(x: number, z: number, r: number, slow: number, parts: { mesh: THREE.InstancedMesh; idx: number; base: THREE.Matrix4; hide?: boolean }[]) {
     const it: Item = { x, z, r, slow, parts: parts.map((p) => ({ ...p, base: p.base.clone() })), state: 0, t: 0, down: 0, ax: 1, az: 0 };
     this.items.push(it);
     this.grid.addBox(x, z, x, z, it);
@@ -109,6 +111,7 @@ export class Breakables {
     // M = T(底部) · R · T(−底部) · 原本的矩陣
     const pivot = this.tr.makeTranslation(it.x, 0, it.z).multiply(this.rot).multiply(new THREE.Matrix4().makeTranslation(-it.x, 0, -it.z));
     for (const p of it.parts) {
+      if (p.hide) { p.mesh.setMatrixAt(p.idx, ang > 0 ? ZERO : p.base); p.mesh.instanceMatrix.needsUpdate = true; continue; }
       this.m.copy(pivot).multiply(p.base);
       p.mesh.setMatrixAt(p.idx, this.m);
       p.mesh.instanceMatrix.needsUpdate = true;

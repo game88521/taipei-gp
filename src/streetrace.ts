@@ -201,6 +201,7 @@ export class StreetRace {
     let m = this.models.get(name);
     if (!m) {
       m = makeF1(TEAMS[RIVAL_TEAM[name] ?? 1].livery);
+      m.root.traverse((o) => { if ((o as THREE.Mesh).isMesh && !(o as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material.transparent) { o.castShadow = true; o.receiveShadow = true; } });
       m.root.visible = false;
       this.scene.add(m.root);
       this.models.set(name, m);

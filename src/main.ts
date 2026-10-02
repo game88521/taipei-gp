@@ -46,7 +46,7 @@ const MOBILE = matchMedia('(pointer: coarse)').matches; // 觸控裝置（手機
 const qPref = save.quality ?? 'auto';
 let level: Level = qPref === 'auto' ? defaultLevel(MOBILE) : qPref;
 const Q = qualityFor(level);
-const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2 && !Q.bloom, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2 && !Q.bloom, powerPreference: 'high-performance', stencil: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pixelRatio));
 renderer.shadowMap.enabled = Q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -103,7 +103,9 @@ const GradeShader = {
     }`,
 };
 function setupBloom() {
-  composer = new EffectComposer(renderer);
+  // 自己給後製畫布：要有 stencil（預先算好的影子靠它避免重疊處更黑）
+  const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: true });
+  composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale), 0.55, 0.45, 0.82);
   composer.addPass(bloom);
@@ -122,9 +124,10 @@ function applyShadowFlags() {
     const lambert = mat0 instanceof THREE.MeshLambertMaterial || mat0 instanceof THREE.MeshStandardMaterial; // 有打光的材質
     if (!lambert) return;
     m.receiveShadow = true;
-    if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = true; return; }
-    box.setFromObject(m).getSize(size);
-    m.castShadow = size.y > 0.3 && size.y < 1000;
+    let dyn = false;
+    for (let o2: THREE.Object3D | null = m; o2; o2 = o2.parent) if (o2.userData.dynamic) { dyn = true; break; }
+    m.castShadow = dyn;
+    void box; void size;
   });
 }
 let cityReady = false;
@@ -160,6 +163,7 @@ const cityLoad = loadCity(scene, track, Q).then((c) => {
 });
 
 const carModel = makeF1(PLAYER_LIVERY); // 玩家：躍馬紅（紅白黑）
+carModel.root.userData.dynamic = true;
 scene.add(carModel.root);
 const ghostModel = makeF1(PLAYER_LIVERY, true);
 ghostModel.root.visible = false;
@@ -169,6 +173,8 @@ const sedanModel = makeSedan('#f2f2f0');
 sedanModel.root.visible = false;
 scene.add(sedanModel.root);
 const taxiModel = makeSedan('#f5c518', true); // 計程車任務開的小黃
+// 會動的東西才投射即時陰影（建築、樹的影子是預先算好的）
+for (const m of [sedanModel, taxiModel]) m.root.userData.dynamic = true;
 taxiModel.root.visible = false;
 scene.add(taxiModel.root);
 
@@ -196,6 +202,7 @@ const opts = {
   assist: save.opts.assist ?? true,
   ghost: save.opts.ghost ?? true,
   sound: save.opts.sound ?? true,
+  fps: save.opts.fps ?? false,
 };
 for (const k of Object.keys(opts) as (keyof typeof opts)[]) {
   const el = $<HTMLInputElement>('opt-' + k);
@@ -1003,6 +1010,7 @@ function carGear(v: number) {
   const lo = CAR_GEARS[g], hi = g === CAR_GEARS.length - 1 ? CAR_VMAX : CAR_GEARS[g + 1];
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
+let heavyAcc = 0;
 function freeStep(dt: number) {
   let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
@@ -1015,14 +1023,19 @@ function freeStep(dt: number) {
     if (sr.phase === 'done' && !srShown) showStreetResult();
     if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(taxiOn() ? null : sr.checkOffer(fcar.x, fcar.z, fcar.v)); // 載客時不接街頭挑戰
   }
-  if (traffic && !NO_TRAFFIC) {
-    traffic.update(dt, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? [])]); // 車流會讓對手與過馬路的行人
+  heavyAcc += dt;
+  const heavy = heavyAcc >= 1 / 60; // 車流、行人每秒更新 60 次就夠（玩家的車照樣每步都算）
+  if (traffic && !NO_TRAFFIC && heavy) {
+    traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? [])]); // 車流會讓對手與過馬路的行人
     impact = Math.max(impact, traffic.collidePlayer(fcar));
   }
-  if (peds && peds.update(dt, fcar, traffic)) {
+  if (traffic && !NO_TRAFFIC && !heavy) impact = Math.max(impact, traffic.collidePlayer(fcar));
+  if (peds && heavy && peds.update(heavyAcc, fcar, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
     sound.hit(6);
   }
+  if (heavy) heavyAcc = 0;
+
   if (impact) sound.hit(impact * 2.5);
   if (taxi && taxiOn()) {
     if (impact) taxi.onHit(impact);
@@ -1129,7 +1142,9 @@ qSel.addEventListener('change', () => {
 
 // ---------------------------------------------------------------- 主迴圈
 const clock = new THREE.Clock();
-let acc = 0;
+let fpsN2 = 0, fpsT2 = 0;
+let acc = 0; // （保留給同步模擬用）
+void acc;
 car.placeAt(track, 1);
 showMenu(false);
 // ?phys：汽車物理測試（加速、轉彎半徑、撞牆後能不能脫困），結果寫在標題
@@ -1255,14 +1270,23 @@ function runSim() {
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (state === 'race' || state === 'free') {
-    acc += dt;
-    while (acc >= STEP) { if (state === 'race') step(STEP); else freeStep(STEP); acc -= STEP; }
+  if ((state === 'race' || state === 'free') && dt > 0) {
+    // 每一幀剛好把物理推進到這一幀的時間：切成 n 小步（每步 ≤ 1/120 秒）。
+    // 之前固定 1/120 秒一步、剩下的留到下一幀，幀率不是 60/120 時每幀步數忽多忽少，畫面會一頓一頓。
+    const n = Math.max(1, Math.ceil(dt / STEP - 1e-6)), sub = dt / n;
+    for (let k = 0; k < n; k++) { if (state === 'race') step(sub); else if (state === 'free') freeStep(sub); }
   } else {
-    acc = 0;
     if (state === 'countdown') updateCountdown(dt);
   }
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
+  // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
+  fpsN2++; fpsT2 += dt;
+  if (fpsT2 >= 0.5) {
+    const el = $('fps');
+    el.style.display = opts.fps ? '' : 'none';
+    if (opts.fps) el.textContent = `${Math.round(fpsN2 / fpsT2)} FPS · ${((fpsT2 / fpsN2) * 1000).toFixed(1)} ms · ${LEVEL_NAME[level]}`;
+    fpsN2 = 0; fpsT2 = 0;
+  }
   if (state === 'race' || state === 'countdown') updateDrsButton();
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);

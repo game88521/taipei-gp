@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 import { sedanGeo } from './models';
+import { bakedShadowMaterial, blobTexture } from './world';
+
+/** 車底柔邊影子（不用即時陰影也看得出車貼在地上） */
+export function carBlob(w: number, l: number) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l).rotateX(-Math.PI / 2), bakedShadowMaterial(blobTexture()));
+  m.position.y = 0.04;
+  m.renderOrder = 1;
+  return m;
+}
 
 export interface CarModel {
   root: THREE.Group;
@@ -65,6 +74,7 @@ export function makeSedan(color: string, taxi = false): CarModel {
   const body = new THREE.Group();
   root.add(body);
   const g = sedanGeo({ taxi, noWheels: true });
+  root.add(carBlob(2.5, 5.6));
   body.add(new THREE.Mesh(g.paint, new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.28 }))); // 烤漆：會映出天空
   body.add(new THREE.Mesh(g.fixed, new THREE.MeshLambertMaterial({ vertexColors: true })));
   const steer: THREE.Group[] = [], spin: THREE.Mesh[] = [];

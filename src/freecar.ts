@@ -85,7 +85,7 @@ export class FreeCar {
     let a = 0;
     if (throttle) a = vl < -0.3 ? BRAKE : ENGINE * (1 - Math.max(0, vl / CAR_VMAX) ** 2);
     else if (brake) a = vl > 0.3 ? -BRAKE : -5; // 停下來後繼續按＝倒車
-    else a = -Math.sign(vl) * Math.min(Math.abs(vl) / dt, 1.0);
+    else a = -Math.sign(vl) * Math.min(Math.abs(vl) / Math.max(dt, 1e-6), 1.0); // dt 可能是 0（同一幀），不能除以 0
     a -= 0.0004 * vl * Math.abs(vl);
     vl += a * dt;
     if (!throttle && !brake && Math.abs(vl) < 0.05) vl = 0;
