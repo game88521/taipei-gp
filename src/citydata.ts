@@ -1,6 +1,6 @@
 // city.json 的型別與共用查詢（路網、最近道路、碰撞）
 
-export interface Building { p: number[]; h: number; m?: number; s: number; c?: string; n?: string }
+export interface Building { p: number[]; h: number; m?: number; s: number; c?: string; n?: string; k?: string /* 特殊地標造型（landmarks3d.ts） */ }
 export interface NetWay {
   n: number[]; // 節點編號
   w: number; // 路寬 (m)
@@ -25,6 +25,8 @@ export interface CityData {
   lamps?: number[]; // [x, z, 燈臂方向, ...]
   parked?: number[]; // [x, z, 車頭方向, 顏色, ...]
   terrain?: Terrain | null; // 象山一帶的山
+  trails?: { p: number[]; s: number }[]; // 山上的登山步道（s = 1 石階）
+  rocks?: number[]; // 六巨石的位置
 }
 export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
 

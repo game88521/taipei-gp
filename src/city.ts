@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeFiller, buildFiller, type Filler } from './filler';
+import { buildSpecial, buildTrails } from './landmarks3d';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
 import { TOWER_101, CITY_SIZE, type Track } from './track';
 import { stage, fetchJson } from './loading';
@@ -374,7 +375,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     const geo = tileGeo(`f${style}${variant}`, ring[0][0], ring[0][1]);
     const roofs = tileGeo('roof', ring[0][0], ring[0][1]);
     const shopsGeo = tileGeo('shop', ring[0][0], ring[0][1]), signsGeo = tileGeo('sign', ring[0][0], ring[0][1]);
-    if (q.rooftops && style === 0 && y0 < 0 && y1 < 45) roofDetails(ring, y1);
+    if (q.rooftops && style === 0 && y0 < 0 && y1 < 45 && !b.k) roofDetails(ring, y1);
     const aoTint = tint.clone().multiplyScalar(0.5);
     // 預先算好的地面影子：腳印＋沿太陽反方向推出去的腳印，取凸包（高度最多算 80 m，免得 101 的影子拖到 1.5 km 外）
     if (y0 < 0 && y1 > 3) {
@@ -388,6 +389,11 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
         const [P, Q] = cy < 0 ? [C, B] : [B, C];
         sg.tri([A[0], 0.03, A[1]], [P[0], 0.03, P[1]], [Q[0], 0.03, Q[1]], [0, 1, 0], [0, 0], [0, 0], [0, 0]);
       }
+    }
+    // 有專屬造型的地標：影子照外框算（上面），模型另外做
+    if (b.k) {
+      const m = buildSpecial(b);
+      if (m) { scene.add(m); cullAdd(m, ring[0][0], ring[0][1], 'far', 200); continue; }
     }
     let u = 0;
     const streetLevel = y0 < 0 && (b.s === 0 || b.s === 2) && y1 < 70;
@@ -591,6 +597,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       c.o.visible = inRange && !c.o.userData.off; // off = 街道賽時藏起來的
     }
   };
+  if (data.terrain && data.trails) scene.add(buildTrails(data.trails, data.terrain, data.rocks ?? []));
   await stage('外圍市區', 0.72);
   const filler = makeFiller(data);
   buildFiller(scene, filler);

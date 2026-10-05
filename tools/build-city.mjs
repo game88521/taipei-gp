@@ -346,25 +346,35 @@ for (const e of E) {
   else if (e.type === 'relation' && t.building && !/^(roof|construction)$/.test(t.building)) outlines.push({ id: e.id, t, rings: outerRings(e) });
 }
 // 有 building:part 的建築：外框不畫，改畫各部件（101、遠企都是這樣才有真實外形）
+// 特殊地標：執行時換成專屬模型（landmarks3d.ts）；k = hall 國父紀念館、dome 大巨蛋、arena 小巨蛋、chimney 煙囪
+// 這些保留外框、丟掉裡面的部件（反正要換模型）；市政府照部件畫，但部件套上外框的花崗岩色
+const SPECIAL = [[/^國父紀念館$/, 'hall'], [/^臺北大巨蛋$/, 'dome'], [/^臺北小巨蛋$/, 'arena']];
+const isSpecial = (t) => SPECIAL.some(([re]) => re.test(t.name || '')) || t.man_made === 'chimney';
+const OUTLINE_COLOUR = [[/^臺北市政府$/, '#b8a487']];
 const partCentroids = parts.map((p) => centroid(p.rings[0]));
-const keep = [];
+const keep = [], dropParts = new Set();
 let skippedOutline = 0, droppedTrack = 0;
 for (const o of outlines) {
   const r0 = o.rings[0];
   if (!r0 || o.under) continue;
   const xs = r0.map((p) => p[0]), zs = r0.map((p) => p[1]);
   const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
-  if (partCentroids.some((c) => c[0] > x0 && c[0] < x1 && c[1] > z0 && c[1] < z1 && inside(c, r0))) { skippedOutline++; continue; }
+  const inner = parts.filter((_, i) => { const c = partCentroids[i]; return c[0] > x0 && c[0] < x1 && c[1] > z0 && c[1] < z1 && inside(c, r0); });
+  if (inner.length && isSpecial(o.t)) { for (const p of inner) dropParts.add(p); keep.push(o); continue; }
+  const oc = OUTLINE_COLOUR.find(([re]) => re.test(o.t.name || ''));
+  if (oc) for (const p of inner) p.colour = oc[1];
+  if (inner.length) { skippedOutline++; continue; }
   keep.push(o);
 }
-keep.push(...parts);
+keep.push(...parts.filter((p) => !dropParts.has(p)));
 
+const BRICK_PARKS = E.filter((e) => e.type === 'way' && e.geometry && /^松山文創園區$/.test(e.tags?.name || '')).map((e) => ring(e.geometry));
 const buildings = [];
 for (const b of keep) {
   for (const r0 of b.rings) {
     let r = r0;
     if (Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 0.5) r = r.slice(0, -1);
-    if (r.length < 3 || area(r) < 12) continue;
+    if (r.length < 3 || (area(r) < 12 && b.t.man_made !== 'chimney')) continue; // 煙囪底面積很小，不能被當成雜訊濾掉
     const c = centroid(r);
     if (farFromTrack(c[0], c[1])) continue;
     if (r.some((p) => distToTrack(p[0], p[1]) < TRACK_CLEAR) || inside(line[0], r)) { droppedTrack++; continue; }
@@ -376,6 +386,12 @@ for (const b of keep) {
     const col = colour(b.t['building:colour']);
     if (col) o.c = col;
     if (b.t.name && (h > 25 || area(r) > 1500)) o.n = b.t.name; // 地標名稱：屋頂招牌與接近提示用
+    for (const [re, k] of SPECIAL) if (re.test(b.t.name || '')) o.k = k;
+    if (b.t.man_made === 'chimney') o.k = 'chimney';
+    const oc = OUTLINE_COLOUR.find(([re]) => re.test(b.t.name || ''));
+    if (b.colour || oc) o.c = b.colour || oc[1]; // 市政府：花崗岩外牆
+    // 松菸：日治時期的紅磚廠房（園區裡的老建築）
+    if (!o.k && h < 20 && BRICK_PARKS.some((pk) => inside(centroid(r), pk))) { o.c = '#a24e38'; o.s = 3; }
     buildings.push(o);
   }
 }
@@ -712,6 +728,32 @@ let terrain = null;
   }
 }
 
+// ---------------------------------------------------------------- 登山步道（象山、虎山、拇指山…）與六巨石
+// 只留在山坡上（地形高 > 1 m）的步道：石階（steps）與泥土／石板路；執行時沿地形鋪
+const trails = [];
+const rocks = [];
+if (terrain) {
+  const T = terrain;
+  const th = (x, z) => {
+    const fx = (x - T.x0) / T.step, fz = (z - T.z0) / T.step, i = Math.floor(fx), j = Math.floor(fz);
+    if (i < 0 || j < 0 || i >= T.nx - 1 || j >= T.nz - 1) return 0;
+    const a = fx - i, b = fz - j, H = T.h, n = T.nx;
+    return (H[j * n + i] * (1 - a) + H[j * n + i + 1] * a) * (1 - b) + (H[(j + 1) * n + i] * (1 - a) + H[(j + 1) * n + i + 1] * a) * b;
+  };
+  for (const e of E) {
+    const t = e.tags || {};
+    if (e.type !== 'way' || !e.geometry || !/^(steps|footway|path)$/.test(t.highway || '')) continue;
+    const r = ring(e.geometry);
+    if (r.filter((p) => th(p[0], p[1]) > 1).length < r.length * 0.5) continue;
+    trails.push({ p: rdp(r, 0.8).flatMap(([x, z]) => [r1(x), r1(z)]), s: t.highway === 'steps' ? 1 : 0 });
+  }
+  for (const e of E) if (/六巨石/.test(e.tags?.name || '')) {
+    const g = e.type === 'node' ? e : e.center || (e.geometry && e.geometry[0]);
+    if (g?.lat) { const [x, z] = proj(g.lat, g.lon); rocks.push(r1(x), r1(z)); }
+  }
+  console.log(`登山步道 ${trails.length} 段（石階 ${trails.filter((t) => t.s).length}）、六巨石 ${rocks.length / 2} 處`);
+}
+
 // ---------------------------------------------------------------- 擋在車道上的建築
 // 車道中心線穿過建築底面：高架的（layer ≥ 1）或路標成「穿過建築」的，把建築墊高讓車從底下過；
 // 其他的多半是資料錯誤（或沒標 layer 的地下結構），直接拿掉。幹道、一般道路穿過 3 m 以上就算，巷弄 8 m 以上
@@ -768,7 +810,7 @@ let raisedOver = 0, droppedOver = 0;
 }
 console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上墊高 ${raisedOver}、壓在路上拿掉 ${droppedOver}`);
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain };
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks };
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);
