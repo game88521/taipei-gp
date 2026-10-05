@@ -493,7 +493,24 @@ html:not(.touch) #gas { display: none; }
   font-weight: 800;
   touch-action: none;
 }
-#hud[data-mode='race'] #wanted, #hud[data-mode='race'] #btn-pursuit { display: none !important; }
+#btn-horn {
+  position: absolute;
+  right: calc(max(14px, env(safe-area-inset-right)) + 132px);
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 150px);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 12, 20, 0.45);
+  font-size: 26px;
+  touch-action: none;
+}
+#btn-horn:active { background: rgba(255, 212, 0, 0.5); }
+html:not(.touch) #btn-horn { display: none; }
+@media (max-height: 480px) {
+  #btn-horn { width: 54px; height: 54px; font-size: 22px; right: calc(max(14px, env(safe-area-inset-right)) + 108px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 120px); }
+}
+#hud[data-mode='race'] #wanted, #hud[data-mode='race'] #btn-pursuit, #hud[data-mode='race'] #btn-horn { display: none !important; }
 
 /* ---------------- 載入進度條 */
 #load { height: 4px; margin: 0 0 6px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }

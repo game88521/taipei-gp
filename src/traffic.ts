@@ -40,6 +40,9 @@ export interface Agent {
   kx: number; kz: number; kh: number; // 被撞開的位移與車頭偏轉（慢慢回到車道）
   kvx: number; kvz: number; kw: number; // 被撞開的速度與旋轉（在地上滑、摩擦慢慢停下）
   down: number; fall: number; // 機車被撞倒：倒地剩幾秒、目前倒下的程度（0 站著 ~ 1 躺平）
+  lo: number; // 目前離道路中線的橫向位置（換車道時慢慢移過去，不會瞬移）
+  blockT: number; // 被玩家擋在後面多久（太久會按喇叭）
+  honkT: number; // 幾秒後按喇叭（被撞、回按）
   alive: boolean;
 }
 
@@ -75,7 +78,7 @@ export class Traffic {
   private spawnable: DEdge[] = [];
   private clusters: Cluster[] = [];
   private nodeCluster = new Map<number, Cluster>();
-  private agents: Agent[] = [];
+  agents: Agent[] = [];
   private meshes: { paint: THREE.InstancedMesh; fixed: THREE.InstancedMesh }[] = [];
   private heads: { c: Cluster; g: 0 | 1; idx: number }[] = [];
   private lamps!: THREE.InstancedMesh;
@@ -258,7 +261,7 @@ export class Traffic {
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
         e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
-        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, alive: true,
+        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, lo: NaN, blockT: 0, honkT: 0, alive: true,
       };
       const dead = this.agents.findIndex((q) => !q.alive);
       if (dead >= 0) this.agents[dead] = a; else this.agents.push(a);
@@ -269,11 +272,36 @@ export class Traffic {
     return false;
   }
 
+  private laneOff(a: Agent) {
+    const e = a.e;
+    return e.base + (a.lane + 0.5) * e.laneW - e.laneW / 2 + (a.kind === 3 ? e.laneW * 0.3 : 0);
+  }
   private place(a: Agent) {
-    const e = a.e, off = e.base + (a.lane + 0.5) * e.laneW - e.laneW / 2 + (a.kind === 3 ? e.laneW * 0.3 : 0);
+    const e = a.e;
+    if (Number.isNaN(a.lo)) a.lo = this.laneOff(a);
+    const off = a.lo;
     a.x = e.ax + e.ux * a.s - e.uz * off;
     a.z = e.az + e.uz * a.s + e.ux * off;
     a.h = Math.atan2(e.ux, e.uz);
+  }
+
+  /** 喇叭聲（給 main 播）：位置與要不要生氣一點（被撞） */
+  honks: { x: number; z: number; angry: boolean }[] = [];
+
+  /** 玩家按喇叭：前方 40 m 內同方向的車，多車道的換到旁邊車道讓路，單線道讓不了的回按喇叭；回傳讓路的台數 */
+  honk(px: number, pz: number, ph: number): number {
+    const fx = Math.sin(ph), fz = Math.cos(ph);
+    let yielded = 0;
+    for (const a of this.agents) {
+      if (!a.alive || a.stunned > 0) continue;
+      const dx = a.x - px, dz = a.z - pz, ahead = dx * fx + dz * fz, lat = Math.abs(-dx * fz + dz * fx);
+      if (ahead < 2 || ahead > 40 || lat > 4 || Math.cos(a.h - ph) < 0.6) continue;
+      if (a.e.lanes > 1 && a.kind !== 2) {
+        a.lane = a.lane < a.e.lanes - 1 ? a.lane + 1 : a.lane - 1; // 往外側（或內側）讓
+        yielded++;
+      } else if (a.honkT <= 0) a.honkT = 0.35 + this.rand() * 0.4;
+    }
+    return yielded;
   }
 
   private key(x: number, z: number) { return (Math.floor(x / 20) + 1000) * 4000 + Math.floor(z / 20) + 1000; }
@@ -281,12 +309,12 @@ export class Traffic {
   /** 前方最近的障礙物距離（同方向、橫向 1.8 m 內）與它的速度 */
   private leader(a: Agent, player: { x: number; z: number; v: number }) {
     const fx = Math.sin(a.h), fz = Math.cos(a.h);
-    let gap = 80, lv = 0;
-    const consider = (x: number, z: number, len: number, v: number, w: number) => {
+    let gap = 80, lv = 0, isPlayer = false;
+    const consider = (x: number, z: number, len: number, v: number, w: number, p = false) => {
       const dx = x - a.x, dz = z - a.z, ahead = dx * fx + dz * fz, lat = Math.abs(-dx * fz + dz * fx);
       if (ahead <= 0 || lat > w) return;
       const g = ahead - (KIND_LEN[a.kind] + len) / 2;
-      if (g < gap) { gap = g; lv = v; }
+      if (g < gap) { gap = g; lv = v; isPlayer = p; }
     };
     const cx = Math.floor(a.x / 20), cz = Math.floor(a.z / 20);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
@@ -296,9 +324,9 @@ export class Traffic {
         consider(b.x + b.kx, b.z + b.kz, KIND_LEN[b.kind], b.v, a.kind === 3 || b.kind === 3 ? 1.1 : 1.8); // 被撞開的車看它實際在哪
       }
     }
-    consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2);
+    consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2, true);
     for (const o of this.extras) consider(o.x, o.z, 4.6, Math.max(0, o.v), 2.0);
-    return { gap, lv };
+    return { gap, lv, isPlayer };
   }
 
   /**
@@ -366,6 +394,9 @@ export class Traffic {
           if (vn < 0) { a.kvx -= 1.3 * vn * nx; a.kvz -= 1.3 * vn * nz; a.kw *= 0.5; }
         }
       }
+      // 被撞飛的車撞到別台車：照質量交換動量，被撞的那台也跟著滑出去、停下來（連環車禍）
+      if (Math.hypot(a.kvx, a.kvz) > 1.5) this.knockOthers(a);
+      if (a.honkT > 0) { a.honkT -= dt; if (a.honkT <= 0) this.honks.length < 16 && this.honks.push({ x: a.x + a.kx, z: a.z + a.kz, angry: true }); }
       // 機車倒地：躺著，時間到再扶起來
       if (a.down > 0) a.down -= dt;
       const fallTo = a.down > 0 ? 1 : 0;
@@ -379,7 +410,13 @@ export class Traffic {
         if (Math.abs(a.kx) + Math.abs(a.kz) + Math.abs(a.kh) < 0.01) a.kx = a.kz = a.kh = 0;
       }
       if (a.stunned > 0) { a.stunned -= dt; a.v = 0; continue; }
-      let { gap, lv } = this.leader(a, player);
+      let { gap, lv, isPlayer } = this.leader(a, player);
+      // 被玩家擋住太久：按喇叭（之後冷卻一下）
+      if (isPlayer && a.v < 0.6 && gap < 9) a.blockT += dt; else a.blockT = Math.max(0, a.blockT - dt);
+      if (a.blockT > 2.5) { this.honks.length < 16 && this.honks.push({ x: a.x, z: a.z, angry: false }); a.blockT = -5; }
+      // 換車道：橫向位置慢慢移到新車道
+      const tgt = this.laneOff(a);
+      if (!Number.isNaN(a.lo) && Math.abs(tgt - a.lo) > 0.01) a.lo += (tgt - a.lo) * Math.min(1, dt * 1.8);
       // 紅綠燈：這段路的終點是號誌路口，而且還沒進那個路口
       const c = this.nodeCluster.get(a.e.b);
       if (c && a.inC !== c) {
@@ -458,9 +495,36 @@ export class Traffic {
         a.kw = Math.max(-3, Math.min(3, a.kw));
         a.stunned = Math.max(a.stunned, KIND_STUN[a.kind]);
         if (a.kind === 3 && Math.hypot(dvx, dvz) > 3) a.down = 4; // 機車被撞倒
+        if (Math.hypot(dvx, dvz) > 3 && a.honkT <= 0 && a.kind !== 3) a.honkT = 0.5 + this.rand() * 0.4; // 被撞的駕駛不爽按喇叭
       }
     }
     return impact;
+  }
+
+  /** a 正被撞飛：撞到旁邊的車就交換動量（a、b 都當成圓，半徑約半個車寬＋一點） */
+  private knockOthers(a: Agent) {
+    const ax = a.x + a.kx, az = a.z + a.kz;
+    const cx = Math.floor(ax / 20), cz = Math.floor(az / 20);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      for (const b of this.grid.get((cx + i + 1000) * 4000 + cz + j + 1000) || []) {
+        if (b === a || !b.alive) continue;
+        const bx = b.x + b.kx, bz = b.z + b.kz, dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz);
+        const r = KIND_R[a.kind] + KIND_R[b.kind] + 0.9;
+        if (d >= r || d < 1e-3) continue;
+        const nx = dx / d, nz = dz / d;
+        if (b.v > 0) { b.kvx += Math.sin(b.h) * b.v; b.kvz += Math.cos(b.h) * b.v; b.v = 0; }
+        const vn = (a.kvx - b.kvx) * nx + (a.kvz - b.kvz) * nz;
+        if (vn >= 0) continue;
+        const ma = KIND_MASS[a.kind], mb = KIND_MASS[b.kind], J = (-(1 + 0.25) * vn) / (1 / ma + 1 / mb);
+        a.kvx += (J / ma) * nx; a.kvz += (J / ma) * nz;
+        b.kvx -= (J / mb) * nx; b.kvz -= (J / mb) * nz;
+        const push = (r - d) / 2;
+        a.kx += nx * push; a.kz += nz * push; b.kx -= nx * push; b.kz -= nz * push;
+        b.stunned = Math.max(b.stunned, KIND_STUN[b.kind]);
+        if (b.kind === 3 && J / mb > 3) b.down = 4;
+        if (b.honkT <= 0 && b.kind !== 3) b.honkT = 0.4 + this.rand() * 0.5;
+      }
+    }
   }
 
   render(dt: number) {

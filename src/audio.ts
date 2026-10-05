@@ -62,6 +62,29 @@ export class Sound {
     src.start();
   }
 
+  /** 汽車喇叭：兩個差三度的方波（像真的雙音喇叭）＋低通；vol 0..1、pitch 倍率（每台車不太一樣） */
+  horn(vol = 1, pitch = 1, dur = 0.35) {
+    if (!this.ctx || !this.enabled || vol <= 0.02) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.16 * vol, t + 0.015);
+    g.gain.setValueAtTime(0.16 * vol, t + dur);
+    g.gain.linearRampToValueAtTime(0, t + dur + 0.06);
+    lp.connect(g).connect(this.master);
+    for (const f of [415, 523]) {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f * pitch;
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.08);
+    }
+  }
+
   beep(freq: number, dur = 0.18) {
     if (!this.ctx || !this.enabled) return;
     const o = this.ctx.createOscillator();

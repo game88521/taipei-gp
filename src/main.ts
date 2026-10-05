@@ -156,6 +156,8 @@ let police: Police | null = null;
 const WANTED_TEST = new URLSearchParams(location.search).has('wanted');
 const PURSUIT_TEST = new URLSearchParams(location.search).has('pursuit');
 const policeLog: string[] = []; // 測試標題用
+const HONK_TEST = new URLSearchParams(location.search).has('honktest');
+let honkYield = 0, honkBack = 0, honkT = 0, honkPlaced = false;
 const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
@@ -1073,6 +1075,22 @@ function updateWantedHud() {
     el.className = 'show cop';
   } else el.className = '';
 }
+// 喇叭：電腦 H、手機喇叭鍵；前面的車會讓路或回按
+function playerHorn() {
+  if (state !== 'free') return;
+  sound.horn(1, chosen.id === 'pickup' ? 0.8 : chosen.id === 'f1' || chosen.id === 'super' ? 1.15 : 1, 0.4);
+  traffic?.honk(fcar.x, fcar.z, fcar.h);
+}
+$('btn-horn').addEventListener('pointerdown', (e) => { e.preventDefault(); playerHorn(); });
+addEventListener('keydown', (e) => { if (e.code === 'KeyH' && !e.repeat) playerHorn(); });
+/** 車流按的喇叭：照距離決定音量，音高每台不太一樣 */
+function playTrafficHonks() {
+  if (!traffic?.honks.length) return;
+  for (const h of traffic.honks.splice(0)) {
+    const d = Math.hypot(h.x - fcar.x, h.z - fcar.z), vol = Math.max(0, 1 - d / 110) * (h.angry ? 0.7 : 0.5);
+    sound.horn(vol, 0.82 + Math.random() * 0.35, h.angry ? 0.5 : 0.25 + Math.random() * 0.2);
+  }
+}
 function startPursuit() {
   if (!police || chosen.id !== 'police' || mode !== 'free' || state !== 'free') return;
   const m = police.startPursuit(fcar);
@@ -1230,6 +1248,16 @@ function streetRacing() {
 function freeStep(dt: number) {
   fcar.spec = streetRacing() ? DEFAULT_SPEC : chosen.spec;
   if (PURSUIT_TEST && police && !police.suspect && policeLog.length === 0) startPursuit();
+  if (HONK_TEST && traffic && FREE_SIM) {
+    honkT += dt;
+    // 3 秒後把玩家放到一台行駛中的車前面 15 m（同車道、同方向），後面的車就會被擋住
+    if (!honkPlaced && honkT > 3) {
+      const a = traffic.agents.find((b) => b.alive && b.v > 6 && b.kind !== 3 && b.kind !== 2);
+      if (a) { honkPlaced = true; fcar.place(a.x + Math.sin(a.h) * 15, a.z + Math.cos(a.h) * 15, a.h); honkT = 0; }
+    }
+    if (honkPlaced && honkT > 2) { honkT = 0; honkYield += traffic.honk(fcar.x, fcar.z, fcar.h); }
+    honkBack += traffic.honks.splice(0).length;
+  }
   let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
@@ -1307,6 +1335,7 @@ function updateFreeHud(dt: number) {
     const cops = police?.mapDots ?? [];
     minimap?.draw(fcar.x, fcar.z, fcar.h, cops.length ? { route: null, next: null, flags: [], ...base, rivals: [...(base?.rivals ?? []), ...cops] } : base);
     updateWantedHud();
+    playTrafficHonks();
     updateTaxiHud();
     updateSrHud();
   }
@@ -1443,6 +1472,18 @@ function physicsTest() {
         }
         res.push(`${nm}被撞開${Math.hypot(a.kx, a.kz).toFixed(1)}m轉${(Math.abs(a.kh) * 57.3).toFixed(0)}°${a.fall > 0.5 ? '倒地' : ''}/玩家剩${(vAfter * 3.6).toFixed(0)}km/h`);
       }
+      // 連環車禍：撞停著的轎車，它往前滑撞到前面 6.5 m 那台
+      traffic.update(STEP, fcar);
+      const a1 = traffic.testAgent(0), a2 = a1 && traffic.agents.find((b) => b.alive && b !== a1 && b.kind !== 2);
+      if (a1 && a2) {
+        Object.assign(a2, { kind: 0, v: 0, stunned: 6, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, x: a1.x + Math.sin(a1.h) * 6.5, z: a1.z + Math.cos(a1.h) * 6.5, h: a1.h });
+        const x2 = a2.x, z2 = a2.z;
+        const t = new FreeCar(), fx = Math.sin(a1.h), fz = Math.cos(a1.h);
+        t.place(a1.x - fx * 12, a1.z - fz * 12, a1.h);
+        t.vx = fx * 16.7; t.vz = fz * 16.7;
+        for (let n = 0; n < 120 * 3; n++) { t.update(STEP, 0, false, false, null); traffic.collidePlayer(t); traffic.update(STEP, { x: t.x, z: t.z, h: t.h, v: t.v }); }
+        res.push(`連環：前車被推${Math.hypot(a2.x + a2.kx - x2, a2.z + a2.kz - z2).toFixed(1)}m`);
+      }
       out.push('撞車流 ' + res.join(' '));
     }
     // 5) 撞倒測試：從起點全油門直衝 25 秒，路上的樹／路燈會被撞倒，看能跑多遠、撞倒幾個
@@ -1512,6 +1553,7 @@ if (FREE) void cityLoad.then(() => {
     breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
+    if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
     if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
