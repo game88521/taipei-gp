@@ -85,6 +85,7 @@ export function buildRoads(scene: THREE.Scene, d: CityData) {
     const tex = g.tex();
     tex.anisotropy = 8;
     const mat = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -n });
+    mat.userData.road = true; // 下雨時換成會反光的濕路面（weather.ts）
     scene.add(new THREE.Mesh(geo, mat));
   });
 }

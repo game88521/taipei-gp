@@ -92,6 +92,9 @@ export class Traffic {
   private blob!: THREE.InstancedMesh;
   readonly max: number;
 
+  /** 晚上、下雨開車燈（weather.ts 設定） */
+  lightsOn = false;
+  private carLights!: THREE.InstancedMesh;
   /** 有設定的話，被撞飛的車會停在牆邊，不會滑進建築裡 */
   collider: Collider | null = null;
   private pushOut = [0, 0];
@@ -156,6 +159,12 @@ export class Traffic {
     this.blob.count = 0;
     this.blob.frustumCulled = false;
     scene.add(this.blob);
+    // ---- 車燈：小方塊、不受光照（開了光暈會暈開）
+    this.carLights = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.14, 0.05), new THREE.MeshBasicMaterial({ toneMapped: false }), this.max * 4);
+    this.carLights.count = 0;
+    this.carLights.frustumCulled = false;
+    this.carLights.setColorAt(0, new THREE.Color());
+    scene.add(this.carLights);
     // ---- 車輛外型
     const mats = [new THREE.MeshStandardMaterial({ metalness: 0.4, roughness: 0.32 }), new THREE.MeshLambertMaterial({ vertexColors: true })]; // 車身烤漆會反光
     for (let k = 0 as Kind; k < 5; k = (k + 1) as Kind) {
@@ -556,6 +565,24 @@ export class Traffic {
     }
     this.blob.count = nb;
     this.blob.instanceMatrix.needsUpdate = true;
+    // 車燈
+    let nl = 0;
+    if (this.lightsOn) {
+      const head = new THREE.Color(3, 2.8, 2.3), tail = new THREE.Color(2.4, 0.15, 0.1), lm = new THREE.Matrix4(), off = new THREE.Matrix4();
+      for (const a of this.agents) {
+        if (!a.alive || nl + 4 > this.carLights.instanceMatrix.count) continue;
+        q.setFromAxisAngle(up, a.vh + a.kh);
+        m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
+        const L = KIND_LEN[a.kind] / 2 + 0.03, sides = a.kind === 3 ? [0] : a.kind === 2 ? [-0.9, 0.9] : [-0.6, 0.6], y = a.kind === 2 ? 0.85 : a.kind === 3 ? 0.95 : 0.75;
+        for (const s of sides) {
+          lm.multiplyMatrices(m, off.makeTranslation(s, y, L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, head);
+          lm.multiplyMatrices(m, off.makeTranslation(s, y + 0.05, -L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, tail);
+        }
+      }
+    }
+    this.carLights.count = nl;
+    this.carLights.visible = nl > 0;
+    if (nl) { this.carLights.instanceMatrix.needsUpdate = true; if (this.carLights.instanceColor) this.carLights.instanceColor.needsUpdate = true; }
     this.meshes.forEach((mm, k) => {
       mm.paint.count = mm.fixed.count = counts[k];
       mm.paint.instanceMatrix.needsUpdate = mm.fixed.instanceMatrix.needsUpdate = true;

@@ -106,8 +106,12 @@ function facade(kind: 'res' | 'glass' | 'civic', seed: number, reflective = fals
   });
   map.anisotropy = emissive.anisotropy = 8;
   // 高畫質：玻璃帷幕用會反射天空的材質（夕陽時整面樓映出晚霞）
-  if (reflective) return new THREE.MeshStandardMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true, metalness: 0.55, roughness: 0.22, envMapIntensity: 1.1 });
-  return new THREE.MeshLambertMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true });
+  // userData.windows：亮燈窗戶的亮度跟著時段變（weather.ts：白天暗、晚上亮）
+  const m = reflective
+    ? new THREE.MeshStandardMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true, metalness: 0.55, roughness: 0.22, envMapIntensity: 1.1 })
+    : new THREE.MeshLambertMaterial({ map, emissiveMap: emissive, emissive: '#ffffff', emissiveIntensity: 0.9, vertexColors: true });
+  m.userData.windows = true;
+  return m;
 }
 
 /** 店面：一樓亮燈的玻璃櫥窗 + 上方橫式招牌，4 種店輪流 */
@@ -497,7 +501,22 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     const n = L.length / 3;
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 8.5, 6).translate(0, 4.25 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
     const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.8).translate(0, 7.8, 0.9), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.14, 0.75).translate(0, 7.72, 1.7), new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false }), n);
+    const headMat = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false });
+    headMat.userData.lamp = true; // 白天熄燈、晚上更亮（weather.ts）
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.14, 0.75).translate(0, 7.72, 1.7), headMat, n);
+    // 晚上路燈照在地上的光圈（平常隱藏；加法混色疊在路面上）
+    const poolTex = canvasTex(64, 64, (g) => {
+      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, 'rgba(255,214,150,0.55)');
+      grd.addColorStop(0.5, 'rgba(255,190,120,0.18)');
+      grd.addColorStop(1, 'rgba(255,170,100,0)');
+      g.clearRect(0, 0, 64, 64);
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 64, 64);
+    }, false);
+    const pool = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2).translate(0, -0.2, 2.6), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 }), n);
+    pool.userData.nightOnly = true;
+    pool.visible = false;
     const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     for (let i = 0; i < n; i++) {
       qq.setFromAxisAngle(up, L[i * 3 + 2]);
@@ -505,9 +524,10 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       pole.setMatrixAt(i, m4);
       arm.setMatrixAt(i, m4);
       head.setMatrixAt(i, m4);
+      pool.setMatrixAt(i, m4);
       breakables.add(L[i * 3], L[i * 3 + 1], 0.2, 0.9, [pole, arm, head], i, m4); // 撞到會倒，車速剩 90%
     }
-    for (const m of [pole, arm, head]) { m.computeBoundingSphere(); scene.add(m); }
+    for (const m of [pole, arm, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
   }
 
   // ---- 路邊停的機車（簡化外型，數量多）

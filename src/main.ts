@@ -12,6 +12,7 @@ import { loadCity } from './city';
 import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
+import { Weather, headlightRig, TIME_NAME, type TimeKind } from './weather';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -32,7 +33,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -84,33 +85,36 @@ const world = buildWorld(scene, track);
   sc.bias = -0.0004;
   sc.normalBias = 0.6;
 }
-// 環境反射：用天空漸層＋夕陽做一張反射貼圖，車漆、玻璃帷幕會映出晚霞
-{
+// 環境反射：用天空漸層＋夕陽做一張反射貼圖，車漆、玻璃帷幕會映出晚霞（換時段天氣時重做）
+function buildEnv(sunColor = new THREE.Color(6, 4.2, 2.6)) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const env = new THREE.Scene();
   env.add(new THREE.Mesh(world.sky.geometry, world.sky.material));
-  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(160, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 4.2, 2.6) }));
+  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(160, 16, 8), new THREE.MeshBasicMaterial({ color: sunColor }));
   sunBall.position.copy(world.sunDir).multiplyScalar(2000);
   env.add(sunBall);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color: '#2e2b29' }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -20;
   env.add(floor);
+  const old = scene.environment;
   scene.environment = pmrem.fromScene(env, 0.03, 0.1, 6000).texture;
-  scene.environmentIntensity = 0.75; // 不要讓反光蓋過原本的顏色
+  old?.dispose();
   pmrem.dispose();
 }
+buildEnv();
+scene.environmentIntensity = 0.75; // 不要讓反光蓋過原本的顏色
 // 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開；最後加一點暗角與暖色調
-let composer: EffectComposer | null = null, bloom: UnrealBloomPass | null = null;
+let composer: EffectComposer | null = null, bloom: UnrealBloomPass | null = null, gradePass: ShaderPass | null = null;
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, vignette: { value: 0.42 }, saturation: { value: 1.1 } },
+  uniforms: { tDiffuse: { value: null }, vignette: { value: 0.42 }, saturation: { value: 1.1 }, tint: { value: new THREE.Vector3(1.03, 1, 0.96) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; uniform vec3 tint; varying vec2 vUv;
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-      c.rgb = mix(vec3(l), c.rgb, saturation) * vec3(1.03, 1.0, 0.96);
+      c.rgb = mix(vec3(l), c.rgb, saturation) * tint;
       float d = length((vUv - 0.5) * vec2(1.0, 0.8));
       c.rgb *= mix(1.0, smoothstep(0.85, 0.25, d), vignette);
       gl_FragColor = c;
@@ -123,7 +127,8 @@ function setupBloom() {
   composer.addPass(new RenderPass(scene, camera));
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale), 0.55, 0.45, 0.82);
   composer.addPass(bloom);
-  composer.addPass(new ShaderPass(GradeShader));
+  gradePass = new ShaderPass(GradeShader);
+  composer.addPass(gradePass);
   composer.addPass(new OutputPass());
 }
 /** 平面（路面、綠地、地面）只接受陰影；有厚度的東西（建築、樹、車、人）才投射 */
@@ -197,6 +202,8 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   // 有平行編譯擴充（KHR_parallel_shader_compile）時不會卡住主執行緒
   await stage('準備畫面', 0.98);
   applyShadowFlags();
+  weather.collect();
+  applyWeather();
   const hidden: THREE.Object3D[] = [];
   scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
   try { await renderer.compileAsync(scene, camera); } catch { /* 不支援就照舊第一次畫時編 */ }
@@ -240,6 +247,23 @@ for (const [id, pv] of playerCars) { const c = save.paint?.[id]; if (c) pv.setPa
 const CAR_Q = new URLSearchParams(location.search).get('car');
 let chosen = vehicleById(CAR_Q ?? (ownedCars().has(save.car ?? '') ? save.car : 'sedan'));
 const pcar = () => playerCars.get(chosen.id)!;
+// 時段天氣（weather.ts）
+const weather = new Weather(scene, world, Q.level === 'high' ? 3000 : Q.level === 'medium' ? 1800 : 900);
+{
+  const FRONT: Record<string, [number, number, number]> = { sedan: [2.35, 0.75, 0.6], taxi: [2.35, 0.75, 0.6], muscle: [2.45, 0.72, 0.68], super: [2.38, 0.58, 0.62], police: [2.35, 0.75, 0.6], pickup: [2.3, 0.75, 0.6], f1: [3.2, 0.35, 0.35] };
+  for (const [id, pv] of playerCars) { const h = headlightRig(...(FRONT[id] ?? FRONT.sedan)); pv.model.root.add(h); weather.headlights.push(h); }
+  const h = headlightRig(...FRONT.f1);
+  carModel.root.add(h);
+  weather.headlights.push(h);
+}
+const TIMES = Object.keys(TIME_NAME) as TimeKind[];
+let timeKind: TimeKind = TIMES.includes(new URLSearchParams(location.search).get('time') as TimeKind) ? new URLSearchParams(location.search).get('time') as TimeKind : TIMES.includes(save.time as TimeKind) ? save.time as TimeKind : 'dusk';
+function applyWeather() {
+  weather.apply(timeKind, Q.fogFar, bloom, gradePass);
+  buildEnv(weather.envSun);
+  if (traffic) traffic.lightsOn = weather.night || weather.raining;
+}
+applyWeather(); // 載入中的天空就先換好（城市載入完會再套一次，連窗戶、路燈）
 
 const car = new Car(); // 街道賽的 F1
 const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
@@ -262,6 +286,9 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------- 選項
 // 手機轉向：左右按鈕（預設）／拖曳滑桿／傾斜手機；舊存檔勾過「傾斜手機轉向」的沿用
 let steerMode: SteerMode = save.steer ?? (save.opts.tilt ? 'tilt' : 'buttons');
+const timeSel = $<HTMLSelectElement>('opt-time');
+timeSel.value = timeKind;
+timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind; save.time = timeKind; writeSave(); applyWeather(); });
 const touchSel = $<HTMLSelectElement>('opt-touch');
 touchSel.value = save.touch ?? 'auto';
 touchSel.addEventListener('change', () => { save.touch = touchSel.value as 'auto' | 'on' | 'off'; writeSave(); applyTouch(); });
@@ -1617,6 +1644,7 @@ renderer.setAnimationLoop(() => {
     fpsN2 = 0; fpsT2 = 0;
   }
   if (state === 'race' || state === 'countdown') updateDrsButton();
+  weather.update(dt, camera.position);
   if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);

@@ -50,6 +50,7 @@ function farMountains(): THREE.Group {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.userData.top = Float32Array.from(col.filter((_, i) => i % 3 === 0).map((_, v) => ([1, 4, 5].includes(v % 6) ? 1 : 0))); // 每個頂點是稜線（1）還是山腳（0）
     // 會寫入深度：山後面那片（霧色的）遠方地面被山擋住，從高空看山腳才不會跟地面之間空出一條天空
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
     m.renderOrder = -0.5 + li * 0.1; // 天空（-1）之後、城市之前
@@ -71,7 +72,7 @@ export function bakedShadowMaterial(map?: THREE.Texture) {
     polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -150,
     stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
   });
-  if (!map) shadowMat ??= m;
+  if (!map) { shadowMat ??= m; shadowMat.userData.bakedShadow = true; } // 太陽投出來的影子：晚上、陰天要淡（weather.ts）；車底的柔邊影子不變
   return map ? m : shadowMat!;
 }
 /** 柔邊的橢圓影子貼圖（樹、車、人） */
@@ -144,6 +145,13 @@ export interface World {
   race: THREE.Group;
   sun: THREE.DirectionalLight;
   sunDir: THREE.Vector3;
+  hemi: THREE.HemisphereLight;
+  sunDisc: THREE.Sprite;
+  clouds: THREE.Mesh;
+  /** 重新上色天空漸層（頂、中、地平線）：換時段天氣用 */
+  setSky: (top: string, mid: string, hor: string) => void;
+  /** 重新上色遠山：每層 [稜線色, 山腳色]（遠層、近層） */
+  setMountains: (layers: [string, string][]) => void;
 }
 
 export function buildWorld(scene: THREE.Scene, t: Track): World {
@@ -151,21 +159,25 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
 
   // ---- 天空（黃昏漸層）與霧
   const skyGeo = new THREE.SphereGeometry(2500, 32, 16);
-  const skyCol: number[] = [];
-  const top = new THREE.Color('#1c2552'), mid = new THREE.Color('#b5577a'), hor = new THREE.Color('#ff9d5c');
-  const p = skyGeo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const h = Math.max(0, p.getY(i) / 2500);
-    const c = h < 0.12 ? hor.clone().lerp(mid, h / 0.12) : mid.clone().lerp(top, Math.min(1, (h - 0.12) / 0.5));
-    skyCol.push(c.r, c.g, c.b);
-  }
-  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(skyCol, 3));
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(skyGeo.attributes.position.count * 3), 3));
+  const setSky = (topC: string, midC: string, horC: string) => {
+    const top = new THREE.Color(topC), mid = new THREE.Color(midC), hor = new THREE.Color(horC);
+    const p = skyGeo.attributes.position, col = skyGeo.attributes.color as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      const h = Math.max(0, p.getY(i) / 2500);
+      const c = h < 0.12 ? hor.clone().lerp(mid, h / 0.12) : mid.clone().lerp(top, Math.min(1, (h - 0.12) / 0.5));
+      col.setXYZ(i, c.r, c.g, c.b);
+    }
+    col.needsUpdate = true;
+  };
+  setSky('#1c2552', '#b5577a', '#ff9d5c'); // 黃昏（預設）
   const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -1;
   scene.add(sky);
   scene.fog = new THREE.Fog('#d98a6c', 300, 2400); // 拉遠一點，整圈都看得到 101
 
-  scene.add(new THREE.HemisphereLight('#b8c6ff', '#4a3428', 1.6));
+  const hemi = new THREE.HemisphereLight('#b8c6ff', '#4a3428', 1.6);
+  scene.add(hemi);
   // 夕陽：低角度的平行光（main.ts 會讓它跟著玩家，陰影才夠細）
   const sunDir = SUN_DIR.clone();
   const sun = new THREE.DirectionalLight('#ffb47a', 2.2);
@@ -359,5 +371,13 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
     race.add(pole, head);
   }
 
-  return { sky, mountains, assist, race, sun, sunDir };
+  const setMountains = (layers: [string, string][]) => {
+    mountains.children.forEach((m, li) => {
+      const g = (m as THREE.Mesh).geometry, col = g.attributes.color as THREE.BufferAttribute, top = g.userData.top as Float32Array;
+      const [ct, cb] = (layers[li] ?? layers[0]).map((c) => new THREE.Color(c));
+      for (let v = 0; v < col.count; v++) { const c = top[v] ? ct : cb; col.setXYZ(v, c.r, c.g, c.b); }
+      col.needsUpdate = true;
+    });
+  };
+  return { sky, mountains, assist, race, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains };
 }
