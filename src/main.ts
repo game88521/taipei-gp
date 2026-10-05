@@ -31,7 +31,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -48,8 +48,14 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 // 所以也看觸控點數；真的被手指點到也算。觸控按鈕的顯示看 html.touch（style.css）
 const TOUCH = matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 const MOBILE = matchMedia('(pointer: coarse)').matches || (TOUCH && !matchMedia('(hover: hover)').matches);
-document.documentElement.classList.toggle('touch', TOUCH);
-addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') document.documentElement.classList.add('touch'); }, { capture: true });
+// 選單「觸控按鈕」：自動（有觸控螢幕或被手指點到就顯示）／總是顯示／不顯示（觸控筆電當電腦玩）
+let touchSeen = false;
+function applyTouch() {
+  const pref = save.touch ?? 'auto';
+  document.documentElement.classList.toggle('touch', pref === 'on' || (pref === 'auto' && (TOUCH || touchSeen)));
+}
+applyTouch();
+addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && !touchSeen) { touchSeen = true; applyTouch(); } }, { capture: true });
 const qPref = (new URLSearchParams(location.search).get('q') as Level | null) ?? save.quality ?? 'auto'; // ?q=medium 給測試用
 let level: Level = qPref === 'auto' ? defaultLevel(MOBILE) : qPref;
 const Q = qualityFor(level);
@@ -153,7 +159,7 @@ let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 let holdRender = false;
 onProgress((label, f) => {
   if (cityReady) return;
-  holdRender = f >= 0.41;
+  if (f >= 0.41 && f < 0.98) holdRender = true; // 解除只在著色器編好之後（下面），「完成」那一步不能又把它打開
   $('btn-free').textContent = `${label}… ${Math.round(f * 100)}%`;
   $('load-bar').style.width = `${Math.round(f * 100)}%`;
 });
@@ -239,6 +245,9 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------- 選項
 // 手機轉向：左右按鈕（預設）／拖曳滑桿／傾斜手機；舊存檔勾過「傾斜手機轉向」的沿用
 let steerMode: SteerMode = save.steer ?? (save.opts.tilt ? 'tilt' : 'buttons');
+const touchSel = $<HTMLSelectElement>('opt-touch');
+touchSel.value = save.touch ?? 'auto';
+touchSel.addEventListener('change', () => { save.touch = touchSel.value as 'auto' | 'on' | 'off'; writeSave(); applyTouch(); });
 const steerSel = $<HTMLSelectElement>('opt-steer');
 steerSel.value = steerMode;
 steerSel.addEventListener('change', () => { steerMode = steerSel.value as SteerMode; save.steer = steerMode; writeSave(); applyOpts(); });
@@ -707,6 +716,7 @@ function updateGpHud() {
   st.forEach((r, k) => {
     const li = document.createElement('li');
     if (r.isPlayer) li.className = 'me';
+    else if (k !== 0 && Math.abs(k - me) > 1) li.className = 'far'; // 矮螢幕只列領先者、前後一名（style.css）
     const sw = document.createElement('i');
     sw.style.background = r.color;
     const nm = document.createElement('span');

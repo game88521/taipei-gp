@@ -379,7 +379,10 @@ html:not(.touch) #gas { display: none; }
 #res-table td:nth-child(4), #res-table td:nth-child(5) { font-family: var(--mono); }
 #res-table tr.me td { background: rgba(225, 6, 0, 0.35); }
 @media (max-height: 480px) {
-  .gp-panel { top: calc(max(10px, env(safe-area-inset-top)) + 104px); }
+  /* 手機橫向：名次表移到右上（暫停鍵下面），只列 4 行，不跟左下的 ◀ ▶ 搶位置 */
+  .gp-panel { top: calc(max(10px, env(safe-area-inset-top)) + 54px); left: auto; right: max(10px, env(safe-area-inset-right)); width: 150px; text-align: right; }
+  #board li.far { display: none; }
+  #board li { text-align: left; }
   #pos { font-size: 30px; }
   #board { font-size: 11px; }
   #board li { padding: 1px 6px; }
