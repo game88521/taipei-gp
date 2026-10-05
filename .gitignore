@@ -3,3 +3,4 @@ dist
 tools/osm-raw.json
 tools/plan.svg
 tools/osm-cache/
+tools/osm-rail.json

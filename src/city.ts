@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { makeFiller, buildFiller, type Filler } from './filler';
 import { buildSpecial, buildTrails } from './landmarks3d';
+import { buildElevated, type ElevatedHits } from './elevated';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
 import { TOWER_101, CITY_SIZE, type Track } from './track';
 import { stage, fetchJson } from './loading';
@@ -221,7 +222,7 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits }> {
   // 依距離顯示：每個區塊記住中心點，離鏡頭太遠就整塊不畫（地圖變大後很重要）
   // 分四層：far = 整個可視距離（建築、屋頂）；mid = 一半多（樹冠）；near = 550 m 內（店面、招牌、地上影子、機車、樹幹）；
   // close = 300 m 內（路名牌：一支一個物件，離遠了也看不清字）。遠處的小東西在手機螢幕上只有幾個像素，卻一個就多一次繪製
@@ -598,10 +599,11 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
     }
   };
   if (data.terrain && data.trails) scene.add(buildTrails(data.trails, data.terrain, data.rocks ?? []));
+  const elev = buildElevated(scene, data); // 高架道路、人行空橋、文湖線、地下道入口
   await stage('外圍市區', 0.72);
   const filler = makeFiller(data);
   buildFiller(scene, filler);
-  return { data, landmarks, breakables, raceHide, cull, filler };
+  return { data, landmarks, breakables, raceHide, cull, filler, elev };
 }
 
 /** 台北 101：照真實比例的竹節造型（總高 508 m）。方形錐台 = 4 邊的圓柱轉 45°，邊對齊街道 */

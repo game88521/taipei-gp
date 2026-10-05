@@ -167,6 +167,8 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   await stage('建立碰撞與路網', 0.76);
   collider = new Collider(c.data);
   for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
+  for (const [x, z, r] of c.elev.posts) collider.addPost(x, z, r); // 高架橋墩
+  for (const [x1, z1, x2, z2] of c.elev.walls) collider.addWall(x1, z1, x2, z2); // 匝道貼地那段
   roadNet = new RoadNet(c.data);
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;

@@ -27,6 +27,8 @@ export interface CityData {
   terrain?: Terrain | null; // 象山一帶的山
   trails?: { p: number[]; s: number }[]; // 山上的登山步道（s = 1 石階）
   rocks?: number[]; // 六巨石的位置
+  elevated?: { p: number[]; y: number[]; w: number; k: number }[]; // 高架：k 0 道路、1 人行空橋、2 文湖線、3 月台；y 每點離地高度
+  portals?: number[]; // 地下道入口 [x, z, 朝隧道方向, 路寬, ...]
 }
 export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
 
@@ -129,6 +131,8 @@ export class Collider {
     // 行道樹、路燈不在這裡：它們會被撞倒（breakables.ts），不是固定的障礙物
   }
   addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
+  /** 一面牆（高架匝道貼地那段的側邊） */
+  addWall(x1: number, z1: number, x2: number, z2: number) { this.edges.addBox(x1, z1, x2, z2, { x1, z1, x2, z2 }); }
   /** 軸對齊的方塊建築（地圖外圍的遠景城市） */
   addRect(cx: number, cz: number, w: number, d: number) {
     const a = cx - w / 2, b = cz - d / 2, c = cx + w / 2, e = cz + d / 2;

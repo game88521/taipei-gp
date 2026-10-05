@@ -4,7 +4,7 @@
 //   - 周邊道路、公園綠地、行道樹
 // 用法：npm run build-city（改了賽道路線或篩選規則才需要重跑）
 // 資料授權：© OpenStreetMap contributors，ODbL
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -255,6 +255,7 @@ const coarse = line.filter((_, i) => i % 10 === 0);
 const farFromTrack = (x, z) => coarse.every((p) => Math.hypot(p[0] - x, p[1] - z) > VIEW);
 
 const ring = (geom) => geom.map((g) => proj(g.lat, g.lon));
+const polyLen = (r) => r.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - r[i - 1][0], p[1] - r[i - 1][1]) : 0), 0);
 const centroid = (r) => r.reduce((s, p) => [s[0] + p[0] / r.length, s[1] + p[1] / r.length], [0, 0]);
 function inside(pt, r) {
   let c = false;
@@ -445,9 +446,13 @@ const nodeOf = (id, g) => {
 for (const e of roadWays) {
   const t = e.tags;
   let w = RW[t.highway];
-  if (!w || t.tunnel === 'yes' || t.bridge === 'yes' || (t.layer && Number(t.layer) !== 0) || t.area === 'yes') continue;
-  if (t.oneway !== 'yes' && /primary|secondary|tertiary/.test(t.highway)) w *= 1.6;
+  if (!w || t.tunnel === 'yes' || t.area === 'yes') continue;
   const r = ring(e.geometry);
+  // 橋：40 m 以內、一層的小橋（跨排水溝）當成地面道路；長的高架另外畫（elevated，車子從底下過）
+  const isBridge = (t.bridge && t.bridge !== 'no') || (t.layer && Number(t.layer) > 0);
+  if (isBridge && !(polyLen(r) < 40 && !(Number(t.layer) > 1) && !/trunk|motorway/.test(t.highway))) continue;
+  if (t.layer && Number(t.layer) < 0) continue;
+  if (t.oneway !== 'yes' && /primary|secondary|tertiary/.test(t.highway)) w *= 1.6;
   if (r.every((p) => farFromTrack(p[0], p[1]))) continue;
   roads.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]), w });
   const way = { n: e.nodes.map((id, k) => nodeOf(id, e.geometry[k])), w, c: CLS[t.highway] ?? 4 };
@@ -459,6 +464,82 @@ for (const e of roadWays) {
   if (t['name:en']) way.en = t['name:en'];
   netWays.push(way);
   if (t.tunnel === 'building_passage' || t.covered === 'yes') passWays.add(way); // 穿過建築底下的路（騎樓、門洞）
+}
+
+// ---------------------------------------------------------------- 高架道路、人行空橋、文湖線高架、地下道入口
+// 高度：接到地面道路的節點 = 0；高架主線照 layer（一層約 6.5 m）；匝道沿線依距離從地面升到高架
+// k：0 道路、1 人行空橋、2 捷運高架；車子不能開上去（物理是平面的），從底下過，橋墩會擋
+const elevated = [];
+const portals = [];
+{
+  const LAYER_H = 6.5;
+  const deckOf = new Map(); // OSM 節點 → 這個節點所在高架主線的高度
+  const elevWays = roadWays.filter((e) => {
+    const t = e.tags;
+    if (!e.geometry || t.tunnel === 'yes' || t.area === 'yes') return false;
+    const isBridge = (t.bridge && t.bridge !== 'no') || (t.layer && Number(t.layer) > 0);
+    if (!isBridge) return false;
+    const r = ring(e.geometry);
+    return !(polyLen(r) < 40 && !(Number(t.layer) > 1) && !/trunk|motorway/.test(t.highway)); // 短橋已經併進地面路網
+  });
+  const kindOf = (t) => (/footway|cycleway|path|pedestrian/.test(t.highway) ? 1 : /steps|construction/.test(t.highway) ? -1 : 0);
+  for (const e of elevWays) {
+    const t = e.tags, k = kindOf(t);
+    if (k !== 0 || /_link$/.test(t.highway)) continue;
+    const h = Math.max(1, Number(t.layer) || 1) * LAYER_H;
+    for (const id of e.nodes) deckOf.set(id, Math.max(deckOf.get(id) ?? 0, h));
+  }
+  for (const e of elevWays) {
+    const t = e.tags, k = kindOf(t);
+    if (k < 0) continue;
+    const r = ring(e.geometry);
+    if (r.every((p) => farFromTrack(p[0], p[1]))) continue;
+    const layerH = Math.max(1, Number(t.layer) || 1) * LAYER_H;
+    let ys;
+    if (k === 1) ys = r.map(() => 6);
+    else {
+      // 錨點：地面節點 0、主線節點＝主線高度、自己的端點＝自己的高度；中間照距離內插
+      const anchor = e.nodes.map((id, i) => (netIndex.has(id) ? 0 : deckOf.has(id) ? deckOf.get(id) : i === 0 || i === e.nodes.length - 1 ? layerH : null));
+      if (!/_link$/.test(t.highway)) for (let i = 0; i < anchor.length; i++) if (anchor[i] == null) anchor[i] = layerH;
+      const s = [0];
+      for (let i = 1; i < r.length; i++) s.push(s[i - 1] + Math.hypot(r[i][0] - r[i - 1][0], r[i][1] - r[i - 1][1]));
+      ys = anchor.map((a, i) => {
+        if (a != null) return a;
+        let lo = i, hi = i;
+        while (lo > 0 && anchor[lo] == null) lo--;
+        while (hi < anchor.length - 1 && anchor[hi] == null) hi++;
+        const a0 = anchor[lo] ?? layerH, a1 = anchor[hi] ?? layerH, f = (s[i] - s[lo]) / (s[hi] - s[lo] || 1);
+        return a0 + (a1 - a0) * f;
+      });
+    }
+    const w = k === 1 ? 3.5 : (RW[t.highway] ?? 8) * (t.oneway !== 'yes' && !/_link$/.test(t.highway) ? 1.6 : 1);
+    elevated.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]), y: ys.map(r1), w: r1(w), k });
+  }
+  // 捷運文湖線高架（另外下載的 osm-rail.json；沒有就略過）
+  const railFile = here('./osm-rail.json');
+  if (existsSync(railFile)) {
+    for (const e of JSON.parse(readFileSync(railFile, 'utf8')).elements) {
+      const t = e.tags || {};
+      if (e.type !== 'way' || !e.geometry || !(Number(t.layer) > 0 || t.bridge)) continue;
+      if (!/subway|light_rail|monorail|platform/.test(t.railway || '')) continue;
+      const r = ring(e.geometry);
+      const y = 8 + Math.max(1, Number(t.layer) || 1) * 3; // 文湖線高架約 11~17 m
+      elevated.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]), y: r.map(() => y), w: t.railway === 'platform' ? 4 : 6.5, k: t.railway === 'platform' ? 3 : 2 });
+    }
+  }
+  // 地下道入口：車行的地下道（layer < 0 或 tunnel=yes）接到地面道路的那一端
+  for (const e of roadWays) {
+    const t = e.tags;
+    if (!e.geometry || !(t.tunnel === 'yes' || Number(t.layer) < 0) || !/trunk|primary|secondary|tertiary|unclassified|residential/.test(t.highway)) continue;
+    const r = ring(e.geometry), n = e.nodes;
+    for (const [i, j] of [[0, 1], [n.length - 1, n.length - 2]]) {
+      if (!netIndex.has(n[i]) || n.length < 2) continue;
+      const ang = Math.atan2(r[j][0] - r[i][0], r[j][1] - r[i][1]); // 朝隧道裡面
+      const w = (RW[t.highway] ?? 8) * (t.oneway !== 'yes' ? 1.6 : 1);
+      portals.push(r1(r[i][0]), r1(r[i][1]), Math.round(ang * 1000) / 1000, r1(w));
+    }
+  }
+  console.log(`高架 ${elevated.filter((e) => e.k === 0).length} 段、人行空橋 ${elevated.filter((e) => e.k === 1).length}、文湖線 ${elevated.filter((e) => e.k >= 2).length}、地下道入口 ${portals.length / 4}`);
 }
 
 // 紅綠燈與斑馬線：只要落在車道上的
@@ -810,7 +891,7 @@ let raisedOver = 0, droppedOver = 0;
 }
 console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上墊高 ${raisedOver}、壓在路上拿掉 ${droppedOver}`);
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks };
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals };
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);
