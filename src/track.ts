@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import trackData from './data/track.json' with { type: 'json' };
+/** city.json 解壓縮後的位元組數（載入進度條用） */
+export const CITY_SIZE: number = (trackData as { citySize?: number }).citySize ?? 5.5e6;
 
 // 車子性能與「建議速度曲線」共用同一組數字，輔助線才會跟手感一致
 export const VMAX = 84; // m/s ≈ 302 km/h

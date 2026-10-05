@@ -124,18 +124,27 @@ export class Traffic {
       e.out = (outOf.get(e.b) || []).filter((o) => !(o.b === e.a && o.way === e.way) && e.ux * o.ux + e.uz * o.uz > -0.85);
     }
 
-    // ---- 號誌路口：35 m 內的號誌節點算同一個路口
+    // ---- 號誌路口：35 m 內的號誌節點算同一個路口（格子索引找附近的路口）
+    const cgrid = new Map<number, Cluster[]>();
     for (const ni of d.signals) {
       const x = N[ni * 2], z = N[ni * 2 + 1];
-      let c = this.clusters.find((k) => Math.hypot(k.cx - x, k.cz - z) < 35);
-      if (!c) { c = { cx: x, cz: z, nodes: new Set(), axis: 0, offset: this.rand() * CYCLE_LEN }; this.clusters.push(c); }
+      const gk = (Math.floor(x / 35) + 1000) * 4000 + Math.floor(z / 35) + 1000;
+      let c: Cluster | undefined;
+      for (let i = -1; i <= 1 && !c; i++) for (let j = -1; j <= 1 && !c; j++) c = cgrid.get(gk + i * 4000 + j)?.find((k) => Math.hypot(k.cx - x, k.cz - z) < 35);
+      if (!c) {
+        c = { cx: x, cz: z, nodes: new Set(), axis: 0, offset: this.rand() * CYCLE_LEN };
+        this.clusters.push(c);
+        if (!cgrid.has(gk)) cgrid.set(gk, []);
+        cgrid.get(gk)!.push(c);
+      }
       c.nodes.add(ni);
       this.nodeCluster.set(ni, c);
     }
-    for (const c of this.clusters) {
-      // 路口的「主方向」= 進入路口最寬的那條路
-      let bw = -1;
-      for (const e of this.edges) if (c.nodes.has(e.b) && e.way.w > bw) { bw = e.way.w; c.axis = Math.atan2(e.ux, e.uz); }
+    // 路口的「主方向」= 進入路口最寬的那條路（車道只掃一次；以前每個路口掃全部車道，大地圖要一秒多）
+    const bw = new Map<Cluster, number>();
+    for (const e of this.edges) {
+      const c = this.nodeCluster.get(e.b);
+      if (c && e.way.w > (bw.get(c) ?? -1)) { bw.set(c, e.way.w); c.axis = Math.atan2(e.ux, e.uz); }
     }
     this.buildSignals(scene, d);
 
@@ -167,7 +176,7 @@ export class Traffic {
     for (const e of this.edges) {
       const c = this.nodeCluster.get(e.b);
       if (!c || c.nodes.has(e.a) || e.way.c > 2) continue;
-      const key = `${this.clusters.indexOf(c)}:${e.way.nm || e.way.w}:${Math.round(Math.atan2(e.ux, e.uz) * 2)}`;
+      const key = `${c.cx},${c.cz}:${e.way.nm || e.way.w}:${Math.round(Math.atan2(e.ux, e.uz) * 2)}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const rx = -e.uz, rz = e.ux; // 右手邊

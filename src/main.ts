@@ -11,6 +11,7 @@ import { buildWorld } from './world';
 import { loadCity } from './city';
 import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
+import { stage, marks, onProgress } from './loading';
 import { VEHICLES, vehicleById, buildPlayerVehicle, type PlayerVehicle, type VehicleId } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -147,7 +148,17 @@ let taxi: TaxiJob | null = null;
 const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
-const cityLoad = loadCity(scene, track, Q).then((c) => {
+// 載入進度：選單的按鈕上顯示目前在做什麼＋進度條
+// 開始建城市之後先不重畫背景：每加進一批新東西，畫面第一次畫到它就要同步編譯著色器，載入會一直卡
+let holdRender = false;
+onProgress((label, f) => {
+  if (cityReady) return;
+  holdRender = f >= 0.41;
+  $('btn-free').textContent = `${label}… ${Math.round(f * 100)}%`;
+  $('load-bar').style.width = `${Math.round(f * 100)}%`;
+});
+const cityLoad = loadCity(scene, track, Q).then(async (c) => {
+  await stage('建立碰撞與路網', 0.76);
   collider = new Collider(c.data);
   for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
   roadNet = new RoadNet(c.data);
@@ -156,11 +167,26 @@ const cityLoad = loadCity(scene, track, Q).then((c) => {
   breakables = c.breakables;
   raceHide = c.raceHide;
   cityCull = c.cull;
+  await stage('車流與紅綠燈', 0.82);
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   traffic.collider = collider;
+  await stage('行人', 0.9);
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
+  await stage('街頭挑戰與導航', 0.95);
   sr = new StreetRace(scene, c.data, c.landmarks);
   taxi = new TaxiJob(scene, c.landmarks, new Router(c.data));
+  // 著色器一次編好：隱藏的東西（其他車、遠處區塊、計程車頂燈）也先打開一起編，之後切換才不會卡一下；
+  // 有平行編譯擴充（KHR_parallel_shader_compile）時不會卡住主執行緒
+  await stage('準備畫面', 0.98);
+  applyShadowFlags();
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+  try { await renderer.compileAsync(scene, camera); } catch { /* 不支援就照舊第一次畫時編 */ }
+  for (const o of hidden) o.visible = false;
+  holdRender = false;
+  await stage('完成', 1);
+  $('load-bar').parentElement!.style.display = 'none';
+  if (new URLSearchParams(location.search).has('prof')) document.title = 'PROF ' + marks.map(([l, ms]) => `${l}:${ms}`).join(' ');
   taxi.money = save.taxi?.money ?? 0;
   taxi.trips = save.taxi?.trips ?? 0;
   applyShadowFlags();
@@ -1375,6 +1401,7 @@ renderer.setAnimationLoop(() => {
     fpsN2 = 0; fpsT2 = 0;
   }
   if (state === 'race' || state === 'countdown') updateDrsButton();
+  if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);
 });

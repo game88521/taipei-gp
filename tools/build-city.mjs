@@ -223,7 +223,8 @@ console.log('路口', Object.fromEntries(Object.entries(J).map(([k, v]) => [k, v
 console.log('101 中心', c101.map(Math.round));
 
 mkdirSync(here('../src/data/'), { recursive: true });
-writeFileSync(here('../src/data/track.json'), JSON.stringify({ origin: [LAT0, LON0], tower101: c101.map(r1), points: line.map(([x, z]) => [r1(x), r1(z)]) }));
+const trackOut = { origin: [LAT0, LON0], tower101: c101.map(r1), points: line.map(([x, z]) => [r1(x), r1(z)]) };
+writeFileSync(here('../src/data/track.json'), JSON.stringify(trackOut));
 
 // ================================================================ 城市
 const TRACK_CLEAR = 11; // 建築／樹離賽道中心線至少這麼遠（護牆 9.5 m + 1.5 m）
@@ -771,6 +772,8 @@ const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, r
 mkdirSync(here('../public/data/'), { recursive: true });
 const json = JSON.stringify(city);
 writeFileSync(here('../public/data/city.json'), json);
+// 載入進度條要知道解壓縮後有多大（伺服器用 brotli 傳，Content-Length 是壓縮後的）
+writeFileSync(here('../src/data/track.json'), JSON.stringify({ ...trackOut, citySize: Buffer.byteLength(json) }));
 console.log(`建築 ${buildings.length}（外框改畫部件 ${skippedOutline}、壓到賽道刪掉 ${droppedTrack}）、道路 ${roads.length}、綠地 ${greens.length}、樹 ${trees.length / 2}`);
 console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、地標 ${places.length}、路燈 ${lamps.length / 3}、路邊機車 ${parked.length / 4}`);
 console.log(`city.json ${(json.length / 1024).toFixed(0)} KB`);

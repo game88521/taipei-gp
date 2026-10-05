@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { makeFiller, buildFiller, type Filler } from './filler';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
-import { TOWER_101, type Track } from './track';
+import { TOWER_101, CITY_SIZE, type Track } from './track';
+import { stage, fetchJson } from './loading';
 
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
@@ -228,7 +229,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   const cullables: { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number }[] = [];
   const cullAdd = (o: THREE.Object3D, x: number, z: number, layer: Layer = 'far', pad = TILE * 0.71) => cullables.push({ o, x, z, layer, pad });
   const breakables = new Breakables();
-  const data = (await (await fetch('/data/city.json')).json()) as CityData;
+  const data = await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4);
+  await stage('鋪地面與綠地', 0.42);
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
   const G = 30, grid = new Map<string, number[]>();
@@ -294,12 +296,14 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   scene.add(greenMesh);
 
   // ---- 道路（有標線）、斑馬線、路名牌、地標招牌
+  await stage('鋪道路與斑馬線', 0.46);
   buildRoads(scene, data);
   buildCrossings(scene, data);
   const raceHide = buildStreetSigns(scene, data, breakables, (x, z) => nearest(x, z)[1] < 16, (g, x, z) => cullAdd(g, x, z, 'close', 0));
   const landmarks = buildLandmarks(scene, data);
 
   // ---- 建築
+  await stage('蓋房子', 0.5);
   // 依 300 m 分區塊：鏡頭（和陰影）看不到的區塊整塊不畫
   // 外牆、屋頂從遠處就看得到，用 600 m 的大區塊（繪製次數少 4 倍）；店面、招牌、地上影子只在近處畫，用 300 m
   const BIG = TILE * 2;
@@ -450,6 +454,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   tiles.clear();
 
   // ---- 頂樓水塔與鐵皮加蓋
+  await stage('頂樓、路燈、路邊機車', 0.62);
   if (tanks.length) {
     const tank = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 12).translate(0, 1.6, 0), new THREE.MeshLambertMaterial({ color: '#c9ced3' }), tanks.length);
     const leg = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.8, 1.4).translate(0, 0.4, 0), new THREE.MeshLambertMaterial({ color: '#6a6f75' }), tanks.length);
@@ -527,6 +532,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
 
   scene.add(build101());
 
+  await stage('種行道樹', 0.66);
   // ---- 行道樹：依區塊分成多組 InstancedMesh（看不到的區塊不畫）；離賽道遠的依畫質抽掉一些
   const tr = data.trees;
   const byTile = new Map<string, [number, number][]>();
@@ -585,6 +591,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       c.o.visible = inRange && !c.o.userData.off; // off = 街道賽時藏起來的
     }
   };
+  await stage('外圍市區', 0.72);
   const filler = makeFiller(data);
   buildFiller(scene, filler);
   return { data, landmarks, breakables, raceHide, cull, filler };
