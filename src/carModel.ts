@@ -86,7 +86,9 @@ export function makeFromGeo(g: VehicleGeo, color: string, opt: { rim?: string; t
 
 function finishCar(root: THREE.Group, body: THREE.Group, g: VehicleGeo, color: string, opt: { rim?: string; tyreW?: number; blob?: [number, number]; metal?: number } = {}): CarModel {
   root.add(carBlob(...(opt.blob ?? [2.5, 5.6])));
-  body.add(new THREE.Mesh(g.paint, new THREE.MeshStandardMaterial({ color, metalness: opt.metal ?? 0.45, roughness: 0.28 }))); // 烤漆：會映出天空
+  const paint = new THREE.MeshStandardMaterial({ color, metalness: opt.metal ?? 0.45, roughness: 0.28 }); // 烤漆：會映出天空
+  root.userData.paint = paint; // 換烤漆用（vehicles.ts）
+  body.add(new THREE.Mesh(g.paint, paint));
   body.add(new THREE.Mesh(g.fixed, new THREE.MeshLambertMaterial({ vertexColors: true })));
   const steer: THREE.Group[] = [], spin: THREE.Mesh[] = [];
   const tyre = new THREE.MeshLambertMaterial({ color: '#151515' }), rim = new THREE.MeshLambertMaterial({ color: opt.rim ?? '#c4c8ce' });

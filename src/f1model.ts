@@ -213,6 +213,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
         main: std(l.main, 0.45, 0.28), accent: std(l.accent, 0.4, 0.3), accent2: std(l.accent2, 0.4, 0.3),
         carbon: std('#18191c', 0.3, 0.55), dark: std('#050506', 0, 0.9), helmet: std(l.helmet, 0.3, 0.25), visor: std('#0d1014', 0.8, 0.1),
       };
+  if (!ghost) root.userData.paint = mats.main; // 換烤漆用（vehicles.ts）
   for (const [k, list] of Object.entries(parts)) {
     if (!list.length) continue;
     body.add(new THREE.Mesh(mergeGeometries(list.map(strip)), mats[k]));

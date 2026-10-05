@@ -16,41 +16,46 @@ export interface Vehicle {
   color: string; // 選單上的色點
   spec: CarSpec;
   sign: [number, number]; // 計程車模式頂燈的位置（y, z）；小黃本身就有
+  price: number; // 解鎖價格（NT$，0 = 一開始就有）
   build: () => CarModel;
 }
+
+/** 烤漆色盤（每台車原本的顏色另外算，免費） */
+export const PAINTS = ['#f2f2f0', '#1b1c20', '#9aa0a6', '#c8102e', '#ff7a00', '#f5c518', '#8cc800', '#1f5fa8', '#5b1fc0', '#ff5fa2'];
+export const PAINT_PRICE = 300;
 
 export const VEHICLES: Vehicle[] = [
   {
     id: 'sedan', name: '白色轎車', note: '好開、穩定，什麼都普普通通', color: '#f2f2f0',
-    spec: DEFAULT_SPEC, sign: [1.58, -0.3], build: () => makeSedan('#f2f2f0'),
+    spec: DEFAULT_SPEC, sign: [1.58, -0.3], price: 0, build: () => makeSedan('#f2f2f0'),
   },
   {
     id: 'taxi', name: '小黃', note: '台北街頭最常見的車，載客專用', color: '#f5c518',
-    spec: { ...DEFAULT_SPEC, mass: 1.05 }, sign: [0, 0], build: () => makeSedan('#f5c518', true),
+    spec: { ...DEFAULT_SPEC, mass: 1.05 }, sign: [0, 0], price: 0, build: () => makeSedan('#f5c518', true),
   },
   {
     id: 'muscle', name: '紫電 GT', note: '美式肌肉跑車：長車頭、雙白條紋，馬力大、車尾容易甩', color: '#6a2bd1',
-    spec: { engine: 10.5, vmax: 64, brake: 15, grip: 12.5, mass: 1.15 }, sign: [1.5, -0.3],
+    spec: { engine: 10.5, vmax: 64, brake: 15, grip: 12.5, mass: 1.15 }, sign: [1.5, -0.3], price: 2500,
     build: () => makeFromGeo(muscleGeo(), '#5b1fc0', { rim: '#2a2a2e', tyreW: 0.3, blob: [2.6, 5.8], metal: 0.55 }),
   },
   {
     id: 'f1', name: '躍馬紅 F1', note: '街道賽同款：加速、煞車、過彎都是最強，但很輕、一撞就飛', color: '#d40000',
-    spec: { engine: 15, vmax: 88, brake: 30, grip: 24, mass: 0.55 }, sign: [1.14, -0.5],
+    spec: { engine: 15, vmax: 88, brake: 30, grip: 24, mass: 0.55 }, sign: [1.14, -0.5], price: 8000,
     build: () => makeF1(PLAYER_LIVERY),
   },
   {
     id: 'super', name: '雷霆 V12', note: '楔形超跑：低趴、極速快，過彎抓地力很好', color: '#9bd800',
-    spec: { engine: 13, vmax: 80, brake: 22, grip: 18, mass: 1.05 }, sign: [1.26, -0.45],
+    spec: { engine: 13, vmax: 80, brake: 22, grip: 18, mass: 1.05 }, sign: [1.26, -0.45], price: 4500,
     build: () => makeFromGeo(superGeo(), '#8cc800', { rim: '#1b1b1d', tyreW: 0.32, blob: [2.7, 5.5], metal: 0.6 }),
   },
   {
     id: 'police', name: '巡邏車', note: '車頂紅藍警示燈會閃，車身重、撞人不吃虧', color: '#1c4fc9',
-    spec: { engine: 10, vmax: 58, brake: 18, grip: 15, mass: 1.25 }, sign: [1.62, -0.75],
+    spec: { engine: 10, vmax: 58, brake: 18, grip: 15, mass: 1.25 }, sign: [1.62, -0.75], price: 1500,
     build: () => makeFromGeo(policeGeo(), '#f4f5f7'),
   },
   {
     id: 'pickup', name: '發財車', note: '台灣味小貨車，載滿水果：慢、重，撞車流最有份量', color: '#2f6fb5',
-    spec: { engine: 6.5, vmax: 33, brake: 12, grip: 11, mass: 1.5 }, sign: [2.02, 1.55],
+    spec: { engine: 6.5, vmax: 33, brake: 12, grip: 11, mass: 1.5 }, sign: [2.02, 1.55], price: 600,
     build: () => makeFromGeo(pickupGeo(), '#2f6fb5', { rim: '#d0d3d8', blob: [2.3, 5.2] }),
   },
 ];
@@ -78,6 +83,8 @@ function taxiSign(): THREE.Group {
 export interface PlayerVehicle {
   v: Vehicle;
   model: CarModel;
+  baseColor: string; // 原廠顏色
+  setPaint: (c: string) => void;
   taxiSign: THREE.Object3D | null; // 計程車模式才顯示
   tick: (t: number) => void; // 每格呼叫（警示燈閃爍）
 }
@@ -109,5 +116,7 @@ export function buildPlayerVehicle(v: Vehicle): PlayerVehicle {
       blue.color.copy(ph === 4 || ph === 6 ? onB : dimB);
     };
   }
-  return { v, model, taxiSign: sign, tick };
+  const paint = model.root.userData.paint as THREE.MeshStandardMaterial | undefined;
+  const baseColor = paint ? '#' + paint.color.getHexString() : v.color;
+  return { v, model, taxiSign: sign, tick, baseColor, setPaint: (c) => paint?.color.set(c) };
 }

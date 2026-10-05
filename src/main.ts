@@ -12,7 +12,7 @@ import { loadCity } from './city';
 import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
-import { VEHICLES, vehicleById, buildPlayerVehicle, type PlayerVehicle, type VehicleId } from './vehicles';
+import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
@@ -31,7 +31,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -197,6 +197,7 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   if (new URLSearchParams(location.search).has('prof')) document.title = 'PROF ' + marks.map(([l, ms]) => `${l}:${ms}`).join(' ');
   taxi.money = save.taxi?.money ?? 0;
   taxi.trips = save.taxi?.trips ?? 0;
+  refreshGarage();
   applyShadowFlags();
   cityReady = true;
   if (state === 'menu') showMenu(false);
@@ -222,8 +223,12 @@ for (const v of VEHICLES) {
   scene.add(pv.model.root);
   playerCars.set(v.id, pv);
 }
-// ?car=muscle 測試用：直接指定車
-let chosen = vehicleById(new URLSearchParams(location.search).get('car') ?? save.car);
+// 車庫：一開始有白色轎車和小黃，其他用賺的錢買（save.owned）；烤漆每台各自記（save.paints 買過的、save.paint 目前的）
+const ownedCars = () => new Set<string>(['sedan', 'taxi', ...(save.owned ?? [])]);
+for (const [id, pv] of playerCars) { const c = save.paint?.[id]; if (c) pv.setPaint(c); }
+// ?car=muscle 測試用：直接指定車（不管有沒有買）
+const CAR_Q = new URLSearchParams(location.search).get('car');
+let chosen = vehicleById(CAR_Q ?? (ownedCars().has(save.car ?? '') ? save.car : 'sedan'));
 const pcar = () => playerCars.get(chosen.id)!;
 
 const car = new Car(); // 街道賽的 F1
@@ -613,23 +618,98 @@ function beginCountdown() {
 
 // ---------------------------------------------------------------- 選單
 const menu = $('menu'), hud = $('hud');
-// 選車：自由駕駛與計程車都用這台
-{
-  const list = $('car-list'), note = $('car-note');
+// ---------------------------------------------------------------- 錢包與車庫
+// 錢包就是計程車的收入（save.taxi.money）；街頭對決、正賽拿名次也有獎金
+function money() { return taxi ? taxi.money : save.taxi?.money ?? 0; }
+function setMoney(n: number) {
+  if (taxi) taxi.money = n;
+  save.taxi = { money: n, trips: taxi?.trips ?? save.taxi?.trips ?? 0 };
+  writeSave();
+  refreshGarage();
+}
+function earn(n: number, why: string) {
+  if (n <= 0) return;
+  setMoney(money() + n);
+  toast(`💰 ${why} 獎金 NT$ ${n.toLocaleString()}`, '');
+}
+// 選車：點車子看介紹；已經有的直接換上，沒有的顯示購買按鈕
+let preview: Vehicle = chosen;
+const fmtNT = (n: number) => `NT$ ${n.toLocaleString()}`;
+function refreshGarage() {
+  const list = $('car-list'), have = ownedCars(), m = money();
+  $('wallet').textContent = `💰 ${fmtNT(m)}`;
+  for (const b of list.children) {
+    const id = (b as HTMLElement).dataset.id!, v = vehicleById(id);
+    b.classList.toggle('on', id === preview.id);
+    b.classList.toggle('mine', id === chosen.id);
+    b.classList.toggle('locked', !have.has(id));
+    b.querySelector('small')!.textContent = have.has(id) ? '' : `🔒 ${v.price.toLocaleString()}`;
+  }
   const stars = (x: number, lo: number, hi: number) => '★'.repeat(Math.max(1, Math.min(5, Math.round(1 + ((x - lo) / (hi - lo)) * 4)))).padEnd(5, '☆');
-  const show = () => {
-    for (const b of list.children) b.classList.toggle('on', (b as HTMLElement).dataset.id === chosen.id);
-    const s = chosen.spec;
-    note.textContent = `${chosen.note}｜極速約 ${Math.round(s.vmax * 3.6 * 0.9)} km/h　加速 ${stars(s.engine, 6, 15)}　操控 ${stars(s.grip, 11, 24)}　重量 ${stars(s.mass, 0.5, 1.5)}`;
-  };
+  const s = preview.spec;
+  $('car-note').textContent = `${preview.note}｜極速約 ${Math.round(s.vmax * 3.6 * 0.9)} km/h　加速 ${stars(s.engine, 6, 15)}　操控 ${stars(s.grip, 11, 24)}　重量 ${stars(s.mass, 0.5, 1.5)}`;
+  const buy = $<HTMLButtonElement>('car-buy');
+  const owned = have.has(preview.id);
+  buy.style.display = owned ? 'none' : '';
+  if (!owned) {
+    buy.disabled = m < preview.price;
+    buy.textContent = m >= preview.price ? `購買 ${preview.name}（${fmtNT(preview.price)}）` : `${preview.name} ${fmtNT(preview.price)}：還差 ${fmtNT(preview.price - m)}（開計程車、贏比賽賺錢）`;
+  }
+  // 烤漆：自己的車才能換；小黃是計程車，不換色
+  const pl = $('paint-list');
+  pl.innerHTML = '';
+  pl.style.display = owned && preview.id !== 'taxi' ? '' : 'none';
+  if (owned && preview.id !== 'taxi') {
+    const pv = playerCars.get(preview.id as VehicleId)!, cur = save.paint?.[preview.id] ?? pv.baseColor, bought = new Set(save.paints?.[preview.id] ?? []);
+    const label = document.createElement('span');
+    label.textContent = '烤漆';
+    pl.appendChild(label);
+    for (const c of [pv.baseColor, ...PAINTS.filter((p) => p !== pv.baseColor)]) {
+      const sw = document.createElement('button');
+      const free = c === pv.baseColor || bought.has(c);
+      sw.style.background = c;
+      sw.className = (c === cur ? 'on ' : '') + (free ? '' : 'locked');
+      sw.title = free ? '換上' : `${fmtNT(PAINT_PRICE)}`;
+      sw.addEventListener('click', () => {
+        if (!free) {
+          if (money() < PAINT_PRICE) { $('car-note').textContent = `烤漆 ${fmtNT(PAINT_PRICE)}，還差 ${fmtNT(PAINT_PRICE - money())}`; return; }
+          save.paints = { ...save.paints, [preview.id]: [...bought, c] };
+          setMoney(money() - PAINT_PRICE);
+        }
+        save.paint = { ...save.paint, [preview.id]: c };
+        pv.setPaint(c);
+        writeSave();
+        refreshGarage();
+      });
+      pl.appendChild(sw);
+    }
+    const tip = document.createElement('small');
+    tip.textContent = `每色 ${fmtNT(PAINT_PRICE)}，買過就能隨時換`;
+    pl.appendChild(tip);
+  }
+}
+{
+  const list = $('car-list');
   for (const v of VEHICLES) {
     const b = document.createElement('button');
     b.dataset.id = v.id;
-    b.innerHTML = `<i style="background:${v.color}"></i>${v.name}`;
-    b.addEventListener('click', () => { chosen = v; save.car = v.id; writeSave(); show(); });
+    b.innerHTML = `<i style="background:${v.color}"></i>${v.name}<small></small>`;
+    b.addEventListener('click', () => {
+      preview = v;
+      if (ownedCars().has(v.id)) { chosen = v; save.car = v.id; writeSave(); }
+      refreshGarage();
+    });
     list.appendChild(b);
   }
-  show();
+  $('car-buy').addEventListener('click', () => {
+    if (ownedCars().has(preview.id) || money() < preview.price) return;
+    save.owned = [...(save.owned ?? []), preview.id];
+    chosen = preview;
+    save.car = preview.id;
+    setMoney(money() - preview.price);
+    toast(`🚗 買下 ${preview.name}！`, '');
+  });
+  refreshGarage();
 }
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
@@ -750,6 +830,11 @@ function showResults() {
   });
   const me = st.findIndex((r) => r.isPlayer) + 1;
   $('res-title').textContent = me === 1 ? '🏆 冠軍！' : me <= 3 ? `第 ${me} 名，上頒獎台！` : `第 ${me} 名`;
+  if (raceKind === 'gp') {
+    const prize = ([1500, 1000, 700, 400, 300, 250, 200, 150][me - 1] ?? 100) * (field.laps >= 6 ? 2 : 1); // 6 圈加倍
+    $('res-title').textContent += `　💰 +${fmtNT(prize)}`;
+    earn(prize, `正賽第 ${me} 名`);
+  }
   $('results').classList.remove('hidden');
   if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s`;
 }
@@ -989,6 +1074,8 @@ function showStreetResult() {
     writeSave();
   }
   $('sr-res-title').textContent = sr.duel ? (place === 1 ? '🏆 街頭之王！' : `第 ${place} 名`) : win ? `🏆 你贏了 ${c.def.rival}！` : `${c.def.rival} 贏了`;
+  const prize = me != null && isFinite(me) ? (sr.duel ? [600, 350, 200, 100, 50][place - 1] ?? 0 : win ? 300 : 0) : 0;
+  if (prize) { $('sr-res-title').textContent += `　💰 +${fmtNT(prize)}`; earn(prize, sr.duel ? `街頭對決第 ${place} 名` : '街頭飆車獲勝'); }
   $('sr-res-sub').textContent = (sr.duel ? `${c.def.title} ｜ 你 ${me != null && isFinite(me) ? fmt(me) : '未完成'}` : `你 ${me != null && isFinite(me) ? fmt(me) : '未完成'} ｜ ${c.def.rival} ${rv != null ? fmt(rv) : '未完成'}`) + (save.street?.[c.def.id] ? ` ｜ 最佳 ${fmt(save.street[c.def.id])}` : '');
   $('sr-result').classList.remove('hidden');
 }
@@ -1137,7 +1224,7 @@ function freeStep(dt: number) {
     const msg = taxi.update(dt, fcar);
     if (msg) {
       toast(msg, msg.startsWith('💰') ? 'purple' : '');
-      if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); sound.beep(990, 0.3); }
+      if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); refreshGarage(); sound.beep(990, 0.3); }
     }
   }
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
