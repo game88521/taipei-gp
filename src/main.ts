@@ -29,7 +29,8 @@ import { Sound } from './audio';
 
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+type SteerMode = 'buttons' | 'drag' | 'tilt';
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -42,7 +43,12 @@ const save = loadSave();
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const MOBILE = matchMedia('(pointer: coarse)').matches; // 觸控裝置（手機、平板）
+// 觸控裝置（手機、平板）：有些手機／瀏覽器（例如「電腦版網站」模式）會回報 pointer: fine，
+// 所以也看觸控點數；真的被手指點到也算。觸控按鈕的顯示看 html.touch（style.css）
+const TOUCH = matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+const MOBILE = matchMedia('(pointer: coarse)').matches || (TOUCH && !matchMedia('(hover: hover)').matches);
+document.documentElement.classList.toggle('touch', TOUCH);
+addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') document.documentElement.classList.add('touch'); }, { capture: true });
 const qPref = (new URLSearchParams(location.search).get('q') as Level | null) ?? save.quality ?? 'auto'; // ?q=medium 給測試用
 let level: Level = qPref === 'auto' ? defaultLevel(MOBILE) : qPref;
 const Q = qualityFor(level);
@@ -151,6 +157,7 @@ const cityLoad = loadCity(scene, track, Q).then((c) => {
   raceHide = c.raceHide;
   cityCull = c.cull;
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
+  traffic.collider = collider;
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   sr = new StreetRace(scene, c.data, c.landmarks);
   taxi = new TaxiJob(scene, c.landmarks, new Router(c.data));
@@ -188,7 +195,7 @@ const fcar = new FreeCar(); // 自由駕駛的汽車
 type Mode = 'free' | 'race';
 let mode: Mode = 'free';
 const veh = () => (mode === 'race' ? car : fcar);
-const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'));
+const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'), $('steer-l'), $('steer-r'));
 const sound = new Sound();
 
 addEventListener('resize', () => {
@@ -200,8 +207,12 @@ addEventListener('resize', () => {
 });
 
 // ---------------------------------------------------------------- 選項
+// 手機轉向：左右按鈕（預設）／拖曳滑桿／傾斜手機；舊存檔勾過「傾斜手機轉向」的沿用
+let steerMode: SteerMode = save.steer ?? (save.opts.tilt ? 'tilt' : 'buttons');
+const steerSel = $<HTMLSelectElement>('opt-steer');
+steerSel.value = steerMode;
+steerSel.addEventListener('change', () => { steerMode = steerSel.value as SteerMode; save.steer = steerMode; writeSave(); applyOpts(); });
 const opts = {
-  tilt: save.opts.tilt ?? false,
   assist: save.opts.assist ?? true,
   ghost: save.opts.ghost ?? true,
   sound: save.opts.sound ?? true,
@@ -210,12 +221,14 @@ const opts = {
 for (const k of Object.keys(opts) as (keyof typeof opts)[]) {
   const el = $<HTMLInputElement>('opt-' + k);
   el.checked = opts[k];
-  el.addEventListener('change', () => { opts[k] = el.checked; save.opts = { ...opts }; writeSave(); applyOpts(); });
+  el.addEventListener('change', () => { opts[k] = el.checked; save.opts = { ...save.opts, ...opts }; writeSave(); applyOpts(); });
 }
 function applyOpts() {
   world.assist.visible = opts.assist;
   sound.enabled = opts.sound;
-  input.tilt = opts.tilt;
+  input.tilt = steerMode === 'tilt';
+  // 傾斜模式仍顯示拖曳滑桿（陀螺儀不能用時可以改用手指）
+  document.documentElement.dataset.steer = steerMode === 'buttons' ? 'buttons' : 'drag';
 }
 applyOpts();
 // 正賽的圈數與起跑胎（記在存檔裡）
@@ -575,13 +588,13 @@ function hideMenu() {
 }
 async function userStart() {
   sound.start();
-  if (opts.tilt) {
+  if (steerMode === 'tilt') {
     const ok = await input.enableTilt();
     if (!ok) toast('無法使用陀螺儀，改用觸控轉向', '');
   }
   const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
   try {
-    if (!document.fullscreenElement && el.requestFullscreen && matchMedia('(pointer: coarse)').matches) {
+    if (!document.fullscreenElement && el.requestFullscreen && TOUCH) {
       await el.requestFullscreen();
       await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape');
     }
@@ -749,13 +762,16 @@ $('replay-speed').addEventListener('click', () => {
   replaySpeed = replaySpeed === 1 ? 2 : replaySpeed === 2 ? 4 : 1;
   $('replay-speed').textContent = replaySpeed === 4 ? '1×' : `${replaySpeed * 2}×`;
 });
-// DRS、進站按鈕（電腦：E 開 DRS、B 進站）
+// DRS、進站按鈕（電腦：Ctrl 或 E 開 DRS、B 進站）
 let drsPress = false, pitPress = false;
 $('drs').addEventListener('pointerdown', (e) => { e.preventDefault(); drsPress = true; });
 $('pit').addEventListener('pointerdown', (e) => { e.preventDefault(); pitPress = true; });
 addEventListener('keydown', (e) => {
   if (state !== 'race') return;
-  if (e.code === 'KeyE') drsPress = true;
+  // 比賽中按著 Ctrl 再按 S／D／A 會觸發瀏覽器的存檔、加書籤、全選，擋掉（Ctrl+W 關分頁瀏覽器不讓擋，街道賽油門自動不用按 W）
+  if (e.ctrlKey && /^Key[SDAPF]$/.test(e.code)) e.preventDefault();
+  if (e.repeat) return; // 按住不放不會一直重複觸發
+  if (e.code === 'KeyE' || e.code === 'ControlLeft' || e.code === 'ControlRight') drsPress = true;
   if (e.code === 'KeyB') pitPress = true;
 });
 function updateDrsButton() {
@@ -1112,7 +1128,7 @@ function watchFps(dt: number) {
   renderer.setPixelRatio(Math.min(devicePixelRatio, nq.pixelRatio));
   if (!nq.shadows) { world.sun.castShadow = false; renderer.shadowMap.enabled = false; }
   save.quality = 'auto';
-  save.opts = { ...opts };
+  save.opts = { ...save.opts, ...opts };
   try { localStorage.setItem(KEY + '-auto-level', level); } catch { /* 不重要 */ }
   toast(`畫面有點卡（${fps.toFixed(0)} fps），已自動調成「${LEVEL_NAME[level]}」畫質`, '');
 }
@@ -1195,6 +1211,26 @@ function physicsTest() {
     for (let k = 0; k < 360; k++) c.update(STEP, 1, true, false, collider);
     const away = Math.hypot(c.x - x1, c.z - z1);
     out.push(`撞擊:${(maxImpact * 3.6).toFixed(0)}km/h 反彈:${(bounce * 3.6).toFixed(1)}km/h 倒車退:${back.toFixed(1)}m 轉向開走:${away.toFixed(1)}m`);
+    // 4b) 撞車流：時速 60 從正後方撞上停著的轎車／機車／公車，3 秒後看對方被撞開多遠、玩家剩多快
+    if (traffic) {
+      const res: string[] = [];
+      for (const [k, nm] of [[0, '轎車'], [3, '機車'], [2, '公車']] as const) {
+        traffic.update(STEP, fcar);
+        const a = traffic.testAgent(k);
+        if (!a) continue;
+        const t = new FreeCar(), fx = Math.sin(a.h), fz = Math.cos(a.h);
+        t.place(a.x - fx * 12, a.z - fz * 12, a.h);
+        t.vx = fx * 16.7; t.vz = fz * 16.7;
+        let vAfter = -1;
+        for (let n = 0; n < 120 * 3; n++) {
+          t.update(STEP, 0, false, false, null);
+          if (traffic.collidePlayer(t) && vAfter < 0) vAfter = t.v;
+          traffic.update(STEP, { x: t.x, z: t.z, h: t.h, v: t.v });
+        }
+        res.push(`${nm}被撞開${Math.hypot(a.kx, a.kz).toFixed(1)}m轉${(Math.abs(a.kh) * 57.3).toFixed(0)}°${a.fall > 0.5 ? '倒地' : ''}/玩家剩${(vAfter * 3.6).toFixed(0)}km/h`);
+      }
+      out.push('撞車流 ' + res.join(' '));
+    }
     // 5) 撞倒測試：從起點全油門直衝 25 秒，路上的樹／路燈會被撞倒，看能跑多遠、撞倒幾個
     c.place(fcar.x, fcar.z, fcar.h);
     const before = breakables?.knocked ?? 0, x0b = c.x, z0b = c.z;
@@ -1313,4 +1349,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, get state() { return state; } };

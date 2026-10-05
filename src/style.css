@@ -33,6 +33,26 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 /* ---------------- HUD */
 #hud { position: fixed; inset: 0; pointer-events: none; }
 #hud button, #pad { pointer-events: auto; }
+/* 左右轉向按鈕 */
+#steer-btns {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 14px;
+}
+#steer-btns button {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 40px;
+  color: rgba(255, 255, 255, 0.85);
+  touch-action: none;
+}
+#steer-btns button.on { background: rgba(255, 255, 255, 0.45); transform: scale(0.95); }
+html:not([data-steer='buttons']) #steer-btns, html[data-steer='buttons'] #pad { display: none; }
 .panel {
   background: var(--panel);
   border-radius: 10px;
@@ -200,9 +220,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
   touch-action: none;
 }
 #brake.on { background: rgba(225, 6, 0, 0.75); transform: scale(0.96); }
-@media (pointer: fine) {
-  #pad, #brake { display: none; }
-}
+html:not(.touch) #pad, html:not(.touch) #brake, html:not(.touch) #steer-btns { display: none; }
 
 /* ---------------- 選單 */
 .overlay {
@@ -280,6 +298,8 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
   .help { display: none; }
   #pad { height: 84px; }
   #brake { width: 104px; height: 104px; }
+  #steer-btns { gap: 10px; }
+  #steer-btns button { width: 88px; height: 88px; font-size: 34px; }
   .speedo b { font-size: 38px; }
 }
 
@@ -327,9 +347,7 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 #hud[data-mode='free'] .tl, #hud[data-mode='free'] .tc, #hud[data-mode='free'] #lights { display: none; }
 #hud[data-mode='race'] #gas, #hud[data-mode='race'] #road, #hud[data-mode='race'] #minimap { display: none; }
 #hud[data-mode='free'] #brake { width: 104px; height: 104px; font-size: 18px; }
-@media (pointer: fine) {
-  #gas { display: none; }
-}
+html:not(.touch) #gas { display: none; }
 @media (max-height: 480px) {
   #gas { width: 96px; height: 96px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 108px); }
   #hud[data-mode='free'] #brake { width: 92px; height: 92px; }
@@ -484,9 +502,7 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 #tyre.worn { animation: blink 0.8s steps(2) infinite; }
 #hud[data-mode='free'] #drs, #hud[data-mode='free'] #pit, #hud[data-mode='free'] #tyre { display: none; }
 #hud[data-kind='tt'] #pit, #hud[data-kind='tt'] #tyre { display: none; }
-@media (pointer: fine) {
-  #drs, #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 20px); }
-}
+html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 20px); }
 @media (max-height: 480px) {
   #drs, #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px); height: 44px; }
   #tyre { top: calc(max(10px, env(safe-area-inset-top)) + 106px); left: calc(max(10px, env(safe-area-inset-left)) + 150px); }

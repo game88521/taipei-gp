@@ -1,4 +1,4 @@
-// 操作：手機（左下拖曳轉向 / 右下按住煞車 / 可選傾斜轉向），電腦（方向鍵、WASD、空白鍵）
+// 操作：手機（左下 ◀ ▶ 按鈕或拖曳滑桿轉向 / 右下油門、煞車 / 可選傾斜轉向），電腦（方向鍵、WASD、空白鍵）
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
@@ -8,10 +8,30 @@ export class Input {
   private padId = -1;
   private brakeIds = new Set<number>();
   private gasIds = new Set<number>();
+  private leftIds = new Set<number>();
+  private rightIds = new Set<number>();
   private keys = new Set<string>();
   private tiltSteer = 0;
 
-  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement) {
+  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement, leftBtn: HTMLElement, rightBtn: HTMLElement) {
+    // 按住型的按鈕：多指同時按也不會互相干擾（每根手指各自記 pointerId）
+    const hold = (btn: HTMLElement, ids: Set<number>) => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        btn.setPointerCapture(e.pointerId);
+        ids.add(e.pointerId);
+        btn.classList.add('on');
+      });
+      const end = (e: PointerEvent) => {
+        ids.delete(e.pointerId);
+        if (!ids.size) btn.classList.remove('on');
+      };
+      btn.addEventListener('pointerup', end);
+      btn.addEventListener('pointercancel', end);
+      addEventListener('blur', () => { ids.clear(); btn.classList.remove('on'); });
+    };
+    hold(leftBtn, this.leftIds);
+    hold(rightBtn, this.rightIds);
     const padMove = (e: PointerEvent) => {
       const r = pad.getBoundingClientRect();
       // 拖到 30% 寬就打滿；中間有一點死區，小幅修正比較穩
@@ -93,6 +113,7 @@ export class Input {
     if (k.has('ArrowLeft') || k.has('KeyA')) steer -= 1;
     if (k.has('ArrowRight') || k.has('KeyD')) steer += 1;
     if (this.padId >= 0) steer = this.padSteer;
+    else if (this.leftIds.size || this.rightIds.size) steer = (this.rightIds.size ? 1 : 0) - (this.leftIds.size ? 1 : 0);
     else if (this.tilt && steer === 0) steer = this.tiltSteer;
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
     const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');

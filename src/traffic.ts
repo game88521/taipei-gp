@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CityData, NetWay } from './citydata';
+import type { CityData, NetWay, Collider } from './citydata';
 import { lanesOf } from './decor';
 import { sedanGeo, busGeo, scooterGeo } from './models';
 import { FreeCar } from './freecar';
@@ -24,14 +24,22 @@ interface Cluster { cx: number; cz: number; nodes: Set<number>; axis: number; of
 type Kind = 0 | 1 | 2 | 3 | 4; // 轎車、計程車、公車、機車、掀背車
 const KIND_LEN = [4.6, 4.6, 11, 1.9, 4.3];
 const KIND_V = [13, 13.5, 10, 12, 12.5]; // 期望車速 m/s（市區約 45~50 km/h）
+// 撞車用：質量是玩家車的幾倍（公車很重、機車連人約 1/5）、轉動慣量 ÷ 質量（m²）、碰撞半徑、被撞後停幾秒
+const KIND_MASS = [1, 1, 8, 0.2, 0.85];
+const KIND_INERTIA = [1.9, 1.9, 10, 0.35, 1.6];
+const KIND_R = [1.0, 1.0, 1.3, 0.5, 1.0];
+const KIND_STUN = [2.5, 2.5, 1.2, 4.5, 2.5];
+const KNOCK_VMAX = [12, 12, 4, 11, 12]; // 被撞出去的速度上限（避免撞一下就飛出畫面）
 
-interface Agent {
+export interface Agent {
   e: DEdge; s: number; lane: number; v: number; v0: number;
   kind: Kind; color: THREE.Color;
   x: number; z: number; h: number; vh: number; // vh = 畫面上平滑過的車頭方向
   inC: Cluster | null; // 已經進入的路口（同一個路口其他號誌節點不再停）
   stunned: number; // 被撞後停住的秒數
   kx: number; kz: number; kh: number; // 被撞開的位移與車頭偏轉（慢慢回到車道）
+  kvx: number; kvz: number; kw: number; // 被撞開的速度與旋轉（在地上滑、摩擦慢慢停下）
+  down: number; fall: number; // 機車被撞倒：倒地剩幾秒、目前倒下的程度（0 站著 ~ 1 躺平）
   alive: boolean;
 }
 
@@ -81,6 +89,9 @@ export class Traffic {
   private blob!: THREE.InstancedMesh;
   readonly max: number;
 
+  /** 有設定的話，被撞飛的車會停在牆邊，不會滑進建築裡 */
+  collider: Collider | null = null;
+  private pushOut = [0, 0];
   constructor(scene: THREE.Scene, d: CityData, max: number, private breakables: Breakables | null = null) {
     this.max = max; // 依畫質（quality.ts）
     const N = d.net.nodes;
@@ -238,7 +249,7 @@ export class Traffic {
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
         e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
-        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, alive: true,
+        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, alive: true,
       };
       const dead = this.agents.findIndex((q) => !q.alive);
       if (dead >= 0) this.agents[dead] = a; else this.agents.push(a);
@@ -273,7 +284,7 @@ export class Traffic {
       for (const b of this.grid.get((cx + i + 1000) * 4000 + cz + j + 1000) || []) {
         if (b === a || !b.alive) continue;
         if (Math.cos(b.h - a.h) < 0.3) continue; // 對向或橫向的車不算
-        consider(b.x, b.z, KIND_LEN[b.kind], b.v, a.kind === 3 || b.kind === 3 ? 1.1 : 1.8);
+        consider(b.x + b.kx, b.z + b.kz, KIND_LEN[b.kind], b.v, a.kind === 3 || b.kind === 3 ? 1.1 : 1.8); // 被撞開的車看它實際在哪
       }
     }
     consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2);
@@ -319,10 +330,31 @@ export class Traffic {
 
     for (const a of this.agents) {
       if (!a.alive) continue;
-      // 被撞開的位移：停住時不動，之後 1~2 秒內滑回車道
-      if (a.stunned <= 0 && (a.kx || a.kz || a.kh)) {
-        const k = Math.exp(-dt * 1.6);
-        a.kx *= k; a.kz *= k; a.kh *= k;
+      // 被撞出去：照速度在地上滑，輪胎（機車倒地是車身）摩擦讓它停下；撞到牆就停在牆邊
+      if (a.kvx || a.kvz || a.kw) {
+        a.kx += a.kvx * dt; a.kz += a.kvz * dt; a.kh += a.kw * dt;
+        const sp = Math.hypot(a.kvx, a.kvz), dec = a.kind === 3 ? 7 : a.kind === 2 ? 6 : 8.5;
+        const k = sp > 1e-3 ? Math.max(0, sp - dec * dt) / sp : 0;
+        a.kvx *= k; a.kvz *= k;
+        a.kw *= Math.exp(-dt * 2.2);
+        if (sp < 0.05 && Math.abs(a.kw) < 0.05) a.kvx = a.kvz = a.kw = 0;
+        if (this.collider && this.collider.push(a.x + a.kx, a.z + a.kz, KIND_R[a.kind], this.pushOut)) {
+          const [ox, oz] = this.pushOut, ol = Math.hypot(ox, oz) || 1, nx = ox / ol, nz = oz / ol;
+          a.kx += ox; a.kz += oz;
+          const vn = a.kvx * nx + a.kvz * nz;
+          if (vn < 0) { a.kvx -= 1.3 * vn * nx; a.kvz -= 1.3 * vn * nz; a.kw *= 0.5; }
+        }
+      }
+      // 機車倒地：躺著，時間到再扶起來
+      if (a.down > 0) a.down -= dt;
+      const fallTo = a.down > 0 ? 1 : 0;
+      a.fall += (fallTo - a.fall) * Math.min(1, dt * (fallTo ? 9 : 2.5));
+      // 停住、滑完之後才慢慢開回車道
+      if (a.stunned <= 0 && !a.kvx && !a.kvz && (a.kx || a.kz || a.kh)) {
+        const k = Math.exp(-dt * 0.9);
+        a.kx *= k; a.kz *= k;
+        // 車頭偏轉取最短的轉法回正（被撞到轉好幾圈也不會倒著轉回去）
+        a.kh = Math.atan2(Math.sin(a.kh), Math.cos(a.kh)) * k;
         if (Math.abs(a.kx) + Math.abs(a.kz) + Math.abs(a.kh) < 0.01) a.kx = a.kz = a.kh = 0;
       }
       if (a.stunned > 0) { a.stunned -= dt; a.v = 0; continue; }
@@ -364,29 +396,47 @@ export class Traffic {
     if (this.lampAcc > 0.25) { this.lampAcc = 0; this.updateLamps(); }
   }
 
-  /** 玩家的車撞到車流：把玩家推開，被撞的車停一下；回傳撞擊力道 */
-  /** 玩家的車撞到車流：玩家照剛體彈開；被撞的車被推開、歪一下、停 1.5 秒再回到車道 */
+  /**
+   * 玩家的車撞到車流：兩台車照質量交換動量（剛體衝量），被撞的車會被撞出去、旋轉、在地上滑行，
+   * 停幾秒再開回車道；機車又輕又不穩，撞得夠大力會倒地。回傳撞擊力道
+   */
   collidePlayer(p: FreeCar): number {
     let impact = 0;
     const pr = FreeCar.RADIUS;
     for (const a of this.agents) {
       if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9) continue;
-      const ax = Math.sin(a.h + a.kh), az = Math.cos(a.h + a.kh), half = KIND_LEN[a.kind] / 2 - 0.9, ar = a.kind === 3 ? 0.5 : a.kind === 2 ? 1.3 : 1.0;
-      // 越重越推不動：公車幾乎不動、機車會被推很遠
-      const give = a.kind === 2 ? 0.1 : a.kind === 3 ? 1.0 : 0.5;
+      const half = KIND_LEN[a.kind] / 2 - 0.9, ar = KIND_R[a.kind];
+      const inv = 1 / KIND_MASS[a.kind]; // 對方質量倒數 ÷ 玩家的
       for (const [px, pz] of p.circles()) for (const ao of [-half, 0, half]) {
-        const qx = a.x + a.kx + ax * ao, qz = a.z + a.kz + az * ao;
+        const ax = Math.sin(a.h + a.kh), az = Math.cos(a.h + a.kh);
+        const cx = a.x + a.kx, cz = a.z + a.kz;
+        const qx = cx + ax * ao, qz = cz + az * ao;
         const dx = px - qx, dz = pz - qz, d = Math.hypot(dx, dz), r = pr + ar;
         if (d >= r || d < 1e-4) continue;
         const nx = dx / d, nz = dz / d;
-        const hit = p.contact(nx, nz, (r - d) * (1 - give * 0.5), qx + nx * ar, qz + nz * ar, ax * a.v, az * a.v, 0.4, 0.4);
+        // 第一次被撞：原本沿車道開的速度轉成「被撞出去」的速度，之後就照物理滑
+        if (a.v > 0) {
+          a.kvx += Math.sin(a.h) * a.v; a.kvz += Math.cos(a.h) * a.v;
+          a.v = 0;
+        }
+        // 接觸點與對方質心的距離，對方接觸點的速度 = 質心速度 + ω × r
+        const ptx = qx + nx * ar, ptz = qz + nz * ar, rx = ptx - cx, rz = ptz - cz;
+        const ovx = a.kvx + a.kw * rz, ovz = a.kvz - a.kw * rx;
+        // 重疊照質量分攤：輕的那個被推比較多
+        const share = inv / (1 + inv);
+        const hit = p.contact(nx, nz, (r - d) * (1 - share), ptx, ptz, ovx, ovz, 0.3, 0.5, inv);
         impact = Math.max(impact, hit);
-        // 被撞的車往反方向被推、車頭被撞歪
-        const push = (r - d) * give * 0.5 + Math.min(1.2, hit * 0.06) * give;
-        a.kx -= nx * push;
-        a.kz -= nz * push;
-        a.kh += (ao >= 0 ? 1 : -1) * (nx * az - nz * ax) * Math.min(0.5, hit * 0.03) * give;
-        a.stunned = Math.max(a.stunned, 1.5);
+        a.kx -= nx * (r - d) * share;
+        a.kz -= nz * (r - d) * share;
+        // 反作用：玩家吃到 (jx, jz)，對方吃反向 × 質量比，並產生旋轉
+        const dvx = -p.jx * inv, dvz = -p.jz * inv;
+        a.kvx += dvx; a.kvz += dvz;
+        a.kw += (rz * dvx - rx * dvz) / KIND_INERTIA[a.kind];
+        const sp = Math.hypot(a.kvx, a.kvz), cap = KNOCK_VMAX[a.kind];
+        if (sp > cap) { a.kvx *= cap / sp; a.kvz *= cap / sp; }
+        a.kw = Math.max(-3, Math.min(3, a.kw));
+        a.stunned = Math.max(a.stunned, KIND_STUN[a.kind]);
+        if (a.kind === 3 && Math.hypot(dvx, dvz) > 3) a.down = 4; // 機車被撞倒
       }
     }
     return impact;
@@ -395,6 +445,7 @@ export class Traffic {
   render(dt: number) {
     const counts = [0, 0, 0, 0, 0];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+    const fwd = new THREE.Vector3(0, 0, 1), roll = new THREE.Quaternion();
     for (const a of this.agents) {
       if (!a.alive) continue;
       let d = a.h - a.vh;
@@ -402,6 +453,7 @@ export class Traffic {
       a.vh += d * Math.min(1, dt * 8);
       const i = counts[a.kind]++;
       q.setFromAxisAngle(up, a.vh + a.kh);
+      if (a.fall > 0.01) q.multiply(roll.setFromAxisAngle(fwd, a.fall * 1.4)); // 機車倒地：沿車身方向側躺
       m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
       const mm = this.meshes[a.kind];
       mm.paint.setMatrixAt(i, m);
@@ -427,6 +479,13 @@ export class Traffic {
   }
 
   get count() { return this.agents.filter((a) => a.alive).length; }
+  /** 測試用（?phys）：拿一台車改成指定車種、停在原地不動，回傳它 */
+  testAgent(kind: Kind): Agent | null {
+    const a = this.agents.find((b) => b.alive && b.kind !== 2 && b.stunned <= 0) ?? this.agents.find((b) => b.alive);
+    if (!a) return null;
+    Object.assign(a, { kind, v: 0, stunned: 6, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0 });
+    return a;
+  }
   /** 測試用統計：車數、平均速度、停著的車數、各車種數 */
   stats() {
     const al = this.agents.filter((a) => a.alive);

@@ -42,6 +42,7 @@
       <div id="warn"></div>
       <div class="speedo"><b id="speed">0</b><small>km/h</small><span id="gear">N</span></div>
       <div id="pad"><span>◀</span><i id="pad-dot"></i><span>▶</span></div>
+      <div id="steer-btns"><button id="steer-l" aria-label="左轉">◀</button><button id="steer-r" aria-label="右轉">▶</button></div>
       <button id="brake">煞車</button>
       <button id="drs">DRS</button>
       <button id="pit" class="small-btn">進站</button>
@@ -71,7 +72,13 @@
         <button id="btn-gp" class="ghost-btn">街道賽：對決 7 台 AI（3 圈）</button>
         <button id="btn-start" class="ghost-btn">計時賽</button>
         <div class="opts">
-          <label><input type="checkbox" id="opt-tilt" /> 傾斜手機轉向</label>
+          <label class="q">手機轉向
+            <select id="opt-steer">
+              <option value="buttons">左右按鈕</option>
+              <option value="drag">拖曳滑桿</option>
+              <option value="tilt">傾斜手機（陀螺儀）</option>
+            </select>
+          </label>
           <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
           <label><input type="checkbox" id="opt-ghost" /> 影子車</label>
           <label><input type="checkbox" id="opt-sound" /> 音效</label>
@@ -90,7 +97,7 @@
             <small id="quality-now"></small>
           </label>
         </div>
-        <p class="help">自由駕駛：左下拖曳轉向，右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Esc 暫停。</p>
+        <p class="help">手機：左下 ◀ ▶ 轉向（可在下面改成拖曳或傾斜手機），右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Ctrl 或 E 開 DRS、B 進站，Esc 暫停。</p>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
         <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
       </div>

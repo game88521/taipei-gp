@@ -44,6 +44,9 @@ export class FreeCar {
    * 與另一個物體接觸：n 從對方指向自己、depth 為重疊深度、(cx, cz) 接觸點、(ovx, ovz) 對方速度（當作質量無限大）。
    * 回傳撞擊力道（接觸點的法向相對速度）。
    */
+  /** 上一次 contact() 自己吃到的速度變化（給對方算反作用用） */
+  jx = 0;
+  jz = 0;
   contact(nx: number, nz: number, depth: number, cx: number, cz: number, ovx = 0, ovz = 0, e = 0.35, mu = 0.45, otherInvMass = 0): number {
     // 先把車推出重疊（多推一點點，下一步才不會又黏住）
     this.x += nx * (depth + 0.01);
@@ -52,6 +55,7 @@ export class FreeCar {
     // 接觸點速度 = 質心速度 + ω × r（在這個座標系：ω × (rx, rz) = ω·(rz, −rx)）
     const pvx = this.vx + this.w * rz - ovx, pvz = this.vz - this.w * rx - ovz;
     const vn = pvx * nx + pvz * nz;
+    this.jx = this.jz = 0;
     if (vn >= 0) return 0;
     const k = rz * nx - rx * nz; // 法向衝量對角速度的力臂
     // otherInvMass：對方的「質量倒數 ÷ 我的」；牆＝0（推不動）、同樣的車＝1（兩邊各吃一半）
@@ -66,6 +70,9 @@ export class FreeCar {
     this.vx += Jt * tx;
     this.vz += Jt * tz;
     this.w += (Jt * kt) / INERTIA;
+    // 這次碰撞自己吃到的速度變化（衝量 ÷ 自己的質量）；對方要吃反向的 × otherInvMass
+    this.jx = J * nx + Jt * tx;
+    this.jz = J * nz + Jt * tz;
     const impact = -vn;
     if (this.hitCool > 0 || impact < 2) return 0;
     this.hitCool = 0.25;
