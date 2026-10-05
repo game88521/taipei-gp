@@ -312,6 +312,18 @@ export class Traffic {
     return lightOf(best, groupOf(best, ux, uz), this.t) === 'r';
   }
 
+  /** 闖紅燈判斷用：(x, z) 在號誌路口中心 14 m 內時，回傳這個路口與「沿 (ux, uz) 方向走的這條路」是不是紅燈；不在路口回傳 null */
+  signalAt(x: number, z: number, ux: number, uz: number): { id: object; red: boolean } | null {
+    let best: Cluster | null = null, bd = 14;
+    for (const c of this.clusters) {
+      if (Math.abs(c.cx - x) > bd || Math.abs(c.cz - z) > bd) continue;
+      const d = Math.hypot(c.cx - x, c.cz - z);
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (!best) return null;
+    return { id: best, red: lightOf(best, groupOf(best, ux, uz), this.t) === 'r' };
+  }
+
   /** 附近的車（給街頭飆車的對手閃車用） */
   near(x: number, z: number, r: number) {
     return this.agents.filter((a) => a.alive && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);

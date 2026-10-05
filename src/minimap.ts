@@ -17,7 +17,7 @@ export class Minimap {
     this.g = canvas.getContext('2d')!;
   }
 
-  draw(x: number, z: number, h: number, extra?: { route: [number, number][] | null; next: [number, number] | null; rivals: { x: number; z: number }[]; flags: { x: number; z: number }[] }) {
+  draw(x: number, z: number, h: number, extra?: { route: [number, number][] | null; next: [number, number] | null; rivals: { x: number; z: number; color?: string }[]; flags: { x: number; z: number }[] }) {
     const g = this.g, W = this.canvas.width, H = this.canvas.height, k = W / 2 / RANGE;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, W, H);
@@ -60,7 +60,7 @@ export class Minimap {
       g.fill();
     }
     for (const r of extra?.rivals ?? []) {
-      g.fillStyle = '#4fc3ff';
+      g.fillStyle = r.color ?? '#4fc3ff';
       g.beginPath();
       g.arc(r.x, r.z, px(6), 0, Math.PI * 2);
       g.fill();

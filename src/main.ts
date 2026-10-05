@@ -24,6 +24,7 @@ import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
 import { Router } from './router';
 import { TaxiJob } from './taxi';
+import { Police } from './police';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -151,6 +152,10 @@ let peds: Pedestrians | null = null;
 let sr: StreetRace | null = null;
 let breakables: Breakables | null = null;
 let taxi: TaxiJob | null = null;
+let police: Police | null = null;
+const WANTED_TEST = new URLSearchParams(location.search).has('wanted');
+const PURSUIT_TEST = new URLSearchParams(location.search).has('pursuit');
+const policeLog: string[] = []; // 測試標題用
 const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
@@ -182,7 +187,10 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   await stage('街頭挑戰與導航', 0.95);
   sr = new StreetRace(scene, c.data, c.landmarks);
-  taxi = new TaxiJob(scene, c.landmarks, new Router(c.data));
+  const router = new Router(c.data);
+  taxi = new TaxiJob(scene, c.landmarks, router);
+  police = new Police(scene, router, roadNet);
+  if (WANTED_TEST) police.heat = police.stars = +new URLSearchParams(location.search).get('wanted')!; // 測試：?wanted=3 一開始就 3 星通緝
   // 著色器一次編好：隱藏的東西（其他車、遠處區塊、計程車頂燈）也先打開一起編，之後切換才不會卡一下；
   // 有平行編譯擴充（KHR_parallel_shader_compile）時不會卡住主執行緒
   await stage('準備畫面', 0.98);
@@ -486,6 +494,7 @@ function updateVisuals(dt: number) {
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (sr && mode === 'free') sr.render(dt);
+  if (police) { if (mode === 'free') police.render(dt, performance.now() / 1000); else police.hide(); }
   // 街道賽封路：挑戰光柱、紅綠燈、賽道旁的路名牌都不出現（會擋視線）
   sr?.showMarkers(mode === 'free' && !taxiOn());
   taxi?.render(performance.now() / 1000);
@@ -955,6 +964,7 @@ function updateTaxiHud() {
 }
 $('btn-taxi').addEventListener('click', async () => {
   await userStart();
+  police?.hide();
   mode = 'free';
   field.hide();
   sr?.cancel();
@@ -1046,6 +1056,31 @@ function updateSrHud() {
   add(anyDone ? '已有對手到終點' : lead >= 0 ? `領先 ${lead.toFixed(0)} m` : `落後第一名 ${(-lead).toFixed(0)} m`, lead >= 0 ? 'good' : 'bad');
   el.classList.remove('hidden');
 }
+// 通緝星數／追緝嫌犯的狀態，與「追緝」按鈕（開巡邏車時）
+function updateWantedHud() {
+  const el = $('wanted'), btn = $('btn-pursuit');
+  const canPursue = mode === 'free' && chosen.id === 'police' && !taxiOn() && !streetRacing() && !!police && !police.active;
+  btn.style.display = canPursue ? '' : 'none';
+  if (police?.wanted) {
+    const st = police.stars;
+    let t = '★'.repeat(st) + '☆'.repeat(5 - st);
+    if (police.bustT > 0.3) t += `　被包圍 ${Math.max(0, 3 - police.bustT).toFixed(1)}`;
+    else if (police.lostT > 0.5) t += `　甩開中 ${Math.ceil(12 - police.lostT)} s`;
+    el.textContent = t;
+    el.className = 'show' + (police.bustT > 0.3 ? ' bust' : '');
+  } else if (police?.suspect) {
+    el.textContent = `🎯 嫌犯　耐久 ${Math.round(police.suspectHp)}%　剩 ${Math.ceil(police.pursuitT)} s`;
+    el.className = 'show cop';
+  } else el.className = '';
+}
+function startPursuit() {
+  if (!police || chosen.id !== 'police' || mode !== 'free' || state !== 'free') return;
+  const m = police.startPursuit(fcar);
+  if (m) toast(m, '');
+}
+$('btn-pursuit').addEventListener('pointerdown', (e) => { e.preventDefault(); startPursuit(); });
+addEventListener('keydown', (e) => { if (e.code === 'KeyG' && !e.repeat) startPursuit(); });
+
 function showStreetResult() {
   if (!sr?.active) return;
   srShown = true;
@@ -1194,7 +1229,8 @@ function streetRacing() {
 }
 function freeStep(dt: number) {
   fcar.spec = streetRacing() ? DEFAULT_SPEC : chosen.spec;
-  let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
+  if (PURSUIT_TEST && police && !police.suspect && policeLog.length === 0) startPursuit();
+  let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   if (breakables) impact = Math.max(impact, breakables.hit(fcar)); // 樹、路燈：撞倒過去
@@ -1207,16 +1243,30 @@ function freeStep(dt: number) {
   }
   heavyAcc += dt;
   const heavy = heavyAcc >= 1 / 60; // 車流、行人每秒更新 60 次就夠（玩家的車照樣每步都算）
+  let trafficHit = 0, pedHit = false;
   if (traffic && !NO_TRAFFIC && heavy) {
-    traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? [])]); // 車流會讓對手與過馬路的行人
-    impact = Math.max(impact, traffic.collidePlayer(fcar));
+    traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? []), ...(police?.units.map((u) => u.car) ?? [])]); // 車流會讓對手、過馬路的行人、警車
+    trafficHit = traffic.collidePlayer(fcar);
   }
-  if (traffic && !NO_TRAFFIC && !heavy) impact = Math.max(impact, traffic.collidePlayer(fcar));
+  if (traffic && !NO_TRAFFIC && !heavy) trafficHit = traffic.collidePlayer(fcar);
+  impact = Math.max(impact, trafficHit);
   if (peds && heavy && peds.update(heavyAcc, fcar, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
     sound.hit(6);
+    pedHit = true;
   }
   if (heavy) heavyAcc = 0;
+  // 警察：街頭比賽中、自己開巡邏車時不算犯規
+  if (police) {
+    const crimesOn = !streetRacing() && chosen.id !== 'police' && (!FREE_SIM || WANTED_TEST); // 自動測試（同步模擬）時不算，除非 ?wanted
+    const say = (m: string | null) => { if (m) toast(m, 'bad'); };
+    if (crimesOn && trafficHit > 6) say(police.crime(0.35, '撞車'));
+    if (crimesOn && pedHit) say(police.crime(1, '撞到行人'));
+    const r = police.update(dt, fcar, collider, NO_TRAFFIC ? null : traffic, crimesOn);
+    if (r.msg) policeLog.push(r.msg.replace(/[^\p{L}\p{N}$ ]/gu, '').trim());
+    if (r.msg) { toast(r.msg, r.money > 0 ? 'purple' : r.money < 0 || r.msg.startsWith('🚨') ? 'bad' : ''); if (r.msg.startsWith('🚨')) sound.beep(660, 0.25); }
+    if (r.money) setMoney(Math.max(0, money() + r.money));
+  }
 
   if (impact) sound.hit(impact * 2.5);
   if (taxi && taxiOn()) {
@@ -1253,7 +1303,10 @@ function updateFreeHud(dt: number) {
       }
       el.className = w ? 'show' : '';
     }
-    minimap?.draw(fcar.x, fcar.z, fcar.h, taxiOn() ? { ...taxi!.mapInfo, rivals: [], flags: [] } : sr?.mapInfo);
+    const base = taxiOn() ? { ...taxi!.mapInfo, rivals: [], flags: [] } : sr?.mapInfo;
+    const cops = police?.mapDots ?? [];
+    minimap?.draw(fcar.x, fcar.z, fcar.h, cops.length ? { route: null, next: null, flags: [], ...base, rivals: [...(base?.rivals ?? []), ...cops] } : base);
+    updateWantedHud();
     updateTaxiHud();
     updateSrHud();
   }
@@ -1416,6 +1469,15 @@ const NO_TRAFFIC = new URLSearchParams(location.search).has('notraffic'); // 測
 const SR_TEST = new URLSearchParams(location.search).get('sr');
 const TAXI_TEST = new URLSearchParams(location.search).has('taxi'); // ?free&bot&taxi&sim=N：自動跑計程車任務
 /** 測試用：照計程車導航路線開，快到目標就減速停下 */
+/** 測試用：開巡邏車直接衝向嫌犯 */
+function chaseBot() {
+  const s = police?.suspect?.car;
+  if (!s) return { steer: 0, brake: true, throttle: false };
+  let e = Math.atan2(s.x + s.vx * 0.5 - fcar.x, s.z + s.vz * 0.5 - fcar.z) - fcar.h;
+  e = Math.atan2(Math.sin(e), Math.cos(e));
+  const back = Math.abs(e) > 2.2 && Math.hypot(s.x - fcar.x, s.z - fcar.z) < 15;
+  return { steer: Math.max(-1, Math.min(1, (back ? 1 : -1) * e * 2.2)), brake: back, throttle: !back };
+}
 function taxiBot() {
   const path = taxi?.route, tg = taxi?.target;
   if (!path || !tg || path.length < 2) return { steer: 0, brake: true, throttle: false };
@@ -1450,6 +1512,7 @@ if (FREE) void cityLoad.then(() => {
     breakables?.update(1, fcar.x, fcar.z); // 同步模擬沒有跑畫面，把倒下動畫直接推到底，截圖才看得到
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
+    if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
     document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
