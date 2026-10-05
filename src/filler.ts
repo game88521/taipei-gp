@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, type CityData } from './citydata';
+import { terrainHeight, Grid, type CityData } from './citydata';
 
 // 地圖外圍的「遠景城市」：真實資料（OSM）範圍外再補一圈約 900 m 的街廓，
 // 開到地圖邊邊往外看，不會是一片空地。全部是方塊＋著色器畫的窗戶：
@@ -40,6 +40,23 @@ export function makeFiller(d: CityData): Filler {
     [x1, z0, x1 + BAND, z1], // 東
   ];
   const boxes: FillerBox[] = [], streets: number[] = [];
+  // 真實道路（OSM 抓下來的路會延伸到範圍外）上不能蓋房子：沿線每 2 m 檢查是否落在這塊地（含路寬）裡
+  const segs = new Grid<number[]>(40), tmp: number[][] = [], N = d.net.nodes;
+  for (const w of d.net.ways) {
+    if (w.c > 3) continue;
+    for (let k = 0; k + 1 < w.n.length; k++) {
+      const ax = N[w.n[k] * 2], az = N[w.n[k] * 2 + 1], bx = N[w.n[k + 1] * 2], bz = N[w.n[k + 1] * 2 + 1];
+      segs.addBox(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), [ax, az, bx, bz, w.w / 2 + 2]);
+    }
+  }
+  const onRoad = (cx: number, cz: number, hw: number, hd: number) => segs.query(cx, cz, Math.max(hw, hd) + 12, tmp).some(([ax, az, bx, bz, rw]) => {
+    const l = Math.hypot(bx - ax, bz - az) || 1;
+    for (let t = 0; t <= l; t += 2) {
+      const x = ax + ((bx - ax) * t) / l, z = az + ((bz - az) * t) / l;
+      if (Math.abs(x - cx) < hw + rw && Math.abs(z - cz) < hd + rw) return true;
+    }
+    return false;
+  });
   bands.forEach(([bx0, bz0, bx1, bz1], bi) => {
     // 沿 x、z 切出街廓的邊界（80~130 m 一格）
     const cuts = (a: number, b: number) => {
@@ -67,6 +84,7 @@ export function makeFiller(d: CityData): Filler {
         const sb = 2 + r() * 4; // 退縮
         const w = lx1 - lx0 - sb * 2, dd = lz1 - lz0 - sb * 2;
         if (w < 8 || dd < 8) continue;
+        if (onRoad((lx0 + lx1) / 2, (lz0 + lz1) / 2, w / 2, dd / 2)) continue;
         // 高度：大多 4~12 層公寓，少數 20~35 層大樓；南邊山腳都是矮房子
         let h = 10 + r() * r() * 32;
         if (bi !== 1 && r() < 0.07) h = 60 + r() * 55;

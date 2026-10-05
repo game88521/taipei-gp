@@ -333,9 +333,13 @@ function heightOf(t, id, isPart) {
   return [h, mh || 0];
 }
 
+// 地下的建築（捷運站、地下街）：OSM 照樣畫了外框，不排除的話會變成 15~25 m 高的方塊擋在忠孝東路正中間
+const underground = (t) => (t.layer != null && Number(t.layer) < 0) || /underground/.test(t.location || '');
+let droppedUnder = 0;
 const parts = [], outlines = [];
 for (const e of E) {
   const t = e.tags || {};
+  if ((t.building || t['building:part']) && underground(t)) { droppedUnder++; if (t.name) outlines.push({ id: e.id, t, rings: e.geometry ? [ring(e.geometry)] : [], under: true }); continue; } // 名字留給地標提示
   if (e.type === 'way' && e.geometry && t['building:part'] && t['building:part'] !== 'roof') parts.push({ id: e.id, t, rings: [ring(e.geometry)] });
   else if (e.type === 'way' && e.geometry && t.building && !/^(roof|construction|no)$/.test(t.building)) outlines.push({ id: e.id, t, rings: [ring(e.geometry)] });
   else if (e.type === 'relation' && t.building && !/^(roof|construction)$/.test(t.building)) outlines.push({ id: e.id, t, rings: outerRings(e) });
@@ -346,7 +350,7 @@ const keep = [];
 let skippedOutline = 0, droppedTrack = 0;
 for (const o of outlines) {
   const r0 = o.rings[0];
-  if (!r0) continue;
+  if (!r0 || o.under) continue;
   const xs = r0.map((p) => p[0]), zs = r0.map((p) => p[1]);
   const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
   if (partCentroids.some((c) => c[0] > x0 && c[0] < x1 && c[1] > z0 && c[1] < z1 && inside(c, r0))) { skippedOutline++; continue; }
@@ -366,6 +370,7 @@ for (const b of keep) {
     const [h, mh] = heightOf(b.t, b.id, !!b.t['building:part']);
     if (h <= mh + 0.5) continue;
     const o = { p: r.flatMap(([x, z]) => [r1(x), r1(z)]), h: r1(h), s: styleOf(b.t, h) };
+    if (b.t.layer != null && Number(b.t.layer) >= 1) Object.defineProperty(o, 'raised', { value: true }); // 高架（例：文湖線車站跨在和平東路上），不輸出
     if (mh > 0) o.m = r1(mh);
     const col = colour(b.t['building:colour']);
     if (col) o.c = col;
@@ -411,6 +416,7 @@ const roads = [];
 const netIndex = new Map(); // OSM node id → 路網節點編號
 const netNodes = [];
 const netWays = [];
+const passWays = new Set();
 const nodeOf = (id, g) => {
   if (!netIndex.has(id)) {
     const [x, z] = proj(g.lat, g.lon);
@@ -435,6 +441,7 @@ for (const e of roadWays) {
   if (t.name) way.nm = t.name;
   if (t['name:en']) way.en = t['name:en'];
   netWays.push(way);
+  if (t.tunnel === 'building_passage' || t.covered === 'yes') passWays.add(way); // 穿過建築底下的路（騎樓、門洞）
 }
 
 // 紅綠燈與斑馬線：只要落在車道上的
@@ -703,6 +710,62 @@ let terrain = null;
     console.log(`地形：${nx}×${nz} 格，最高 ${maxH.toFixed(0)} m，山坡補種 ${trees.length / 2 - before} 棵樹`);
   }
 }
+
+// ---------------------------------------------------------------- 擋在車道上的建築
+// 車道中心線穿過建築底面：高架的（layer ≥ 1）或路標成「穿過建築」的，把建築墊高讓車從底下過；
+// 其他的多半是資料錯誤（或沒標 layer 的地下結構），直接拿掉。幹道、一般道路穿過 3 m 以上就算，巷弄 8 m 以上
+let raisedOver = 0, droppedOver = 0;
+{
+  const S = 40, grid = new Map();
+  buildings.forEach((b, i) => {
+    if ((b.m ?? 0) > 2) return;
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (let k = 0; k < b.p.length; k += 2) { x0 = Math.min(x0, b.p[k]); x1 = Math.max(x1, b.p[k]); z0 = Math.min(z0, b.p[k + 1]); z1 = Math.max(z1, b.p[k + 1]); }
+    b._bb = [x0, z0, x1, z1];
+    for (let gx = Math.floor(x0 / S); gx <= Math.floor(x1 / S); gx++) for (let gz = Math.floor(z0 / S); gz <= Math.floor(z1 / S); gz++) {
+      const k = `${gx},${gz}`;
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push(i);
+    }
+  });
+  const inFlat = (x, z, p) => {
+    let c = false;
+    for (let i = 0, j = p.length / 2 - 1; i < p.length / 2; j = i++) {
+      const xi = p[i * 2], zi = p[i * 2 + 1], xj = p[j * 2], zj = p[j * 2 + 1];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+    }
+    return c;
+  };
+  const crossed = new Map(); // 建築編號 → { main: 幹道／一般道路穿過的 m, lane: 巷弄的 m, pass: 有沒有標成穿過建築 }
+  for (const w of netWays) {
+    if (w.c > 3) continue;
+    for (let k = 0; k + 1 < w.n.length; k++) {
+      const ax = netNodes[w.n[k] * 2], az = netNodes[w.n[k] * 2 + 1], bx = netNodes[w.n[k + 1] * 2], bz = netNodes[w.n[k + 1] * 2 + 1];
+      const l = Math.hypot(bx - ax, bz - az);
+      for (let s = 0.5; s < l; s += 1) {
+        const x = ax + ((bx - ax) * s) / l, z = az + ((bz - az) * s) / l;
+        for (const i of grid.get(`${Math.floor(x / S)},${Math.floor(z / S)}`) || []) {
+          const b = buildings[i], bb = b._bb;
+          if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3] || !inFlat(x, z, b.p)) continue;
+          const c = crossed.get(i) || { main: 0, lane: 0, pass: false };
+          if (w.c <= 2) c.main++; else c.lane++;
+          if (passWays.has(w)) c.pass = true;
+          crossed.set(i, c);
+        }
+      }
+    }
+  }
+  const drop = new Set();
+  for (const [i, c] of crossed) {
+    if (c.main < 3 && c.lane < 8) continue;
+    const b = buildings[i];
+    if (b.raised || c.pass) { b.m = Math.max(b.m ?? 0, b.raised ? 7 : 4.5); raisedOver++; if (b.h <= b.m + 2) b.h = r1(b.m + 4); }
+    else { drop.add(i); droppedOver++; }
+  }
+  for (const b of buildings) delete b._bb;
+  for (let i = buildings.length - 1; i >= 0; i--) if (drop.has(i)) buildings.splice(i, 1);
+}
+console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上墊高 ${raisedOver}、壓在路上拿掉 ${droppedOver}`);
 
 const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain };
 mkdirSync(here('../public/data/'), { recursive: true });
