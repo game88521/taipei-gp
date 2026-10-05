@@ -461,6 +461,7 @@ function step(dt: number) {
   }
 
   const gear = gearOf(car.v);
+  sound.setEngine('f1');
   sound.engine(gear.rpm, inp.brake ? 0.15 : 1, true);
 }
 
@@ -782,6 +783,7 @@ $('btn-menu').addEventListener('click', () => {
   $('results').classList.add('hidden');
   state = 'menu';
   sound.engine(0, 0, false);
+  sound.sirenAt(0, 0);
   showMenu(false);
 });
 
@@ -824,6 +826,7 @@ function updateGpHud() {
 function showResults() {
   state = 'results';
   sound.engine(0, 0, false);
+  sound.sirenAt(0, 0);
   const st = field.standings();
   const winner = st[0].finish ?? field.raceTime;
   const tb = $('res-table');
@@ -996,6 +999,7 @@ function pause() {
   pausedFrom = state;
   state = 'paused';
   sound.engine(0, 0, false);
+  sound.sirenAt(0, 0);
   showMenu(true);
 }
 $('btn-pause').addEventListener('click', pause);
@@ -1305,7 +1309,15 @@ function freeStep(dt: number) {
       if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); refreshGarage(); sound.beep(990, 0.3); }
     }
   }
+  sound.setEngine(streetRacing() ? 'f1' : chosen.id); // 每台車的引擎聲不一樣（audio.ts ENGINES）
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
+  // 警笛：被通緝時照最近那台警車的距離；自己開巡邏車追嫌犯時自己的警笛
+  let siren = 0;
+  if (police) {
+    for (const u of police.units) siren = Math.max(siren, 1 - Math.hypot(u.car.x - fcar.x, u.car.z - fcar.z) / 260);
+    if (police.suspect) siren = 0.75;
+  }
+  sound.sirenAt(Math.max(0, siren), performance.now() / 1000);
 }
 function updateFreeHud(dt: number) {
   const v = fcar.v;
