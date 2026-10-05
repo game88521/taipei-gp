@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { sedanGeo } from './models';
+import { sedanGeo, type VehicleGeo } from './models';
 import { bakedShadowMaterial, blobTexture } from './world';
 
 /** 車底柔邊影子（不用即時陰影也看得出車貼在地上） */
@@ -73,20 +73,32 @@ export function makeSedan(color: string, taxi = false): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const g = sedanGeo({ taxi, noWheels: true });
-  root.add(carBlob(2.5, 5.6));
-  body.add(new THREE.Mesh(g.paint, new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.28 }))); // 烤漆：會映出天空
+  return finishCar(root, body, sedanGeo({ taxi, noWheels: true }), color);
+}
+
+/** 玩家可選的其他車：外型（models.ts）＋ 會轉向、滾動的車輪；rim 輪框顏色、tyreW 胎寬、blob 車底影子大小 */
+export function makeFromGeo(g: VehicleGeo, color: string, opt: { rim?: string; tyreW?: number; blob?: [number, number]; metal?: number } = {}): CarModel {
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  return finishCar(root, body, g, color, opt);
+}
+
+function finishCar(root: THREE.Group, body: THREE.Group, g: VehicleGeo, color: string, opt: { rim?: string; tyreW?: number; blob?: [number, number]; metal?: number } = {}): CarModel {
+  root.add(carBlob(...(opt.blob ?? [2.5, 5.6])));
+  body.add(new THREE.Mesh(g.paint, new THREE.MeshStandardMaterial({ color, metalness: opt.metal ?? 0.45, roughness: 0.28 }))); // 烤漆：會映出天空
   body.add(new THREE.Mesh(g.fixed, new THREE.MeshLambertMaterial({ vertexColors: true })));
   const steer: THREE.Group[] = [], spin: THREE.Mesh[] = [];
-  const tyre = new THREE.MeshLambertMaterial({ color: '#151515' }), rim = new THREE.MeshLambertMaterial({ color: '#c4c8ce' });
+  const tyre = new THREE.MeshLambertMaterial({ color: '#151515' }), rim = new THREE.MeshLambertMaterial({ color: opt.rim ?? '#c4c8ce' });
+  const tw = opt.tyreW ?? 0.24;
   for (const [x, y, z, r] of g.wheels) {
     const w = new THREE.Group();
     w.position.set(x, y, z);
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.24, 16).rotateZ(Math.PI / 2), tyre);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, tw, 16).rotateZ(Math.PI / 2), tyre);
     // 輪框上加五根輻條，轉動時看得出來
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 10).rotateZ(Math.PI / 2).translate(Math.sign(x) * 0.12, 0, 0), rim);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.03, 10).rotateZ(Math.PI / 2).translate(Math.sign(x) * tw / 2, 0, 0), rim);
     for (let k = 0; k < 5; k++) {
-      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.035, r * 1.15, 0.06).translate(Math.sign(x) * 0.135, 0, 0), tyre);
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.035, r * 1.15, 0.06).translate(Math.sign(x) * (tw / 2 + 0.015), 0, 0), tyre);
       sp.rotation.x = (k / 5) * Math.PI;
       hub.add(sp);
     }

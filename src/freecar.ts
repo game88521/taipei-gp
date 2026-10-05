@@ -17,6 +17,10 @@ const OFFS = [1.45, 0, -1.45];
 
 export interface Contact { nx: number; nz: number; depth: number }
 
+/** 每台車的性能：起步加速度、極速（m/s）、煞車減速度、側向抓地力（m/s²）、質量（一般轎車 = 1，撞車流時用） */
+export interface CarSpec { engine: number; vmax: number; brake: number; grip: number; mass: number }
+export const DEFAULT_SPEC: CarSpec = { engine: ENGINE, vmax: CAR_VMAX, brake: BRAKE, grip: GRIP, mass: 1 };
+
 export class FreeCar {
   x = 0;
   z = 0;
@@ -25,6 +29,7 @@ export class FreeCar {
   vz = 0;
   w = 0; // 角速度 dh/dt
   steer = 0;
+  spec: CarSpec = DEFAULT_SPEC;
   private hitCool = 0;
   private contacts: Contact[] = [];
 
@@ -89,23 +94,24 @@ export class FreeCar {
     let vl = this.vx * fx + this.vz * fz, vlat = this.vx * rx + this.vz * rz;
 
     // ---- 縱向：油門／煞車／倒車／滑行
+    const { engine, vmax, brake: brk, grip } = this.spec;
     let a = 0;
-    if (throttle) a = vl < -0.3 ? BRAKE : ENGINE * (1 - Math.max(0, vl / CAR_VMAX) ** 2);
-    else if (brake) a = vl > 0.3 ? -BRAKE : -5; // 停下來後繼續按＝倒車
+    if (throttle) a = vl < -0.3 ? brk : engine * (1 - Math.max(0, vl / vmax) ** 2);
+    else if (brake) a = vl > 0.3 ? -brk : -5; // 停下來後繼續按＝倒車
     else a = -Math.sign(vl) * Math.min(Math.abs(vl) / Math.max(dt, 1e-6), 1.0); // dt 可能是 0（同一幀），不能除以 0
     a -= 0.0004 * vl * Math.abs(vl);
     vl += a * dt;
     if (!throttle && !brake && Math.abs(vl) < 0.05) vl = 0;
-    vl = Math.max(-REVERSE_MAX, Math.min(CAR_VMAX, vl));
+    vl = Math.max(-REVERSE_MAX, Math.min(vmax, vl));
 
     // ---- 側向：輪胎把側滑速度拉回 0（上限＝抓地力），甩出去也會自己回正
-    const dLat = Math.min(Math.abs(vlat), GRIP * 1.15 * dt);
+    const dLat = Math.min(Math.abs(vlat), grip * 1.15 * dt);
     vlat -= Math.sign(vlat) * dLat;
 
     // ---- 轉向：低速打得多、高速打得少（但反應一樣快）；受抓地力限制
     const maxSteer = 0.62 / (1 + Math.abs(vl) / 16);
     let target = -(vl / WHEELBASE) * Math.tan(maxSteer * this.steer);
-    const lim = (GRIP * 1.05) / Math.max(Math.abs(vl), 1);
+    const lim = (grip * 1.05) / Math.max(Math.abs(vl), 1);
     target = Math.max(-lim, Math.min(lim, target));
     // 側滑時輪胎抓不住，角速度回到目標比較慢（被撞歪會轉一下才回來）
     const settle = 9 / (1 + Math.abs(vlat) / 3);

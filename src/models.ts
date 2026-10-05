@@ -72,6 +72,108 @@ export function sedanGeo(opts: { taxi?: boolean; hatch?: boolean; noWheels?: boo
   return { paint: mergeGeometries(paint.map(clean)), fixed: mergeGeometries(fixed.map(clean)), wheels, length: rearZ < -2.1 ? 4.6 : 4.3 };
 }
 
+// ---------------------------------------------------------------- 玩家可選的車（只給玩家開，輪子另外做：noWheels）
+/** 沿車頂／引擎蓋貼的一段斜板：從 (z0, y0) 到 (z1, y1)，寬 w、橫向位置 x（賽車條紋用）；
+ *  lift = 輪廓的倒角厚度（擠出時倒角會把表面往外推，條紋要跟著墊高才不會埋在車身裡） */
+const slab = (w: number, x: number, z0: number, y0: number, z1: number, y1: number, lift: number) => {
+  const l = Math.hypot(z1 - z0, y1 - y0);
+  return new THREE.BoxGeometry(w, 0.02, l).rotateX(-Math.atan((y1 - y0) / (z1 - z0))).translate(x, (y0 + y1) / 2 + lift + 0.012, (z0 + z1) / 2);
+};
+
+/** 美式肌肉跑車：長引擎蓋、斜背車頂、雙白條紋、引擎蓋進氣口、三段式尾燈 */
+export function muscleGeo(): VehicleGeo {
+  const paint: THREE.BufferGeometry[] = [], fixed: THREE.BufferGeometry[] = [];
+  const W = 1.9;
+  paint.push(profile([[-2.38, 0.3], [2.36, 0.3], [2.44, 0.56], [2.32, 0.86], [0.92, 0.98], [-1.85, 1.0], [-2.36, 0.97], [-2.46, 0.6]], W, 0.08));
+  fixed.push(tint(profile([[0.9, 0.98], [0.12, 1.33], [-0.72, 1.35], [-1.85, 1.0]], W - 0.16, 0.04), '#1c2530'));
+  paint.push(profile([[0.1, 1.32], [-0.7, 1.34], [-0.68, 1.39], [0.08, 1.38]], W - 0.26, 0.03));
+  paint.push(box(0.56, 0.09, 0.62, 0, 1.0, 1.35)); // 引擎蓋進氣口
+  fixed.push(tint(box(0.46, 0.04, 0.05, 0, 1.03, 1.66), '#141414'));
+  // 雙白條紋：引擎蓋 → 擋風玻璃 → 車頂 → 斜背 → 尾箱
+  for (const s of [-1, 1]) {
+    const x = s * 0.2;
+    fixed.push(tint(slab(0.2, x, 2.3, 0.86, 0.92, 0.98, 0.08), '#f4f4f4'));
+    fixed.push(tint(slab(0.2, x, 0.08, 1.38, -0.66, 1.39, 0.03), '#f4f4f4'));
+    fixed.push(tint(slab(0.2, x, -1.85, 1.0, -2.34, 0.97, 0.08), '#f4f4f4'));
+  }
+  // 大面積黑色水箱罩、圓形頭燈、三段式尾燈、尾翼小鴨尾
+  fixed.push(tint(box(1.2, 0.22, 0.06, 0, 0.64, 2.44), '#121212'));
+  for (const s of [-1, 1]) {
+    fixed.push(tint(cyl(0.12, 0.06, 0, 0, 0, 12).rotateY(Math.PI / 2).translate(s * 0.68, 0.72, 2.4), '#fff4d6'));
+    for (let k = 0; k < 3; k++) fixed.push(tint(box(0.1, 0.17, 0.05, s * (0.42 + k * 0.14), 0.78, -2.47), '#e01010'));
+    paint.push(box(0.08, 0.1, 0.18, s * (W / 2 + 0.06), 1.02, 0.75)); // 後照鏡
+  }
+  fixed.push(tint(box(1.55, 0.05, 0.16, 0, 1.03, -2.3), '#151515'));
+  fixed.push(tint(box(W + 0.02, 0.16, 4.7, 0, 0.36, -0.02), '#1a1b1f')); // 下緣黑色裙邊
+  for (const s of [-1, 1]) fixed.push(tint(cyl(0.06, 0.2, 0, 0, 0, 8).rotateY(Math.PI / 2).translate(s * 0.45, 0.33, -2.5), '#9a9ea4')); // 雙出排氣管
+  const wheels: [number, number, number, number][] = [];
+  for (const s of [-1, 1]) for (const z of [1.5, -1.45]) wheels.push([s * 0.86, 0.37, z, 0.37]);
+  return { paint: mergeGeometries(paint.map(clean)), fixed: mergeGeometries(fixed.map(clean)), wheels, length: 4.85 };
+}
+
+/** 楔形超跑：很低、車頭尖、座艙在中間、側面大進氣口、尾翼 */
+export function superGeo(): VehicleGeo {
+  const paint: THREE.BufferGeometry[] = [], fixed: THREE.BufferGeometry[] = [];
+  const W = 2.0;
+  paint.push(profile([[-2.28, 0.24], [2.3, 0.24], [2.4, 0.36], [2.18, 0.58], [0.72, 0.8], [-1.38, 0.9], [-2.22, 0.86], [-2.32, 0.48]], W, 0.07));
+  fixed.push(tint(profile([[0.74, 0.8], [0.02, 1.12], [-0.86, 1.13], [-1.42, 0.9]], W - 0.42, 0.04), '#16202a'));
+  paint.push(profile([[0.0, 1.11], [-0.84, 1.12], [-0.82, 1.16], [-0.02, 1.15]], W - 0.56, 0.02));
+  for (const s of [-1, 1]) {
+    fixed.push(tint(box(0.06, 0.32, 0.9, s * (W / 2 + 0.005), 0.58, -0.55), '#0d0d0d')); // 側面進氣口
+    fixed.push(tint(box(0.5, 0.05, 0.1, s * 0.62, 0.58, 2.3), '#eaf6ff')); // 細長頭燈
+    fixed.push(tint(box(0.62, 0.06, 0.05, s * 0.55, 0.72, -2.31), '#ff1a1a'));
+    fixed.push(tint(box(0.05, 0.3, 0.08, s * 0.55, 1.0, -1.95), '#111111')); // 尾翼支架
+    paint.push(box(0.07, 0.08, 0.16, s * (W / 2 - 0.12), 0.92, 0.5));
+  }
+  fixed.push(tint(box(1.9, 0.05, 0.36, 0, 1.17, -2.0), '#111111')); // 尾翼
+  for (let k = 0; k < 4; k++) fixed.push(tint(box(0.9, 0.02, 0.06, 0, 0.9, -1.55 - k * 0.16), '#0f0f0f')); // 引擎蓋散熱格柵
+  fixed.push(tint(box(1.3, 0.12, 0.06, 0, 0.36, 2.36), '#0d0d0d'));
+  fixed.push(tint(box(1.4, 0.14, 0.1, 0, 0.32, -2.3), '#151515')); // 擴散器
+  fixed.push(tint(box(W + 0.02, 0.1, 4.4, 0, 0.27, 0), '#141518'));
+  const wheels: [number, number, number, number][] = [];
+  for (const s of [-1, 1]) for (const z of [1.42, -1.38]) wheels.push([s * 0.9, 0.36, z, 0.36]);
+  return { paint: mergeGeometries(paint.map(clean)), fixed: mergeGeometries(fixed.map(clean)), wheels, length: 4.6 };
+}
+
+/** 警車：轎車外型、白色車身配藍色腰帶與黑色引擎蓋邊，車頂警示燈另外做（要閃） */
+export function policeGeo(): VehicleGeo {
+  const g = sedanGeo({ noWheels: true });
+  const extra: THREE.BufferGeometry[] = [];
+  for (const s of [-1, 1]) {
+    extra.push(tint(box(0.03, 0.16, 4.3, s * (1.76 / 2 + 0.012), 0.72, 0), '#1c4fc9')); // 藍色腰帶
+    extra.push(tint(box(0.03, 0.05, 4.3, s * (1.76 / 2 + 0.014), 0.83, 0), '#f2c200'));
+  }
+  extra.push(tint(box(1.2, 0.08, 0.22, 0, 1.52, -0.25), '#1a1a1a')); // 警示燈座
+  extra.push(tint(box(1.0, 0.18, 0.12, 0, 0.42, 2.4), '#202020')); // 推桿
+  return { ...g, fixed: mergeGeometries([g.fixed, ...extra.map(clean)]) };
+}
+
+/** 發財車（台灣的小貨車）：平頭駕駛室、後面是有欄板的貨台，載幾箱水果 */
+export function pickupGeo(): VehicleGeo {
+  const paint: THREE.BufferGeometry[] = [], fixed: THREE.BufferGeometry[] = [];
+  const W = 1.7;
+  paint.push(profile([[0.95, 0.46], [2.2, 0.46], [2.27, 0.9], [2.2, 1.86], [0.95, 1.9]], W, 0.08)); // 駕駛室
+  fixed.push(tint(box(W - 0.2, 0.66, 0.06, 0, 1.45, 2.4).rotateX(-0.07), '#1e2a35')); // 擋風玻璃（駕駛室前面倒角 0.08 m，要貼在外面）
+  for (const s of [-1, 1]) {
+    fixed.push(tint(box(0.04, 0.55, 0.75, s * (W / 2 + 0.005), 1.45, 1.75), '#1e2a35'));
+    fixed.push(tint(box(0.3, 0.14, 0.05, s * 0.6, 0.75, 2.36), '#fff4d6'));
+    fixed.push(tint(box(0.04, 0.42, 3.05, s * (W / 2 - 0.02), 1.02, -0.55), '#e8e8e8')); // 白色欄板
+    fixed.push(tint(box(0.2, 0.1, 0.05, s * 0.65, 0.95, -2.1), '#e01818'));
+    paint.push(box(0.06, 0.16, 0.12, s * (W / 2 + 0.08), 1.55, 2.05)); // 後照鏡
+  }
+  fixed.push(tint(box(W, 0.12, 3.1, 0, 0.76, -0.55), '#8a8f96')); // 貨台
+  fixed.push(tint(box(W - 0.04, 0.42, 0.05, 0, 1.02, -2.08), '#e8e8e8')); // 後欄板
+  fixed.push(tint(box(W - 0.04, 0.6, 0.05, 0, 1.12, 0.95), '#e8e8e8')); // 前欄板
+  fixed.push(tint(box(1.3, 0.12, 0.05, 0, 0.62, 2.35), '#202020'));
+  fixed.push(tint(box(1.2, 0.3, 4.1, 0, 0.45, 0.05), '#1d1d1d')); // 底盤
+  // 貨台上的水果箱
+  const crate = [[-0.4, -0.2], [0.4, -0.2], [-0.4, -1.1], [0.35, -1.3], [0, -0.65]];
+  crate.forEach(([x, z], k) => fixed.push(tint(box(0.62, 0.36, 0.5, x, 1.0 + (k === 4 ? 0.36 : 0), z), k % 2 ? '#c58a3e' : '#2f7d3a')));
+  const wheels: [number, number, number, number][] = [];
+  for (const s of [-1, 1]) for (const z of [1.55, -1.3]) wheels.push([s * 0.74, 0.3, z, 0.3]);
+  return { paint: mergeGeometries(paint.map(clean)), fixed: mergeGeometries(fixed.map(clean)), wheels, length: 4.5 };
+}
+
 export function busGeo(): VehicleGeo {
   const paint: THREE.BufferGeometry[] = [], fixed: THREE.BufferGeometry[] = [];
   const W = 2.5, L = 11;

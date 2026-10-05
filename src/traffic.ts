@@ -406,7 +406,7 @@ export class Traffic {
     for (const a of this.agents) {
       if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9) continue;
       const half = KIND_LEN[a.kind] / 2 - 0.9, ar = KIND_R[a.kind];
-      const inv = 1 / KIND_MASS[a.kind]; // 對方質量倒數 ÷ 玩家的
+      const inv = p.spec.mass / KIND_MASS[a.kind]; // 對方質量倒數 ÷ 玩家的（玩家開越重的車，撞得越遠）
       for (const [px, pz] of p.circles()) for (const ao of [-half, 0, half]) {
         const ax = Math.sin(a.h + a.kh), az = Math.cos(a.h + a.kh);
         const cx = a.x + a.kx, cz = a.z + a.kz;

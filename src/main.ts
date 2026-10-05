@@ -9,9 +9,9 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { loadCity } from './city';
-import { makeSedan } from './carModel';
 import { makeF1 } from './f1model';
-import { FreeCar, CAR_VMAX } from './freecar';
+import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
+import { VEHICLES, vehicleById, buildPlayerVehicle, type PlayerVehicle, type VehicleId } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
@@ -30,7 +30,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -179,14 +179,18 @@ const ghostModel = makeF1(PLAYER_LIVERY, true);
 ghostModel.root.visible = false;
 scene.add(ghostModel.root);
 
-const sedanModel = makeSedan('#f2f2f0');
-sedanModel.root.visible = false;
-scene.add(sedanModel.root);
-const taxiModel = makeSedan('#f5c518', true); // 計程車任務開的小黃
-// 會動的東西才投射即時陰影（建築、樹的影子是預先算好的）
-for (const m of [sedanModel, taxiModel]) m.root.userData.dynamic = true;
-taxiModel.root.visible = false;
-scene.add(taxiModel.root);
+// 自由駕駛／計程車可選的車（vehicles.ts）：全部先建好藏起來，選哪台就顯示哪台
+// 會動的東西才投射即時陰影（建築、樹的影子是預先算好的）；buildPlayerVehicle 會標成 dynamic
+const playerCars = new Map<VehicleId, PlayerVehicle>();
+for (const v of VEHICLES) {
+  const pv = buildPlayerVehicle(v);
+  pv.model.root.visible = false;
+  scene.add(pv.model.root);
+  playerCars.set(v.id, pv);
+}
+// ?car=muscle 測試用：直接指定車
+let chosen = vehicleById(new URLSearchParams(location.search).get('car') ?? save.car);
+const pcar = () => playerCars.get(chosen.id)!;
 
 const car = new Car(); // 街道賽的 F1
 const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
@@ -420,18 +424,19 @@ function gearOf(v: number) {
 let camSnap = true;
 // ?cam=x,y,z,看向x,y,z：固定鏡頭（截圖檢查街景用）
 const CAM = new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null;
+const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let camH = 0;
 
 function updateVisuals(dt: number) {
   // 車子
-  // 街道賽、街頭比賽都開 F1；平常自由駕駛開一般汽車
-  const streetRacing = mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
-  const f1Look = mode === 'race' || streetRacing;
-  const vc = veh(), model = f1Look ? carModel : taxiOn() ? taxiModel : sedanModel;
+  // 街道賽、街頭比賽都開 F1；平常自由駕駛、計程車開選單選的車
+  const f1Look = mode === 'race' || streetRacing();
+  const pv = pcar(), vc = veh(), model = f1Look ? carModel : pv.model;
   carModel.root.visible = f1Look;
-  sedanModel.root.visible = !f1Look && !taxiOn();
-  taxiModel.root.visible = !f1Look && taxiOn();
+  for (const p of playerCars.values()) p.model.root.visible = !f1Look && p === pv;
+  if (pv.taxiSign) pv.taxiSign.visible = taxiOn(); // 開別台車載客：車頂加 TAXI 燈箱
+  pv.tick(performance.now() / 1000);
   world.race.visible = mode === 'race';
   if (traffic) {
     traffic.visible = mode === 'free';
@@ -475,7 +480,7 @@ function updateVisuals(dt: number) {
   d = Math.atan2(Math.sin(d), Math.cos(d));
   camH += camSnap ? d : d * Math.min(1, dt * 7);
   const fx = Math.sin(camH), fz = Math.cos(camH);
-  const back = f1Look ? 8 : 7.5, up = f1Look ? 2.9 : 3.3;
+  const lowCar = f1Look || chosen.id === 'f1', back = lowCar ? 8 : chosen.id === 'pickup' ? 8 : 7.5, up = lowCar ? 2.9 : chosen.id === 'pickup' ? 3.7 : 3.3;
   const target = new THREE.Vector3(vc.x - fx * back, up, vc.z - fz * back);
   const look = new THREE.Vector3(vc.x + fx * 6, 1.2, vc.z + fz * 6);
   if (camSnap) { camPos.copy(target); camLook.copy(look); camSnap = false; }
@@ -484,9 +489,14 @@ function updateVisuals(dt: number) {
   camLook.lerp(look, k);
   camera.position.copy(camPos);
   camera.lookAt(camLook);
-  const fov = 62 + (Math.abs(vc.v) / (mode === 'race' ? VMAX : CAR_VMAX)) * 14;
+  const fov = 62 + Math.min(1, Math.abs(vc.v) / (mode === 'race' ? VMAX : fcar.spec.vmax)) * 14;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
+  if (VIEW_FRONT) { // 截圖檢查車子外型：從左前方斜看
+    const sx = Math.cos(vc.h), sz = -Math.sin(vc.h);
+    camera.position.set(vc.x + fx * 5.2 + sx * 3.2, 1.7, vc.z + fz * 5.2 + sz * 3.2);
+    camera.lookAt(vc.x, 1.9, vc.z);
+  }
   world.sky.position.copy(camera.position);
   world.mountains.position.y = -camera.position.y;
   if (Q.shadows && world.sun.castShadow) {
@@ -566,6 +576,24 @@ function beginCountdown() {
 
 // ---------------------------------------------------------------- 選單
 const menu = $('menu'), hud = $('hud');
+// 選車：自由駕駛與計程車都用這台
+{
+  const list = $('car-list'), note = $('car-note');
+  const stars = (x: number, lo: number, hi: number) => '★'.repeat(Math.max(1, Math.min(5, Math.round(1 + ((x - lo) / (hi - lo)) * 4)))).padEnd(5, '☆');
+  const show = () => {
+    for (const b of list.children) b.classList.toggle('on', (b as HTMLElement).dataset.id === chosen.id);
+    const s = chosen.spec;
+    note.textContent = `${chosen.note}｜極速約 ${Math.round(s.vmax * 3.6 * 0.9)} km/h　加速 ${stars(s.engine, 6, 15)}　操控 ${stars(s.grip, 11, 24)}　重量 ${stars(s.mass, 0.5, 1.5)}`;
+  };
+  for (const v of VEHICLES) {
+    const b = document.createElement('button');
+    b.dataset.id = v.id;
+    b.innerHTML = `<i style="background:${v.color}"></i>${v.name}`;
+    b.addEventListener('click', () => { chosen = v; save.car = v.id; writeSave(); show(); });
+    list.appendChild(b);
+  }
+  show();
+}
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
   const free = $<HTMLButtonElement>('btn-free'), race = $<HTMLButtonElement>('btn-start');
@@ -720,7 +748,7 @@ function replayFrame(dt: number) {
   world.race.visible = true;
   if (traffic) { traffic.visible = false; traffic.signalsVisible = false; }
   if (peds) peds.visible = false;
-  sedanModel.root.visible = false;
+  for (const p of playerCars.values()) p.model.root.visible = false;
   for (const o of raceHide) { o.userData.off = true; o.visible = false; }
   replayT += dt * replaySpeed;
   if (replayT >= len) { endReplay(); return; }
@@ -1026,13 +1054,21 @@ function unstick() {
 }
 const CAR_GEARS = [0, 7, 14, 22, 31];
 function carGear(v: number) {
+  // 檔位照這台車的極速等比例放大（跑車、F1 換檔的速度比較高）
+  const k = fcar.spec.vmax / CAR_VMAX;
+  v /= k;
   let g = 0;
   while (g < CAR_GEARS.length - 1 && v >= CAR_GEARS[g + 1]) g++;
   const lo = CAR_GEARS[g], hi = g === CAR_GEARS.length - 1 ? CAR_VMAX : CAR_GEARS[g + 1];
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
 let heavyAcc = 0;
+/** 街頭比賽進行中（倒數、比賽、剛結束）：開 F1、用原本調好的性能（對手的強度是照這個調的） */
+function streetRacing() {
+  return mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
+}
 function freeStep(dt: number) {
+  fcar.spec = streetRacing() ? DEFAULT_SPEC : chosen.spec;
   let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
@@ -1264,7 +1300,7 @@ function taxiBot() {
   let e = Math.atan2(path[j][0] - fcar.x, path[j][1] - fcar.z) - fcar.h;
   e = Math.atan2(Math.sin(e), Math.cos(e));
   const dist = Math.hypot(tg.x - fcar.x, tg.z - fcar.z);
-  const want = dist < 14 ? 0 : Math.min(16, 4 + dist * 0.25) * (Math.abs(e) > 0.6 ? 0.5 : 1);
+  const want = dist < 7 ? 0 : Math.min(16, 3 + dist * 0.25) * (Math.abs(e) > 0.6 ? 0.5 : 1);
   return { steer: Math.max(-1, Math.min(1, -e * 2.2)), brake: fcar.v > want + 1, throttle: fcar.v < want };
 } // 測街頭飆車：?free&bot&sr=0&sim=N 自動接受第 0 個挑戰，玩家照路線開
 if (BOT && !FREE) void cityLoad.then(() => {

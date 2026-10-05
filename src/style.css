@@ -458,6 +458,28 @@ html:not(.touch) #gas { display: none; }
 .opts label.q small { width: 100%; color: var(--muted); font-size: 11px; }
 .credit .author { color: var(--fg); font-weight: 700; }
 
+/* ---------------- 選車 */
+#car-pick { margin: 4px 0 10px; }
+#car-list { display: flex; flex-wrap: wrap; gap: 6px; }
+#car-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+  font-weight: 700;
+}
+#car-list button i { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
+#car-list button.on { border-color: #ffd400; background: rgba(255, 212, 0, 0.18); color: #fff; }
+#car-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+@media (max-height: 480px) {
+  #car-pick { margin: 2px 0 6px; }
+  #car-list button { padding: 4px 9px; font-size: 13px; }
+}
+
 /* ---------------- 正賽：DRS、進站、胎況、回放 */
 #drs {
   position: absolute;
