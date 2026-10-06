@@ -12,7 +12,7 @@ import { loadCity } from './city';
 import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
-import { Weather, headlightRig, TIME_NAME, type TimeKind } from './weather';
+import { Weather, headlightRig, TIME_NAME, cycleAt, CYCLE_LEN, type TimeKind } from './weather';
 import { Cockpit } from './cockpit';
 import { Damage } from './damage';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
@@ -262,10 +262,28 @@ const weather = new Weather(scene, world, Q.level === 'high' ? 3000 : Q.level ==
 }
 const TIMES = Object.keys(TIME_NAME) as TimeKind[];
 let timeKind: TimeKind = TIMES.includes(new URLSearchParams(location.search).get('time') as TimeKind) ? new URLSearchParams(location.search).get('time') as TimeKind : TIMES.includes(save.time as TimeKind) ? save.time as TimeKind : 'dusk';
+// 自動日夜循環：從白天開始（cycleT 秒），每 0.25 秒漸變一次；環境反射只在每段開始時重做（很花時間）
+let cycleT = +(new URLSearchParams(location.search).get('cyclet') ?? 0), cycleAcc = 0, cycleSeg = -1; // 測試：&cyclet=520 直接跳到循環第 520 秒
 function applyWeather() {
-  weather.apply(timeKind, Q.fogFar, bloom, gradePass);
+  weather.apply(timeKind, Q.fogFar, bloom, gradePass, cycleT);
   buildEnv(weather.envSun);
   if (traffic) traffic.lightsOn = weather.night || weather.raining;
+}
+function tickCycle(dt: number) {
+  const clock = $('clock');
+  if (timeKind !== 'auto') { clock.style.display = 'none'; return; }
+  cycleT = (cycleT + dt) % CYCLE_LEN;
+  cycleAcc += dt;
+  const c = cycleAt(cycleT);
+  if (cycleAcc > 0.25 || c.seg !== cycleSeg) {
+    cycleAcc = 0;
+    weather.apply('auto', Q.fogFar, bloom, gradePass, cycleT);
+    if (traffic) traffic.lightsOn = weather.night;
+    if (c.seg !== cycleSeg) { cycleSeg = c.seg; buildEnv(weather.envSun); }
+  }
+  const hh = Math.floor(c.clock) % 24, mm = Math.floor((c.clock % 1) * 60);
+  clock.style.display = state === 'free' || state === 'race' ? '' : 'none';
+  clock.textContent = `🕐 ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 applyWeather(); // 載入中的天空就先換好（城市載入完會再套一次，連窗戶、路燈）
 
@@ -1695,6 +1713,7 @@ renderer.setAnimationLoop(() => {
   }
   if (state === 'race' || state === 'countdown') updateDrsButton();
   weather.update(dt, camera.position);
+  if (cityReady) tickCycle(dt);
   if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);

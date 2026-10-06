@@ -4,21 +4,56 @@ import type { World } from './world';
 // 時段與天氣：黃昏（預設）、白天、夜晚、雨天、雨夜。
 // 建築與樹的影子是預先算好的（方向固定），所以只換光的顏色亮度、天空、霧、窗戶與路燈，不改太陽方向
 
-export type TimeKind = 'dusk' | 'day' | 'night' | 'rain' | 'rainnight';
-export const TIME_NAME: Record<TimeKind, string> = { dusk: '黃昏', day: '白天', night: '夜晚', rain: '雨天', rainnight: '雨夜' };
+export type TimeKind = 'dusk' | 'day' | 'night' | 'rain' | 'rainnight' | 'auto';
+export const TIME_NAME: Record<TimeKind, string> = { dusk: '黃昏', day: '白天', night: '夜晚', rain: '雨天', rainnight: '雨夜', auto: '自動（日夜交替）' };
 
 interface Preset {
   sky: [string, string, string]; fog: string; fogMul: number; fogNear: number;
   hemiSky: string; hemiGround: string; hemi: number; sun: string; sunI: number; disc: number; cloud: string; cloudOp: number;
   windows: number; lamp: number; night: boolean; rain: boolean; bloom: number; env: number; tint: [number, number, number]; shadow: number; mtn: [string, string][]; beam: number;
 }
-const P: Record<TimeKind, Preset> = {
+const P: Record<Exclude<TimeKind, 'auto'>, Preset> = {
   dusk: { sky: ['#1c2552', '#b5577a', '#ff9d5c'], fog: '#d98a6c', fogMul: 1, fogNear: 300, hemiSky: '#b8c6ff', hemiGround: '#4a3428', hemi: 1.6, sun: '#ffb47a', sunI: 2.2, disc: 1, cloud: '#ffffff', cloudOp: 1, windows: 0.9, lamp: 1, night: false, rain: false, bloom: 0.55, env: 0.75, tint: [1.03, 1, 0.96], shadow: 0.42, mtn: [['#8a7a98', '#d9a88a'], ['#5e4e6e', '#c48a7a']], beam: 0 },
   day: { sky: ['#2f6fc8', '#79b2ea', '#d4e6f4'], fog: '#c4d6e4', fogMul: 1.1, fogNear: 400, hemiSky: '#d6e6ff', hemiGround: '#6e6656', hemi: 1.9, sun: '#fff1dc', sunI: 2.9, disc: 0.7, cloud: '#ffffff', cloudOp: 0.75, windows: 0.12, lamp: 0.35, night: false, rain: false, bloom: 0.22, env: 0.9, tint: [1.0, 1.0, 1.0], shadow: 0.5, mtn: [['#8ea3bd', '#c6d4e1'], ['#6f8299', '#aebfcf']], beam: 0 },
   night: { sky: ['#03050c', '#0b1128', '#26213d'], fog: '#151827', fogMul: 0.75, fogNear: 150, hemiSky: '#43507e', hemiGround: '#17120e', hemi: 0.55, sun: '#8ea4d8', sunI: 0.45, disc: 0, cloud: '#3a3a55', cloudOp: 0.5, windows: 1.3, lamp: 1.7, night: true, rain: false, bloom: 0.7, env: 0.3, tint: [0.96, 0.98, 1.06], shadow: 0.2, mtn: [['#191a2c', '#24243a'], ['#0f1020', '#1b1b2c']], beam: 1 },
   rain: { sky: ['#3b404c', '#686c78', '#8b8b8f'], fog: '#7b7e86', fogMul: 0.55, fogNear: 80, hemiSky: '#a2acc0', hemiGround: '#3a3936', hemi: 1.35, sun: '#d6d8e2', sunI: 0.8, disc: 0, cloud: '#9a9ca6', cloudOp: 0.9, windows: 0.8, lamp: 0.8, night: false, rain: true, bloom: 0.45, env: 0.7, tint: [0.98, 1.0, 1.03], shadow: 0.15, mtn: [['#646872', '#868990'], ['#50545d', '#73767d']], beam: 0.35 },
   rainnight: { sky: ['#06080e', '#12172a', '#262636'], fog: '#1a1d2a', fogMul: 0.5, fogNear: 60, hemiSky: '#3e4a6e', hemiGround: '#141210', hemi: 0.5, sun: '#8090b8', sunI: 0.3, disc: 0, cloud: '#2c2c40', cloudOp: 0.6, windows: 1.2, lamp: 1.8, night: true, rain: true, bloom: 0.75, env: 0.35, tint: [0.95, 0.98, 1.07], shadow: 0.1, mtn: [['#141522', '#1c1d2b'], ['#0c0d18', '#151622']], beam: 1 },
 };
+
+// ---- 自動日夜循環：每段 [時段, 停留秒數, 開始的時鐘（小時）, 結束的時鐘]；段與段之間 30 秒漸變
+const CYCLE: [Exclude<TimeKind, 'auto' | 'rain' | 'rainnight'>, number, number, number][] = [
+  ['day', 240, 9, 16.5], ['dusk', 120, 17, 18.5], ['night', 240, 19, 28.5], ['dusk', 90, 5, 6.5],
+];
+const FADE = 30;
+export const CYCLE_LEN = CYCLE.reduce((s, c) => s + c[1] + FADE, 0);
+/** 循環到 t 秒時：從哪個時段漸變到哪個、進度 0~1、遊戲裡的時鐘（小時）；inFade = 正在漸變 */
+export function cycleAt(t: number) {
+  t = ((t % CYCLE_LEN) + CYCLE_LEN) % CYCLE_LEN;
+  for (let i = 0; i < CYCLE.length; i++) {
+    const [k, hold, h0, h1] = CYCLE[i], next = CYCLE[(i + 1) % CYCLE.length];
+    if (t < hold) return { from: k, to: k, f: 0, clock: h0 + ((h1 - h0) * t) / hold, inFade: false, seg: i * 2 };
+    t -= hold;
+    if (t < FADE) return { from: k, to: next[0], f: t / FADE, clock: h1 + (((next[2] + (next[2] < h1 ? 24 : 0)) - h1) * t) / FADE, inFade: true, seg: i * 2 + 1 };
+    t -= FADE;
+  }
+  return { from: 'day' as const, to: 'day' as const, f: 0, clock: 12, inFade: false, seg: 0 };
+}
+const lerpC = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString();
+const lerpN = (a: number, b: number, t: number) => a + (b - a) * t;
+function blend(a: Preset, b: Preset, t: number): Preset {
+  if (t <= 0) return a;
+  if (t >= 1) return b;
+  const pick = t < 0.5 ? a : b;
+  return {
+    sky: [0, 1, 2].map((i) => lerpC(a.sky[i], b.sky[i], t)) as [string, string, string],
+    fog: lerpC(a.fog, b.fog, t), fogMul: lerpN(a.fogMul, b.fogMul, t), fogNear: lerpN(a.fogNear, b.fogNear, t),
+    hemiSky: lerpC(a.hemiSky, b.hemiSky, t), hemiGround: lerpC(a.hemiGround, b.hemiGround, t), hemi: lerpN(a.hemi, b.hemi, t),
+    sun: lerpC(a.sun, b.sun, t), sunI: lerpN(a.sunI, b.sunI, t), disc: lerpN(a.disc, b.disc, t), cloud: lerpC(a.cloud, b.cloud, t), cloudOp: lerpN(a.cloudOp, b.cloudOp, t),
+    windows: lerpN(a.windows, b.windows, t), lamp: lerpN(a.lamp, b.lamp, t), night: pick.night, rain: false, bloom: lerpN(a.bloom, b.bloom, t), env: lerpN(a.env, b.env, t),
+    tint: [0, 1, 2].map((i) => lerpN(a.tint[i], b.tint[i], t)) as [number, number, number], shadow: lerpN(a.shadow, b.shadow, t),
+    mtn: a.mtn.map((l, i) => [lerpC(l[0], b.mtn[i][0], t), lerpC(l[1], b.mtn[i][1], t)] as [string, string]), beam: lerpN(a.beam, b.beam, t),
+  };
+}
 
 /** 雨絲：鏡頭周圍一個 70×40×70 m 的盒子裡往下掉的線段，掉到底就回到上面 */
 class Rain {
@@ -117,10 +152,14 @@ export class Weather {
     });
   }
 
-  /** 套用時段；回傳要不要重建環境反射（天空換了） */
-  apply(kind: TimeKind, fogFar: number, bloom: { strength: number } | null, grade: { uniforms: Record<string, { value: unknown }> } | null) {
+  private cur: Preset = P.dusk;
+  /** 套用時段（auto 時 t = 循環到第幾秒，會在兩個時段之間漸變） */
+  apply(kind: TimeKind, fogFar: number, bloom: { strength: number } | null, grade: { uniforms: Record<string, { value: unknown }> } | null, t = 0) {
     this.kind = kind;
-    const p = P[kind], w = this.world;
+    let p: Preset;
+    if (kind === 'auto') { const c = cycleAt(t); p = blend(P[c.from], P[c.to], c.f); } else p = P[kind];
+    this.cur = p;
+    const w = this.world;
     w.setSky(...p.sky);
     const fog = this.scene.fog as THREE.Fog;
     fog.color.set(p.fog);
@@ -159,10 +198,10 @@ export class Weather {
     return true;
   }
 
-  get night() { return P[this.kind].night; }
-  get raining() { return P[this.kind].rain; }
+  get night() { return this.cur.night; }
+  get raining() { return this.cur.rain; }
   /** 環境反射用：太陽（月亮）的亮度顏色 */
-  get envSun() { const p = P[this.kind]; return new THREE.Color(p.sun).multiplyScalar(p.disc > 0 ? 4 : p.night ? 0.3 : 1.2); }
+  get envSun() { const p = this.cur; return new THREE.Color(p.sun).multiplyScalar(p.disc > 0.3 ? 4 : p.night ? 0.3 : 1.2); }
 
   update(dt: number, cam: THREE.Vector3) { this.rain.update(dt, cam); }
 }

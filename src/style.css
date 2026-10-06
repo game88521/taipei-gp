@@ -462,6 +462,18 @@ html:not(.touch) #gas { display: none; }
 .opts label.q small { width: 100%; color: var(--muted); font-size: 11px; }
 .credit .author { color: var(--fg); font-weight: 700; }
 
+/* ---------------- 自動日夜循環的時鐘 */
+#clock {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  font: 700 15px var(--mono);
+}
+#hud[data-mode='race'] #clock { top: calc(max(10px, env(safe-area-inset-top)) + 150px); }
+
 /* ---------------- 車況、修車 */
 #dmg {
   position: absolute;
