@@ -121,7 +121,17 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
   for (const [x, z, r] of c.elev.posts) collider.addPost(x, z, r); // 高架橋墩
   for (const [x1, z1, x2, z2] of c.elev.walls) collider.addWall(x1, z1, x2, z2); // 匝道貼地那段
+  for (const [x, z] of c.marketSpots) collider.addPost(x, z, 1.1); // 夜市攤位
   roadNet = new RoadNet(c.data);
+  // 水邊：擋住不讓車開進河裡；附近 8 m 內有車道的那段不擋（跨河、跨溝的橋）
+  for (const w of c.data.water ?? []) {
+    const P = w.p, n = P.length / 2;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, mx = (P[i * 2] + P[j * 2]) / 2, mz = (P[i * 2 + 1] + P[j * 2 + 1]) / 2;
+      if (roadNet.segGrid.query(mx, mz, 8).some((s) => s.way.c <= 3)) continue;
+      collider.addWall(P[i * 2], P[i * 2 + 1], P[j * 2], P[j * 2 + 1]);
+    }
+  }
   minimap = new Minimap($<HTMLCanvasElement>('minimap'), roadNet);
   landmarks = c.landmarks;
   breakables = c.breakables;

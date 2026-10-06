@@ -668,7 +668,7 @@ for (const g of greens) {
     const r = [];
     for (let k = 0; k < g.p.length; k += 2) r.push([g.p[k], g.p[k + 1]]);
     const xs = r.map((p) => p[0]), zs = r.map((p) => p[1]);
-    const n = g.k === 3 ? Math.min(2500, Math.floor(g.a / 90)) : Math.min(400, Math.floor(g.a / 140)); // 森林種得比較密
+    const n = g.k === 3 ? Math.min(2500, Math.floor(g.a / 90)) : g.a > 30000 ? Math.min(2200, Math.floor(g.a / 95)) : Math.min(400, Math.floor(g.a / 140)); // 森林、大公園種得比較密
     for (let k = 0, got = 0; k < n * 3 && got < n; k++) {
       const x = Math.min(...xs) + rnd() * (Math.max(...xs) - Math.min(...xs)), z = Math.min(...zs) + rnd() * (Math.max(...zs) - Math.min(...zs));
       if (inside([x, z], r)) { tryTree(x, z); got++; }
@@ -835,6 +835,24 @@ if (terrain) {
   console.log(`登山步道 ${trails.length} 段（石階 ${trails.filter((t) => t.s).length}）、六巨石 ${rocks.length / 2} 處`);
 }
 
+// ---------------------------------------------------------------- 水域（基隆河、池塘）與饒河夜市
+const water = [];
+for (const e of E) {
+  const t = e.tags || {};
+  if (!(t.natural === 'water' || t.waterway === 'riverbank')) continue;
+  const rings = e.type === 'way' && e.geometry ? [ring(e.geometry)] : e.type === 'relation' ? outerRings(e) : [];
+  for (let r of rings) {
+    if (!r || r.length < 3) continue;
+    if (Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 0.5) r = r.slice(0, -1);
+    if (area(r) < 60) continue;
+    water.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]) }); // 不做 RDP 簡化：封閉多邊形頭尾同一點，RDP 會把整圈壓成一個點
+  }
+}
+// 饒河街觀光夜市：饒河街的路線（執行時沿路兩側擺攤）
+const market = [];
+for (const e of roadWays) if (/^饒河街$/.test(e.tags?.name || '') && e.geometry) market.push(ring(e.geometry).flatMap(([x, z]) => [r1(x), r1(z)]));
+console.log(`水域 ${water.length} 塊、夜市街道 ${market.length} 段`);
+
 // ---------------------------------------------------------------- 擋在車道上的建築
 // 車道中心線穿過建築底面：高架的（layer ≥ 1）或路標成「穿過建築」的，把建築墊高讓車從底下過；
 // 其他的多半是資料錯誤（或沒標 layer 的地下結構），直接拿掉。幹道、一般道路穿過 3 m 以上就算，巷弄 8 m 以上
@@ -891,7 +909,7 @@ let raisedOver = 0, droppedOver = 0;
 }
 console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上墊高 ${raisedOver}、壓在路上拿掉 ${droppedOver}`);
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals };
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market };
 mkdirSync(here('../public/data/'), { recursive: true });
 // 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；
 // roads 執行時沒用到（路面是用 net 畫的），不輸出。解碼在 src/citydata.ts decodeCity()
@@ -911,6 +929,8 @@ packed.parked = enc(parked, 4, 100);
 if (terrain) packed.terrain = { ...terrain, h: enc(terrain.h, 1, 2) };
 packed.trails = trails.map((t) => ({ ...t, p: enc(t.p, 2, 10) }));
 packed.elevated = elevated.map((e) => ({ ...e, p: enc(e.p, 2, 10), y: enc(e.y, 1, 10) }));
+packed.water = water.map((w) => ({ p: enc(w.p, 2, 10) }));
+packed.market = market.map((m) => enc(m, 2, 10));
 const json = JSON.stringify(packed);
 {
   // 自我檢查：解回來跟原本差多少（座標應該完全一樣；路燈、機車的角度最多差 0.005 rad）

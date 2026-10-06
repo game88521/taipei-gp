@@ -29,6 +29,8 @@ export interface CityData {
   rocks?: number[]; // 六巨石的位置
   elevated?: { p: number[]; y: number[]; w: number; k: number }[]; // 高架：k 0 道路、1 人行空橋、2 文湖線、3 月台；y 每點離地高度
   portals?: number[]; // 地下道入口 [x, z, 朝隧道方向, 路寬, ...]
+  water?: { p: number[] }[]; // 水域（基隆河、池塘）
+  market?: number[][]; // 饒河夜市的街道線
 }
 export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
 
@@ -50,6 +52,8 @@ export function decodeCity(d: CityData & { enc?: number }): CityData {
   if (d.terrain) d.terrain.h = dec(d.terrain.h, 1, 2);
   for (const t of d.trails ?? []) t.p = dec(t.p, 2, 10);
   for (const e of d.elevated ?? []) { e.p = dec(e.p, 2, 10); e.y = dec(e.y, 1, 10); }
+  for (const w of d.water ?? []) w.p = dec(w.p, 2, 10);
+  if (d.market) d.market = d.market.map((m) => dec(m, 2, 10));
   d.roads ??= [];
   delete d.enc;
   return d;

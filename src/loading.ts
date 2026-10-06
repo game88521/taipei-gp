@@ -10,7 +10,8 @@ let lastLabel = '開始', lastT = performance.now();
 /** 進入下一個階段：回報進度、記錄上一段耗時、讓瀏覽器畫一格 */
 export async function stage(label: string, frac: number) {
   const now = performance.now();
-  marks.push([lastLabel, Math.round(now - lastT)]);
+  const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+  marks.push([lastLabel + (mem ? `(${Math.round(mem.usedJSHeapSize / 1e6)}MB)` : ''), Math.round(now - lastT)]); // ?prof：每段結束時的 JS 記憶體
   lastLabel = label;
   handler(label, frac);
   await new Promise((r) => setTimeout(r, 0));
