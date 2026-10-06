@@ -553,6 +553,22 @@ html:not(.touch) #btn-horn { display: none; }
 }
 #hud[data-mode='race'] #wanted, #hud[data-mode='race'] #btn-pursuit, #hud[data-mode='race'] #btn-horn { display: none !important; }
 
+/* ---------------- 成就頁 */
+#ach-page { z-index: 6; }
+#ach-page .card { max-height: 92vh; overflow-y: auto; }
+#ach-body .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin: 8px 0; }
+#ach-body .stats div { background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 6px 10px; }
+#ach-body .stats small { display: block; color: var(--muted); font-size: 11px; }
+#ach-body .stats b { font: 800 15px var(--mono); }
+#ach-body h3 { margin: 10px 0 6px; font-size: 15px; }
+#ach-body .achs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-bottom: 10px; }
+#ach-body .ach { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); opacity: 0.55; }
+#ach-body .ach.done { opacity: 1; background: rgba(255, 212, 0, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 212, 0, 0.45); }
+#ach-body .ach i { font-style: normal; font-size: 24px; }
+#ach-body .ach span { flex: 1; display: flex; flex-direction: column; }
+#ach-body .ach small { color: var(--muted); font-size: 11px; }
+#ach-body .ach em { height: 4px; border-radius: 2px; margin-top: 4px; background: linear-gradient(90deg, #ffd400 var(--f), rgba(255, 255, 255, 0.12) var(--f)); }
+
 /* ---------------- 載入進度條 */
 #load { height: 4px; margin: 0 0 6px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 #load-bar { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #e10600, #ffd400); transition: width 0.25s; }

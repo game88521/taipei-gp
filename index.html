@@ -131,6 +131,7 @@
           </label>
         </div>
         <p class="help">手機：左下 ◀ ▶ 轉向（可在下面改成拖曳或傾斜手機），右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Ctrl 或 E 開 DRS、B 進站，Esc 暫停。</p>
+        <button id="btn-ach" class="ghost-btn">🏆 成就與紀錄</button>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
         <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
       </div>
@@ -162,6 +163,14 @@
         <p class="sub">開放街道、照常有車流和紅綠燈；4 位對手會鑽車縫、闖紅燈。依序穿過黃色光圈，先到終點的贏。</p>
         <div id="duel-list"></div>
         <button id="duel-back" class="link">返回</button>
+      </div>
+    </div>
+
+    <div id="ach-page" class="overlay hidden">
+      <div class="card wide">
+        <h1>成就與紀錄<small>ACHIEVEMENTS</small></h1>
+        <div id="ach-body"></div>
+        <button id="ach-close" class="primary">返回</button>
       </div>
     </div>
 

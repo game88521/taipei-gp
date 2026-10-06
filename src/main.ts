@@ -15,6 +15,7 @@ import { stage, marks, onProgress } from './loading';
 import { Weather, headlightRig, TIME_NAME, cycleAt, CYCLE_LEN, type TimeKind } from './weather';
 import { Cockpit } from './cockpit';
 import { Damage } from './damage';
+import { emptyStats, newlyUnlocked, renderAchPage, type Stats } from './achievements';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -35,7 +36,7 @@ import { Sound } from './audio';
 // ---------------------------------------------------------------- 存檔
 interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -534,6 +535,38 @@ const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
 let camView: 'chase' | 'cockpit' = new URLSearchParams(location.search).get('view') === 'cockpit' ? 'cockpit' : 'chase';
 const cockpit = new Cockpit($<HTMLCanvasElement>('cockpit'));
 const damage = new Damage(scene); // 車損（damage.ts）：自由駕駛、計程車、街頭比賽都算
+// 成就與統計（achievements.ts）
+const stats: Stats = { ...emptyStats(), ...save.stats };
+save.stats = stats;
+save.ach ??= [];
+let statAcc = 0, statSave = 0, lastKnocked = -1;
+function tickStats(dt: number) {
+  if (state !== 'free' && state !== 'race') return;
+  const v = Math.abs(veh().v);
+  stats.dist += v * dt;
+  if (weather.night) stats.nightDist += v * dt;
+  stats.topSpeed = Math.max(stats.topSpeed, v * 3.6);
+  stats.playTime += dt;
+  const kn = breakables?.knocked ?? 0;
+  if (lastKnocked >= 0 && kn > lastKnocked) stats.knocked += kn - lastKnocked;
+  lastKnocked = kn;
+  statAcc += dt; statSave += dt;
+  if (statAcc > 1) {
+    statAcc = 0;
+    for (const a of newlyUnlocked(stats, save.ach!)) {
+      save.ach!.push(a.id);
+      toast(`🏆 成就解鎖：${a.icon} ${a.name}`, 'purple');
+      sound.beep(1180, 0.3);
+      statSave = 99;
+    }
+  }
+  if (statSave > 5) { statSave = 0; writeSave(); }
+}
+$('btn-ach').addEventListener('click', () => {
+  $('ach-body').innerHTML = renderAchPage(stats, save.ach ?? []);
+  $('ach-page').classList.remove('hidden');
+});
+$('ach-close').addEventListener('click', () => $('ach-page').classList.add('hidden'));
 if (new URLSearchParams(location.search).get('dmg')) damage.value = +new URLSearchParams(location.search).get('dmg')!; // 測試：&dmg=0.8
 // 駕駛的眼睛在車上的位置（本地座標：x 往左、y 往上、z 往前；台灣駕駛座在左邊）
 const EYE: Record<string, [number, number, number]> = { sedan: [0.38, 1.2, 0.15], taxi: [0.38, 1.2, 0.15], police: [0.38, 1.2, 0.15], muscle: [0.4, 1.12, -0.1], super: [0.38, 0.98, -0.25], pickup: [0.4, 1.66, 1.5], f1: [0, 0.98, -0.05] };
@@ -719,6 +752,7 @@ function setMoney(n: number) {
 }
 function earn(n: number, why: string) {
   if (n <= 0) return;
+  stats.earned += n;
   setMoney(money() + n);
   toast(`💰 ${why} 獎金 NT$ ${n.toLocaleString()}`, '');
 }
@@ -927,6 +961,7 @@ function showResults() {
     const prize = ([1500, 1000, 700, 400, 300, 250, 200, 150][me - 1] ?? 100) * (field.laps >= 6 ? 2 : 1); // 6 圈加倍
     $('res-title').textContent += `　💰 +${fmtNT(prize)}`;
     earn(prize, `正賽第 ${me} 名`);
+    if (me === 1) stats.gpWins++;
   }
   $('results').classList.remove('hidden');
   if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s`;
@@ -1161,6 +1196,7 @@ function updateWantedHud() {
 // 喇叭：電腦 H、手機喇叭鍵；前面的車會讓路或回按
 function playerHorn() {
   if (state !== 'free') return;
+  stats.honks++;
   sound.horn(1, chosen.id === 'pickup' ? 0.8 : chosen.id === 'f1' || chosen.id === 'super' ? 1.15 : 1, 0.4);
   traffic?.honk(fcar.x, fcar.z, fcar.h);
   peds?.honked(fcar.x, fcar.z); // 路人轉頭看
@@ -1235,6 +1271,7 @@ function showStreetResult() {
   $('sr-res-title').textContent = sr.duel ? (place === 1 ? '🏆 街頭之王！' : `第 ${place} 名`) : win ? `🏆 你贏了 ${c.def.rival}！` : `${c.def.rival} 贏了`;
   const prize = me != null && isFinite(me) ? (sr.duel ? [600, 350, 200, 100, 50][place - 1] ?? 0 : win ? 300 : 0) : 0;
   if (prize) { $('sr-res-title').textContent += `　💰 +${fmtNT(prize)}`; earn(prize, sr.duel ? `街頭對決第 ${place} 名` : '街頭飆車獲勝'); }
+  if (sr.duel ? place === 1 && me != null && isFinite(me) : win) stats.streetWins++;
   $('sr-res-sub').textContent = (sr.duel ? `${c.def.title} ｜ 你 ${me != null && isFinite(me) ? fmt(me) : '未完成'}` : `你 ${me != null && isFinite(me) ? fmt(me) : '未完成'} ｜ ${c.def.rival} ${rv != null ? fmt(rv) : '未完成'}`) + (save.street?.[c.def.id] ? ` ｜ 最佳 ${fmt(save.street[c.def.id])}` : '');
   $('sr-result').classList.remove('hidden');
 }
@@ -1398,7 +1435,11 @@ function freeStep(dt: number) {
     const say = (m: string | null) => { if (m) toast(m, 'bad'); };
     if (crimesOn && trafficHit > 6) say(police.crime(0.35, '撞車'));
     if (crimesOn && pedHit) say(police.crime(1, '撞到行人'));
+    const starsBefore = police.stars;
     const r = police.update(dt, fcar, collider, NO_TRAFFIC ? null : traffic, crimesOn);
+    if (r.msg?.startsWith('😎')) { stats.escapes++; stats.maxEscaped = Math.max(stats.maxEscaped, starsBefore); }
+    if (r.msg?.startsWith('🚔')) stats.busted++;
+    if (r.msg?.startsWith('✅')) { stats.arrests++; stats.earned += r.money; }
     if (r.msg) policeLog.push(r.msg.replace(/[^\p{L}\p{N}$ ]/gu, '').trim());
     if (r.msg) { toast(r.msg, r.money > 0 ? 'purple' : r.money < 0 || r.msg.startsWith('🚨') ? 'bad' : ''); if (r.msg.startsWith('🚨')) sound.beep(660, 0.25); }
     if (r.money) setMoney(Math.max(0, money() + r.money));
@@ -1410,7 +1451,10 @@ function freeStep(dt: number) {
   if (dmgHit) damage.hit(dmgHit, fcar.x + Math.sin(fcar.h) * 2.2, 0.5, fcar.z + Math.cos(fcar.h) * 2.2);
   if (taxi && taxiOn()) {
     if (impact) taxi.onHit(impact);
+    const moneyBefore = taxi.money;
     const msg = taxi.update(dt, fcar);
+    if (taxi.money > moneyBefore) stats.earned += taxi.money - moneyBefore;
+    stats.trips = Math.max(stats.trips, taxi.trips);
     if (msg) {
       toast(msg, msg.startsWith('💰') ? 'purple' : '');
       if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); refreshGarage(); sound.beep(990, 0.3); }
@@ -1728,6 +1772,7 @@ renderer.setAnimationLoop(() => {
   if (state === 'race' || state === 'countdown') updateDrsButton();
   weather.update(dt, camera.position);
   if (cityReady) tickCycle(dt);
+  tickStats(dt);
   if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
   watchFps(dt);
