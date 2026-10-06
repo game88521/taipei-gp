@@ -728,3 +728,18 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #hud[data-mode='race'] #taxi-hud { display: none; }
 @media (max-height: 480px) { #taxi-hud { font-size: 12px; gap: 8px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); } }
 #fps { position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: max(4px, env(safe-area-inset-bottom)); z-index: 9; font: 700 11px var(--mono); color: #9f9; background: rgba(0, 0, 0, 0.55); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
+
+/* 上方提示的直向排列（放在最後：蓋過各自原本的 position: absolute 與 top） */
+#top-stack {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 62px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+#top-stack > div { position: static; transform: none; top: auto; left: auto; }
+@media (max-height: 480px) { #top-stack { top: calc(max(10px, env(safe-area-inset-top)) + 54px); gap: 4px; } }

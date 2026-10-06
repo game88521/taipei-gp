@@ -52,16 +52,19 @@
       <div id="tyre"></div>
       <button id="gas">油門</button>
       <div id="road"></div>
-      <div id="wanted"></div>
+      <!-- 畫面上方的提示：載客、街頭比賽、通緝、導航，有幾個就由上往下排，不會疊在一起 -->
+      <div id="top-stack">
+        <div id="taxi-hud" class="hidden"></div>
+        <div id="sr-hud" class="hidden"></div>
+        <div id="wanted"></div>
+        <div id="nav-hud" style="display: none"></div>
+      </div>
       <div id="clock" style="display: none"></div>
-      <div id="nav-hud" style="display: none"></div>
       <button id="btn-pursuit" style="display: none">🚨 追緝</button>
       <button id="btn-horn" aria-label="喇叭">📯</button>
       <div id="dmg" style="display: none"></div>
       <button id="btn-repair" style="display: none">🔧 修車</button>
       <canvas id="minimap"></canvas>
-      <div id="sr-hud" class="hidden"></div>
-      <div id="taxi-hud" class="hidden"></div>
       <div id="big"></div>
       <div id="sr-offer" class="hidden">
         <b id="sr-offer-title"></b>

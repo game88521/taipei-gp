@@ -22,7 +22,10 @@ interface Unit {
 const COP_SPEC: CarSpec = { engine: 10.5, vmax: 40, brake: 18, grip: 15, mass: 1.25 };
 const SUSPECT_SPEC: CarSpec = { engine: 9.5, vmax: 36, brake: 16, grip: 13.5, mass: 1 };
 const MAX_UNITS = 4;
-const LOSE_DIST = 160, LOSE_TIME = 12, BUST_TIME = 3;
+// 甩掉：離所有警車 110 m 以外、撐 7 秒（Rex 覺得原本 160 m／12 秒太難）
+const LOSE_DIST = 110, BUST_TIME = 3;
+export const LOSE_TIME = 7;
+const MAX_CHASERS = 3; // 同時追你的警車最多幾台
 
 /** 兩台 FreeCar 互撞：照質量交換動量（a 是主動算的那台，b 吃反作用）；回傳撞擊力道 */
 export function bumpCars(a: FreeCar, b: FreeCar): number {
@@ -180,13 +183,13 @@ export class Police {
 
     // ---- 被通緝：警車
     if (this.wanted) {
-      const want = Math.min(MAX_UNITS, this.stars);
+      const want = Math.min(MAX_CHASERS, this.stars);
       this.spawnT -= dt;
       if (this.units.length < want && this.spawnT <= 0) {
-        this.spawnT = 2.5;
+        this.spawnT = 4; // 增援慢一點
         const a = Math.random() * Math.PI * 2;
-        // 在甩開距離以內出現（130 m）：一出現就算「被看到」，車頭大致朝向玩家
-        const at = this.roadPointNear(p.x + Math.sin(a) * 130, p.z + Math.cos(a) * 130, 0, a + Math.PI);
+        // 在甩開距離（LOSE_DIST）以內出現：一出現就算「被看到」，車頭大致朝向玩家
+        const at = this.roadPointNear(p.x + Math.sin(a) * 95, p.z + Math.cos(a) * 95, 0, a + Math.PI);
         if (at) {
           const pv = this.copPool.find((c) => !this.units.some((u) => u.pv === c))!;
           const car = new FreeCar();
@@ -195,7 +198,7 @@ export class Police {
           this.units.push({ car, pv, path: null, repath: 0, stuck: 0, reverse: 0 });
         }
       }
-      const vmax = 24 + this.stars * 2.5;
+      const vmax = 22 + this.stars * 2; // 1 星約 86 km/h、5 星約 115 km/h
       let nearest = Infinity;
       for (const u of this.units) {
         const d = Math.hypot(u.car.x - p.x, u.car.z - p.z);

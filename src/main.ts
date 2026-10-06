@@ -29,7 +29,7 @@ import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
 import { Router } from './router';
 import { TaxiJob } from './taxi';
-import { Police } from './police';
+import { Police, LOSE_TIME } from './police';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
@@ -1287,7 +1287,7 @@ function updateWantedHud() {
     const st = police.stars;
     let t = '★'.repeat(st) + '☆'.repeat(5 - st);
     if (police.bustT > 0.3) t += `　被包圍 ${Math.max(0, 3 - police.bustT).toFixed(1)}`;
-    else if (police.lostT > 0.5) t += `　甩開中 ${Math.ceil(12 - police.lostT)} s`;
+    else if (police.lostT > 0.5) t += `　甩開中 ${Math.ceil(LOSE_TIME - police.lostT)} s`;
     el.textContent = t;
     el.className = 'show' + (police.bustT > 0.3 ? ' bust' : '');
   } else if (police?.suspect) {
