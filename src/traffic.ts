@@ -43,6 +43,11 @@ export interface Agent {
   lo: number; // 目前離道路中線的橫向位置（換車道時慢慢移過去，不會瞬移）
   blockT: number; // 被玩家擋在後面多久（太久會按喇叭）
   honkT: number; // 幾秒後按喇叭（被撞、回按）
+  next: DEdge | null; // 快到路口時先決定好的下一段（才能提早打方向燈）
+  blink: number; // 方向燈：1 左、-1 右、0 不打
+  laneCool: number; // 換車道冷卻
+  laneBlink: number; // 換車道的方向燈剩幾秒（方向存在 laneSide）
+  laneSide: number;
   alive: boolean;
 }
 
@@ -160,7 +165,7 @@ export class Traffic {
     this.blob.frustumCulled = false;
     scene.add(this.blob);
     // ---- 車燈：小方塊、不受光照（開了光暈會暈開）
-    this.carLights = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.14, 0.05), new THREE.MeshBasicMaterial({ toneMapped: false }), this.max * 4);
+    this.carLights = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.14, 0.05), new THREE.MeshBasicMaterial({ toneMapped: false }), this.max * 6);
     this.carLights.count = 0;
     this.carLights.frustumCulled = false;
     this.carLights.setColorAt(0, new THREE.Color());
@@ -270,7 +275,7 @@ export class Traffic {
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
         e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
-        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, lo: NaN, blockT: 0, honkT: 0, alive: true,
+        kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, lo: NaN, blockT: 0, honkT: 0, next: null, blink: 0, laneCool: 3, laneBlink: 0, laneSide: 0, alive: true,
       };
       const dead = this.agents.findIndex((q) => !q.alive);
       if (dead >= 0) this.agents[dead] = a; else this.agents.push(a);
@@ -279,6 +284,25 @@ export class Traffic {
       return true;
     }
     return false;
+  }
+
+  /** 路口要往哪走：比較常沿同一條路直走 */
+  private choose(a: Agent): DEdge | null {
+    const outs = a.e.out;
+    if (!outs.length) return null;
+    if (outs.length === 1) return outs[0];
+    const straight = outs.filter((o) => o.way.nm && o.way.nm === a.e.way.nm);
+    return straight.length && this.rand() < 0.65 ? straight[0] : outs[Math.floor(this.rand() * outs.length)];
+  }
+  /** 目標車道前後 12 m 有沒有車（同一段路上） */
+  private laneFree(a: Agent, lane: number) {
+    const cx = Math.floor(a.x / 20), cz = Math.floor(a.z / 20);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      for (const b of this.grid.get((cx + i + 1000) * 4000 + cz + j + 1000) || []) {
+        if (b !== a && b.alive && b.e === a.e && b.lane === lane && Math.abs(b.s - a.s) < 12) return false;
+      }
+    }
+    return true;
   }
 
   private laneOff(a: Agent) {
@@ -294,6 +318,7 @@ export class Traffic {
     a.h = Math.atan2(e.ux, e.uz);
   }
 
+  laneChanges = 0; // 測試統計：超車換車道次數
   /** 喇叭聲（給 main 播）：位置與要不要生氣一點（被撞） */
   honks: { x: number; z: number; angry: boolean }[] = [];
 
@@ -423,6 +448,26 @@ export class Traffic {
       // 被玩家擋住太久：按喇叭（之後冷卻一下）
       if (isPlayer && a.v < 0.6 && gap < 9) a.blockT += dt; else a.blockT = Math.max(0, a.blockT - dt);
       if (a.blockT > 2.5) { this.honks.length < 16 && this.honks.push({ x: a.x, z: a.z, angry: false }); a.blockT = -5; }
+      // 超車：前車太慢、多車道、旁邊車道空著 → 打方向燈換過去（公車不超車）
+      a.laneCool -= dt;
+      a.laneBlink = Math.max(0, a.laneBlink - dt);
+      if (a.laneCool <= 0 && a.kind !== 2 && a.e.lanes > 1 && gap < 25 && lv < a.v0 * 0.55 && a.e.len - a.s > 25) {
+        for (const tl of [a.lane - 1, a.lane + 1]) {
+          if (tl < 0 || tl >= a.e.lanes || !this.laneFree(a, tl)) continue;
+          a.laneSide = tl > a.lane ? -1 : 1; // 車道編號越大越靠右
+          a.lane = tl;
+          a.laneBlink = 1.6;
+          this.laneChanges++;
+          a.laneCool = 6 + this.rand() * 4;
+          break;
+        }
+        if (a.laneCool <= 0) a.laneCool = 1.5;
+      }
+      // 快到路口：先決定往哪走，轉彎就打方向燈
+      if (!a.next && a.e.len - a.s < 30) {
+        a.next = this.choose(a);
+        if (a.next) { const cr = a.e.ux * a.next.uz - a.e.uz * a.next.ux; a.blink = cr < -0.35 ? 1 : cr > 0.35 ? -1 : 0; }
+      }
       // 換車道：橫向位置慢慢移到新車道
       const tgt = this.laneOff(a);
       if (!Number.isNaN(a.lo) && Math.abs(tgt - a.lo) > 0.01) a.lo += (tgt - a.lo) * Math.min(1, dt * 1.8);
@@ -443,13 +488,10 @@ export class Traffic {
       // 走完這段就接下一段（路口隨機轉彎，比較常沿同一條路直走）
       while (a.s >= a.e.len) {
         a.s -= a.e.len;
-        const outs = a.e.out;
-        if (!outs.length) { a.alive = false; break; }
-        let next = outs[0];
-        if (outs.length > 1) {
-          const straight = outs.filter((o) => o.way.nm && o.way.nm === a.e.way.nm);
-          next = straight.length && this.rand() < 0.65 ? straight[0] : outs[Math.floor(this.rand() * outs.length)];
-        }
+        const next = a.next && a.e.out.includes(a.next) ? a.next : this.choose(a);
+        a.next = null;
+        a.blink = 0;
+        if (!next) { a.alive = false; break; }
         const cl = this.nodeCluster.get(a.e.b);
         if (cl) a.inC = cl;
         else if (a.inC && !a.inC.nodes.has(next.a)) a.inC = null;
@@ -567,16 +609,26 @@ export class Traffic {
     this.blob.instanceMatrix.needsUpdate = true;
     // 車燈
     let nl = 0;
-    if (this.lightsOn) {
-      const head = new THREE.Color(3, 2.8, 2.3), tail = new THREE.Color(2.4, 0.15, 0.1), lm = new THREE.Matrix4(), off = new THREE.Matrix4();
+    {
+      const head = new THREE.Color(3, 2.8, 2.3), tail = new THREE.Color(2.4, 0.15, 0.1), amber = new THREE.Color(3, 1.5, 0.1), lm = new THREE.Matrix4(), off = new THREE.Matrix4();
+      const blinkOn = (this.t * 2.2) % 1 < 0.5;
+      const cap = this.carLights.instanceMatrix.count;
       for (const a of this.agents) {
-        if (!a.alive || nl + 4 > this.carLights.instanceMatrix.count) continue;
+        if (!a.alive) continue;
+        const side = a.laneBlink > 0 ? a.laneSide : a.blink; // 本地 +x = 車子左邊
+        if (!this.lightsOn && !(side && blinkOn)) continue;
+        if (nl + 6 > cap) break;
         q.setFromAxisAngle(up, a.vh + a.kh);
         m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
         const L = KIND_LEN[a.kind] / 2 + 0.03, sides = a.kind === 3 ? [0] : a.kind === 2 ? [-0.9, 0.9] : [-0.6, 0.6], y = a.kind === 2 ? 0.85 : a.kind === 3 ? 0.95 : 0.75;
-        for (const s of sides) {
+        if (this.lightsOn) for (const s of sides) {
           lm.multiplyMatrices(m, off.makeTranslation(s, y, L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, head);
           lm.multiplyMatrices(m, off.makeTranslation(s, y + 0.05, -L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, tail);
+        }
+        if (side && blinkOn) {
+          const sx = side * (a.kind === 2 ? 1.2 : a.kind === 3 ? 0.25 : 0.82);
+          lm.multiplyMatrices(m, off.makeTranslation(sx, y, L - 0.05)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, amber);
+          lm.multiplyMatrices(m, off.makeTranslation(sx, y + 0.05, -L + 0.05)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, amber);
         }
       }
     }
@@ -604,7 +656,7 @@ export class Traffic {
     const avg = al.reduce((s, a) => s + a.v, 0) / (al.length || 1);
     const kinds = [0, 0, 0, 0, 0];
     al.forEach((a) => kinds[a.kind]++);
-    return `${al.length}台 平均${(avg * 3.6).toFixed(0)}km/h 停著${al.filter((a) => a.v < 0.5).length} 種類${kinds.join('/')} 號誌路口${this.clusters.length} 燈${this.heads.length / 3}`;
+    return `${al.length}台 超車${this.laneChanges} 打方向燈${al.filter((a) => a.blink || a.laneBlink > 0).length} 平均${(avg * 3.6).toFixed(0)}km/h 停著${al.filter((a) => a.v < 0.5).length} 種類${kinds.join('/')} 號誌路口${this.clusters.length} 燈${this.heads.length / 3}`;
   }
 
   /** 街道賽封路：車流不顯示 */
