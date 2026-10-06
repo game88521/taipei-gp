@@ -240,8 +240,10 @@ for (const v of VEHICLES) {
   scene.add(pv.model.root);
   playerCars.set(v.id, pv);
 }
-// 車庫：一開始有白色轎車和小黃，其他用賺的錢買（save.owned）；烤漆每台各自記（save.paints 買過的、save.paint 目前的）
-const ownedCars = () => new Set<string>(['sedan', 'taxi', ...(save.owned ?? [])]);
+// 車庫：所有車都免費選（Rex 要一開始就能全部玩到）；烤漆照樣用錢買，每台各自記（save.paints 買過的、save.paint 目前的）
+// 要改回「賺錢買車」：把 FREE_CARS 改成 false（價格在 vehicles.ts，save.owned 記買過的）
+const FREE_CARS = true;
+const ownedCars = () => new Set<string>(FREE_CARS ? VEHICLES.map((v) => v.id) : ['sedan', 'taxi', ...(save.owned ?? [])]);
 for (const [id, pv] of playerCars) { const c = save.paint?.[id]; if (c) pv.setPaint(c); }
 // ?car=muscle 測試用：直接指定車（不管有沒有買）
 const CAR_Q = new URLSearchParams(location.search).get('car');
