@@ -148,6 +148,28 @@ export class Sound {
     }
   }
 
+  /** 尖叫：從高音往下滑、帶顫音；pitch 每個人不太一樣 */
+  scream(vol = 1, pitch = 1) {
+    if (!this.ctx || !this.enabled || vol <= 0.02) return;
+    const ctx = this.ctx, t = ctx.currentTime, dur = 0.55 + Math.random() * 0.25;
+    const o = ctx.createOscillator(), vib = ctx.createOscillator(), vg = ctx.createGain(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(980 * pitch, t);
+    o.frequency.exponentialRampToValueAtTime(620 * pitch, t + dur);
+    vib.frequency.value = 9;
+    vg.gain.value = 35 * pitch;
+    vib.connect(vg).connect(o.frequency);
+    bp.type = 'bandpass';
+    bp.frequency.value = 1500 * pitch;
+    bp.Q.value = 1.2;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.09 * vol, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(bp).connect(g).connect(this.master);
+    o.start(t); vib.start(t);
+    o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+  }
+
   beep(freq: number, dur = 0.18) {
     if (!this.ctx || !this.enabled) return;
     const o = this.ctx.createOscillator();

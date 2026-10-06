@@ -20,6 +20,9 @@ interface Ped {
   phase: number; // 走路擺腿的相位
   dodge: number; // 閃避時的橫向位移
   sit: number; // 坐在地上的剩餘秒數
+  scared: number; // 被衝過來的車嚇到：舉手、跑開的剩餘秒數
+  look: number; // 被按喇叭：停下來轉頭看的剩餘秒數
+  lookX: number; lookZ: number;
   shirt: THREE.Color; pants: THREE.Color; skin: THREE.Color; hair: THREE.Color; sleeve: THREE.Color; shoe: THREE.Color;
   scale: number; bag: boolean; bagColor: THREE.Color;
   alive: boolean;
@@ -137,7 +140,7 @@ export class Pedestrians {
       const p: Ped = {
         mode: 'walk', cw: null, from: 0, ct: 0, cool: this.rand() * 10,
         w, s, dir: this.rand() < 0.5 ? 1 : -1, v: 1.1 + this.rand() * 0.5, x, z, h: 0, phase: this.rand() * 6,
-        dodge: 0, sit: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)),
+        dodge: 0, sit: 0, scared: 0, look: 0, lookX: 0, lookZ: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)),
         hair: new THREE.Color(pick(HAIR)), sleeve: new THREE.Color(), shoe: new THREE.Color(pick(SHOES)),
         scale: 0.9 + this.rand() * 0.18, bag: this.rand() < 0.4, bagColor: new THREE.Color(), alive: true,
       };
@@ -150,6 +153,28 @@ export class Pedestrians {
   }
 
   /** 回傳被碰到的行人數（給音效用） */
+  /** 尖叫（給 main 播）：位置 */
+  screams: { x: number; z: number }[] = [];
+  screamCount = 0; // 測試用
+  private scream(p: Ped) { this.screamCount++; if (this.screams.length < 6) this.screams.push({ x: p.x, z: p.z }); }
+
+  /** 玩家按喇叭：28 m 內的人停下來轉頭看 */
+  honked(px: number, pz: number) {
+    for (const p of this.peds) {
+      if (!p.alive || p.sit > 0 || p.scared > 0 || Math.hypot(p.x - px, p.z - pz) > 28) continue;
+      p.look = 1.2 + this.rand() * 1.3;
+      p.lookX = px; p.lookZ = pz;
+    }
+  }
+
+  /** 車子是不是正朝這個人衝過來（夠快、在車頭前面、橫向偏差小） */
+  private danger(p: Ped, car: { x: number; z: number; v: number }, fx: number, fz: number) {
+    const dx = p.x - car.x, dz = p.z - car.z, dist = Math.hypot(dx, dz);
+    if (dist > 16 || Math.abs(car.v) < 8) return false;
+    const ahead = (dx * fx + dz * fz) * Math.sign(car.v), lat = Math.abs(-dx * fz + dz * fx);
+    return ahead > 0 && lat < 3.5;
+  }
+
   update(dt: number, car: { x: number; z: number; h: number; v: number }, traffic: Traffic | null = null): number {
     let alive = 0, bumped = 0;
     for (const p of this.peds) {
@@ -162,6 +187,9 @@ export class Pedestrians {
     for (const p of this.peds) {
       if (!p.alive) continue;
       p.cool -= dt;
+      p.scared = Math.max(0, p.scared - dt);
+      p.look = Math.max(0, p.look - dt);
+      if (p.sit <= 0 && p.scared <= 0 && this.danger(p, car, fx, fz)) { p.scared = 1.6; p.look = 0; this.scream(p); }
       // ---- 等紅燈／過馬路
       if (p.mode !== 'walk' && p.cw) {
         const c = p.cw, [ax, az] = c.ends[p.from], [bx, bz] = c.ends[1 - p.from];
@@ -176,13 +204,13 @@ export class Pedestrians {
         }
         // 過馬路：走到對面，再接上那一側的人行道
         const len = Math.hypot(bx - ax, bz - az) || 1;
-        p.ct += (p.v * 1.15 * dt) / len;
+        p.ct += (p.v * (p.scared > 0 ? 3 : 1.15) * dt) / len; // 嚇到就衝過去
         p.phase += p.v * dt * 5.6;
         p.x = ax + (bx - ax) * p.ct;
         p.z = az + (bz - az) * p.ct;
         p.h = Math.atan2(bx - ax, bz - az);
         const cdx = p.x - car.x, cdz = p.z - car.z;
-        if (Math.hypot(cdx, cdz) < 1.6 && Math.abs(car.v) > 0.5 && p.sit <= 0) { p.sit = 2.5; bumped++; }
+        if (Math.hypot(cdx, cdz) < 1.6 && Math.abs(car.v) > 0.5 && p.sit <= 0) { p.sit = 2.5; bumped++; this.scream(p); }
         if (p.ct >= 1) this.landOn(p, bx, bz);
         continue;
       }
@@ -200,9 +228,12 @@ export class Pedestrians {
       }
       if (p.sit > 0) {
         p.sit -= dt;
+      } else if (p.look > 0 && p.scared <= 0) {
+        // 被按喇叭：站著看
       } else {
-        p.s += p.dir * p.v * dt;
-        p.phase += p.v * dt * 5.2;
+        const run = p.scared > 0 ? 2.4 : 1; // 嚇到就跑
+        p.s += p.dir * p.v * run * dt;
+        p.phase += p.v * run * dt * 5.2;
         if (p.s > w.len || p.s < 0) {
           // 走到這段盡頭：接到相鄰的人行道，沒有就掉頭
           const endX = p.s > w.len ? w.x2 : w.x1, endZ = p.s > w.len ? w.z2 : w.z1;
@@ -222,10 +253,11 @@ export class Pedestrians {
       // 車子靠近：往遠離車子的那一側閃開
       const dx = p.x - car.x, dz = p.z - car.z, dist = Math.hypot(dx, dz);
       const ahead = dx * fx + dz * fz;
-      if (dist < 9 && Math.abs(car.v) > 1.5 && ahead > -2) {
+      if ((dist < 9 && Math.abs(car.v) > 1.5 && ahead > -2) || p.scared > 0) {
         const away = Math.sign(dx * -vz + dz * vx) || 1;
-        p.dodge += away * dt * 3;
-        p.dodge = Math.max(-2.2, Math.min(2.2, p.dodge));
+        const lim = p.scared > 0 ? 3.5 : 2.2;
+        p.dodge += away * dt * (p.scared > 0 ? 9 : 3); // 嚇到就往旁邊跳開
+        p.dodge = Math.max(-lim, Math.min(lim, p.dodge));
       } else {
         p.dodge *= 1 - Math.min(1, dt * 0.8);
       }
@@ -236,8 +268,9 @@ export class Pedestrians {
         p.sit = 2.5;
         p.dodge += (Math.sign(dx * -vz + dz * vx) || 1) * 1.5;
         bumped++;
+        this.scream(p);
       }
-      p.h = Math.atan2(vx * p.dir, vz * p.dir);
+      p.h = p.look > 0 && p.scared <= 0 ? Math.atan2(p.lookX - p.x, p.lookZ - p.z) : Math.atan2(vx * p.dir, vz * p.dir);
     }
     return bumped;
   }
@@ -298,7 +331,7 @@ export class Pedestrians {
       put('hair', m, p.hair);
       put('blob', m, p.hair);
       put('bag', p.bag ? m : zero, p.bagColor);
-      const swing = sitting || p.mode === 'wait' ? 0 : Math.sin(p.phase) * 0.5; // 等紅燈時站好
+      const swing = sitting || p.mode === 'wait' || (p.look > 0 && p.scared <= 0) ? 0 : Math.sin(p.phase) * (p.scared > 0 ? 0.8 : 0.5); // 等紅燈、轉頭看時站好；跑的時候擺比較大
       // 腿：髖關節 (±0.09, 0.9)；坐著時往前伸直
       for (const [leg, shoe, side, sgn] of [['legL', 'shoeL', -0.09, 1], ['legR', 'shoeR', 0.09, -1]] as const) {
         j.copy(m).multiply(t.makeTranslation(side, 0.9, 0)).multiply(r.makeRotationX(sitting ? -1.45 : swing * sgn));
@@ -307,7 +340,8 @@ export class Pedestrians {
       }
       // 手：肩關節 (±0.23, 1.44)，跟同側的腿反向擺
       for (const [arm, side, sgn] of [['armL', -0.23, -1], ['armR', 0.23, 1]] as const) {
-        j.copy(m).multiply(t.makeTranslation(side, 1.44, 0)).multiply(r.makeRotationX(sitting ? -0.3 : swing * sgn * 0.8)).multiply(r.makeRotationZ(side * 0.25));
+        const raise = p.scared > 0 && !sitting ? Math.PI - 0.35 : 0; // 嚇到：雙手舉高
+        j.copy(m).multiply(t.makeTranslation(side, 1.44, 0)).multiply(r.makeRotationX(sitting ? -0.3 : raise ? raise : swing * sgn * 0.8)).multiply(r.makeRotationZ(side * (raise ? 0.6 : 0.25)));
         put(arm, j, p.sleeve);
       }
       n++;

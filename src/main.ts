@@ -1163,9 +1163,18 @@ function playerHorn() {
   if (state !== 'free') return;
   sound.horn(1, chosen.id === 'pickup' ? 0.8 : chosen.id === 'f1' || chosen.id === 'super' ? 1.15 : 1, 0.4);
   traffic?.honk(fcar.x, fcar.z, fcar.h);
+  peds?.honked(fcar.x, fcar.z); // 路人轉頭看
 }
 $('btn-horn').addEventListener('pointerdown', (e) => { e.preventDefault(); playerHorn(); });
 addEventListener('keydown', (e) => { if (e.code === 'KeyH' && !e.repeat) playerHorn(); });
+/** 路人的尖叫：照距離決定音量 */
+function playScreams() {
+  if (!peds?.screams.length) return;
+  for (const s of peds.screams.splice(0)) {
+    const vol = Math.max(0, 1 - Math.hypot(s.x - fcar.x, s.z - fcar.z) / 45);
+    sound.scream(vol, 0.8 + Math.random() * 0.5);
+  }
+}
 /** 車流按的喇叭：照距離決定音量，音高每台不太一樣 */
 function playTrafficHonks() {
   if (!traffic?.honks.length) return;
@@ -1447,6 +1456,7 @@ function updateFreeHud(dt: number) {
     updateWantedHud();
     updateDamageHud();
     playTrafficHonks();
+    playScreams();
     updateTaxiHud();
     updateSrHud();
   }
@@ -1666,7 +1676,7 @@ if (FREE) void cityLoad.then(() => {
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
     if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
-    document.title = `FREE 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
+    document.title = `FREE 尖叫${peds?.screamCount} 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
