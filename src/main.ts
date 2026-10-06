@@ -160,6 +160,7 @@ let sr: StreetRace | null = null;
 let breakables: Breakables | null = null;
 let taxi: TaxiJob | null = null;
 let police: Police | null = null;
+let trains: import('./trains').Trains | null = null;
 const WANTED_TEST = new URLSearchParams(location.search).has('wanted');
 const PURSUIT_TEST = new URLSearchParams(location.search).has('pursuit');
 const policeLog: string[] = []; // 測試標題用
@@ -189,6 +190,8 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   breakables = c.breakables;
   raceHide = c.raceHide;
   cityCull = c.cull;
+  trains = c.trains;
+  trains.frozen = new URLSearchParams(location.search).has('trainfreeze');
   await stage('車流與紅綠燈', 0.82);
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
   traffic.collider = collider;
@@ -556,6 +559,7 @@ function updateVisuals(dt: number) {
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
   if (sr && mode === 'free') sr.render(dt);
+  trains?.update(dt);
   if (police) { if (mode === 'free') police.render(dt, performance.now() / 1000); else police.hide(); }
   // 街道賽封路：挑戰光柱、紅綠燈、賽道旁的路名牌都不出現（會擋視線）
   sr?.showMarkers(mode === 'free' && !taxiOn());
@@ -1662,7 +1666,7 @@ if (FREE) void cityLoad.then(() => {
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
     if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
-    document.title = `FREE 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
+    document.title = `FREE 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
@@ -1725,4 +1729,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get state() { return state; } };
