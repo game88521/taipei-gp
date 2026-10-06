@@ -148,6 +148,10 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 | `src/bigmap.ts` | 全螢幕大地圖與導航箭頭 |
 | `src/achievements.ts` | 成就與統計 |
 | `api/leaderboard.js` | 線上排行榜（Vercel Serverless Function + Upstash Redis） |
+| `src/save.ts` | 存檔（localStorage）的型別與讀寫 |
+| `src/graphics.ts` | 環境反射、光暈＋調色後處理、陰影旗標 |
+| `src/physicstest.ts` | `?phys` 汽車物理測試 |
+| `src/leaderboard-ui.ts` | 線上排行榜的畫面 |
 | `src/f1model.ts` | 精緻 F1 車模（放樣機身、三層前翼、DRS 尾翼、halo、懸吊、胎色圈）與 8 支虛構車隊塗裝 |
 | `src/rivals.ts` | 街道賽的 7 台 AI 對手（發車格、超車、尾流、碰撞、計圈、名次） |
 | `src/streetrace.ts` | 自由駕駛的街頭飆車（挑戰點、真實道路規劃路線、檢查點、閃車流的對手） |

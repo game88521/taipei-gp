@@ -1,13 +1,12 @@
 import './style.css';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
+import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
 import { loadCity } from './city';
 import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
@@ -33,20 +32,11 @@ import { Police, LOSE_TIME } from './police';
 import { Car } from './car';
 import { Input } from './input';
 import { Sound } from './audio';
+import { physicsTest } from './physicstest';
+import { initLeaderboard, submitLap } from './leaderboard-ui';
 
-// ---------------------------------------------------------------- 存檔
-interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
-type SteerMode = 'buttons' | 'drag' | 'tilt';
-interface Save { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
-const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
-function loadSave(): Save {
-  const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
-  try { return { ...empty, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return empty; }
-}
-function writeSave() {
-  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch { /* 無痕模式存不了就算了 */ }
-}
-const save = loadSave();
+
+import { save, writeSave, KEY, type Ghost, type SteerMode } from './save';
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -89,70 +79,13 @@ const world = buildWorld(scene, track);
   sc.bias = -0.0004;
   sc.normalBias = 0.6;
 }
-// 環境反射：用天空漸層＋夕陽做一張反射貼圖，車漆、玻璃帷幕會映出晚霞（換時段天氣時重做）
-function buildEnv(sunColor = new THREE.Color(6, 4.2, 2.6)) {
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const env = new THREE.Scene();
-  env.add(new THREE.Mesh(world.sky.geometry, world.sky.material));
-  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(160, 16, 8), new THREE.MeshBasicMaterial({ color: sunColor }));
-  sunBall.position.copy(world.sunDir).multiplyScalar(2000);
-  env.add(sunBall);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color: '#2e2b29' }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -20;
-  env.add(floor);
-  const old = scene.environment;
-  scene.environment = pmrem.fromScene(env, 0.03, 0.1, 6000).texture;
-  old?.dispose();
-  pmrem.dispose();
-}
+const buildEnv = (sunColor?: THREE.Color) => buildEnvMap(renderer, scene, world, sunColor);
 buildEnv();
 scene.environmentIntensity = 0.75; // 不要讓反光蓋過原本的顏色
 // 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開；最後加一點暗角與暖色調
 let composer: EffectComposer | null = null, bloom: UnrealBloomPass | null = null, gradePass: ShaderPass | null = null;
-const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, vignette: { value: 0.42 }, saturation: { value: 1.1 }, tint: { value: new THREE.Vector3(1.03, 1, 0.96) } },
-  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; uniform vec3 tint; varying vec2 vUv;
-    void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
-      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-      c.rgb = mix(vec3(l), c.rgb, saturation) * tint;
-      float d = length((vUv - 0.5) * vec2(1.0, 0.8));
-      c.rgb *= mix(1.0, smoothstep(0.85, 0.25, d), vignette);
-      gl_FragColor = c;
-    }`,
-};
-function setupBloom() {
-  // 自己給後製畫布：要有 stencil（預先算好的影子靠它避免重疊處更黑）
-  const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: true });
-  composer = new EffectComposer(renderer, rt);
-  composer.addPass(new RenderPass(scene, camera));
-  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * Q.bloomScale, innerHeight * Q.bloomScale), 0.55, 0.45, 0.82);
-  composer.addPass(bloom);
-  gradePass = new ShaderPass(GradeShader);
-  composer.addPass(gradePass);
-  composer.addPass(new OutputPass());
-}
-/** 平面（路面、綠地、地面）只接受陰影；有厚度的東西（建築、樹、車、人）才投射 */
-function applyShadowFlags() {
-  if (!Q.shadows) return;
-  const box = new THREE.Box3(), size = new THREE.Vector3();
-  scene.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (!m.isMesh || o.userData.shadowDone) return;
-    o.userData.shadowDone = true;
-    const mat0 = Array.isArray(m.material) ? m.material[0] : m.material;
-    const lambert = mat0 instanceof THREE.MeshLambertMaterial || mat0 instanceof THREE.MeshStandardMaterial; // 有打光的材質
-    if (!lambert) return;
-    m.receiveShadow = true;
-    let dyn = false;
-    for (let o2: THREE.Object3D | null = m; o2; o2 = o2.parent) if (o2.userData.dynamic) { dyn = true; break; }
-    m.castShadow = dyn;
-    void box; void size;
-  });
-}
+function setupBloom() { ({ composer, bloom, gradePass } = makeComposer(renderer, scene, camera, Q.bloomScale)); }
+const applyShadowFlags = () => applyShadowFlagsIn(scene, Q.shadows);
 let cityReady = false;
 let collider: Collider | null = null, roadNet: RoadNet | null = null, minimap: Minimap | null = null;
 let landmarks: Landmark[] = [];
@@ -627,46 +560,7 @@ function tickStats(dt: number) {
   }
   if (statSave > 5) { statSave = 0; writeSave(); }
 }
-// ---------------------------------------------------------------- 線上排行榜（計時賽最快圈，api/leaderboard.js）
-save.name ??= `車手${Math.floor(100 + Math.random() * 900)}`;
-async function submitLap(t: number) {
-  try {
-    const r = await fetch('/api/leaderboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: save.name, time: t }) });
-    if (r.ok) { const j = await r.json(); toast(`🌐 排行榜第 ${j.rank} 名`, 'purple'); }
-  } catch { /* 沒網路、排行榜沒開：不影響遊戲 */ }
-}
-async function showLeaderboard() {
-  const box = $('lb-list'), st = $('lb-status');
-  $<HTMLInputElement>('lb-name').value = save.name ?? '';
-  $('lb-page').classList.remove('hidden');
-  box.innerHTML = '';
-  st.textContent = '讀取中…';
-  try {
-    const r = await fetch(`/api/leaderboard?name=${encodeURIComponent(save.name ?? '')}`);
-    if (r.status === 503) { st.textContent = '排行榜尚未啟用（需要在 Vercel 後台開啟儲存空間）'; return; }
-    if (!r.ok) throw new Error(String(r.status));
-    const j = (await r.json()) as { top: { name: string; time: number }[]; me?: { rank: number; time: number } };
-    st.textContent = j.top.length ? (j.me ? `你是第 ${j.me.rank} 名（${fmt(j.me.time)}）` : save.best != null ? '你還沒上榜：按「上傳我的最快圈」' : '先跑一圈計時賽再來上榜') : '還沒有人上榜，搶頭香！';
-    j.top.forEach((e, i) => {
-      const row = document.createElement('li');
-      if (e.name === save.name) row.className = 'me';
-      row.innerHTML = `<b>${i + 1}</b><span></span><em>${fmt(e.time)}</em>`;
-      row.querySelector('span')!.textContent = e.name; // 名字當純文字放，不解析 HTML
-      box.appendChild(row);
-    });
-  } catch { st.textContent = '目前連不到排行榜（離線或本機測試）'; }
-}
-$('btn-lb').addEventListener('click', () => void showLeaderboard());
-$('lb-close').addEventListener('click', () => $('lb-page').classList.add('hidden'));
-$('lb-name').addEventListener('change', () => {
-  const v = $<HTMLInputElement>('lb-name').value.replace(/[<>"'`\\]/g, '').trim().slice(0, 12);
-  if (v) { save.name = v; writeSave(); }
-});
-$('lb-submit').addEventListener('click', async () => {
-  if (save.best == null) { $('lb-status').textContent = '先跑一圈計時賽'; return; }
-  await submitLap(save.best);
-  void showLeaderboard();
-});
+initLeaderboard(toast, fmt);
 $('btn-ach').addEventListener('click', () => {
   $('ach-body').innerHTML = renderAchPage(stats, save.ach ?? []);
   $('ach-page').classList.remove('hidden');
@@ -1684,95 +1578,7 @@ void acc;
 car.placeAt(track, 1);
 showMenu(false);
 // ?phys：汽車物理測試（加速、轉彎半徑、撞牆後能不能脫困），結果寫在標題
-function physicsTest() {
-  const out: string[] = [];
-  const c = new FreeCar();
-  // 1) 0→100 km/h
-  c.place(0, 0, 0);
-  let t = 0;
-  while (c.v < 27.8 && t < 30) { c.update(STEP, 0, true, false, null); t += STEP; }
-  out.push(`0-100:${t.toFixed(1)}s`);
-  // 2) 60 km/h 方向盤打滿的迴轉半徑
-  c.place(0, 0, 0);
-  while (c.v < 16.7) c.update(STEP, 0, true, false, null);
-  for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 16.7, false, null);
-  out.push(`R60:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
-  // 3) 120 km/h 打滿
-  c.place(0, 0, 0);
-  while (c.v < 33.3) c.update(STEP, 0, true, false, null);
-  for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 33.3, false, null);
-  out.push(`R120:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
-  // 4) 撞牆：朝起點附近 60~250 m 最近的一面牆直衝，記錄撞擊、反彈後速度，再倒車 1.5 秒、打方向加油 3 秒看能不能脫困
-  //    （地圖變大後，從起點照原方向直衝 40 秒可能一路都沒牆）
-  if (collider) {
-    const probe: { nx: number; nz: number; depth: number }[] = [];
-    let wallH = fcar.h, wallD = Infinity;
-    for (let a = 0; a < 72; a++) {
-      const h = (a / 72) * Math.PI * 2;
-      for (let d = 60; d < Math.min(250, wallD); d += 2)
-        if (collider.contacts(fcar.x + Math.sin(h) * d, fcar.z + Math.cos(h) * d, 1, probe).length) { wallD = d; wallH = h; break; }
-    }
-    c.place(fcar.x, fcar.z, wallH);
-    let hitAt = -1, maxImpact = 0, bounce = 0;
-    for (let k = 0; k < 120 * 40 && hitAt < 0; k++) {
-      const imp = c.update(STEP, 0, true, false, collider);
-      if (imp > 0) { hitAt = k; maxImpact = imp; }
-    }
-    for (let k = 0; k < 30; k++) { c.update(STEP, 0, false, false, collider); bounce = Math.min(bounce, c.v); }
-    const x0 = c.x, z0 = c.z;
-    for (let k = 0; k < 180; k++) c.update(STEP, 0, false, true, collider);
-    const back = Math.hypot(c.x - x0, c.z - z0);
-    const x1 = c.x, z1 = c.z;
-    for (let k = 0; k < 360; k++) c.update(STEP, 1, true, false, collider);
-    const away = Math.hypot(c.x - x1, c.z - z1);
-    out.push(`撞擊:${(maxImpact * 3.6).toFixed(0)}km/h 反彈:${(bounce * 3.6).toFixed(1)}km/h 倒車退:${back.toFixed(1)}m 轉向開走:${away.toFixed(1)}m`);
-    // 4b) 撞車流：時速 60 從正後方撞上停著的轎車／機車／公車，3 秒後看對方被撞開多遠、玩家剩多快
-    if (traffic) {
-      const res: string[] = [];
-      for (const [k, nm] of [[0, '轎車'], [3, '機車'], [2, '公車']] as const) {
-        traffic.update(STEP, fcar);
-        const a = traffic.testAgent(k);
-        if (!a) continue;
-        const t = new FreeCar(), fx = Math.sin(a.h), fz = Math.cos(a.h);
-        t.place(a.x - fx * 12, a.z - fz * 12, a.h);
-        t.vx = fx * 16.7; t.vz = fz * 16.7;
-        let vAfter = -1;
-        for (let n = 0; n < 120 * 3; n++) {
-          t.update(STEP, 0, false, false, null);
-          if (traffic.collidePlayer(t) && vAfter < 0) vAfter = t.v;
-          traffic.update(STEP, { x: t.x, z: t.z, h: t.h, v: t.v });
-        }
-        res.push(`${nm}被撞開${Math.hypot(a.kx, a.kz).toFixed(1)}m轉${(Math.abs(a.kh) * 57.3).toFixed(0)}°${a.fall > 0.5 ? '倒地' : ''}/玩家剩${(vAfter * 3.6).toFixed(0)}km/h`);
-      }
-      // 連環車禍：撞停著的轎車，它往前滑撞到前面 6.5 m 那台
-      traffic.update(STEP, fcar);
-      const a1 = traffic.testAgent(0), a2 = a1 && traffic.agents.find((b) => b.alive && b !== a1 && b.kind !== 2);
-      if (a1 && a2) {
-        Object.assign(a2, { kind: 0, v: 0, stunned: 6, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, x: a1.x + Math.sin(a1.h) * 6.5, z: a1.z + Math.cos(a1.h) * 6.5, h: a1.h });
-        const x2 = a2.x, z2 = a2.z;
-        const t = new FreeCar(), fx = Math.sin(a1.h), fz = Math.cos(a1.h);
-        t.place(a1.x - fx * 12, a1.z - fz * 12, a1.h);
-        t.vx = fx * 16.7; t.vz = fz * 16.7;
-        for (let n = 0; n < 120 * 3; n++) { t.update(STEP, 0, false, false, null); traffic.collidePlayer(t); traffic.update(STEP, { x: t.x, z: t.z, h: t.h, v: t.v }); }
-        res.push(`連環：前車被推${Math.hypot(a2.x + a2.kx - x2, a2.z + a2.kz - z2).toFixed(1)}m`);
-      }
-      out.push('撞車流 ' + res.join(' '));
-    }
-    // 5) 撞倒測試：從起點全油門直衝 25 秒，路上的樹／路燈會被撞倒，看能跑多遠、撞倒幾個
-    c.place(fcar.x, fcar.z, fcar.h);
-    const before = breakables?.knocked ?? 0, x0b = c.x, z0b = c.z;
-    let minV = Infinity, started = false;
-    for (let k = 0; k < 120 * 25; k++) {
-      c.update(STEP, 0, true, false, collider);
-      breakables?.hit(c);
-      if (c.v > 20) started = true;
-      if (started) minV = Math.min(minV, c.v);
-    }
-    out.push(`直衝25秒:${Math.hypot(c.x - x0b, c.z - z0b).toFixed(0)}m 撞倒:${(breakables?.knocked ?? 0) - before} 期間最低速:${(minV * 3.6).toFixed(0)}km/h`);
-  }
-  document.title = 'PHYS ' + out.join(' ');
-}
-if (new URLSearchParams(location.search).has('phys')) void cityLoad.then(() => { mode = 'free'; hideMenu(); beginFree(); physicsTest(); });
+if (new URLSearchParams(location.search).has('phys')) void cityLoad.then(() => { mode = 'free'; hideMenu(); beginFree(); document.title = physicsTest(fcar, collider, traffic, breakables); });
 
 // ?free：直接進自由駕駛（加 &bot&sim=N 會油門全開直行 N 秒，測碰撞用）
 const FREE = new URLSearchParams(location.search).has('free');
