@@ -30,6 +30,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  if (new URL(req.url).pathname.startsWith('/api/')) return; // 排行榜這類即時資料：不要快取
 
   // 開網頁：先問網路（才拿得到新版），沒網路就用快取的那一份
   if (req.mode === 'navigate') {

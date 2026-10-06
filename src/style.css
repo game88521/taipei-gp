@@ -574,6 +574,19 @@ html:not(.touch) #btn-horn { display: none; }
 }
 #hud[data-mode='race'] #btn-map, #hud[data-mode='race'] #nav-hud { display: none !important; }
 
+/* ---------------- 線上排行榜 */
+#lb-page { z-index: 6; }
+#lb-page .card { max-height: 92vh; overflow-y: auto; }
+.lb-name { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+.lb-name input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.25); background: #1b1e28; color: var(--fg); font: inherit; }
+#lb-list { list-style: none; margin: 6px 0 10px; padding: 0; }
+#lb-list li { display: flex; gap: 10px; align-items: center; padding: 5px 8px; border-radius: 6px; }
+#lb-list li:nth-child(odd) { background: rgba(255, 255, 255, 0.04); }
+#lb-list li.me { background: rgba(225, 6, 0, 0.35); }
+#lb-list b { width: 24px; font: 800 14px var(--mono); color: #ffd400; }
+#lb-list span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lb-list em { font: 700 14px var(--mono); font-style: normal; }
+
 /* ---------------- 成就頁 */
 #ach-page { z-index: 6; }
 #ach-page .card { max-height: 92vh; overflow-y: auto; }

@@ -134,6 +134,7 @@
         </div>
         <p class="help">手機：左下 ◀ ▶ 轉向（可在下面改成拖曳或傾斜手機），右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Ctrl 或 E 開 DRS、B 進站，Esc 暫停。</p>
         <button id="btn-ach" class="ghost-btn">🏆 成就與紀錄</button>
+        <button id="btn-lb" class="ghost-btn">🌐 線上排行榜（計時賽）</button>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
         <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
       </div>
@@ -175,6 +176,17 @@
         <div id="map-marks"></div>
         <button id="map-clear" class="ghost-btn">取消導航</button>
         <button id="map-close" class="primary">返回駕駛</button>
+      </div>
+    </div>
+
+    <div id="lb-page" class="overlay hidden">
+      <div class="card">
+        <h1>線上排行榜<small>TIME TRIAL · 3.1 KM</small></h1>
+        <label class="lb-name">車手名稱 <input id="lb-name" maxlength="12" /></label>
+        <p class="sub" id="lb-status"></p>
+        <ol id="lb-list"></ol>
+        <button id="lb-submit" class="ghost-btn">上傳我的最快圈</button>
+        <button id="lb-close" class="primary">返回</button>
       </div>
     </div>
 
