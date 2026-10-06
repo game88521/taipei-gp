@@ -175,10 +175,10 @@ let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西�
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 // 載入進度：選單的按鈕上顯示目前在做什麼＋進度條
 // 開始建城市之後先不重畫背景：每加進一批新東西，畫面第一次畫到它就要同步編譯著色器，載入會一直卡
-let holdRender = false;
+let holdRender = true; // 一開始就先不畫：開場就建好的車、警車、雨…第一次畫到也要同步編譯，等最後 compileAsync 一次編
 onProgress((label, f) => {
   if (cityReady) return;
-  if (f >= 0.41 && f < 0.98) holdRender = true; // 解除只在著色器編好之後（下面），「完成」那一步不能又把它打開
+  // holdRender 從一開始就是 true；解除只在著色器編好之後（下面）
   $('btn-free').textContent = `${label}… ${Math.round(f * 100)}%`;
   $('load-bar').style.width = `${Math.round(f * 100)}%`;
 });
@@ -232,6 +232,7 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   if (state === 'menu') showMenu(false);
 }).catch((e) => {
   console.error(e);
+  holdRender = false; // 街景載入失敗：至少把賽道畫出來
   cityReady = true; // 街景載入失敗也讓人能玩（只剩賽道）
   $('menu-best').textContent = '街景載入失敗，請檢查網路後重新整理';
 });
@@ -274,9 +275,11 @@ const TIMES = Object.keys(TIME_NAME) as TimeKind[];
 let timeKind: TimeKind = TIMES.includes(new URLSearchParams(location.search).get('time') as TimeKind) ? new URLSearchParams(location.search).get('time') as TimeKind : TIMES.includes(save.time as TimeKind) ? save.time as TimeKind : 'dusk';
 // 自動日夜循環：從白天開始（cycleT 秒），每 0.25 秒漸變一次；環境反射只在每段開始時重做（很花時間）
 let cycleT = +(new URLSearchParams(location.search).get('cyclet') ?? 0), cycleAcc = 0, cycleSeg = -1; // 測試：&cyclet=520 直接跳到循環第 520 秒
+let envFor = 'dusk'; // 環境反射目前是照哪個時段做的（開場的 buildEnv() 是黃昏）
 function applyWeather() {
   weather.apply(timeKind, Q.fogFar, bloom, gradePass, cycleT);
-  buildEnv(weather.envSun);
+  const k = timeKind === 'auto' ? `auto${cycleAt(cycleT).seg}` : timeKind;
+  if (k !== envFor) { envFor = k; buildEnv(weather.envSun); } // 很花時間：時段真的變了才重做
   if (traffic) traffic.lightsOn = weather.night || weather.raining;
 }
 function tickCycle(dt: number) {
@@ -289,7 +292,7 @@ function tickCycle(dt: number) {
     cycleAcc = 0;
     weather.apply('auto', Q.fogFar, bloom, gradePass, cycleT);
     if (traffic) traffic.lightsOn = weather.night;
-    if (c.seg !== cycleSeg) { cycleSeg = c.seg; buildEnv(weather.envSun); }
+    if (c.seg !== cycleSeg) { cycleSeg = c.seg; envFor = `auto${c.seg}`; buildEnv(weather.envSun); }
   }
   const hh = Math.floor(c.clock) % 24, mm = Math.floor((c.clock % 1) * 60);
   clock.style.display = state === 'free' || state === 'race' ? '' : 'none';

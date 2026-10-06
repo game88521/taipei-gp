@@ -893,7 +893,38 @@ console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上
 
 const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals };
 mkdirSync(here('../public/data/'), { recursive: true });
-const json = JSON.stringify(city);
+// 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；
+// roads 執行時沒用到（路面是用 net 畫的），不輸出。解碼在 src/citydata.ts decodeCity()
+const enc = (a, stride, scale) => {
+  const o = new Array(a.length);
+  for (let i = 0; i < a.length; i++) o[i] = Math.round(a[i] * scale) - (i >= stride ? Math.round(a[i - stride] * scale) : 0);
+  return o;
+};
+const packed = { ...city, enc: 1 };
+delete packed.roads;
+packed.buildings = buildings.map((b) => ({ ...b, p: enc(b.p, 2, 10) }));
+packed.greens = greens.map((g) => ({ ...g, p: enc(g.p, 2, 10) }));
+packed.trees = enc(trees, 2, 10);
+packed.net = { nodes: enc(netNodes, 2, 10), ways: netWays.map((w) => ({ ...w, n: enc(w.n, 1, 1) })) };
+packed.lamps = enc(lamps, 3, 100);
+packed.parked = enc(parked, 4, 100);
+if (terrain) packed.terrain = { ...terrain, h: enc(terrain.h, 1, 2) };
+packed.trails = trails.map((t) => ({ ...t, p: enc(t.p, 2, 10) }));
+packed.elevated = elevated.map((e) => ({ ...e, p: enc(e.p, 2, 10), y: enc(e.y, 1, 10) }));
+const json = JSON.stringify(packed);
+{
+  // 自我檢查：解回來跟原本差多少（座標應該完全一樣；路燈、機車的角度最多差 0.005 rad）
+  const dec = (a, stride, scale) => { const acc = new Array(stride).fill(0); return a.map((v, i) => (acc[i % stride] += v) / scale); };
+  const maxDiff = (a, b) => a.reduce((m, v, i) => Math.max(m, Math.abs(v - b[i])), 0);
+  const P = JSON.parse(json);
+  const worst = Math.max(
+    ...P.buildings.map((b, i) => maxDiff(dec(b.p, 2, 10), buildings[i].p)),
+    maxDiff(dec(P.trees, 2, 10), trees), maxDiff(dec(P.net.nodes, 2, 10), netNodes),
+    ...P.net.ways.map((w, i) => maxDiff(dec(w.n, 1, 1), netWays[i].n)),
+    terrain ? maxDiff(dec(P.terrain.h, 1, 2), terrain.h) : 0,
+  );
+  console.log(`瘦身格式自我檢查：座標最大誤差 ${worst.toExponential(1)}，路燈角度最大誤差 ${maxDiff(dec(P.lamps, 3, 100), lamps).toFixed(4)}`);
+}
 writeFileSync(here('../public/data/city.json'), json);
 // 載入進度條要知道解壓縮後有多大（伺服器用 brotli 傳，Content-Length 是壓縮後的）
 writeFileSync(here('../src/data/track.json'), JSON.stringify({ ...trackOut, citySize: Buffer.byteLength(json) }));

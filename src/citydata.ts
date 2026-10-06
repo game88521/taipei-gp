@@ -32,6 +32,29 @@ export interface CityData {
 }
 export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
 
+/** 解碼 city.json 的瘦身格式（tools/build-city.mjs 的 enc）：每 stride 個一組累加差值，再除回倍數 */
+function dec(a: number[], stride: number, scale: number): number[] {
+  const o = new Array<number>(a.length), acc = new Array<number>(stride).fill(0);
+  for (let i = 0; i < a.length; i++) { acc[i % stride] += a[i]; o[i] = acc[i % stride] / scale; }
+  return o;
+}
+export function decodeCity(d: CityData & { enc?: number }): CityData {
+  if (d.enc !== 1) return d;
+  for (const b of d.buildings) b.p = dec(b.p, 2, 10);
+  for (const g of d.greens) g.p = dec(g.p, 2, 10);
+  d.trees = dec(d.trees, 2, 10);
+  d.net.nodes = dec(d.net.nodes, 2, 10);
+  for (const w of d.net.ways) w.n = dec(w.n, 1, 1);
+  if (d.lamps) d.lamps = dec(d.lamps, 3, 100);
+  if (d.parked) d.parked = dec(d.parked, 4, 100);
+  if (d.terrain) d.terrain.h = dec(d.terrain.h, 1, 2);
+  for (const t of d.trails ?? []) t.p = dec(t.p, 2, 10);
+  for (const e of d.elevated ?? []) { e.p = dec(e.p, 2, 10); e.y = dec(e.y, 1, 10); }
+  d.roads ??= [];
+  delete d.enc;
+  return d;
+}
+
 /** 地形高度（雙線性內插）；範圍外是 0 */
 export function terrainHeight(t: Terrain | null | undefined, x: number, z: number): number {
   if (!t) return 0;

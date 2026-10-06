@@ -10,7 +10,7 @@ import { stage, fetchJson } from './loading';
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
 
-import { terrainHeight, type CityData } from './citydata';
+import { terrainHeight, decodeCity, type CityData } from './citydata';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
 import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
@@ -240,7 +240,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   const cullables: { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number }[] = [];
   const cullAdd = (o: THREE.Object3D, x: number, z: number, layer: Layer = 'far', pad = TILE * 0.71) => cullables.push({ o, x, z, layer, pad });
   const breakables = new Breakables();
-  const data = await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4);
+  const data = decodeCity(await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4));
   await stage('鋪地面與綠地', 0.42);
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
