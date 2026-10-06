@@ -553,6 +553,27 @@ html:not(.touch) #btn-horn { display: none; }
 }
 #hud[data-mode='race'] #wanted, #hud[data-mode='race'] #btn-pursuit, #hud[data-mode='race'] #btn-horn { display: none !important; }
 
+/* ---------------- 大地圖、導航 */
+#map-page { position: fixed; inset: 0; z-index: 7; background: #0c0e14; }
+#bigmap { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+#map-page .map-side { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 190px; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: rgba(10, 12, 20, 0.85); }
+#map-marks { display: flex; flex-wrap: wrap; gap: 4px; }
+#map-marks button { padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); font-size: 12px; }
+#map-page .map-side .primary, #map-page .map-side .ghost-btn { padding: 8px; font-size: 14px; }
+#nav-hud {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 62px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(10, 40, 50, 0.75);
+  color: #8ff0ff;
+  font: 700 14px var(--font);
+  white-space: nowrap;
+}
+#hud[data-mode='race'] #btn-map, #hud[data-mode='race'] #nav-hud { display: none !important; }
+
 /* ---------------- 成就頁 */
 #ach-page { z-index: 6; }
 #ach-page .card { max-height: 92vh; overflow-y: auto; }

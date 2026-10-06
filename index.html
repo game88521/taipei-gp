@@ -35,6 +35,7 @@
         <div id="delta"></div>
       </div>
       <div class="tr">
+        <button id="btn-map" class="small" aria-label="大地圖">🗺</button>
         <button id="btn-cam" class="small" aria-label="切換視角">📷</button>
         <button id="btn-reset" class="small" aria-label="扶正">⟲</button>
         <button id="btn-pause" class="small" aria-label="暫停">❚❚</button>
@@ -53,6 +54,7 @@
       <div id="road"></div>
       <div id="wanted"></div>
       <div id="clock" style="display: none"></div>
+      <div id="nav-hud" style="display: none"></div>
       <button id="btn-pursuit" style="display: none">🚨 追緝</button>
       <button id="btn-horn" aria-label="喇叭">📯</button>
       <div id="dmg" style="display: none"></div>
@@ -163,6 +165,16 @@
         <p class="sub">開放街道、照常有車流和紅綠燈；4 位對手會鑽車縫、闖紅燈。依序穿過黃色光圈，先到終點的贏。</p>
         <div id="duel-list"></div>
         <button id="duel-back" class="link">返回</button>
+      </div>
+    </div>
+
+    <div id="map-page" class="hidden">
+      <canvas id="bigmap"></canvas>
+      <div class="map-side">
+        <b>🧭 點地圖選目的地</b>
+        <div id="map-marks"></div>
+        <button id="map-clear" class="ghost-btn">取消導航</button>
+        <button id="map-close" class="primary">返回駕駛</button>
       </div>
     </div>
 

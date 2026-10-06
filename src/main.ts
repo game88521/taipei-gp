@@ -16,6 +16,7 @@ import { Weather, headlightRig, TIME_NAME, cycleAt, CYCLE_LEN, type TimeKind } f
 import { Cockpit } from './cockpit';
 import { Damage } from './damage';
 import { emptyStats, newlyUnlocked, renderAchPage, type Stats } from './achievements';
+import { BigMap, NavArrows } from './bigmap';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -161,6 +162,8 @@ let sr: StreetRace | null = null;
 let breakables: Breakables | null = null;
 let taxi: TaxiJob | null = null;
 let police: Police | null = null;
+let router: Router | null = null;
+let bigmap: BigMap | null = null;
 let trains: import('./trains').Trains | null = null;
 const WANTED_TEST = new URLSearchParams(location.search).has('wanted');
 const PURSUIT_TEST = new URLSearchParams(location.search).has('pursuit');
@@ -200,8 +203,11 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   peds = new Pedestrians(scene, c.data, collider, Q.peds);
   await stage('街頭挑戰與導航', 0.95);
   sr = new StreetRace(scene, c.data, c.landmarks);
-  const router = new Router(c.data);
+  router = new Router(c.data);
   taxi = new TaxiJob(scene, c.landmarks, router);
+  bigmap = new BigMap($<HTMLCanvasElement>('bigmap'), roadNet, c.landmarks);
+  bigmap.onPick = (x, z) => setNav(x, z);
+  buildMapShortcuts();
   police = new Police(scene, router, roadNet);
   if (WANTED_TEST) police.heat = police.stars = +new URLSearchParams(location.search).get('wanted')!; // 測試：?wanted=3 一開始就 3 星通緝
   // 著色器一次編好：隱藏的東西（其他車、遠處區塊、計程車頂燈）也先打開一起編，之後切換才不會卡一下；
@@ -531,6 +537,61 @@ let camSnap = true;
 // ?cam=x,y,z,看向x,y,z：固定鏡頭（截圖檢查街景用）
 const CAM = new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null;
 const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
+// ---------------------------------------------------------------- 大地圖與導航
+// 🗺（電腦 M）開全螢幕地圖，點一下或選地標＝目的地；路上一排箭頭指路，偏離太多自動重新規劃
+const navArrows = new NavArrows(scene);
+let nav: { x: number; z: number; nm: string; path: [number, number][] | null; t: number } | null = null;
+let mapOpen = false;
+function setNav(x: number, z: number, nm?: string) {
+  if (!nm) {
+    let best = '地圖上的點', bd = 80;
+    for (const l of landmarks) { const d = Math.hypot(l.x - x, l.z - z); if (d < bd) { bd = d; best = l.nm; } }
+    nm = best;
+  }
+  nav = { x, z, nm, path: null, t: 99 };
+  closeMap();
+  toast(`🧭 導航到 ${nm}`, '');
+}
+function updateNav(dt: number) {
+  if (!nav || !router) { navArrows.update(null, 0, 0, 0); $('nav-hud').style.display = 'none'; return; }
+  nav.t += dt;
+  const d = Math.hypot(nav.x - fcar.x, nav.z - fcar.z);
+  // 偏離路線 25 m 以上、或每 6 秒，重新規劃
+  let off = 0;
+  if (nav.path) { off = Infinity; for (const [x, z] of nav.path) off = Math.min(off, Math.hypot(x - fcar.x, z - fcar.z)); }
+  if (nav.t > 6 || off > 25) { nav.t = 0; nav.path = router.route(fcar.x, fcar.z, nav.x, nav.z)?.path ?? null; }
+  if (d < 25) { toast(`🏁 抵達 ${nav.nm}`, 'purple'); nav = null; navArrows.update(null, 0, 0, 0); $('nav-hud').style.display = 'none'; return; }
+  navArrows.update(nav.path, fcar.x, fcar.z, performance.now() / 1000);
+  let len = 0;
+  if (nav.path) for (let i = 1; i < nav.path.length; i++) len += Math.hypot(nav.path[i][0] - nav.path[i - 1][0], nav.path[i][1] - nav.path[i - 1][1]);
+  const el = $('nav-hud');
+  el.style.display = '';
+  el.textContent = `🧭 ${nav.nm}　${(len || d) >= 1000 ? `${((len || d) / 1000).toFixed(1)} km` : `${Math.round(len || d)} m`}`;
+}
+function openMap() {
+  if (!bigmap || state !== 'free') return;
+  mapOpen = true;
+  bigmap.cx = fcar.x; bigmap.cz = fcar.z;
+  $('map-page').classList.remove('hidden');
+}
+function closeMap() { mapOpen = false; $('map-page').classList.add('hidden'); }
+function buildMapShortcuts() {
+  const box = $('map-marks');
+  const want = ['台北101', '臺北市政府', '國父紀念館', '臺北大巨蛋', '臺北小巨蛋', '臺北國際會議中心', '捷運象山站', '臺北市議會'];
+  for (const nm of want) {
+    const l = landmarks.find((m) => m.nm === nm);
+    if (!l) continue;
+    const b = document.createElement('button');
+    b.textContent = nm.replace(/^臺北/, '');
+    b.addEventListener('click', () => setNav(l.x, l.z, l.nm));
+    box.appendChild(b);
+  }
+}
+$('btn-map').addEventListener('click', openMap);
+$('map-close').addEventListener('click', closeMap);
+$('map-clear').addEventListener('click', () => { nav = null; closeMap(); });
+addEventListener('keydown', (e) => { if (e.code === 'KeyM' && !e.repeat) { if (mapOpen) closeMap(); else openMap(); } });
+
 // 鏡頭：車後追蹤／車內（📷 按鈕、電腦 C）；車內時藏起車身，畫面疊上儀表板與雨刷（cockpit.ts）
 let camView: 'chase' | 'cockpit' = new URLSearchParams(location.search).get('view') === 'cockpit' ? 'cockpit' : 'chase';
 const cockpit = new Cockpit($<HTMLCanvasElement>('cockpit'));
@@ -1494,11 +1555,13 @@ function updateFreeHud(dt: number) {
       }
       el.className = w ? 'show' : '';
     }
-    const base = taxiOn() ? { ...taxi!.mapInfo, rivals: [], flags: [] } : sr?.mapInfo;
+    const navInfo = nav?.path && !taxiOn() && !(sr?.active) ? { route: nav.path, next: [nav.x, nav.z] as [number, number], rivals: [], flags: [] } : undefined;
+    const base = taxiOn() ? { ...taxi!.mapInfo, rivals: [], flags: [] } : navInfo ?? sr?.mapInfo;
     const cops = police?.mapDots ?? [];
     minimap?.draw(fcar.x, fcar.z, fcar.h, cops.length ? { route: null, next: null, flags: [], ...base, rivals: [...(base?.rivals ?? []), ...cops] } : base);
     updateWantedHud();
     updateDamageHud();
+    updateNav(dt);
     playTrafficHonks();
     playScreams();
     updateTaxiHud();
@@ -1750,7 +1813,8 @@ function runSim() {
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if ((state === 'race' || state === 'free') && dt > 0) {
+  if (mapOpen && bigmap) bigmap.draw(fcar.x, fcar.z, fcar.h, nav, nav?.path ?? null);
+  if ((state === 'race' || state === 'free') && dt > 0 && !mapOpen) {
     // 每一幀剛好把物理推進到這一幀的時間：切成 n 小步（每步 ≤ 1/120 秒）。
     // 之前固定 1/120 秒一步、剩下的留到下一幀，幀率不是 60/120 時每幀步數忽多忽少，畫面會一頓一頓。
     const n = Math.max(1, Math.ceil(dt / STEP - 1e-6)), sub = dt / n;
