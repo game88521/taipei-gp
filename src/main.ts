@@ -1477,7 +1477,7 @@ function freeStep(dt: number) {
   const heavy = heavyAcc >= 1 / 60; // 車流、行人每秒更新 60 次就夠（玩家的車照樣每步都算）
   let trafficHit = 0, pedHit = false;
   if (traffic && !NO_TRAFFIC && heavy) {
-    traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? []), ...(police?.units.map((u) => u.car) ?? [])]); // 車流會讓對手、過馬路的行人、警車
+    traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? []), ...(police?.units.map((u) => u.car) ?? []), ...(police?.suspect ? [police.suspect.car] : [])]); // 車流會讓對手、過馬路的行人、警車、嫌犯車
     trafficHit = traffic.collidePlayer(fcar);
   }
   if (traffic && !NO_TRAFFIC && !heavy) trafficHit = traffic.collidePlayer(fcar);
@@ -1694,7 +1694,7 @@ if (FREE) void cityLoad.then(() => {
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
-    if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 路障${police?.blocks.length} 直升機${police?.heli.on ? "有" : "無"} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
+    if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 路障${police?.blocks.length} 直升機${police?.heli.on ? "有" : "無"} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 嫌犯撞車${police?.suspectBumps} 疊住${police?.suspectOverlap} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
     document.title = `FREE 尖叫${peds?.screamCount} 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
