@@ -130,6 +130,9 @@ export class Weather {
   private nightOnly: THREE.Object3D[] = [];
   private roads: { mesh: THREE.Mesh; dry: THREE.Material; wet?: THREE.Material }[] = [];
   private shadowMats: THREE.MeshBasicMaterial[] = [];
+  private nightGlow: THREE.MeshBasicMaterial[] = []; // 晚上變亮的招牌、燈圈（userData.nightScale）
+  private nightEmis: THREE.MeshLambertMaterial[] = []; // 晚上換發光色的（101 塔身）
+  private tickers: THREE.Texture[] = []; // 會捲動的跑馬燈
   headlights: THREE.Object3D[] = [];
   constructor(private scene: THREE.Scene, private world: World, rainDrops: number) {
     this.rain = new Rain(scene, rainDrops);
@@ -137,10 +140,11 @@ export class Weather {
 
   /** 城市載入後掃一遍：有標記的材質（窗戶、路燈、道路、只在晚上出現的東西） */
   collect() {
-    this.windows = []; this.lamps = []; this.nightOnly = []; this.roads = []; this.shadowMats = [];
+    this.windows = []; this.lamps = []; this.nightOnly = []; this.roads = []; this.shadowMats = []; this.nightGlow = []; this.nightEmis = []; this.tickers = [];
     const seen = new Set<THREE.Material>();
     this.scene.traverse((o) => {
       if (o.userData.nightOnly) this.nightOnly.push(o);
+      if (o.userData.ticker && !this.tickers.includes(o.userData.ticker)) this.tickers.push(o.userData.ticker);
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (!m || Array.isArray(m)) return;
       if (m.userData.road) this.roads.push({ mesh: o as THREE.Mesh, dry: m });
@@ -149,6 +153,8 @@ export class Weather {
       if (m.userData.windows) this.windows.push(m as THREE.MeshLambertMaterial);
       if (m.userData.lamp) { m.userData.base ??= (m as THREE.MeshBasicMaterial).color.clone(); this.lamps.push(m as THREE.MeshBasicMaterial); }
       if (m.userData.bakedShadow) this.shadowMats.push(m as THREE.MeshBasicMaterial);
+      if (m.userData.nightScale) this.nightGlow.push(m as THREE.MeshBasicMaterial);
+      if (m.userData.nightEmissive) this.nightEmis.push(m as THREE.MeshLambertMaterial);
     });
   }
 
@@ -182,6 +188,10 @@ export class Weather {
     for (const h of this.headlights) { h.visible = p.beam > 0; h.userData.beamBase = p.beam; (h.userData.beam as THREE.MeshBasicMaterial).opacity = p.beam; }
     w.setMountains(p.mtn);
     for (const m of this.shadowMats) m.opacity = p.shadow;
+    // 夜晚程度 0~1（照窗戶亮度換算，自動循環時會跟著漸變）
+    const nightness = Math.max(0, Math.min(1, (p.windows - 0.12) / (1.25 - 0.12)));
+    for (const m of this.nightGlow) m.color.setScalar(0.85 + ((m.userData.nightScale as number) - 0.85) * nightness);
+    for (const m of this.nightEmis) { const [d, n] = m.userData.nightEmissive as [string, string]; m.emissive.set(d).lerp(new THREE.Color(n), nightness); }
     if (bloom) bloom.strength = p.bloom;
     if (grade) (grade.uniforms.tint.value as THREE.Vector3).set(...p.tint);
     this.rain.mesh.visible = p.rain;
@@ -203,5 +213,8 @@ export class Weather {
   /** 環境反射用：太陽（月亮）的亮度顏色 */
   get envSun() { const p = this.cur; return new THREE.Color(p.sun).multiplyScalar(p.disc > 0.3 ? 4 : p.night ? 0.3 : 1.2); }
 
-  update(dt: number, cam: THREE.Vector3) { this.rain.update(dt, cam); }
+  update(dt: number, cam: THREE.Vector3) {
+    this.rain.update(dt, cam);
+    for (const t of this.tickers) t.offset.x = (t.offset.x + dt * 0.035) % 1;
+  }
 }

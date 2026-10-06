@@ -131,7 +131,9 @@ function textAtlas(items: string[][], draw: (g: CanvasRenderingContext2D, x: num
       chunk.forEach((it, k) => draw(g, (k % 2) * 512, Math.floor(k / 2) * 128, it));
     }, false);
     tex.anisotropy = 8;
-    mats.push(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, ...basic }));
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, ...basic });
+    if (basic.transparent) mat.userData.nightScale = 1.7; // 地標屋頂招牌：晚上更亮（路名牌不透明，不變）
+    mats.push(mat);
     chunk.forEach((_, k) => {
       const cx = k % 2, cy = Math.floor(k / 2);
       slots.push({ mat: mats.length - 1, u0: cx / 2, u1: (cx + 1) / 2, v0: 1 - (cy + 1) / 8, v1: 1 - cy / 8 });

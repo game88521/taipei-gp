@@ -140,7 +140,9 @@ function storefrontMat() {
       for (let s = 0; s < 3; s++) g.fillRect(x + 20 + s * 80, 150 + (s % 2) * 20, 50, 80); // 店內貨架剪影
     });
   });
-  return new THREE.MeshBasicMaterial({ map, toneMapped: false });
+  const m = new THREE.MeshBasicMaterial({ map, toneMapped: false });
+  m.userData.nightScale = 1.45; // 店面燈箱：晚上更亮、會暈開
+  return m;
 }
 
 /** 直式霓虹招牌圖集（8 格） */
@@ -164,7 +166,9 @@ function signMat() {
       chars.forEach((ch, n) => g.fillText(ch, x0 + 64, 22 + step * (n + 0.5)));
     });
   }, false);
-  return new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide, toneMapped: false });
+  const m = new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide, toneMapped: false });
+  m.userData.nightScale = 1.6; // 直式招牌
+  return m;
 }
 
 /** 累積三角形用的小工具 */
@@ -630,8 +634,10 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
 function build101(): THREE.Group {
   const g = new THREE.Group();
   const glass = new THREE.MeshLambertMaterial({ color: '#5f8f88', emissive: '#16332f' });
+  glass.userData.nightEmissive = ['#16332f', '#2fbf8f']; // 晚上塔身亮翠綠（weather.ts）
   const dark = new THREE.MeshLambertMaterial({ color: '#3f5f5a' });
   const glow = new THREE.MeshBasicMaterial({ color: '#c8fff0', toneMapped: false });
+  glow.userData.nightScale = 2.4; // 竹節之間的燈圈：晚上更亮
   const frustum = (top: number, bot: number, h: number) => new THREE.CylinderGeometry(top * Math.SQRT2, bot * Math.SQRT2, h, 4, 1).rotateY(Math.PI / 4);
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, y: number) => {
     const m = new THREE.Mesh(geo, mat);
@@ -646,6 +652,38 @@ function build101(): THREE.Group {
     add(frustum(29, 23, 35.5), glass, y + 17.75);
     add(frustum(29.6, 29.6, 1.2), glow, y + 35.5);
     y += 35.8;
+  }
+  // 跑馬燈：第 7 節外圍四面的 LED 字幕（晚上才亮，文字一直往左捲）
+  {
+    const c = document.createElement('canvas');
+    c.width = 2048; c.height = 96;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, 2048, 96);
+    x.font = '900 64px "Microsoft JhengHei","PingFang TC",Arial,sans-serif';
+    x.textBaseline = 'middle';
+    const text = '  TAIPEI 101  ★  台北街道賽 TAIPEI STREET GP  ★  今晚開跑  ★  ';
+    const grd = x.createLinearGradient(0, 0, 2048, 0);
+    grd.addColorStop(0, '#ffd84a'); grd.addColorStop(0.5, '#7fffd4'); grd.addColorStop(1, '#ff7ab8');
+    x.fillStyle = grd;
+    x.fillText(text, 0, 50);
+    x.fillText(text, x.measureText(text).width, 50);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(0.5, 1);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: new THREE.Color(1.6, 1.6, 1.6) });
+    const yy = 92 + 35.8 * 6 + 18, half = 27.4;
+    for (let k = 0; k < 4; k++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 - 2, 7), mat);
+      const a = (k * Math.PI) / 2;
+      m.position.set(Math.sin(a) * half, yy, Math.cos(a) * half);
+      m.rotation.y = a;
+      m.userData.nightOnly = true;
+      m.userData.ticker = tex;
+      m.visible = false;
+      g.add(m);
+    }
   }
   // 頂部（收窄兩段）＋ 塔尖
   add(frustum(15, 18, 30), glass, y + 15);
