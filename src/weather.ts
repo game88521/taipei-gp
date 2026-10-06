@@ -140,7 +140,7 @@ export class Weather {
     for (const m of this.windows) m.emissiveIntensity = p.windows;
     for (const m of this.lamps) m.color.copy(m.userData.base as THREE.Color).multiplyScalar(p.lamp);
     for (const o of this.nightOnly) o.visible = p.night;
-    for (const h of this.headlights) { h.visible = p.beam > 0; (h.userData.beam as THREE.MeshBasicMaterial).opacity = p.beam; }
+    for (const h of this.headlights) { h.visible = p.beam > 0; h.userData.beamBase = p.beam; (h.userData.beam as THREE.MeshBasicMaterial).opacity = p.beam; }
     w.setMountains(p.mtn);
     for (const m of this.shadowMats) m.opacity = p.shadow;
     if (bloom) bloom.strength = p.bloom;

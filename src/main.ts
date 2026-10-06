@@ -14,6 +14,7 @@ import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
 import { Weather, headlightRig, TIME_NAME, type TimeKind } from './weather';
 import { Cockpit } from './cockpit';
+import { Damage } from './damage';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -511,6 +512,8 @@ const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
 // 鏡頭：車後追蹤／車內（📷 按鈕、電腦 C）；車內時藏起車身，畫面疊上儀表板與雨刷（cockpit.ts）
 let camView: 'chase' | 'cockpit' = new URLSearchParams(location.search).get('view') === 'cockpit' ? 'cockpit' : 'chase';
 const cockpit = new Cockpit($<HTMLCanvasElement>('cockpit'));
+const damage = new Damage(scene); // 車損（damage.ts）：自由駕駛、計程車、街頭比賽都算
+if (new URLSearchParams(location.search).get('dmg')) damage.value = +new URLSearchParams(location.search).get('dmg')!; // 測試：&dmg=0.8
 // 駕駛的眼睛在車上的位置（本地座標：x 往左、y 往上、z 往前；台灣駕駛座在左邊）
 const EYE: Record<string, [number, number, number]> = { sedan: [0.38, 1.2, 0.15], taxi: [0.38, 1.2, 0.15], police: [0.38, 1.2, 0.15], muscle: [0.4, 1.12, -0.1], super: [0.38, 0.98, -0.25], pickup: [0.4, 1.66, 1.5], f1: [0, 0.98, -0.05] };
 function toggleCam() { camView = camView === 'chase' ? 'cockpit' : 'chase'; camSnap = true; }
@@ -588,6 +591,7 @@ function updateVisuals(dt: number) {
   model.body.visible = !inCar;
   for (const w of [...model.steer, ...model.spin]) w.visible = !inCar;
   model.root.traverse((o) => { if (o.userData.lens) o.visible = !inCar; });
+  if (mode === 'free' && state === 'free') damage.update(dt, model, f1Look ? '#d40000' : save.paint?.[chosen.id] ?? pv.baseColor, vc.x, -0.25, vc.z, vc.h);
   if (inCar) {
     const [ex, ey, ez] = EYE[f1Look ? 'f1' : chosen.id] ?? EYE.sedan;
     const hx = Math.sin(vc.h), hz = Math.cos(vc.h), lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 前、左
@@ -742,6 +746,7 @@ function refreshGarage() {
         }
         save.paint = { ...save.paint, [preview.id]: c };
         pv.setPaint(c);
+        damage.refreshPaint();
         writeSave();
         refreshGarage();
       });
@@ -1147,6 +1152,20 @@ function playTrafficHonks() {
     sound.horn(vol, 0.82 + Math.random() * 0.35, h.angry ? 0.5 : 0.25 + Math.random() * 0.2);
   }
 }
+// 車況與修車：車損 30% 以上、車子停住時出現修車鍵（NT$100，沒錢免費）
+function updateDamageHud() {
+  const el = $('dmg'), btn = $('btn-repair'), d = damage.value;
+  const show = mode === 'free' && d > 0.05;
+  el.style.display = show ? '' : 'none';
+  if (show) { el.textContent = `🔧 車況 ${Math.round((1 - d) * 100)}%`; el.className = d > 0.75 ? 'bad' : d > 0.45 ? 'warn' : ''; }
+  btn.style.display = mode === 'free' && d > 0.3 && Math.abs(fcar.v) < 1 && state === 'free' ? '' : 'none';
+}
+$('btn-repair').addEventListener('click', () => {
+  const cost = money() >= 100 ? 100 : 0;
+  if (cost) setMoney(money() - cost);
+  damage.repair();
+  toast(cost ? '🔧 修好了（NT$ 100）' : '🔧 修好了（這次免費）', '');
+});
 function startPursuit() {
   if (!police || chosen.id !== 'police' || mode !== 'free' || state !== 'free') return;
   const m = police.startPursuit(fcar);
@@ -1302,7 +1321,7 @@ function streetRacing() {
   return mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
 }
 function freeStep(dt: number) {
-  fcar.spec = streetRacing() ? DEFAULT_SPEC : chosen.spec;
+  fcar.spec = streetRacing() ? DEFAULT_SPEC : damage.speedMul < 1 ? { ...chosen.spec, vmax: chosen.spec.vmax * damage.speedMul } : chosen.spec;
   if (PURSUIT_TEST && police && !police.suspect && policeLog.length === 0) startPursuit();
   if (HONK_TEST && traffic && FREE_SIM) {
     honkT += dt;
@@ -1317,7 +1336,9 @@ function freeStep(dt: number) {
   let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
-  if (breakables) impact = Math.max(impact, breakables.hit(fcar)); // 樹、路燈：撞倒過去
+  const knockHit = breakables ? breakables.hit(fcar) : 0; // 樹、路燈：撞倒過去
+  const hardHit = impact;
+  impact = Math.max(impact, knockHit);
   if (sr) {
     const msg = sr.update(dt, fcar, traffic);
     if (msg) { bigMsg(msg); if (msg.length <= 3) sound.beep(msg === 'GO!' ? 880 : 520, 0.25); }
@@ -1353,6 +1374,9 @@ function freeStep(dt: number) {
   }
 
   if (impact) sound.hit(impact * 2.5);
+  // 車損：撞牆、撞車照實算；撞倒行道樹、路燈這種一撞就倒的只算 35%
+  const dmgHit = Math.max(hardHit, trafficHit, knockHit * 0.35, impact === knockHit ? 0 : impact);
+  if (dmgHit) damage.hit(dmgHit, fcar.x + Math.sin(fcar.h) * 2.2, 0.5, fcar.z + Math.cos(fcar.h) * 2.2);
   if (taxi && taxiOn()) {
     if (impact) taxi.onHit(impact);
     const msg = taxi.update(dt, fcar);
@@ -1399,6 +1423,7 @@ function updateFreeHud(dt: number) {
     const cops = police?.mapDots ?? [];
     minimap?.draw(fcar.x, fcar.z, fcar.h, cops.length ? { route: null, next: null, flags: [], ...base, rivals: [...(base?.rivals ?? []), ...cops] } : base);
     updateWantedHud();
+    updateDamageHud();
     playTrafficHonks();
     updateTaxiHud();
     updateSrHud();
@@ -1619,7 +1644,7 @@ if (FREE) void cityLoad.then(() => {
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
     if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
-    document.title = `FREE x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
+    document.title = `FREE 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
@@ -1681,4 +1706,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get state() { return state; } };
