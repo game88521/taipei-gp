@@ -1432,7 +1432,7 @@ function carGear(v: number) {
   const lo = CAR_GEARS[g], hi = g === CAR_GEARS.length - 1 ? CAR_VMAX : CAR_GEARS[g + 1];
   return { n: g + 1, rpm: Math.min(1, (v - lo) / (hi - lo)) };
 }
-let heavyAcc = 0;
+let heavyAcc = 0, heliAcc = 0;
 /** 街頭比賽進行中（倒數、比賽、剛結束）：開 F1、用原本調好的性能（對手的強度是照這個調的） */
 function streetRacing() {
   return mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
@@ -1518,6 +1518,8 @@ function freeStep(dt: number) {
     if (police.suspect) siren = 0.75;
   }
   sound.sirenAt(Math.max(0, siren), performance.now() / 1000);
+  // 直升機旋翼聲
+  if (police?.heli.on) { heliAcc += dt; if (heliAcc > 0.12) { heliAcc = 0; sound.thump(police.heliVol); } }
 }
 function updateFreeHud(dt: number) {
   const v = fcar.v;
@@ -1682,7 +1684,7 @@ if (FREE) void cityLoad.then(() => {
     roadAcc = lmAcc = 1;
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
-    if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
+    if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 路障${police?.blocks.length} 直升機${police?.heli.on ? "有" : "無"} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
     document.title = `FREE 尖叫${peds?.screamCount} 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });

@@ -187,6 +187,22 @@ export class Sound {
     o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
   }
 
+  /** 直升機旋翼：一下低沉的「噠」（main 每 0.12 秒呼叫一次） */
+  thump(vol: number) {
+    if (!this.ctx || !this.enabled || vol <= 0.02) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180;
+    const g = this.ctx.createGain(), t = this.ctx.currentTime;
+    g.gain.setValueAtTime(0.5 * vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    src.connect(lp).connect(g).connect(this.fx);
+    src.start(t);
+    src.stop(t + 0.1);
+  }
+
   beep(freq: number, dur = 0.18) {
     if (!this.ctx || !this.enabled) return;
     const o = this.ctx.createOscillator();

@@ -27,6 +27,41 @@ const LOSE_DIST = 110, BUST_TIME = 3;
 export const LOSE_TIME = 7;
 const MAX_CHASERS = 3; // 同時追你的警車最多幾台
 
+/** 拒馬：被撞到會飛出去（簡單的拋物線＋翻滾），一段時間後消失 */
+interface Barrier { m: THREE.Mesh; x: number; z: number; vx: number; vy: number; vz: number; y: number; spin: number; hit: boolean }
+/** 路障：兩台橫停的警車＋中間一排拒馬 */
+interface Roadblock { cops: Unit[]; bars: Barrier[]; x: number; z: number; age: number }
+
+/** 直升機：機身、尾桁、旋翼、探照燈光錐＋地上的光圈 */
+function makeHeli(): { g: THREE.Group; rotor: THREE.Object3D; tail: THREE.Object3D; beam: THREE.Mesh; spot: THREE.Mesh } {
+  const g = new THREE.Group();
+  const body = new THREE.MeshLambertMaterial({ color: '#1d2a4a' }), white = new THREE.MeshLambertMaterial({ color: '#e8e8e8' });
+  const cab = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 10).scale(1, 0.85, 1.7), body);
+  g.add(cab);
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1, 0.8, 1.2).rotateX(Math.PI / 2.4).translate(0, 0.2, 1.4), new THREE.MeshStandardMaterial({ color: '#7fb6d8', metalness: 0.5, roughness: 0.1 }));
+  g.add(glass);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.25, 3.6).translate(0, -0.3, 0), white);
+  g.add(stripe);
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.4, 5, 8).rotateX(Math.PI / 2).translate(0, 0.3, -4.2), body);
+  g.add(boom);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 0.8).translate(0, 0.9, -6.6), body);
+  g.add(fin);
+  for (const s of [-1, 1]) g.add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 3.2).translate(s * 1.1, -1.55, 0), white)); // 起落架
+  const rotor = new THREE.Group();
+  for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 6.2), new THREE.MeshLambertMaterial({ color: '#202226' })); b.rotation.y = (k * Math.PI) / 4; b.position.z = 0; rotor.add(b); }
+  rotor.position.y = 1.55;
+  g.add(rotor);
+  const tail = new THREE.Group();
+  tail.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.5, 0.18), new THREE.MeshLambertMaterial({ color: '#202226' })));
+  tail.position.set(0.15, 0.9, -6.6);
+  g.add(tail);
+  // 探照燈：往下的光錐（加法混色）＋地上的光圈
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(7, 1, 24, 1, true).translate(0, -0.5, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.95, 1.1), transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  const spot = new THREE.Mesh(new THREE.CircleGeometry(7, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.1, 1.1, 1.2), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -60 }));
+  g.visible = beam.visible = spot.visible = false;
+  return { g, rotor, tail, beam, spot };
+}
+
 /** 兩台 FreeCar 互撞：照質量交換動量（a 是主動算的那台，b 吃反作用）；回傳撞擊力道 */
 export function bumpCars(a: FreeCar, b: FreeCar): number {
   if (Math.abs(a.x - b.x) > 8 || Math.abs(a.z - b.z) > 8) return 0;
@@ -59,6 +94,14 @@ export class Police {
   private lastSignal: object | null = null;
   private crashCool = 0;
   private copPool: PlayerVehicle[] = [];
+  private blockPool: PlayerVehicle[] = []; // 路障用的警車（另外一組）
+  private barPool: THREE.Mesh[] = [];
+  blocks: Roadblock[] = [];
+  private blockT = 0;
+  heli = { on: false, x: 0, z: 0, h: 0, vx: 0, vz: 0 };
+  private heliM: ReturnType<typeof makeHeli>;
+  /** 直升機旋翼聲要不要播（main 用）：0~1 */
+  heliVol = 0;
   private suspectPv: PlayerVehicle;
   private suspectPaint = ['#2a2a2a', '#7a1f1f', '#e8e8e8', '#304a6e'];
   constructor(scene: THREE.Scene, private router: Router, private net: RoadNet) {
@@ -71,6 +114,23 @@ export class Police {
     this.suspectPv = buildPlayerVehicle(vehicleById('sedan'));
     this.suspectPv.model.root.visible = false;
     scene.add(this.suspectPv.model.root);
+    for (let k = 0; k < 4; k++) {
+      const pv = buildPlayerVehicle(vehicleById('police'));
+      pv.model.root.visible = false;
+      scene.add(pv.model.root);
+      this.blockPool.push(pv);
+    }
+    // 拒馬：紅白相間的橫桿＋兩支腳
+    const barTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 8; const x = c.getContext('2d')!; for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#ffffff' : '#e01818'; x.fillRect(i * 8, 0, 8, 8); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    for (let k = 0; k < 12; k++) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 0.12).translate(0, 0.95, 0), new THREE.MeshLambertMaterial({ map: barTex }));
+      for (const s of [-1, 1]) m.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 1, 0.5).translate(s * 1.0, 0.5, 0), new THREE.MeshLambertMaterial({ color: '#d8d8d8' })));
+      m.visible = false;
+      scene.add(m);
+      this.barPool.push(m);
+    }
+    this.heliM = makeHeli();
+    scene.add(this.heliM.g, this.heliM.beam, this.heliM.spot);
   }
 
   get wanted() { return this.stars > 0; }
@@ -92,6 +152,43 @@ export class Police {
     this.heat = 0; this.stars = 0; this.lostT = 0; this.bustT = 0;
     for (const u of this.units) u.pv.model.root.visible = false;
     this.units = [];
+    for (const b of this.blocks) this.removeBlock(b);
+    this.blocks = [];
+    this.heli.on = false;
+    this.heliVol = 0;
+  }
+
+  private removeBlock(b: Roadblock) {
+    for (const c of b.cops) c.pv.model.root.visible = false;
+    for (const r of b.bars) r.m.visible = false;
+  }
+
+  /** 4 星以上：在玩家前方約 200 m 的路上設路障（兩台橫停的警車＋中間一排拒馬） */
+  private placeBlock(p: FreeCar) {
+    const fx = Math.sin(p.h), fz = Math.cos(p.h);
+    const at = this.roadPointNear(p.x + fx * 200, p.z + fz * 200, 0, p.h);
+    if (!at) return;
+    const [x, z, h] = at;
+    const sx = Math.cos(h), sz = -Math.sin(h); // 道路的橫向
+    const used = new Set(this.blocks.flatMap((b) => b.cops.map((c) => c.pv)));
+    const pvs = this.blockPool.filter((pv) => !used.has(pv)).slice(0, 2);
+    if (pvs.length < 2) return;
+    const usedBars = new Set(this.blocks.flatMap((b) => b.bars.map((r) => r.m)));
+    const bars = this.barPool.filter((m) => !usedBars.has(m)).slice(0, 4);
+    const cops: Unit[] = pvs.map((pv, i) => {
+      const car = new FreeCar();
+      car.spec = COP_SPEC;
+      const off = (i ? 1 : -1) * 6.5;
+      car.place(x + sx * off, z + sz * off, h + Math.PI / 2 + (i ? 0.2 : -0.2)); // 車身橫在路上
+      return { car, pv, path: null, repath: 0, stuck: 0, reverse: 0 };
+    });
+    const bs: Barrier[] = bars.map((m, i) => {
+      const off = (i - 1.5) * 2.4;
+      m.visible = true;
+      m.rotation.set(0, h + Math.PI / 2, 0);
+      return { m, x: x + sx * off, z: z + sz * off, vx: 0, vy: 0, vz: 0, y: -0.25, spin: 0, hit: false };
+    });
+    this.blocks.push({ cops, bars: bs, x, z, age: 0 });
   }
 
   /** 開巡邏車時：叫出一台逃逸的嫌犯車 */
@@ -215,10 +312,52 @@ export class Police {
         if (hit > 4 && crimesOn && toward > 6 && toward > copToward) msg = this.crime(0.4, '撞警車') ?? msg;
       }
       for (let i = 0; i < this.units.length; i++) for (let j = i + 1; j < this.units.length; j++) bumpCars(this.units[i].car, this.units[j].car);
+      // ---- 路障（4 星以上）
+      this.blockT -= dt;
+      if (this.stars >= 4 && this.blockT <= 0 && this.blocks.length < 2 && Math.abs(p.v) > 8) { this.blockT = 25; this.placeBlock(p); }
+      for (const b of this.blocks) {
+        b.age += dt;
+        for (const c of b.cops) {
+          c.car.update(dt, 0, false, true, col); // 停著（被撞會被推動）
+          bumpCars(p, c.car);
+          nearest = Math.min(nearest, Math.hypot(c.car.x - p.x, c.car.z - p.z));
+        }
+        for (const r of b.bars) {
+          if (!r.hit) {
+            const d = Math.hypot(r.x - p.x, r.z - p.z);
+            if (d < 2.2 && Math.abs(p.v) > 1) {
+              // 撞到拒馬：飛出去翻滾，車子被擋一下
+              r.hit = true;
+              r.vx = p.vx * 0.9 + (r.x - p.x) * 2; r.vz = p.vz * 0.9 + (r.z - p.z) * 2; r.vy = 4 + Math.abs(p.v) * 0.25; r.spin = (Math.random() - 0.5) * 12;
+              p.vx *= 0.82; p.vz *= 0.82;
+            }
+          } else if (r.y > -0.25 || r.vy > 0) {
+            r.vy -= 18 * dt;
+            r.x += r.vx * dt; r.z += r.vz * dt; r.y = Math.max(-0.25, r.y + r.vy * dt);
+            r.m.rotation.x += r.spin * dt;
+            if (r.y <= -0.25) { r.vx *= 0.4; r.vz *= 0.4; r.vy = r.vy < -3 ? -r.vy * 0.3 : 0; }
+          }
+          r.m.position.set(r.x, r.y, r.z);
+        }
+      }
+      this.blocks = this.blocks.filter((b) => { const far = b.age > 70 || Math.hypot(b.x - p.x, b.z - p.z) > 450; if (far) this.removeBlock(b); return !far; });
+      // ---- 直升機（5 星）：在玩家上方跟著飛，探照燈照著你；在你頭上 70 m 內就算看到你
+      if (this.stars >= 5 && !this.heli.on) { this.heli.on = true; this.heli.x = p.x - Math.sin(p.h) * 260; this.heli.z = p.z - Math.cos(p.h) * 260; }
+      if (this.heli.on) {
+        const H = this.heli, dx = p.x + p.vx * 1.2 - H.x, dz = p.z + p.vz * 1.2 - H.z, d = Math.hypot(dx, dz);
+        const want = Math.min(30, d * 0.8); // 最快約 108 km/h：開更快就甩得掉
+        H.vx += ((dx / (d || 1)) * want - H.vx) * Math.min(1, dt * 1.2);
+        H.vz += ((dz / (d || 1)) * want - H.vz) * Math.min(1, dt * 1.2);
+        H.x += H.vx * dt; H.z += H.vz * dt;
+        if (Math.hypot(H.vx, H.vz) > 2) H.h = Math.atan2(H.vx, H.vz);
+        const hd = Math.hypot(H.x - p.x, H.z - p.z);
+        if (hd < 70) nearest = Math.min(nearest, 0); // 被直升機照到＝被看到
+        this.heliVol = Math.max(0, 1 - hd / 400);
+      }
       // 太遠的警車收掉（之後會在附近重新出現）
       this.units = this.units.filter((u) => { const far = Math.hypot(u.car.x - p.x, u.car.z - p.z) > 450; if (far) u.pv.model.root.visible = false; return !far; });
       // 甩掉：離所有警車夠遠、撐一段時間
-      if (this.units.length && nearest > LOSE_DIST) this.lostT += dt; else this.lostT = 0; // 警車還沒出現時不算甩開
+      if ((this.units.length || this.blocks.length || this.heli.on) && nearest > LOSE_DIST) this.lostT += dt; else this.lostT = 0; // 警車還沒出現時不算甩開
       if (this.lostT > LOSE_TIME) { this.clear(); msg = '😎 甩掉警察了！'; }
       // 被逮捕：警車在旁邊、自己停住
       if (nearest < 9 && Math.hypot(p.vx, p.vz) < 4) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt * 2);
@@ -276,12 +415,27 @@ export class Police {
       u.pv.tick(t);
     };
     for (const u of this.units) draw(u);
+    for (const b of this.blocks) for (const c of b.cops) draw(c);
     if (this.suspect) draw(this.suspect);
+    // 直升機
+    const H = this.heli, M = this.heliM;
+    M.g.visible = M.beam.visible = M.spot.visible = H.on;
+    if (H.on) {
+      const alt = 55;
+      M.g.position.set(H.x, alt, H.z);
+      M.g.rotation.set(Math.min(0.25, Math.hypot(H.vx, H.vz) * 0.01), H.h, 0, 'YXZ');
+      M.rotor.rotation.y += dt * 28;
+      M.tail.rotation.x += dt * 40;
+      // 探照燈：從機腹垂直往下打（直升機緊跟著玩家，光圈就落在玩家附近）
+      M.spot.position.set(H.x, -0.2, H.z);
+      M.beam.position.set(H.x, alt - 1.5, H.z);
+      M.beam.scale.set(1, alt - 1.5, 1);
+    }
   }
 
   /** 小地圖用：警車（紅藍）與嫌犯（橘） */
   get mapDots(): { x: number; z: number; color: string }[] {
-    return [...this.units.map((u) => ({ x: u.car.x, z: u.car.z, color: '#3a6cff' })), ...(this.suspect ? [{ x: this.suspect.car.x, z: this.suspect.car.z, color: '#ff8a1a' }] : [])];
+    return [...this.units.map((u) => ({ x: u.car.x, z: u.car.z, color: '#3a6cff' })), ...this.blocks.map((b) => ({ x: b.x, z: b.z, color: '#ff3b30' })), ...(this.heli.on ? [{ x: this.heli.x, z: this.heli.z, color: '#ffffff' }] : []), ...(this.suspect ? [{ x: this.suspect.car.x, z: this.suspect.car.z, color: '#ff8a1a' }] : [])];
   }
 
   hide() { this.clear(); this.endPursuit(); }
