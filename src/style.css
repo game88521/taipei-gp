@@ -587,6 +587,15 @@ html:not(.touch) #btn-horn { display: none; }
 #lb-list span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #lb-list em { font: 700 14px var(--mono); font-style: normal; }
 
+/* ---------------- 設定滑桿、教學 */
+.opts input[type='range'] { flex: 1; min-width: 80px; accent-color: #e10600; }
+.opts label.q #sens-val { width: auto; margin-left: 6px; }
+.opts .vols { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; width: 100%; font-size: 13px; color: var(--muted); }
+.opts .vols input { flex: 1 1 70px; }
+#tut { z-index: 8; }
+#tut .tut-step { color: var(--muted); }
+#tut .tut-text { font-size: 16px; line-height: 1.6; margin: 10px 0 16px; text-align: left; }
+
 /* ---------------- 成就頁 */
 #ach-page { z-index: 6; }
 #ach-page .card { max-height: 92vh; overflow-y: auto; }

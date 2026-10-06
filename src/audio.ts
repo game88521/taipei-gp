@@ -32,6 +32,17 @@ export class Sound {
   private sirenGain!: GainNode;
   private prof: EngineProfile = ENGINES.sedan;
   private profKey = 'sedan';
+  private engBus!: GainNode;
+  private fx!: GainNode;
+  /** 音量 0~1：主音量、引擎聲、音效 */
+  vol = { master: 1, engine: 1, fx: 1 };
+  setVolume(v: Partial<{ master: number; engine: number; fx: number }>) { Object.assign(this.vol, v); this.applyVolume(); }
+  private applyVolume() {
+    if (!this.ctx) return;
+    this.master.gain.value = 0.6 * this.vol.master;
+    this.engBus.gain.value = this.vol.engine;
+    this.fx.gain.value = this.vol.fx;
+  }
 
   /** 一定要在點擊事件裡呼叫（iOS 規定） */
   start() {
@@ -41,6 +52,12 @@ export class Sound {
     this.master = ctx.createGain();
     this.master.gain.value = 0.6;
     this.master.connect(ctx.destination);
+    // 引擎與其他音效分開兩個通道，選單可以各自調音量
+    this.engBus = ctx.createGain();
+    this.engBus.connect(this.master);
+    this.fx = ctx.createGain();
+    this.fx.connect(this.master);
+    this.applyVolume();
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
     this.filter.Q.value = 4;
@@ -53,7 +70,7 @@ export class Sound {
     this.lfoGain.gain.value = 0;
     this.lfo.connect(this.lfoGain).connect(this.am.gain);
     this.lfo.start();
-    this.filter.connect(this.am).connect(this.engGain).connect(this.master);
+    this.filter.connect(this.am).connect(this.engGain).connect(this.engBus);
     this.o1 = ctx.createOscillator();
     this.o2 = ctx.createOscillator();
     this.g2 = ctx.createGain();
@@ -66,7 +83,7 @@ export class Sound {
     this.siren.type = 'triangle';
     this.sirenGain = ctx.createGain();
     this.sirenGain.gain.value = 0;
-    this.siren.connect(this.sirenGain).connect(this.master);
+    this.siren.connect(this.sirenGain).connect(this.fx);
     this.siren.start();
     this.applyProfile();
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
@@ -121,7 +138,7 @@ export class Sound {
     src.buffer = this.noise;
     const g = this.ctx.createGain();
     g.gain.value = Math.min(1, power / 40);
-    src.connect(g).connect(this.master);
+    src.connect(g).connect(this.fx);
     src.start();
   }
 
@@ -137,7 +154,7 @@ export class Sound {
     g.gain.linearRampToValueAtTime(0.16 * vol, t + 0.015);
     g.gain.setValueAtTime(0.16 * vol, t + dur);
     g.gain.linearRampToValueAtTime(0, t + dur + 0.06);
-    lp.connect(g).connect(this.master);
+    lp.connect(g).connect(this.fx);
     for (const f of [415, 523]) {
       const o = ctx.createOscillator();
       o.type = 'square';
@@ -165,7 +182,7 @@ export class Sound {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(0.09 * vol, t + 0.04);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(bp).connect(g).connect(this.master);
+    o.connect(bp).connect(g).connect(this.fx);
     o.start(t); vib.start(t);
     o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
   }
@@ -179,7 +196,7 @@ export class Sound {
     const t = this.ctx.currentTime;
     g.gain.setValueAtTime(0.12, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g).connect(this.master);
+    o.connect(g).connect(this.fx);
     o.start(t);
     o.stop(t + dur);
   }

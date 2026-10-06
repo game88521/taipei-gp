@@ -110,6 +110,14 @@
               <option value="tilt">傾斜手機（陀螺儀）</option>
             </select>
           </label>
+          <label class="q">轉向靈敏度 <input type="range" id="opt-sens" min="0.5" max="1.5" step="0.1" /><small id="sens-val"></small></label>
+          <label class="q">音量
+            <span class="vols">
+              主音量 <input type="range" id="opt-vol-master" min="0" max="1" step="0.05" />
+              引擎 <input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" />
+              音效 <input type="range" id="opt-vol-fx" min="0" max="1" step="0.05" />
+            </span>
+          </label>
           <label class="q">觸控按鈕
             <select id="opt-touch">
               <option value="auto">自動</option>
@@ -136,6 +144,7 @@
           </label>
         </div>
         <p class="help">手機：左下 ◀ ▶ 轉向（可在下面改成拖曳或傾斜手機），右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Ctrl 或 E 開 DRS、B 進站，Esc 暫停。</p>
+        <button id="btn-tut" class="ghost-btn">📖 操作教學</button>
         <button id="btn-ach" class="ghost-btn">🏆 成就與紀錄</button>
         <button id="btn-lb" class="ghost-btn">🌐 線上排行榜（計時賽）</button>
         <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
@@ -190,6 +199,16 @@
         <ol id="lb-list"></ol>
         <button id="lb-submit" class="ghost-btn">上傳我的最快圈</button>
         <button id="lb-close" class="primary">返回</button>
+      </div>
+    </div>
+
+    <div id="tut" class="overlay hidden">
+      <div class="card">
+        <small id="tut-step" class="tut-step"></small>
+        <h1 id="tut-title"></h1>
+        <p id="tut-text" class="tut-text"></p>
+        <button id="tut-next" class="primary">下一頁</button>
+        <button id="tut-skip" class="link">略過教學</button>
       </div>
     </div>
 

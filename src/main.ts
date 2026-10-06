@@ -257,6 +257,55 @@ let steerMode: SteerMode = save.steer ?? (save.opts.tilt ? 'tilt' : 'buttons');
 const timeSel = $<HTMLSelectElement>('opt-time');
 timeSel.value = timeKind;
 timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind; save.time = timeKind; writeSave(); applyWeather(); });
+// 轉向靈敏度、音量（滑桿；記在存檔）
+{
+  const sens = $<HTMLInputElement>('opt-sens');
+  sens.value = String(save.sens ?? 1);
+  input.sens = save.sens ?? 1;
+  const showSens = () => { $('sens-val').textContent = `${(+sens.value).toFixed(1)}×`; };
+  showSens();
+  sens.addEventListener('input', () => { input.sens = save.sens = +sens.value; showSens(); writeSave(); });
+  const vol = save.vol ?? { master: 1, engine: 1, fx: 1 };
+  sound.setVolume(vol);
+  for (const k of ['master', 'engine', 'fx'] as const) {
+    const el = $<HTMLInputElement>(`opt-vol-${k}`);
+    el.value = String(vol[k]);
+    el.addEventListener('input', () => { vol[k] = +el.value; save.vol = vol; sound.setVolume(vol); writeSave(); });
+  }
+}
+// 新手教學：第一次進自由駕駛時跳出來；選單也可以重看
+const TUT_TOUCH = [
+  ['🚗 開車', '左下 ◀ ▶ 轉向（選單可改拖曳或傾斜手機），右下「油門」「煞車」。停住再按煞車＝倒車。'],
+  ['📷 視角與地圖', '右上 📷 切換車後／車內視角，🗺 打開大地圖：點一下就能導航過去。⟲ 卡住時回到路上。'],
+  ['📯 喇叭與車流', '按 📯 喇叭，前面的車會讓路；撞到車會把它撞開，但車子也會受損，停車時可以 🔧 修車。'],
+  ['🚨 小心警察', '撞車、撞人、闖紅燈會被通緝。離警車 110 m 以外撐 7 秒就甩掉，停在警車旁邊會被抓。'],
+  ['🏁 玩法', '路上的橘色光柱是街頭飆車挑戰；選單還有計程車載客、街頭對決、F1 正賽和計時賽（線上排行榜）。'],
+];
+const TUT_KEYS = [
+  ['🚗 開車', '↑／W 油門、↓／S 煞車（停住再按＝倒車）、← →／A D 轉向，Esc 暫停。'],
+  ['📷 視角與地圖', 'C 切換車後／車內視角，M 打開大地圖：點一下就能導航過去。右上 ⟲ 卡住時回到路上。'],
+  ['📯 喇叭與車流', 'H 按喇叭，前面的車會讓路；撞到車會把它撞開，但車子也會受損，停車時可以 🔧 修車。'],
+  ['🚨 小心警察', '撞車、撞人、闖紅燈會被通緝。離警車 110 m 以外撐 7 秒就甩掉，停在警車旁邊會被抓。開巡邏車按 G 可以追緝嫌犯。'],
+  ['🏁 玩法', '路上的橘色光柱是街頭飆車挑戰（Enter 接受）；正賽 Ctrl／E 開 DRS、B 進站。'],
+];
+let tutPage = 0;
+function showTut(page = 0) {
+  const pages = document.documentElement.classList.contains('touch') ? TUT_TOUCH : TUT_KEYS;
+  tutPage = Math.max(0, Math.min(pages.length - 1, page));
+  const [t, b] = pages[tutPage];
+  $('tut-title').textContent = t;
+  $('tut-text').textContent = b;
+  $('tut-step').textContent = `${tutPage + 1} / ${pages.length}`;
+  $('tut-next').textContent = tutPage === pages.length - 1 ? '開始開車！' : '下一頁';
+  $('tut').classList.remove('hidden');
+}
+function closeTut() { $('tut').classList.add('hidden'); save.tutDone = true; writeSave(); }
+$('tut-next').addEventListener('click', () => {
+  const pages = document.documentElement.classList.contains('touch') ? TUT_TOUCH : TUT_KEYS;
+  if (tutPage >= pages.length - 1) closeTut(); else showTut(tutPage + 1);
+});
+$('tut-skip').addEventListener('click', closeTut);
+$('btn-tut').addEventListener('click', () => showTut(0));
 const touchSel = $<HTMLSelectElement>('opt-touch');
 touchSel.value = save.touch ?? 'auto';
 touchSel.addEventListener('change', () => { save.touch = touchSel.value as 'auto' | 'on' | 'off'; writeSave(); applyTouch(); });
@@ -1094,6 +1143,7 @@ $('btn-taxi').addEventListener('click', async () => {
 
 $('btn-free').addEventListener('click', async () => {
   await userStart();
+  if (!save.tutDone && !BOT) showTut(0);
   taxi?.stop();
   mode = 'free';
   field.hide();

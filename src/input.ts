@@ -4,6 +4,8 @@ const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
 export class Input {
   tilt = false;
+  /** 轉向靈敏度（0.5~1.5）：手機按鈕、拖曳、傾斜、鍵盤都乘上這個 */
+  sens = 1;
   private padSteer = 0;
   private padId = -1;
   private brakeIds = new Set<number>();
@@ -117,6 +119,7 @@ export class Input {
     else if (this.tilt && steer === 0) steer = this.tiltSteer;
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
     const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
+    steer = clamp(steer * this.sens);
     return { steer, brake, throttle };
   }
 }
