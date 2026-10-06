@@ -13,6 +13,7 @@ import { makeF1 } from './f1model';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
 import { Weather, headlightRig, TIME_NAME, type TimeKind } from './weather';
+import { Cockpit } from './cockpit';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -507,6 +508,14 @@ let camSnap = true;
 // ?cam=x,y,z,看向x,y,z：固定鏡頭（截圖檢查街景用）
 const CAM = new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null;
 const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
+// 鏡頭：車後追蹤／車內（📷 按鈕、電腦 C）；車內時藏起車身，畫面疊上儀表板與雨刷（cockpit.ts）
+let camView: 'chase' | 'cockpit' = new URLSearchParams(location.search).get('view') === 'cockpit' ? 'cockpit' : 'chase';
+const cockpit = new Cockpit($<HTMLCanvasElement>('cockpit'));
+// 駕駛的眼睛在車上的位置（本地座標：x 往左、y 往上、z 往前；台灣駕駛座在左邊）
+const EYE: Record<string, [number, number, number]> = { sedan: [0.38, 1.2, 0.15], taxi: [0.38, 1.2, 0.15], police: [0.38, 1.2, 0.15], muscle: [0.4, 1.12, -0.1], super: [0.38, 0.98, -0.25], pickup: [0.4, 1.66, 1.5], f1: [0, 0.98, -0.05] };
+function toggleCam() { camView = camView === 'chase' ? 'cockpit' : 'chase'; camSnap = true; }
+$('btn-cam').addEventListener('click', toggleCam);
+addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && (state === 'free' || state === 'race' || state === 'countdown')) toggleCam(); });
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let camH = 0;
 
@@ -574,6 +583,20 @@ function updateVisuals(dt: number) {
   camera.lookAt(camLook);
   const fov = 62 + Math.min(1, Math.abs(vc.v) / (mode === 'race' ? VMAX : fcar.spec.vmax)) * 14;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  // 車內視角
+  const inCar = camView === 'cockpit' && (state === 'free' || state === 'race' || state === 'countdown') && !CAM;
+  model.body.visible = !inCar;
+  for (const w of [...model.steer, ...model.spin]) w.visible = !inCar;
+  model.root.traverse((o) => { if (o.userData.lens) o.visible = !inCar; });
+  if (inCar) {
+    const [ex, ey, ez] = EYE[f1Look ? 'f1' : chosen.id] ?? EYE.sedan;
+    const hx = Math.sin(vc.h), hz = Math.cos(vc.h), lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 前、左
+    const base = mode === 'free' ? -0.25 : 0;
+    camera.position.set(vc.x + lx * ex + hx * ez, base + ey, vc.z + lz * ex + hz * ez);
+    camera.lookAt(vc.x + lx * ex + hx * 30, base + ey - 0.8, vc.z + lz * ex + hz * 30);
+    if (Math.abs(camera.fov - 72) > 0.05) { camera.fov = 72; camera.updateProjectionMatrix(); }
+    cockpit.draw(dt, f1Look || chosen.id === 'f1', weather.raining, vc.v, vc.steer);
+  } else cockpit.hide();
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   if (VIEW_FRONT) { // 截圖檢查車子外型：從左前方斜看
     const sx = Math.cos(vc.h), sz = -Math.sin(vc.h);

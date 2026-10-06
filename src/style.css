@@ -33,6 +33,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 /* ---------------- HUD */
 #hud { position: fixed; inset: 0; pointer-events: none; }
 #hud button, #pad { pointer-events: auto; }
+#cockpit { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
 /* 左右轉向按鈕 */
 #steer-btns {
   position: absolute;

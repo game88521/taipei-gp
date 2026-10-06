@@ -80,6 +80,7 @@ export function headlightRig(front = 2.35, y = 0.72, half = 0.62): THREE.Group {
   for (const s of [-1, 1]) {
     const l = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), lens);
     l.position.set(s * half, y, front + 0.02);
+    l.userData.lens = true; // 車內視角時藏起來（就在鏡頭正前方）
     g.add(l);
   }
   g.visible = false;
