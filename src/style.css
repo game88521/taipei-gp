@@ -784,3 +784,299 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 }
 #top-stack > div { position: static; transform: none; top: auto; left: auto; }
 @media (max-height: 480px) { #top-stack { top: calc(max(10px, env(safe-area-inset-top)) + 54px); gap: 4px; } }
+
+/* ================= 開始選單（左側導覽＋分頁：開始／車庫／設定／紀錄） ================= */
+#menu {
+  --m-line: rgba(255, 255, 255, 0.09);
+  --m-line2: rgba(255, 255, 255, 0.18);
+  --m-glass: rgba(255, 255, 255, 0.035);
+  --m-gold: #f2c14e;
+  padding: 24px;
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(225, 6, 0, 0.16), transparent 60%),
+    linear-gradient(90deg, rgba(4, 5, 9, 0.9) 0%, rgba(4, 5, 9, 0.72) 50%, rgba(4, 5, 9, 0.38) 100%);
+}
+#menu .m-shell {
+  width: min(1060px, 100%);
+  height: min(620px, 100%);
+  display: grid;
+  grid-template-columns: 228px 1fr;
+  border: 1px solid var(--m-line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(20, 22, 31, 0.9), rgba(9, 10, 15, 0.92));
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+@media (pointer: fine) {
+  #menu .m-shell { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+}
+
+/* ---- 左側：品牌、分頁、錢包 */
+#menu .m-side {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px 18px 20px;
+  border-right: 1px solid var(--m-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 60%);
+}
+#menu .m-brand { display: flex; gap: 12px; align-items: stretch; padding: 0 6px; }
+#menu .m-mark { flex: 0 0 4px; border-radius: 2px; background: linear-gradient(180deg, #ff2a1f, #8a0400); box-shadow: 0 0 14px rgba(225, 6, 0, 0.6); }
+#menu h1 { font-size: 25px; font-weight: 900; letter-spacing: 4px; line-height: 1.15; }
+#menu h1 small { margin-top: 6px; font: 700 10px var(--mono); letter-spacing: 4.5px; color: rgba(255, 255, 255, 0.45); }
+#menu .m-tabs { display: flex; flex-direction: column; gap: 4px; }
+#menu .m-tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  transition: background 0.18s, color 0.18s;
+}
+#menu .m-tabs button.on { color: #fff; background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px var(--m-line); }
+#menu .m-tabs button.on::before { content: ''; position: absolute; left: -18px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--red); box-shadow: 0 0 10px var(--red); }
+#menu svg { width: 20px; height: 20px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#menu .m-wallet { margin-top: auto; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(242, 193, 78, 0.25); background: linear-gradient(135deg, rgba(242, 193, 78, 0.12), rgba(242, 193, 78, 0.02)); }
+#menu .m-wallet small { display: block; font-size: 11px; letter-spacing: 3px; color: rgba(242, 193, 78, 0.75); }
+#menu #wallet { margin: 2px 0 0; display: block; font: 800 20px var(--mono); color: var(--m-gold); letter-spacing: 0.5px; }
+
+/* ---- 右側：分頁內容 */
+#menu .m-main { position: relative; display: flex; flex-direction: column; min-height: 0; padding: 28px 32px 14px; overflow-y: auto; overscroll-behavior: contain; }
+#menu .m-pane { display: none; animation: m-in 0.28s ease; }
+#menu .m-pane.on { display: block; }
+@keyframes m-in { from { opacity: 0; transform: translateY(6px); } }
+#menu .m-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+#menu .m-eyebrow { display: block; font: 700 11px var(--mono); letter-spacing: 3.5px; color: rgba(255, 255, 255, 0.42); }
+#menu h2 { margin: 4px 0 0; font-size: 26px; font-weight: 800; letter-spacing: 2px; }
+#menu .m-hint { color: var(--muted); font-size: 12px; }
+#menu #menu-best { margin: 0; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--m-line); background: var(--m-glass); font: 700 14px var(--mono); color: #d8dbe4; white-space: nowrap; }
+#menu #menu-best:empty { display: none; }
+#menu #load { margin: 0 0 14px; height: 3px; }
+#menu #btn-resume { margin-bottom: 12px; padding: 12px; font-size: 18px; letter-spacing: 4px; border-radius: 14px; background: linear-gradient(135deg, #ff2a1f, #b30500); box-shadow: 0 10px 26px rgba(225, 6, 0, 0.35); }
+#menu .credit { margin: auto 0 0; padding-top: 16px; font-size: 11px; color: rgba(255, 255, 255, 0.38); text-align: right; }
+
+/* ---- 模式卡片 */
+#menu .m-modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+#menu .m-mode {
+  --c: #9aa3b8;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid var(--m-line);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  text-align: left;
+  transition: transform 0.18s, border-color 0.18s, background 0.18s;
+}
+#menu .m-mode:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+#menu .m-mode:disabled { cursor: default; }
+#menu .m-ico { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 12px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
+#menu .m-ico svg { width: 22px; height: 22px; }
+#menu .m-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#menu .m-txt b { font-size: 17px; font-weight: 800; letter-spacing: 1.5px; }
+#menu .m-txt small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+#menu .m-mode.taxi { --c: #f5c518; }
+#menu .m-mode.duel { --c: #b98cff; }
+#menu .m-mode.gp { --c: #ff5246; }
+#menu .m-mode.tt { --c: #5fd4ff; }
+#menu .m-mode.gold { --c: #f2c14e; }
+/* 主卡：自由駕駛 */
+#menu .m-mode.hero {
+  grid-column: 1 / -1;
+  min-height: 112px;
+  padding: 18px 22px;
+  border-color: rgba(255, 90, 80, 0.45);
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 14px),
+    linear-gradient(120deg, #e10600 0%, #a30400 55%, #5c0200 100%);
+  box-shadow: 0 16px 36px rgba(225, 6, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+#menu .m-mode.hero .m-ico { --c: #fff; flex-basis: 54px; height: 54px; border-radius: 14px; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+#menu .m-mode.hero .m-ico svg { width: 28px; height: 28px; }
+#menu .m-mode.hero .m-txt b { font-size: 26px; letter-spacing: 5px; }
+#menu .m-mode.hero .m-txt small { color: rgba(255, 255, 255, 0.78); font-size: 13px; }
+#menu .m-mode.hero:disabled { opacity: 1; filter: saturate(0.55) brightness(0.8); }
+#menu .m-mode.hero:disabled .m-txt b { font-size: 18px; letter-spacing: 2px; }
+#menu .m-go { margin-left: auto; font: 300 46px/1 var(--font); color: rgba(255, 255, 255, 0.85); transition: transform 0.18s; }
+#menu .m-mode.hero:disabled .m-go { display: none; }
+#menu .m-small { grid-template-columns: repeat(3, 1fr); }
+
+/* ---- 車庫 */
+#menu #car-pick { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+#menu #car-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+#menu #car-list button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 12px 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--m-line);
+  background: var(--m-glass);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.18s, background 0.18s;
+}
+#menu #car-list button i { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; height: auto; border-radius: 0; box-shadow: none; }
+#menu #car-list button.on { border-color: rgba(242, 193, 78, 0.7); background: linear-gradient(135deg, rgba(242, 193, 78, 0.16), rgba(242, 193, 78, 0.03)); box-shadow: 0 0 0 1px rgba(242, 193, 78, 0.25); }
+#menu #car-list button.mine::after { content: '使用中'; position: absolute; right: 8px; top: 8px; margin: 0; padding: 1px 6px; border-radius: 999px; background: rgba(47, 224, 122, 0.16); color: #6ff0a4; font-size: 10px; letter-spacing: 1px; }
+#menu #car-list button.locked { opacity: 0.6; }
+#menu #car-list button small { color: var(--m-gold); font: 700 11px var(--mono); letter-spacing: 0.5px; }
+#menu .m-car { padding: 18px; border-radius: 16px; border: 1px solid var(--m-line); background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)); }
+#menu #car-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+#menu #car-note .m-cn { display: block; color: #fff; font-size: 22px; font-weight: 900; letter-spacing: 3px; }
+#menu #car-note .m-cd { display: block; margin: 4px 0 14px; }
+#menu .m-stat { display: grid; grid-template-columns: 44px 1fr 64px; align-items: center; gap: 10px; margin: 7px 0; font-size: 12px; }
+#menu .m-stat i { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ff5246, #f2c14e) 0 0 / var(--f) 100% no-repeat, rgba(255, 255, 255, 0.08); }
+#menu .m-stat em { font: 700 12px var(--mono); font-style: normal; color: #d8dbe4; text-align: right; }
+#menu #car-buy { margin-top: 14px; padding: 10px; border-radius: 12px; border-color: rgba(242, 193, 78, 0.55); color: var(--m-gold); font-weight: 800; font-size: 14px; background: rgba(242, 193, 78, 0.06); }
+#menu #paint-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m-line); gap: 8px; }
+#menu #paint-list span { width: 100%; font-size: 11px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.5); }
+#menu #paint-list button { width: 28px; height: 28px; border: 2px solid rgba(0, 0, 0, 0.35); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); transition: transform 0.15s; }
+#menu #paint-list button.on { box-shadow: 0 0 0 2px #0d0f15, 0 0 0 4px var(--m-gold); }
+#menu #paint-list small { margin-top: 2px; }
+
+/* ---- 設定：四組卡片 */
+#menu .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; font-size: 14px; }
+#menu .opts fieldset { margin: 0; padding: 12px 14px 8px; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-glass); min-width: 0; }
+#menu .opts legend { padding: 0 6px; margin-left: -6px; font: 700 11px var(--mono); letter-spacing: 3.5px; color: rgba(255, 255, 255, 0.5); }
+#menu .opts label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; padding: 4px 0; border-radius: 0; background: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+#menu .opts label:last-child { border-bottom: 0; }
+#menu .opts select {
+  margin-left: auto;
+  max-width: 60%;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 28px 6px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--m-line2);
+  background: #161922 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23a9adba' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") right 10px center / 10px no-repeat;
+  color: var(--fg);
+  font: 600 13px var(--font);
+}
+#menu .opts select { min-width: 132px; }
+#menu .opts label.q small { width: 100%; margin-top: -2px; color: rgba(255, 255, 255, 0.4); font-size: 11px; }
+/* 滑桿：標題固定寬度，每一條從同一個位置開始 */
+#menu .opts label.rng { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; }
+#menu .opts label.rng input { width: 100%; min-width: 0; height: 18px; margin: 0; accent-color: #ff3b30; }
+#menu .opts label.rng #sens-val { width: auto; margin: 0; color: #d8dbe4; font: 700 12px var(--mono); }
+/* 勾選框做成開關 */
+#menu .opts label.sw { justify-content: space-between; flex-wrap: nowrap; cursor: pointer; }
+#menu .opts label.sw input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+#menu .opts label.sw input::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #e9ebf0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); transition: transform 0.2s; }
+#menu .opts label.sw input:checked { background: linear-gradient(135deg, #ff3b30, #c00500); }
+#menu .opts label.sw input:checked::after { transform: translateX(18px); }
+
+/* ---- 紀錄與說明 */
+#menu .m-keys { display: grid; gap: 8px; margin: 16px 0 10px; }
+#menu .m-keys div { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--m-line); background: var(--m-glass); font-size: 13px; line-height: 1.55; color: var(--muted); }
+#menu .m-keys b { color: #fff; font-size: 13px; letter-spacing: 2px; }
+#menu #btn-reset-best { padding: 4px 0; color: rgba(255, 255, 255, 0.4); }
+
+/* 滑鼠移過去的效果：只給有滑鼠的裝置（觸控螢幕點過之後 hover 會一直卡著） */
+@media (hover: hover) {
+  #menu .m-tabs button:hover { color: var(--fg); background: rgba(255, 255, 255, 0.04); }
+  #menu .m-mode:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--m-line2); background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)); }
+  #menu .m-mode.hero:hover:not(:disabled) { background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 14px), linear-gradient(120deg, #f20a00 0%, #b00500 55%, #650200 100%); border-color: rgba(255, 140, 130, 0.6); }
+  #menu .m-mode.hero:hover:not(:disabled) .m-go { transform: translateX(4px); }
+  #menu #car-list button:hover { border-color: var(--m-line2); }
+  #menu #paint-list button:hover { transform: scale(1.1); }
+}
+
+/* ---- 手機橫向（矮螢幕）：導覽列變窄、內容區自己捲動 */
+@media (max-height: 480px) {
+  #menu { padding: 0; }
+  #menu .m-shell { width: 100%; height: 100%; border-radius: 0; border: 0; grid-template-columns: 158px 1fr; }
+  #menu .m-side { gap: 12px; padding: max(12px, env(safe-area-inset-top)) 10px 10px max(12px, env(safe-area-inset-left)); }
+  #menu .m-brand { padding: 0 4px; gap: 9px; }
+  #menu h1 { font-size: 17px; letter-spacing: 2px; }
+  #menu h1 small { font-size: 8px; letter-spacing: 2.5px; margin-top: 3px; }
+  #menu .m-tabs button { padding: 8px 10px; font-size: 14px; gap: 10px; }
+  #menu .m-tabs button.on::before { left: -10px; }
+  #menu .m-wallet { padding: 7px 10px; border-radius: 11px; }
+  #menu #wallet { font-size: 15px; }
+  #menu .m-main { padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px 16px; }
+  #menu .m-head { margin-bottom: 10px; }
+  #menu .m-eyebrow { font-size: 9px; letter-spacing: 2.5px; }
+  #menu h2 { font-size: 18px; margin-top: 2px; }
+  #menu #menu-best { padding: 4px 9px; font-size: 12px; }
+  #menu .m-modes { gap: 8px; }
+  #menu .m-mode { min-height: 58px; padding: 9px 12px; gap: 10px; border-radius: 13px; }
+  #menu .m-ico { flex-basis: 36px; height: 36px; border-radius: 10px; }
+  #menu .m-ico svg { width: 19px; height: 19px; }
+  #menu .m-txt b { font-size: 15px; }
+  #menu .m-txt small { font-size: 11px; }
+  #menu .m-mode.hero { min-height: 72px; padding: 10px 16px; }
+  #menu .m-mode.hero .m-ico { flex-basis: 42px; height: 42px; }
+  #menu .m-mode.hero .m-txt b { font-size: 21px; letter-spacing: 4px; }
+  #menu .m-mode.hero .m-txt small { font-size: 12px; }
+  #menu .m-go { font-size: 36px; }
+  #menu #btn-resume { padding: 8px; font-size: 16px; margin-bottom: 8px; }
+  #menu #car-pick { gap: 10px; }
+  #menu #car-list button { padding: 8px 10px 7px 13px; font-size: 13px; }
+  #menu .m-car { padding: 12px 14px; }
+  #menu #car-note .m-cn { font-size: 18px; }
+  #menu #car-note .m-cd { margin-bottom: 8px; font-size: 12px; }
+  #menu .m-stat { margin: 4px 0; }
+  #menu .opts { gap: 8px; }
+  #menu .opts fieldset { padding: 8px 12px 4px; border-radius: 13px; }
+  #menu .opts label { min-height: 34px; font-size: 13px; }
+  #menu .m-keys { margin: 10px 0 6px; gap: 6px; }
+  #menu .m-keys div { padding: 8px 12px; font-size: 12px; }
+  #menu .credit { padding-top: 8px; font-size: 10px; }
+}
+
+/* ---- 直向窄螢幕：導覽列放到上方 */
+@media (max-width: 640px) and (orientation: portrait) {
+  #menu { padding: 0; }
+  #menu .m-shell { width: 100%; height: 100%; border-radius: 0; border: 0; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #menu .m-side { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: max(14px, env(safe-area-inset-top)) 14px 10px; border-right: 0; border-bottom: 1px solid var(--m-line); }
+  #menu .m-wallet { margin: 0; align-self: center; padding: 6px 10px; }
+  #menu #wallet { font-size: 15px; }
+  #menu .m-tabs { grid-column: 1 / -1; flex-direction: row; }
+  #menu .m-tabs button { flex: 1; flex-direction: column; gap: 4px; padding: 8px 4px; font-size: 12px; letter-spacing: 1px; }
+  #menu .m-tabs button.on::before { left: 30%; right: 30%; top: auto; bottom: -11px; width: auto; height: 3px; border-radius: 3px 3px 0 0; }
+  #menu .m-main { padding: 18px 16px max(12px, env(safe-area-inset-bottom)); }
+  #menu .m-modes, #menu .m-small, #menu .opts, #menu #car-pick { grid-template-columns: 1fr; }
+  #menu .m-head { flex-wrap: wrap; align-items: flex-start; }
+}
+
+/* ---- 其他彈出視窗（教學、結果、排行榜、成就、選路線）：跟開始選單同一套質感 */
+.overlay:not(#menu) { background: radial-gradient(80% 60% at 50% 110%, rgba(225, 6, 0, 0.22), transparent 60%), rgba(4, 5, 9, 0.62); }
+.card {
+  border-color: rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(20, 22, 31, 0.95), rgba(9, 10, 15, 0.97));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.primary { border-radius: 14px; background: linear-gradient(135deg, #ff2a1f, #b30500); box-shadow: 0 10px 26px rgba(225, 6, 0, 0.3); letter-spacing: 4px; }
+.ghost-btn { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.035); border-radius: 14px; }
+@media (hover: hover) { .ghost-btn:hover { border-color: rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.07); } }

@@ -116,7 +116,7 @@ let holdRender = true; // 一開始就先不畫：開場就建好的車、警車
 onProgress((label, f) => {
   if (cityReady) return;
   // holdRender 從一開始就是 true；解除只在著色器編好之後（下面）
-  $('btn-free').textContent = `${label}… ${Math.round(f * 100)}%`;
+  $('free-label').textContent = `${label}… ${Math.round(f * 100)}%`;
   $('load-bar').style.width = `${Math.round(f * 100)}%`;
 });
 // 自動測試（?sim）是同步模擬，等不到背景載入：一次載入全部區塊（?alltiles 也可以）
@@ -297,7 +297,7 @@ timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind;
 }
 // 新手教學：第一次進自由駕駛時跳出來；選單也可以重看
 const TUT_TOUCH = [
-  ['🚗 開車', '左下 ◀ ▶ 轉向（選單可改拖曳或傾斜手機），右下「油門」「煞車」。停住再按煞車＝倒車。'],
+  ['🚗 開車', '左下 ◀ ▶ 轉向（「設定」可改拖曳或傾斜手機），右下「油門」「煞車」。停住再按煞車＝倒車。'],
   ['📷 視角與地圖', '右上 📷 切換車後／車內視角，🗺 打開大地圖：點一下就能導航過去。⟲ 卡住時回到路上。'],
   ['📯 喇叭與甩尾', '按 📯 喇叭，前面的車會讓路。高速轉彎時按住 🌀 甩尾（會自動給油），甩越久分數越高、還能賺錢；撞到東西分數歸零。'],
   ['🚨 小心警察', '撞車、撞人、闖紅燈會被通緝。離警車 110 m 以外撐 7 秒就甩掉，停在警車旁邊會被抓。'],
@@ -837,7 +837,7 @@ let preview: Vehicle = chosen;
 const fmtNT = (n: number) => `NT$ ${n.toLocaleString()}`;
 function refreshGarage() {
   const list = $('car-list'), have = ownedCars(), m = money();
-  $('wallet').textContent = `💰 ${fmtNT(m)}`;
+  $('wallet').textContent = fmtNT(m);
   for (const b of list.children) {
     const id = (b as HTMLElement).dataset.id!, v = vehicleById(id);
     b.classList.toggle('on', id === preview.id);
@@ -845,9 +845,14 @@ function refreshGarage() {
     b.classList.toggle('locked', !have.has(id));
     b.querySelector('small')!.textContent = have.has(id) ? '' : `🔒 ${v.price.toLocaleString()}`;
   }
-  const stars = (x: number, lo: number, hi: number) => '★'.repeat(Math.max(1, Math.min(5, Math.round(1 + ((x - lo) / (hi - lo)) * 4)))).padEnd(5, '☆');
-  const s = preview.spec;
-  $('car-note').textContent = `${preview.note}｜極速約 ${Math.round(s.vmax * 3.6 * 0.9)} km/h　加速 ${stars(s.engine, 6, 15)}　操控 ${stars(s.grip, 11, 24)}　重量 ${stars(s.mass, 0.5, 1.5)}`;
+  // 車子介紹：名稱、說明、四項性能長條（0~100 分）
+  const s = preview.spec, kmh = Math.round(s.vmax * 3.6 * 0.9);
+  const f01 = (x: number, lo: number, hi: number) => Math.max(0.06, Math.min(1, (x - lo) / (hi - lo)));
+  const bar = (label: string, f: number, txt: string) => `<div class="m-stat"><span>${label}</span><i style="--f:${(f * 100).toFixed(0)}%"></i><em>${txt}</em></div>`;
+  const score = (f: number) => String(Math.round(f * 100));
+  const fa = f01(s.engine, 5, 15), fg = f01(s.grip, 10, 24), fm = f01(s.mass, 0.4, 1.6);
+  $('car-note').innerHTML = `<b class="m-cn">${preview.name}</b><span class="m-cd">${preview.note}</span>`
+    + bar('極速', f01(kmh, 100, 340), `${kmh} km/h`) + bar('加速', fa, score(fa)) + bar('操控', fg, score(fg)) + bar('重量', fm, score(fm));
   const buy = $<HTMLButtonElement>('car-buy');
   const owned = have.has(preview.id);
   buy.style.display = owned ? 'none' : '';
@@ -912,12 +917,19 @@ function refreshGarage() {
   });
   refreshGarage();
 }
+// 選單分頁：開始／車庫／設定／紀錄
+function menuTab(t: string) {
+  for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.classList.toggle('on', b.dataset.tab === t);
+  for (const p of document.querySelectorAll<HTMLElement>('.m-pane')) p.classList.toggle('on', p.dataset.pane === t);
+  document.querySelector('.m-main')?.scrollTo(0, 0);
+}
+for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.addEventListener('click', () => menuTab(b.dataset.tab!));
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
   const free = $<HTMLButtonElement>('btn-free'), race = $<HTMLButtonElement>('btn-start');
   free.disabled = race.disabled = !cityReady;
   $('btn-resume').style.display = paused ? '' : 'none';
-  free.textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
+  $('free-label').textContent = !cityReady ? '載入台北街景中…' : '自由駕駛';
   race.style.display = cityReady ? '' : 'none';
   for (const id of ['btn-gp', 'btn-duel', 'btn-taxi']) {
     const b = $<HTMLButtonElement>(id);

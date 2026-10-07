@@ -76,81 +76,164 @@
     </div>
 
     <div id="menu" class="overlay">
-      <div class="card">
-        <h1>台北街道賽<small>TAIPEI STREET GP</small></h1>
-        <p class="sub">真實信義區街道 · 自由駕駛 ／ 3.1 km 街道賽</p>
-        <div id="menu-best"></div>
-        <div id="car-pick">
-          <div id="wallet"></div>
-          <div id="car-list"></div>
-          <small id="car-note"></small>
-          <button id="car-buy" class="ghost-btn" style="display: none"></button>
-          <div id="paint-list"></div>
-        </div>
-        <button id="btn-resume" class="primary" style="display: none">繼續</button>
-        <div id="load"><i id="load-bar"></i></div>
-        <button id="btn-free" class="primary">自由駕駛</button>
-        <button id="btn-taxi" class="ghost-btn">🚕 計程車載客</button>
-        <button id="btn-duel" class="ghost-btn">街頭對決：開放街道 vs 4 台 AI</button>
-        <button id="btn-gp" class="ghost-btn">街道賽：對決 7 台 AI（3 圈）</button>
-        <button id="btn-start" class="ghost-btn">計時賽</button>
-        <div class="opts">
-          <label class="q">時段天氣
-            <select id="opt-time">
-              <option value="dusk">黃昏</option>
-              <option value="day">白天</option>
-              <option value="night">夜晚</option>
-              <option value="rain">雨天</option>
-              <option value="rainnight">雨夜</option>
-              <option value="auto">自動（日夜交替）</option>
-            </select>
-          </label>
-          <label class="q">手機轉向
-            <select id="opt-steer">
-              <option value="buttons">左右按鈕</option>
-              <option value="drag">拖曳滑桿</option>
-              <option value="tilt">傾斜手機（陀螺儀）</option>
-            </select>
-          </label>
-          <label class="q">轉向靈敏度 <input type="range" id="opt-sens" min="0.5" max="1.5" step="0.1" /><small id="sens-val"></small></label>
-          <label class="q">音量
-            <span class="vols">
-              主音量 <input type="range" id="opt-vol-master" min="0" max="1" step="0.05" />
-              引擎 <input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" />
-              音效 <input type="range" id="opt-vol-fx" min="0" max="1" step="0.05" />
-            </span>
-          </label>
-          <label class="q">觸控按鈕
-            <select id="opt-touch">
-              <option value="auto">自動</option>
-              <option value="on">總是顯示</option>
-              <option value="off">不顯示（電腦用）</option>
-            </select>
-          </label>
-          <label><input type="checkbox" id="opt-assist" /> 行車輔助線</label>
-          <label><input type="checkbox" id="opt-ghost" /> 影子車</label>
-          <label><input type="checkbox" id="opt-sound" /> 音效</label>
-          <label><input type="checkbox" id="opt-fps" /> 顯示 FPS</label>
-          <label class="q">正賽
-            <select id="opt-laps"><option value="3">3 圈</option><option value="6">6 圈</option></select>
-            <select id="opt-tyre"><option value="0">起跑：軟胎</option><option value="1" selected>起跑：中性胎</option><option value="2">起跑：硬胎</option></select>
-          </label>
-          <label class="q">畫質
-            <select id="opt-quality">
-              <option value="auto">自動</option>
-              <option value="high">高（陰影＋光暈）</option>
-              <option value="medium">中</option>
-              <option value="low">低（最順）</option>
-            </select>
-            <small id="quality-now"></small>
-          </label>
-        </div>
-        <p class="help">手機：左下 ◀ ▶ 轉向（可在下面改成拖曳或傾斜手機），右下油門／煞車（停住再按煞車＝倒車）。<br />街道賽：油門自動，地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS。<br />電腦：↑ 油門、↓ 煞車／倒車、← → 轉向，Ctrl 或 E 開 DRS、B 進站，Esc 暫停。</p>
-        <button id="btn-tut" class="ghost-btn">📖 操作教學</button>
-        <button id="btn-ach" class="ghost-btn">🏆 成就與紀錄</button>
-        <button id="btn-lb" class="ghost-btn">🌐 線上排行榜（計時賽）</button>
-        <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
-        <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
+      <div class="m-shell">
+        <aside class="m-side">
+          <div class="m-brand">
+            <i class="m-mark"></i>
+            <h1>台北街道賽<small>TAIPEI STREET GP</small></h1>
+          </div>
+          <nav class="m-tabs">
+            <button data-tab="play" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.4" /><path d="M3.4 10.6h6.2M14.4 10.6h6.2M12 14.4V21" /></svg><span>開始</span></button>
+            <button data-tab="garage"><svg viewBox="0 0 24 24"><path d="M3 15.5l1.7-5A2 2 0 0 1 6.6 9h10.8a2 2 0 0 1 1.9 1.5l1.7 5V19h-2.4M5.4 19H3v-3.5h18" /><circle cx="7.6" cy="17.6" r="1.7" /><circle cx="16.4" cy="17.6" r="1.7" /></svg><span>車庫</span></button>
+            <button data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" /><circle cx="15" cy="6" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="18" r="2" /></svg><span>設定</span></button>
+            <button data-tab="records"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5.2a3 3 0 0 0 2.9 4M16 6h2.8a3 3 0 0 1-2.9 4M12 13v4M8.5 21h7M10 17h4" /></svg><span>紀錄</span></button>
+          </nav>
+          <div class="m-wallet"><small>錢包</small><b id="wallet"></b></div>
+        </aside>
+
+        <main class="m-main">
+          <section class="m-pane on" data-pane="play">
+            <header class="m-head">
+              <div><small class="m-eyebrow">真實信義區街道 · 3.1 KM 街道賽</small><h2>選擇模式</h2></div>
+              <div id="menu-best"></div>
+            </header>
+            <div id="load"><i id="load-bar"></i></div>
+            <button id="btn-resume" class="primary" style="display: none">繼續</button>
+            <div class="m-modes">
+              <button id="btn-free" class="m-mode hero">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h7.5a3 3 0 0 0 0-6h-7a3 3 0 0 1 0-6H16" /></svg></span>
+                <span class="m-txt"><b id="free-label">自由駕駛</b><small>開放街道 · 車流、紅綠燈、警察、甩尾</small></span>
+                <span class="m-go">›</span>
+              </button>
+              <button id="btn-taxi" class="m-mode taxi">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M9.5 5.5h5l.8 3.4" /><path d="M4 16l1.6-5A2 2 0 0 1 7.5 9.6h9a2 2 0 0 1 1.9 1.4L20 16v3h-2.2M6.2 19H4v-3h16" /><circle cx="8" cy="16.6" r="1.4" /><circle cx="16" cy="16.6" r="1.4" /></svg></span>
+                <span class="m-txt"><b>計程車載客</b><small>限時送客、跳表賺錢</small></span>
+              </button>
+              <button id="btn-duel" class="m-mode duel">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M13.5 3L5 13.5h6.2L10 21l8.5-10.5h-6.2L13.5 3z" /></svg></span>
+                <span class="m-txt"><b>街頭對決</b><small>開放街道 vs 4 台 AI</small></span>
+              </button>
+              <button id="btn-gp" class="m-mode gp">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M5 21V4" /><path d="M5 4h14v8H5" /><path d="M5 4h3.5v4H5zM12 4h3.5v4H12zM8.5 8H12v4H8.5zM15.5 8H19v4h-3.5z" fill="currentColor" stroke="none" /></svg></span>
+                <span class="m-txt"><b>大獎賽</b><small>封閉街道 · 對決 7 台 AI</small></span>
+              </button>
+              <button id="btn-start" class="m-mode tt">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5" /><path d="M12 9.5v4l2.6 2.4M9.5 2.8h5M18.6 6.4l1.5-1.5" /></svg></span>
+                <span class="m-txt"><b>計時賽</b><small>單圈挑戰最快圈</small></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="m-pane" data-pane="garage">
+            <header class="m-head">
+              <div><small class="m-eyebrow">GARAGE</small><h2>車庫</h2></div>
+              <small class="m-hint">點車子就換上 · 烤漆每色買一次</small>
+            </header>
+            <div id="car-pick">
+              <div id="car-list"></div>
+              <div class="m-car">
+                <div id="car-note"></div>
+                <button id="car-buy" class="ghost-btn" style="display: none"></button>
+                <div id="paint-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="m-pane" data-pane="settings">
+            <header class="m-head">
+              <div><small class="m-eyebrow">SETTINGS</small><h2>設定</h2></div>
+            </header>
+            <div class="opts">
+              <fieldset>
+                <legend>畫面</legend>
+                <label class="q">時段天氣
+                  <select id="opt-time">
+                    <option value="dusk">黃昏</option>
+                    <option value="day">白天</option>
+                    <option value="night">夜晚</option>
+                    <option value="rain">雨天</option>
+                    <option value="rainnight">雨夜</option>
+                    <option value="auto">自動（日夜交替）</option>
+                  </select>
+                </label>
+                <label class="q">畫質
+                  <select id="opt-quality">
+                    <option value="auto">自動</option>
+                    <option value="high">高（陰影＋光暈）</option>
+                    <option value="medium">中</option>
+                    <option value="low">低（最順）</option>
+                  </select>
+                  <small id="quality-now"></small>
+                </label>
+                <label class="sw">顯示 FPS<input type="checkbox" id="opt-fps" /></label>
+              </fieldset>
+              <fieldset>
+                <legend>操作</legend>
+                <label class="q">手機轉向
+                  <select id="opt-steer">
+                    <option value="buttons">左右按鈕</option>
+                    <option value="drag">拖曳滑桿</option>
+                    <option value="tilt">傾斜手機（陀螺儀）</option>
+                  </select>
+                </label>
+                <label class="q">觸控按鈕
+                  <select id="opt-touch">
+                    <option value="auto">自動</option>
+                    <option value="on">總是顯示</option>
+                    <option value="off">不顯示（電腦用）</option>
+                  </select>
+                </label>
+                <label class="q rng">轉向靈敏度<input type="range" id="opt-sens" min="0.5" max="1.5" step="0.1" /><small id="sens-val"></small></label>
+                <label class="sw">行車輔助線<input type="checkbox" id="opt-assist" /></label>
+              </fieldset>
+              <fieldset>
+                <legend>音效</legend>
+                <label class="sw">音效<input type="checkbox" id="opt-sound" /></label>
+                <label class="q rng">主音量<input type="range" id="opt-vol-master" min="0" max="1" step="0.05" /></label>
+                <label class="q rng">引擎<input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" /></label>
+                <label class="q rng">音效<input type="range" id="opt-vol-fx" min="0" max="1" step="0.05" /></label>
+              </fieldset>
+              <fieldset>
+                <legend>比賽</legend>
+                <label class="q">正賽圈數
+                  <select id="opt-laps"><option value="3">3 圈</option><option value="6">6 圈</option></select>
+                </label>
+                <label class="q">起跑輪胎
+                  <select id="opt-tyre"><option value="0">軟胎</option><option value="1" selected>中性胎</option><option value="2">硬胎</option></select>
+                </label>
+                <label class="sw">影子車（計時賽）<input type="checkbox" id="opt-ghost" /></label>
+              </fieldset>
+            </div>
+          </section>
+
+          <section class="m-pane" data-pane="records">
+            <header class="m-head">
+              <div><small class="m-eyebrow">RECORDS</small><h2>紀錄與說明</h2></div>
+            </header>
+            <div class="m-modes m-small">
+              <button id="btn-ach" class="m-mode gold">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6-4.4-4.2 6-.9z" /></svg></span>
+                <span class="m-txt"><b>成就與紀錄</b><small>駕駛統計、解鎖成就</small></span>
+              </button>
+              <button id="btn-lb" class="m-mode tt">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg></span>
+                <span class="m-txt"><b>線上排行榜</b><small>計時賽最快圈</small></span>
+              </button>
+              <button id="btn-tut" class="m-mode">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15z" /><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5M8.5 7.5h7M8.5 11h5" /></svg></span>
+                <span class="m-txt"><b>操作教學</b><small>一步步看怎麼玩</small></span>
+              </button>
+            </div>
+            <div class="m-keys">
+              <div><b>手機</b><span>左下 ◀ ▶ 轉向（設定可改拖曳或傾斜手機），右下油門／煞車，停住再按煞車＝倒車；按住 🌀 甩尾</span></div>
+              <div><b>街道賽</b><span>油門自動；地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS</span></div>
+              <div><b>電腦</b><span>↑ 油門、↓ 煞車／倒車、← → 轉向、Shift 甩尾、Ctrl 或 E 開 DRS、B 進站、Esc 暫停</span></div>
+            </div>
+            <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
+          </section>
+
+          <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
+        </main>
       </div>
     </div>
 
