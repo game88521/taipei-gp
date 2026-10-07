@@ -474,6 +474,38 @@ html:not(.touch) #gas { display: none; }
 }
 #hud[data-mode='race'] #clock { top: calc(max(10px, env(safe-area-inset-top)) + 150px); }
 
+/* ---------------- 甩尾 */
+#btn-drift {
+  position: absolute;
+  right: calc(max(14px, env(safe-area-inset-right)) + 132px);
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 72px);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid rgba(160, 120, 255, 0.7);
+  background: rgba(60, 30, 120, 0.45);
+  font-size: 26px;
+  touch-action: none;
+}
+#btn-drift.on { background: rgba(140, 90, 255, 0.75); transform: scale(0.95); }
+html:not(.touch) #btn-drift { display: none; }
+#hud[data-mode='race'] #btn-drift, #hud[data-mode='race'] #drift-hud { display: none !important; }
+#drift-hud {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 900 30px var(--mono);
+  color: #c9a8ff;
+  text-shadow: 0 0 12px rgba(140, 90, 255, 0.9), 0 2px 6px #000;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (max-height: 480px) {
+  #btn-drift { width: 54px; height: 54px; font-size: 22px; right: calc(max(14px, env(safe-area-inset-right)) + 108px); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 60px); }
+  #drift-hud { font-size: 24px; }
+}
+
 /* ---------------- 車況、修車 */
 #dmg {
   position: absolute;

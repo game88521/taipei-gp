@@ -1,5 +1,6 @@
 // 由 main.ts 拆出來（行為不變）：汽車物理測試（?phys），結果寫在分頁標題
 import { FreeCar } from './freecar';
+import { DriftScore } from './drift';
 import type { Collider } from './citydata';
 import type { Traffic } from './traffic';
 import type { Breakables } from './breakables';
@@ -24,6 +25,30 @@ export function physicsTest(fcar: FreeCar, collider: Collider | null, traffic: T
   while (c.v < 33.3) c.update(STEP, 0, true, false, null);
   for (let k = 0; k < 240; k++) c.update(STEP, 1, c.v < 33.3, false, null);
   out.push(`R120:${(Math.abs(c.v / c.w)).toFixed(1)}m`);
+  // 2b) 甩尾：60 km/h 打滿方向盤、按住甩尾鍵 2 秒，看側滑角能到幾度（不按的話）
+  for (const [dr, st] of [[false, 1], [true, 1], [true, 0.6]] as const) {
+    c.place(0, 0, 0);
+    while (c.v < 16.7) c.update(STEP, 0, true, false, null);
+    let maxSlip = 0;
+    c.drift = dr;
+    for (let k = 0; k < 240; k++) { c.update(STEP, st, true, false, null); maxSlip = Math.max(maxSlip, c.slip); }
+    c.drift = false;
+    out.push(`${dr ? `甩尾(方向盤${st})` : '一般'}側滑:${((maxSlip * 180) / Math.PI).toFixed(0)}°`);
+  }
+  // 2c) 甩尾計分：甩 3 秒再直走 3 秒（入帳）
+  {
+    const ds = new DriftScore();
+    c.place(0, 0, 0);
+    while (c.v < 16.7) c.update(STEP, 0, true, false, null);
+    let banked = 0;
+    for (let k = 0; k < 120 * 6; k++) {
+      c.drift = k < 360;
+      c.update(STEP, k < 360 ? 1 : 0, true, false, null);
+      banked = Math.max(banked, ds.update(STEP, c, 0).banked ?? 0);
+    }
+    c.drift = false;
+    out.push(`甩尾3秒得分:${banked}`);
+  }
   // 4) 撞牆：朝起點附近 60~250 m 最近的一面牆直衝，記錄撞擊、反彈後速度，再倒車 1.5 秒、打方向加油 3 秒看能不能脫困
   //    （地圖變大後，從起點照原方向直衝 40 秒可能一路都沒牆）
   if (collider) {

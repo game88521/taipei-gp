@@ -15,8 +15,10 @@ export interface Stats {
   streetWins: number;
   honks: number;
   playTime: number; // 秒
+  bestDrift: number; // 單次甩尾最高分
+  totalDrift: number;
 }
-export const emptyStats = (): Stats => ({ dist: 0, nightDist: 0, topSpeed: 0, trips: 0, earned: 0, knocked: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, gpWins: 0, streetWins: 0, honks: 0, playTime: 0 });
+export const emptyStats = (): Stats => ({ dist: 0, nightDist: 0, topSpeed: 0, trips: 0, earned: 0, knocked: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, gpWins: 0, streetWins: 0, honks: 0, playTime: 0, bestDrift: 0, totalDrift: 0 });
 
 interface Ach { id: string; icon: string; name: string; desc: string; value: (s: Stats) => number; goal: number }
 export const ACHIEVEMENTS: Ach[] = [
@@ -34,6 +36,8 @@ export const ACHIEVEMENTS: Ach[] = [
   { id: 'gp', icon: '🏆', name: '冠軍', desc: '贏得一場 F1 正賽', value: (s) => s.gpWins, goal: 1 },
   { id: 'street5', icon: '👑', name: '街頭之王', desc: '贏 5 場街頭比賽', value: (s) => s.streetWins, goal: 5 },
   { id: 'honk', icon: '📯', name: '喇叭狂', desc: '按喇叭 100 次', value: (s) => s.honks, goal: 100 },
+  { id: 'drift1', icon: '🌀', name: '甩尾新手', desc: '單次甩尾拿到 3,000 分', value: (s) => s.bestDrift, goal: 3000 },
+  { id: 'drift2', icon: '🔥', name: '甩尾大師', desc: '單次甩尾拿到 20,000 分', value: (s) => s.bestDrift, goal: 20000 },
 ];
 
 /** 新達成的成就（還沒在 got 裡的） */
@@ -49,6 +53,7 @@ export function renderAchPage(s: Stats, got: string[]): string {
     ['載客趟數', `${s.trips}`], ['累積收入', `NT$ ${Math.round(s.earned).toLocaleString()}`], ['撞倒路邊物', `${s.knocked}`],
     ['甩掉警察', `${s.escapes} 次（最高 ${s.maxEscaped} 星）`], ['被逮捕', `${s.busted} 次`], ['逮捕嫌犯', `${s.arrests}`],
     ['正賽冠軍', `${s.gpWins}`], ['街頭比賽獲勝', `${s.streetWins}`], ['按喇叭', `${s.honks}`],
+    ['甩尾最高分', `${Math.round(s.bestDrift).toLocaleString()}`], ['甩尾累積', `${Math.round(s.totalDrift).toLocaleString()}`],
   ];
   const stat = rows.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('');
   const ach = ACHIEVEMENTS.map((a) => {

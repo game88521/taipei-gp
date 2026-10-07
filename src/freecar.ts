@@ -30,9 +30,18 @@ export class FreeCar {
   w = 0; // 角速度 dh/dt
   steer = 0;
   spec: CarSpec = DEFAULT_SPEC;
+  /** 甩尾中（按住甩尾鍵）：側向抓地力降到約一半、轉向率上限放寬，車尾就甩得出去（打滿方向盤約 40°，不會原地打轉） */
+  drift = false;
   private hitCool = 0;
   private contacts: Contact[] = [];
 
+  /** 側滑角（弧度）：速度方向跟車頭方向差多少；甩尾計分用 */
+  get slip() {
+    const sp = Math.hypot(this.vx, this.vz);
+    if (sp < 1) return 0;
+    const fx = Math.sin(this.h), fz = Math.cos(this.h);
+    return Math.acos(Math.max(-1, Math.min(1, Math.abs(this.vx * fx + this.vz * fz) / sp)));
+  }
   /** 沿車頭方向的速度（HUD、車流、行人都用這個） */
   get v() { return this.vx * Math.sin(this.h) + this.vz * Math.cos(this.h); }
   /** 設定速度：保留方向、只改大小（別的系統用 v *= 0.7 這種寫法減速） */
@@ -105,13 +114,15 @@ export class FreeCar {
     vl = Math.max(-REVERSE_MAX, Math.min(vmax, vl));
 
     // ---- 側向：輪胎把側滑速度拉回 0（上限＝抓地力），甩出去也會自己回正
-    const dLat = Math.min(Math.abs(vlat), grip * 1.15 * dt);
+    // 甩尾：側滑越大、輪胎拉回來的力越大（側滑角會穩在約 35°，不會一路轉到打轉）
+    const latK = this.drift ? 0.55 + 1.2 * Math.min(1.5, Math.abs(vlat) / Math.max(Math.abs(vl), 1)) : 1.15;
+    const dLat = Math.min(Math.abs(vlat), grip * latK * dt);
     vlat -= Math.sign(vlat) * dLat;
 
     // ---- 轉向：低速打得多、高速打得少（但反應一樣快）；受抓地力限制
     const maxSteer = 0.62 / (1 + Math.abs(vl) / 16);
     let target = -(vl / WHEELBASE) * Math.tan(maxSteer * this.steer);
-    const lim = (grip * 1.05) / Math.max(Math.abs(vl), 1);
+    const lim = (grip * (this.drift ? 1.45 : 1.05)) / Math.max(Math.abs(vl), 1);
     target = Math.max(-lim, Math.min(lim, target));
     // 側滑時輪胎抓不住，角速度回到目標比較慢（被撞歪會轉一下才回來）
     const settle = 9 / (1 + Math.abs(vlat) / 3);

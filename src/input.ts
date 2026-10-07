@@ -12,10 +12,11 @@ export class Input {
   private gasIds = new Set<number>();
   private leftIds = new Set<number>();
   private rightIds = new Set<number>();
+  private driftIds = new Set<number>();
   private keys = new Set<string>();
   private tiltSteer = 0;
 
-  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement, leftBtn: HTMLElement, rightBtn: HTMLElement) {
+  constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement, leftBtn: HTMLElement, rightBtn: HTMLElement, driftBtn?: HTMLElement) {
     // 按住型的按鈕：多指同時按也不會互相干擾（每根手指各自記 pointerId）
     const hold = (btn: HTMLElement, ids: Set<number>) => {
       btn.addEventListener('pointerdown', (e) => {
@@ -34,6 +35,7 @@ export class Input {
     };
     hold(leftBtn, this.leftIds);
     hold(rightBtn, this.rightIds);
+    if (driftBtn) hold(driftBtn, this.driftIds);
     const padMove = (e: PointerEvent) => {
       const r = pad.getBoundingClientRect();
       // 拖到 30% 寬就打滿；中間有一點死區，小幅修正比較穩
@@ -120,6 +122,7 @@ export class Input {
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
     const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
     steer = clamp(steer * this.sens);
-    return { steer, brake, throttle };
+    const handbrake = this.driftIds.size > 0 || k.has('ShiftLeft') || k.has('ShiftRight'); // 甩尾
+    return { steer, brake, throttle, handbrake };
   }
 }

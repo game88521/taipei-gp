@@ -17,6 +17,7 @@ import { Damage } from './damage';
 import { emptyStats, newlyUnlocked, renderAchPage, type Stats } from './achievements';
 import { BigMap, NavArrows } from './bigmap';
 import { RainFx } from './rainfx';
+import { DriftScore } from './drift';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
 import { Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
@@ -253,7 +254,8 @@ const fcar = new FreeCar(); // 自由駕駛的汽車
 type Mode = 'free' | 'race';
 let mode: Mode = 'free';
 const veh = () => (mode === 'race' ? car : fcar);
-const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'), $('steer-l'), $('steer-r'));
+const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'), $('steer-l'), $('steer-r'), $('btn-drift'));
+const drift = new DriftScore(); // 甩尾計分（drift.ts）
 const sound = new Sound();
 
 addEventListener('resize', () => {
@@ -290,14 +292,14 @@ timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind;
 const TUT_TOUCH = [
   ['🚗 開車', '左下 ◀ ▶ 轉向（選單可改拖曳或傾斜手機），右下「油門」「煞車」。停住再按煞車＝倒車。'],
   ['📷 視角與地圖', '右上 📷 切換車後／車內視角，🗺 打開大地圖：點一下就能導航過去。⟲ 卡住時回到路上。'],
-  ['📯 喇叭與車流', '按 📯 喇叭，前面的車會讓路；撞到車會把它撞開，但車子也會受損，停車時可以 🔧 修車。'],
+  ['📯 喇叭與甩尾', '按 📯 喇叭，前面的車會讓路。高速轉彎時按住 🌀 甩尾（會自動給油），甩越久分數越高、還能賺錢；撞到東西分數歸零。'],
   ['🚨 小心警察', '撞車、撞人、闖紅燈會被通緝。離警車 110 m 以外撐 7 秒就甩掉，停在警車旁邊會被抓。'],
   ['🏁 玩法', '路上的橘色光柱是街頭飆車挑戰；選單還有計程車載客、街頭對決、F1 正賽和計時賽（線上排行榜）。'],
 ];
 const TUT_KEYS = [
   ['🚗 開車', '↑／W 油門、↓／S 煞車（停住再按＝倒車）、← →／A D 轉向，Esc 暫停。'],
   ['📷 視角與地圖', 'C 切換車後／車內視角，M 打開大地圖：點一下就能導航過去。右上 ⟲ 卡住時回到路上。'],
-  ['📯 喇叭與車流', 'H 按喇叭，前面的車會讓路；撞到車會把它撞開，但車子也會受損，停車時可以 🔧 修車。'],
+  ['📯 喇叭與甩尾', 'H 按喇叭，前面的車會讓路。高速轉彎時按住 Shift 甩尾，甩越久分數越高、還能賺錢；撞到東西分數歸零。車子受損時停車可以 🔧 修車。'],
   ['🚨 小心警察', '撞車、撞人、闖紅燈會被通緝。離警車 110 m 以外撐 7 秒就甩掉，停在警車旁邊會被抓。開巡邏車按 G 可以追緝嫌犯。'],
   ['🏁 玩法', '路上的橘色光柱是街頭飆車挑戰（Enter 接受）；正賽 Ctrl／E 開 DRS、B 進站。'],
 ];
@@ -1288,6 +1290,11 @@ function playTrafficHonks() {
   }
 }
 // 車況與修車：車損 30% 以上、車子停住時出現修車鍵（NT$100，沒錢免費）
+function updateDriftHud() {
+  const el = $('drift-hud');
+  if (drift.active && mode === 'free') { el.style.display = ''; el.textContent = `🌀 ${drift.total.toLocaleString()}  ×${drift.mult}`; }
+  else el.style.display = 'none';
+}
 function updateDamageHud() {
   const el = $('dmg'), btn = $('btn-repair'), d = damage.value;
   const show = mode === 'free' && d > 0.05;
@@ -1471,6 +1478,9 @@ function freeStep(dt: number) {
   }
   let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
+  const hb = !!(inp as { handbrake?: boolean }).handbrake;
+  fcar.drift = hb && Math.abs(fcar.v) > 8; // 按住甩尾鍵：車尾甩出去
+  if (hb && !inp.brake) inp = { ...inp, throttle: true }; // 甩尾時自動給油（手機右手大拇指只要按住 🌀）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   const knockHit = breakables ? breakables.hit(fcar) : 0; // 樹、路燈：撞倒過去
   const hardHit = impact;
@@ -1514,6 +1524,18 @@ function freeStep(dt: number) {
   }
 
   if (impact) sound.hit(impact * 2.5);
+  // 甩尾計分：入帳時換成一點錢（每 100 分 NT$1）
+  {
+    const r = drift.update(dt, fcar, impact);
+    if (r.banked) {
+      const cash = Math.floor(r.banked / 100);
+      stats.bestDrift = Math.max(stats.bestDrift, r.banked);
+      stats.totalDrift += r.banked;
+      if (cash) { setMoney(money() + cash); stats.earned += cash; }
+      toast(`🌀 甩尾 +${r.banked.toLocaleString()} 分${cash ? `（NT$ ${cash}）` : ''}`, 'purple');
+    }
+    if (r.lost) toast('💥 撞到了，甩尾分數歸零', 'bad');
+  }
   // 車損：撞牆、撞車照實算；撞倒行道樹、路燈這種一撞就倒的只算 35%
   const dmgHit = Math.max(hardHit, trafficHit, knockHit * 0.35, impact === knockHit ? 0 : impact);
   if (dmgHit) damage.hit(dmgHit, fcar.x + Math.sin(fcar.h) * 2.2, 0.5, fcar.z + Math.cos(fcar.h) * 2.2);
@@ -1570,6 +1592,7 @@ function updateFreeHud(dt: number) {
     minimap?.draw(fcar.x, fcar.z, fcar.h, cops.length ? { route: null, next: null, flags: [], ...base, rivals: [...(base?.rivals ?? []), ...cops] } : base);
     updateWantedHud();
     updateDamageHud();
+    updateDriftHud();
     updateNav(dt);
     playTrafficHonks();
     playScreams();
@@ -1769,4 +1792,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, drift, get state() { return state; } };
