@@ -19,6 +19,7 @@ interface Item {
   t: number; // 倒下的進度（秒）
   down: number; // 倒在地上多久了
   ax: number; az: number; // 倒下時的旋轉軸（水平）
+  tag?: number; // 屬於哪個城市區塊（區塊卸載時一起拿掉）
 }
 
 const FALL_TIME = 0.8;
@@ -49,9 +50,9 @@ export class Breakables {
     this.grid.addBox(x, z, x, z, it);
   }
   /** 各部位各自的 index 與矩陣（紅綠燈：桿、橫桿、燈箱、三顆燈） */
-  addParts(x: number, z: number, r: number, slow: number, parts: { mesh: THREE.InstancedMesh; idx: number; base?: THREE.Matrix4; hide?: boolean }[]) {
+  addParts(x: number, z: number, r: number, slow: number, parts: { mesh: THREE.InstancedMesh; idx: number; base?: THREE.Matrix4; hide?: boolean }[], tag?: number) {
     // 呼叫前 InstancedMesh 的矩陣都已經設好了，所以不存 base（撞倒時再讀）
-    const it: Item = { x, z, r, slow, parts: parts.map((p) => ({ mesh: p.mesh, idx: p.idx, hide: p.hide })), state: 0, t: 0, down: 0, ax: 1, az: 0 };
+    const it: Item = { x, z, r, slow, parts: parts.map((p) => ({ mesh: p.mesh, idx: p.idx, hide: p.hide })), state: 0, t: 0, down: 0, ax: 1, az: 0, tag };
     this.items.push(it);
     this.grid.addBox(x, z, x, z, it);
   }
@@ -125,6 +126,14 @@ export class Breakables {
       it.obj.matrix.copy(pivot);
       it.obj.matrixWorldNeedsUpdate = true;
     }
+  }
+
+  /** 區塊卸載：拿掉這個區塊的所有東西（bb = 範圍） */
+  removeTag(tag: number, bb: [number, number, number, number]) {
+    const pred = (it: Item) => it.tag === tag;
+    this.grid.removeIf(bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1, pred);
+    this.items = this.items.filter((it) => !pred(it));
+    for (const it of this.moving) if (pred(it)) this.moving.delete(it);
   }
 
   get count() { return this.items.length; }

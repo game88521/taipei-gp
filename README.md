@@ -47,7 +47,7 @@ npm run check-track  # 賽道健檢：長度、最急彎、路段是否靠太近
 ```
 node tools/fetch-rail.mjs  # 另外下載捷運軌道（文湖線高架）→ tools/osm-rail.json（不進 git，沒有也能 build）
 npm run fetch-osm    # 從 Overpass API 分塊下載（原本 6 塊＋北側、西側擴充長條＋水域）（快取在 tools/osm-cache/，失敗重跑會跳過已下載的）→ tools/osm-raw.json（23 MB，不進 git）
-npm run build-city   # 轉成 src/data/track.json（賽道）與 public/data/city.json（建築、道路、綠地、樹）
+npm run build-city   # 轉成 src/data/track.json（賽道）、public/data/city.json（路網、綠地、地形…）與 public/data/tiles/（建築、樹、路邊機車，600 m 一塊）
 npm run plan         # 輸出 tools/plan.svg 平面圖，檢查賽道有沒有對準真實道路
 ```
 
@@ -57,6 +57,8 @@ npm run plan         # 輸出 tools/plan.svg 平面圖，檢查賽道有沒有�
 - **建築**：輪廓 + 高度（`height`，沒有就用樓層數 × 3.3 m）；有 `building:part` 的建築改畫各部件。
   壓到賽道的建築會刪掉。101 的塔身在 `src/city.ts` 用竹節造型重做（OSM 只有一根方柱），裙樓照 OSM。
 - **行道樹**：OSM 有標的樹 + 主要道路兩側每 11 m 一棵 + 公園、森林裡隨機撒 + 山坡上補種。
+- **區塊**：最後呼叫 `tools/split-tiles.mjs`，把建築、行道樹、路邊機車依 600 m 切到 `public/data/tiles/{tx}_{tz}.json`（目前 138 塊），
+  核心 city.json 只剩全地圖都要用的東西（車流、導航、小地圖要整張路網）。也可以對還沒切過的 city.json 單獨執行 `node tools/split-tiles.mjs`。
 - **地形**：`PEAKS` 列出象山、拇指山、虎山、豹山與南側稜線；在森林或山頭核心範圍、離道路／建築／賽道夠遠的格點才隆起，邊緣模糊成緩坡。
 
 ## 線上排行榜（Vercel）
@@ -68,9 +70,18 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 
 ## 離線快取（Service Worker）
 
-`npm run build` 會自動產生 `dist/sw.js`（範本在 `src/sw-template.js`，產生邏輯在 `vite.config.ts`），街景資料也會一起快取。
+`npm run build` 會自動產生 `dist/sw.js`（範本在 `src/sw-template.js`，產生邏輯在 `vite.config.ts`），核心街景資料也會一起快取（城市區塊檔是開到附近才抓、抓過的才快取）。
 玩過一次之後第二次開幾乎瞬間載入，沒網路也能玩；任何檔案改了版本號就會變，手機下次開啟自動換新版。
 `npm run dev` 時不會註冊，避免改了程式碼看不到。
+
+## 城市串流
+
+建築、頂樓、路邊機車、行道樹依 600 m 區塊串流（`src/city.ts` 的 `stream`）：只載入鏡頭周圍「可視距離 + 一個區塊」內的區塊，
+開遠了在背景載入前方的（每格畫面最多花 6 ms 蓋，身邊的區塊還沒好時 25 ms），超出範圍 450 m 就卸掉（網格、碰撞、可撞倒的樹一起拿掉）。
+地圖再大，同時在記憶體裡的量也只跟可視距離有關：目前的地圖高畫質載 51／138 塊，JS 記憶體約 170 MB（全部載入是 320 MB）。
+所有區塊共用同一組材質，載入時在場景裡各放一個隱藏的代表，讓天氣系統收集得到、著色器先編好。
+自動測試（`?sim=`）與 `?alltiles` 一次載入全部區塊、不卸載（同步模擬等不到背景載入）。
+區塊檔不列入 Service Worker 的預先快取，開到附近才抓、抓過的存進快取。
 
 ## 畫質
 
@@ -127,7 +138,7 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 | `src/city.ts` | 真實街景：建築外牆（公寓／玻璃帷幕／公家）、店面、直式招牌、綠地、行道樹、地形、101、依距離分層顯示 |
 | `src/filler.ts` | 地圖外圍的遠景城市（方塊＋著色器畫的窗戶，5 次繪製，有碰撞） |
 | `src/decor.ts` | 有標線的路面、斑馬線、路口綠色路名牌、地標屋頂招牌 |
-| `src/citydata.ts` | city.json 型別、路網查詢（最近路名）、建築與樹幹碰撞 |
+| `src/citydata.ts` | city.json／區塊檔的型別與解碼、路網查詢（最近路名）、建築碰撞（可依區塊增減） |
 | `src/freecar.ts` | 自由駕駛的汽車物理（油門、煞車、倒車、碰撞） |
 | `src/traffic.ts` | 車流（IDM 跟車、路口轉彎）與紅綠燈（號誌路口分群、週期、燈號顯示） |
 | `src/breakables.ts` | 撞得倒的東西：行道樹、路燈、號誌桿、路名牌（倒下動畫、車子只減速不卡住、開遠後復原） |

@@ -25,6 +25,7 @@ function rng(seed: number) {
 /** 依真實建築的範圍算出外圍街廓（固定亂數種子：每次載入都一樣，碰撞也對得上） */
 export function makeFiller(d: CityData): Filler {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  if (d.tiles) [x0, z0, x1, z1] = d.tiles.bounds; // 建築拆到區塊檔了：用索引裡記的範圍
   for (const b of d.buildings) for (let k = 0; k < b.p.length; k += 2) {
     x0 = Math.min(x0, b.p[k]); x1 = Math.max(x1, b.p[k]);
     z0 = Math.min(z0, b.p[k + 1]); z1 = Math.max(z1, b.p[k + 1]);

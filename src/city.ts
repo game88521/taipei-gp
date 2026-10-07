@@ -11,7 +11,7 @@ import { stage, fetchJson } from './loading';
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
 
-import { terrainHeight, decodeCity, type CityData, type Building } from './citydata';
+import { terrainHeight, decodeCity, decodeTile, Collider, type CityData, type Building, type TileData } from './citydata';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
 import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
@@ -232,14 +232,34 @@ function flatPoly(geo: Geo, r: [number, number][], y: number, up: boolean, color
   }
 }
 
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][] }> {
+export interface CityStream {
+  onAdd: ((g: THREE.Object3D) => void) | null; // 新區塊加進場景時（main 設陰影旗標）
+  onRemove: (() => void) | null; // 卸掉區塊之後（main 清掉繪製清單裡的舊參照）
+  total: number;
+  readonly loaded: number;
+  readonly pending: number;
+  readonly avgMs: number;
+  update(x: number, z: number, r: number): void;
+}
+
+/** opts.all：一次載入全部區塊、不卸載（自動測試是同步模擬，等不到背景載入）；cx, cz：開場先載入哪一帶 */
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: { all?: boolean; cx: number; cz: number }): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][]; collider: Collider; stream: CityStream }> {
   // 依距離顯示：每個區塊記住中心點，離鏡頭太遠就整塊不畫（地圖變大後很重要）
   // 分四層：far = 整個可視距離（建築、屋頂）；mid = 一半多（樹冠）；near = 550 m 內（店面、招牌、地上影子、機車、樹幹）；
   // close = 300 m 內（路名牌：一支一個物件，離遠了也看不清字）。遠處的小東西在手機螢幕上只有幾個像素，卻一個就多一次繪製
   // pad = 區塊半徑（區塊中心到角落），單一物件是 0
   type Layer = 'far' | 'mid' | 'near' | 'close';
-  const cullables: { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number }[] = [];
-  const cullAdd = (o: THREE.Object3D, x: number, z: number, layer: Layer = 'far', pad = TILE * 0.71) => cullables.push({ o, x, z, layer, pad });
+  type CullItem = { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number };
+  const cullables = new Set<CullItem>();
+  const cullAdd = (o: THREE.Object3D, x: number, z: number, layer: Layer = 'far', pad = TILE * 0.71) => cullables.add({ o, x, z, layer, pad });
+  let lastCull: [number, number, number] | null = null;
+  const cullOne = (c: CullItem) => {
+    if (!lastCull) return;
+    const [x, z, r] = lastCull, R = { far: r, mid: r * 0.6, near: Math.min(r, 550), close: 300 }[c.layer];
+    const inRange = (c.x - x) ** 2 + (c.z - z) ** 2 < (R + c.pad) ** 2;
+    c.o.userData.inRange = inRange;
+    c.o.visible = inRange && !c.o.userData.off; // off = 街道賽時藏起來的
+  };
   const breakables = new Breakables();
   const data = decodeCity(await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4));
   await stage('鋪地面與綠地', 0.42);
@@ -316,89 +336,165 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
   const raceHide = buildStreetSigns(scene, data, breakables, (x, z) => nearest(x, z)[1] < 16, (g, x, z) => cullAdd(g, x, z, 'close', 0));
   const landmarks = buildLandmarks(scene, data);
 
-  // ---- 建築
-  await stage('蓋房子', 0.5);
-  // 依 300 m 分區塊：鏡頭（和陰影）看不到的區塊整塊不畫
-  // 外牆、屋頂從遠處就看得到，用 600 m 的大區塊（繪製次數少 4 倍）；店面、招牌、地上影子只在近處畫，用 300 m
+  // ---- 路燈（燈頭會發光，開了光暈效果特別明顯）
+  const L = data.lamps ?? [];
+  if (L.length) {
+    const n = L.length / 3;
+    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 8.5, 6).translate(0, 4.25 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
+    const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.8).translate(0, 7.8, 0.9), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
+    const headMat = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false });
+    headMat.userData.lamp = true; // 白天熄燈、晚上更亮（weather.ts）
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.14, 0.75).translate(0, 7.72, 1.7), headMat, n);
+    // 晚上路燈照在地上的光圈（平常隱藏；加法混色疊在路面上）
+    const poolTex = canvasTex(64, 64, (g) => {
+      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, 'rgba(255,214,150,0.55)');
+      grd.addColorStop(0.5, 'rgba(255,190,120,0.18)');
+      grd.addColorStop(1, 'rgba(255,170,100,0)');
+      g.clearRect(0, 0, 64, 64);
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 64, 64);
+    }, false);
+    const pool = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2).translate(0, -0.2, 2.6), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 }), n);
+    pool.userData.nightOnly = true;
+    pool.visible = false;
+    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (let i = 0; i < n; i++) {
+      qq.setFromAxisAngle(up, L[i * 3 + 2]);
+      m4.compose(new THREE.Vector3(L[i * 3], 0, L[i * 3 + 1]), qq, one);
+      pole.setMatrixAt(i, m4);
+      arm.setMatrixAt(i, m4);
+      head.setMatrixAt(i, m4);
+      pool.setMatrixAt(i, m4);
+      breakables.add(L[i * 3], L[i * 3 + 1], 0.2, 0.9, [pole, arm, head], i, m4); // 撞到會倒，車速剩 90%
+    }
+    for (const m of [pole, arm, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
+  }
+
+
+  scene.add(build101());
+  if (data.terrain && data.trails) scene.add(buildTrails(data.trails, data.terrain, data.rocks ?? []));
+  const elev = buildElevated(scene, data); // 高架道路、人行空橋、文湖線、地下道入口
+  const trains = new Trains(scene, data); // 文湖線列車
+  buildWater(scene, data); // 基隆河、池塘
+  const marketSpots = buildMarket(scene, data); // 饒河夜市
+  await stage('外圍市區', 0.5);
+  const filler = makeFiller(data);
+  buildFiller(scene, filler);
+  const collider = new Collider(data);
+
+  // ---- 建築、頂樓、路邊機車、行道樹：依 600 m 區塊串流
+  // 只載入鏡頭附近（可視距離內）的區塊；開遠了在背景載入前面的、卸掉後面的（網格、碰撞、可撞倒的東西一起拿掉），
+  // 地圖再大，同時在記憶體裡的量也差不多。蓋的時候每一格畫面只花幾毫秒，剩下的留到下一格，開車時不會卡一下
   const BIG = TILE * 2;
-  const tiles = new Map<string, Geo>();
   const sizeOf = (kind: string) => (kind === 'shop' || kind === 'sign' || kind === 'shadow' ? TILE : BIG);
-  const tileGeo = (kind: string, x: number, z: number) => {
-    const S = sizeOf(kind);
-    const key = `${kind}|${Math.floor(x / S)},${Math.floor(z / S)}`;
-    let g = tiles.get(key);
-    if (!g) tiles.set(key, (g = new Geo()));
-    return g;
-  };
-  // 頂樓：水塔（圓柱）、鐵皮加蓋（方塊），台北公寓的標準配備
-  const tanks: [number, number, number, number][] = [], sheds: [number, number, number, number, number, number, number][] = [];
   const resTint = ['#e8e1d5', '#d9d0c3', '#cfc8bd', '#e3d6c8', '#c9cdd1', '#d8cbbd', '#bfb7aa', '#e6d9cf'].map((c) => new THREE.Color(c));
   const roofCol = [new THREE.Color('#8b8883'), new THREE.Color('#7d8288'), new THREE.Color('#96918a')];
   const white = new THREE.Color('#ffffff'), civic = new THREE.Color('#ddd7cc');
-  const r = rng(101);
-  const roofDetails = (ring: [number, number][], y: number) => {
-    const A = Math.abs(signedArea(ring));
-    if (A < 80) return;
-    let cx = 0, cz = 0;
-    for (const p of ring) { cx += p[0]; cz += p[1]; }
-    cx /= ring.length; cz /= ring.length;
-    const inside = (x: number, z: number) => {
-      let c = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, zi] = ring[i], [xj, zj] = ring[j];
-        if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
-      }
-      return c;
-    };
-    const span = Math.sqrt(A) * 0.3;
-    const n = A > 300 ? 2 : 1;
-    for (let k = 0; k < n; k++) {
-      const x = cx + (r() - 0.5) * span, z = cz + (r() - 0.5) * span;
-      if (inside(x, z)) tanks.push([x, y, z, 0.9 + r() * 0.5]);
-    }
-    if (r() < 0.35) {
-      // 鐵皮加蓋：大約占屋頂中間的一塊，順著最長的牆
-      let bi = 0, bl = 0;
-      for (let i = 0; i < ring.length; i++) {
-        const j = (i + 1) % ring.length, l = Math.hypot(ring[j][0] - ring[i][0], ring[j][1] - ring[i][1]);
-        if (l > bl) { bl = l; bi = i; }
-      }
-      const j = (bi + 1) % ring.length;
-      const ang = Math.atan2(ring[j][0] - ring[bi][0], ring[j][1] - ring[bi][1]);
-      const w = Math.min(bl * 0.5, 9), d = Math.min(Math.sqrt(A) * 0.45, 7);
-      if (inside(cx, cz)) sheds.push([cx, y, cz, w, d, ang, Math.floor(r() * 4)]);
-    }
-  };
+  // 所有區塊共用的材質與幾何（卸載區塊時不釋放）
   const mats: Record<string, THREE.Material> = {
     f00: facade('res', 1), f01: facade('res', 5), f02: facade('res', 9),
     f10: facade('glass', 2, q.level === 'high'), f11: facade('glass', 7, q.level === 'high'), f30: facade('civic', 4),
     roof: new THREE.MeshLambertMaterial({ vertexColors: true }), shop: storefrontMat(), sign: signMat(), shadow: bakedShadowMaterial(),
   };
   (mats.shop as THREE.MeshBasicMaterial).map!.wrapS = THREE.RepeatWrapping;
-  // 分批蓋：先照 600 m 大區塊分組，每組蓋完就轉成網格、放掉暫存的 JS 陣列
-  // （3 萬多棟一次全部蓋完才轉，暫存陣列的峰值會到好幾百 MB，手機會被瀏覽器關掉）
-  // 分組用的點跟下面 tileGeo 用的一樣（ring[0]，必要時反轉），同一個區塊只會在同一組
-  const buckets = new Map<string, Building[]>();
-  for (const b of data.buildings) {
-    let rg = toRing(b.p);
-    if (signedArea(rg) > 0) rg = rg.reverse();
-    const key = `${Math.floor(rg[0][0] / BIG)},${Math.floor(rg[0][1] / BIG)}`;
-    let list = buckets.get(key);
-    if (!list) buckets.set(key, (list = []));
-    list.push(b);
-  }
-  const flushTiles = () => {
-    for (const [key, g] of tiles) {
-      if (!g.pos.length) continue;
-      const mesh = new THREE.Mesh(g.build(), mats[key.split('|')[0]]);
-      scene.add(mesh);
-      const [tx, tz] = key.split('|')[1].split(',').map(Number), kind = key.split('|')[0], S = sizeOf(kind);
-      cullAdd(mesh, (tx + 0.5) * S, (tz + 0.5) * S, S === TILE ? 'near' : 'far', S * 0.71);
+  // 頂樓：水塔（圓柱）、鐵皮加蓋（方塊），台北公寓的標準配備
+  const tankGeo = new THREE.CylinderGeometry(0.75, 0.75, 1.6, 12).translate(0, 1.6, 0), tankMat = new THREE.MeshLambertMaterial({ color: '#c9ced3' });
+  const legGeo = new THREE.BoxGeometry(1.4, 0.8, 1.4).translate(0, 0.4, 0), legMat = new THREE.MeshLambertMaterial({ color: '#6a6f75' });
+  const shedGeo = new THREE.BoxGeometry(1, 2.5, 1).translate(0, 1.25, 0), shedMat = new THREE.MeshLambertMaterial(); // 單斜屋頂：一邊高 2.8 m、一邊 2.2 m
+  const tin = ['#5f8fb0', '#6aa07a', '#d8d8d0', '#b06a4a'].map((c) => new THREE.Color(c));
+  // 路邊停的機車（簡化外型，數量多）
+  const parkedGeo = scooterParkedGeo(), parkedMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const parkedCol = ['#e8e8e8', '#2a2a2a', '#c8102e', '#1f5fa8', '#e8c840', '#7fb8d8', '#f0a0b0'].map((c) => new THREE.Color(c));
+  // 行道樹；樹影：沿太陽反方向拉長的柔邊橢圓（預先擺好，不用即時陰影）
+  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 3, 5, 1, true).translate(0, 1.5, 0);
+  const crownGeo = new THREE.IcosahedronGeometry(1.9, q.level === 'high' ? 1 : 0).translate(0, 4.4, 0); // 高畫質：樹冠比較圓
+  const trunkMat = new THREE.MeshLambertMaterial({ color: '#5a4636' }), crownMat = new THREE.MeshLambertMaterial({ flatShading: true });
+  const leaf = ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45', '#44703a'].map((c) => new THREE.Color(c));
+  const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), blobMat = bakedShadowMaterial(blobTexture());
+  blobMat.opacity = 0.28; // 樹影淡一點：大安森林公園那種密林，整片地面都在影子裡，太深會看起來像一片灰土
+  const sl = Math.hypot(SHADOW_PER_M.x, SHADOW_PER_M.z), sdx = SHADOW_PER_M.x / sl, sdz = SHADOW_PER_M.z / sl, syaw = Math.atan2(sdx, sdz);
+  const bq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), syaw);
+  for (const g of [tankGeo, legGeo, shedGeo, parkedGeo, trunkGeo, crownGeo, blobGeo]) g.userData.shared = true;
+  {
+    // 每種材質在場景裡放一個隱藏的代表：天氣（weather.collect）只掃一次場景收集材質，
+    // 載入時的 compileAsync 也靠它先把著色器編好（之後串流進來的區塊第一次畫到才不會卡）
+    const tri = new THREE.BufferGeometry();
+    tri.setAttribute('position', new THREE.Float32BufferAttribute([0, -50, 0, 0, -50, 0.01, 0.01, -50, 0], 3));
+    tri.userData.shared = true;
+    const holders = new THREE.Group();
+    for (const m of Object.values(mats)) holders.add(new THREE.Mesh(tri, m));
+    for (const [m, col] of [[tankMat, false], [legMat, false], [shedMat, true], [parkedMat, true], [trunkMat, false], [crownMat, true], [blobMat, false]] as [THREE.Material, boolean][]) {
+      const im = new THREE.InstancedMesh(tri, m, 1);
+      im.setMatrixAt(0, new THREE.Matrix4());
+      if (col) im.setColorAt(0, white);
+      holders.add(im);
     }
-    tiles.clear();
+    for (const o of holders.children) { o.visible = false; o.frustumCulled = false; }
+    scene.add(holders);
+  }
+
+  type Cull = { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number };
+  let sliceStart = performance.now(), budget = Infinity, busyMs = 0, built = 0; // busyMs：蓋區塊實際花掉的時間（不含等下一格）
+  const slice = async () => {
+    if (performance.now() - sliceStart < budget) return;
+    busyMs += performance.now() - sliceStart;
+    await new Promise<void>((res) => requestAnimationFrame(() => res()));
+    sliceStart = performance.now();
   };
-  for (const list of buckets.values()) {
-    for (const b of list) {
+
+  /** 蓋一個區塊：建築外牆、屋頂、店面招牌、地上影子、頂樓、路邊機車、行道樹，加上碰撞與可撞倒的東西 */
+  async function buildTile(td: TileData, tag: number, group: THREE.Group, [ccx, ccz]: [number, number]) {
+    const cl: Cull[] = [];
+    const add = (o: THREE.Object3D, x: number, z: number, layer: Layer, pad = TILE * 0.71) => { group.add(o); cl.push({ o, x, z, layer, pad }); };
+    const r = rng(101 + tag * 7919); // 每個區塊各自的亂數：卸掉再載入長得一樣
+    // 依 300 m 分小區塊：鏡頭（和陰影）看不到的整塊不畫
+    // 外牆、屋頂從遠處就看得到，用 600 m 的大區塊（繪製次數少 4 倍）；店面、招牌、地上影子只在近處畫，用 300 m
+    const tiles = new Map<string, Geo>();
+    const tileGeo = (kind: string, x: number, z: number) => {
+      const S = sizeOf(kind);
+      const key = `${kind}|${Math.floor(x / S)},${Math.floor(z / S)}`;
+      let g = tiles.get(key);
+      if (!g) tiles.set(key, (g = new Geo()));
+      return g;
+    };
+    const tanks: [number, number, number, number][] = [], sheds: [number, number, number, number, number, number, number][] = [];
+    const roofDetails = (ring: [number, number][], y: number) => {
+      const A = Math.abs(signedArea(ring));
+      if (A < 80) return;
+      let cx = 0, cz = 0;
+      for (const p of ring) { cx += p[0]; cz += p[1]; }
+      cx /= ring.length; cz /= ring.length;
+      const inside = (x: number, z: number) => {
+        let c = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const [xi, zi] = ring[i], [xj, zj] = ring[j];
+          if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+        }
+        return c;
+      };
+      const span = Math.sqrt(A) * 0.3;
+      const n = A > 300 ? 2 : 1;
+      for (let k = 0; k < n; k++) {
+        const x = cx + (r() - 0.5) * span, z = cz + (r() - 0.5) * span;
+        if (inside(x, z)) tanks.push([x, y, z, 0.9 + r() * 0.5]);
+      }
+      if (r() < 0.35) {
+        // 鐵皮加蓋：大約占屋頂中間的一塊，順著最長的牆
+        let bi = 0, bl = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const j = (i + 1) % ring.length, l = Math.hypot(ring[j][0] - ring[i][0], ring[j][1] - ring[i][1]);
+          if (l > bl) { bl = l; bi = i; }
+        }
+        const j = (bi + 1) % ring.length;
+        const ang = Math.atan2(ring[j][0] - ring[bi][0], ring[j][1] - ring[bi][1]);
+        const w = Math.min(bl * 0.5, 9), d = Math.min(Math.sqrt(A) * 0.45, 7);
+        if (inside(cx, cz)) sheds.push([cx, y, cz, w, d, ang, Math.floor(r() * 4)]);
+      }
+    };
+    let nb = 0;
+    for (const b of td.buildings) {
+      if ((++nb & 15) === 0) await slice();
       // 101 塔身：OSM 只有一根方柱，改用下面手工的竹節造型（裙樓購物中心照 OSM）
       if (b.h > 100) {
         let cx = 0, cz = 0;
@@ -435,7 +531,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
       // 有專屬造型的地標：影子照外框算（上面），模型另外做
       if (b.k) {
         const m = buildSpecial(b);
-        if (m) { scene.add(m); cullAdd(m, ring[0][0], ring[0][1], 'far', 200); continue; }
+        if (m) { m.userData.ownMats = true; add(m, ring[0][0], ring[0][1], 'far', 200); continue; }
       }
       let u = 0;
       const streetLevel = y0 < 0 && (b.s === 0 || b.s === 2) && y1 < 70;
@@ -486,176 +582,204 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality): Promis
         if (y0 > 3) flatPoly(roofs, ring, y0, false, roofCol[0], () => [0, 0]); // 懸空的部件（101 的竹節）要有底面
       } catch { /* 畸形多邊形就不加屋頂 */ }
     }
-    flushTiles();
-  }
-
-  // ---- 頂樓水塔與鐵皮加蓋
-  await stage('頂樓、路燈、路邊機車', 0.62);
-  if (tanks.length) {
-    const tank = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 12).translate(0, 1.6, 0), new THREE.MeshLambertMaterial({ color: '#c9ced3' }), tanks.length);
-    const leg = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.8, 1.4).translate(0, 0.4, 0), new THREE.MeshLambertMaterial({ color: '#6a6f75' }), tanks.length);
-    const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
-    tanks.forEach(([x, y, z, k], i) => {
-      m4.compose(pos.set(x, y, z), qq, sc.setScalar(k));
-      tank.setMatrixAt(i, m4);
-      leg.setMatrixAt(i, m4);
-    });
-    tank.computeBoundingSphere();
-    leg.computeBoundingSphere();
-    scene.add(tank, leg);
-  }
-  if (sheds.length) {
-    const tin = ['#5f8fb0', '#6aa07a', '#d8d8d0', '#b06a4a'].map((c) => new THREE.Color(c));
-    // 單斜屋頂：一邊高 2.8 m、一邊 2.2 m
-    const g = new THREE.BoxGeometry(1, 2.5, 1).translate(0, 1.25, 0);
-    const shed = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial(), sheds.length);
-    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    sheds.forEach(([x, y, z, w, d, ang, c], i) => {
-      qq.setFromAxisAngle(up, ang);
-      m4.compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(d, 1, w));
-      shed.setMatrixAt(i, m4);
-      shed.setColorAt(i, tin[c]);
-    });
-    shed.computeBoundingSphere();
-    scene.add(shed);
-  }
-
-  // ---- 路燈（燈頭會發光，開了光暈效果特別明顯）
-  const L = data.lamps ?? [];
-  if (L.length) {
-    const n = L.length / 3;
-    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 8.5, 6).translate(0, 4.25 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
-    const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.8).translate(0, 7.8, 0.9), new THREE.MeshLambertMaterial({ color: '#5d6168' }), n);
-    const headMat = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false });
-    headMat.userData.lamp = true; // 白天熄燈、晚上更亮（weather.ts）
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.14, 0.75).translate(0, 7.72, 1.7), headMat, n);
-    // 晚上路燈照在地上的光圈（平常隱藏；加法混色疊在路面上）
-    const poolTex = canvasTex(64, 64, (g) => {
-      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-      grd.addColorStop(0, 'rgba(255,214,150,0.55)');
-      grd.addColorStop(0.5, 'rgba(255,190,120,0.18)');
-      grd.addColorStop(1, 'rgba(255,170,100,0)');
-      g.clearRect(0, 0, 64, 64);
-      g.fillStyle = grd;
-      g.fillRect(0, 0, 64, 64);
-    }, false);
-    const pool = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2).translate(0, -0.2, 2.6), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 }), n);
-    pool.userData.nightOnly = true;
-    pool.visible = false;
-    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
-    for (let i = 0; i < n; i++) {
-      qq.setFromAxisAngle(up, L[i * 3 + 2]);
-      m4.compose(new THREE.Vector3(L[i * 3], 0, L[i * 3 + 1]), qq, one);
-      pole.setMatrixAt(i, m4);
-      arm.setMatrixAt(i, m4);
-      head.setMatrixAt(i, m4);
-      pool.setMatrixAt(i, m4);
-      breakables.add(L[i * 3], L[i * 3 + 1], 0.2, 0.9, [pole, arm, head], i, m4); // 撞到會倒，車速剩 90%
+    for (const [key, g] of tiles) {
+      if (!g.pos.length) continue;
+      const mesh = new THREE.Mesh(g.build(), mats[key.split('|')[0]]);
+      const [tx, tz] = key.split('|')[1].split(',').map(Number), kind = key.split('|')[0], S = sizeOf(kind);
+      add(mesh, (tx + 0.5) * S, (tz + 0.5) * S, S === TILE ? 'near' : 'far', S * 0.71);
     }
-    for (const m of [pole, arm, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
-  }
+    tiles.clear();
+    await slice();
 
-  // ---- 路邊停的機車（簡化外型，數量多）
-  const P = data.parked ?? [];
-  if (q.parked && P.length) {
-    // 四千多台：依區塊分組，看不到的區塊不畫
-    const geo = scooterParkedGeo(), mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const colors = ['#e8e8e8', '#2a2a2a', '#c8102e', '#1f5fa8', '#e8c840', '#7fb8d8', '#f0a0b0'].map((c) => new THREE.Color(c));
-    const groups = new Map<string, number[]>();
-    for (let i = 0; i < P.length / 4; i++) {
-      const key = `${Math.floor(P[i * 4] / TILE)},${Math.floor(P[i * 4 + 1] / TILE)}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(i);
-    }
-    const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
-    for (const ids of groups.values()) {
-      const body = new THREE.InstancedMesh(geo, mat, ids.length);
-      ids.forEach((i, n) => {
-        qq.setFromAxisAngle(up, P[i * 4 + 2]);
-        m4.compose(new THREE.Vector3(P[i * 4], -0.25, P[i * 4 + 1]), qq, one);
-        body.setMatrixAt(n, m4);
-        body.setColorAt(n, colors[P[i * 4 + 3] % colors.length]);
+    // ---- 頂樓水塔與鐵皮加蓋
+    if (tanks.length) {
+      const tank = new THREE.InstancedMesh(tankGeo, tankMat, tanks.length), leg = new THREE.InstancedMesh(legGeo, legMat, tanks.length);
+      const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
+      tanks.forEach(([x, y, z, k], i) => {
+        m4.compose(pos.set(x, y, z), qq, sc.setScalar(k));
+        tank.setMatrixAt(i, m4);
+        leg.setMatrixAt(i, m4);
       });
-      body.computeBoundingSphere();
-      scene.add(body);
-      cullAdd(body, (Math.floor(P[ids[0] * 4] / TILE) + 0.5) * TILE, (Math.floor(P[ids[0] * 4 + 1] / TILE) + 0.5) * TILE, 'near');
+      tank.computeBoundingSphere();
+      leg.computeBoundingSphere();
+      add(tank, ccx, ccz, 'mid', BIG * 0.71);
+      add(leg, ccx, ccz, 'mid', BIG * 0.71);
     }
+    if (sheds.length) {
+      const shed = new THREE.InstancedMesh(shedGeo, shedMat, sheds.length);
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      sheds.forEach(([x, y, z, w, d, ang, c], i) => {
+        qq.setFromAxisAngle(up, ang);
+        m4.compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(d, 1, w));
+        shed.setMatrixAt(i, m4);
+        shed.setColorAt(i, tin[c]);
+      });
+      shed.computeBoundingSphere();
+      add(shed, ccx, ccz, 'mid', BIG * 0.71);
+    }
+
+    // ---- 路邊停的機車：依 300 m 小區塊分組，看不到的不畫
+    const P = td.parked;
+    if (q.parked && P.length) {
+      const groups = new Map<string, number[]>();
+      for (let i = 0; i < P.length / 4; i++) {
+        const key = `${Math.floor(P[i * 4] / TILE)},${Math.floor(P[i * 4 + 1] / TILE)}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(i);
+      }
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+      for (const ids of groups.values()) {
+        const body = new THREE.InstancedMesh(parkedGeo, parkedMat, ids.length);
+        ids.forEach((i, n) => {
+          qq.setFromAxisAngle(up, P[i * 4 + 2]);
+          m4.compose(new THREE.Vector3(P[i * 4], -0.25, P[i * 4 + 1]), qq, one);
+          body.setMatrixAt(n, m4);
+          body.setColorAt(n, parkedCol[P[i * 4 + 3] % parkedCol.length]);
+        });
+        body.computeBoundingSphere();
+        add(body, (Math.floor(P[ids[0] * 4] / TILE) + 0.5) * TILE, (Math.floor(P[ids[0] * 4 + 1] / TILE) + 0.5) * TILE, 'near');
+      }
+    }
+
+    // ---- 行道樹：依小區塊分成多組 InstancedMesh；離賽道遠的依畫質抽掉一些
+    const bb = collider.addBuildings(td.buildings, tag);
+    const tr = td.trees;
+    const byTile = new Map<string, [number, number][]>();
+    for (let k = 0; k < tr.length; k += 2) {
+      const [, d] = nearest(tr[k], tr[k + 1]);
+      if (d >= 90 && r() > q.treeKeep) continue;
+      const key = `${Math.floor(tr[k] / TILE)},${Math.floor(tr[k + 1] / TILE)}`;
+      if (!byTile.has(key)) byTile.set(key, []);
+      byTile.get(key)!.push([tr[k], tr[k + 1]]);
+      bb[0] = Math.min(bb[0], tr[k]); bb[1] = Math.min(bb[1], tr[k + 1]); bb[2] = Math.max(bb[2], tr[k]); bb[3] = Math.max(bb[3], tr[k + 1]);
+    }
+    const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3(), bm = new THREE.Matrix4();
+    for (const pts of byTile.values()) {
+      await slice();
+      const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, pts.length), crown = new THREE.InstancedMesh(crownGeo, crownMat, pts.length);
+      const blob = new THREE.InstancedMesh(blobGeo, blobMat, pts.length);
+      pts.forEach(([x, z], n) => {
+        const k = 0.75 + r() * 0.6;
+        qt.setFromAxisAngle(up, r() * Math.PI * 2);
+        s.set(k, k * (0.9 + r() * 0.3), k);
+        const ty = terrainHeight(data.terrain, x, z); // 山上的樹長在坡面上
+        m.compose(new THREE.Vector3(x, -0.3 + ty, z), qt, s);
+        trunk.setMatrixAt(n, m);
+        crown.setMatrixAt(n, m);
+        // 影子長度 ≈ 樹高 × 影子比例（樹冠那團影子從樹幹往外一點開始）
+        const len = 5.5 * k * sl * 0.8;
+        bm.compose(new THREE.Vector3(x + sdx * len * 0.55, 0.035, z + sdz * len * 0.55), bq, new THREE.Vector3(3.6 * k, 1, len));
+        if (ty > 0.5) bm.makeScale(0, 0, 0); // 坡上的樹不畫地面影子（平面影子貼不住坡）
+        blob.setMatrixAt(n, bm);
+        breakables.addParts(x, z, 0.35, 0.82, [
+          { mesh: trunk, idx: n, base: m }, { mesh: crown, idx: n, base: m }, { mesh: blob, idx: n, base: bm, hide: true },
+        ], tag); // 撞到會倒，車速剩 82%；倒下後地上的樹影跟著消失
+        crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
+      });
+      trunk.computeBoundingSphere();
+      crown.computeBoundingSphere();
+      blob.computeBoundingSphere();
+      const cx = (Math.floor(pts[0][0] / TILE) + 0.5) * TILE, cz = (Math.floor(pts[0][1] / TILE) + 0.5) * TILE;
+      add(trunk, cx, cz, 'near');
+      add(blob, cx, cz, 'near');
+      add(crown, cx, cz, 'mid');
+    }
+    return { cull: cl, bb };
   }
 
-  scene.add(build101());
-
-  await stage('種行道樹', 0.66);
-  // ---- 行道樹：依區塊分成多組 InstancedMesh（看不到的區塊不畫）；離賽道遠的依畫質抽掉一些
-  const tr = data.trees;
-  const byTile = new Map<string, [number, number][]>();
-  for (let k = 0; k < tr.length; k += 2) {
-    const [, d] = nearest(tr[k], tr[k + 1]);
-    if (d >= 90 && r() > q.treeKeep) continue;
-    const key = `${Math.floor(tr[k] / TILE)},${Math.floor(tr[k + 1] / TILE)}`;
-    if (!byTile.has(key)) byTile.set(key, []);
-    byTile.get(key)!.push([tr[k], tr[k + 1]]);
+  // ---- 串流：哪些區塊要載入、哪些要卸掉
+  const TI = data.tiles ?? { size: BIG, list: [], bounds: [0, 0, 0, 0] };
+  const S = TI.size;
+  const loaded = new Map<number, { group: THREE.Group; cull: Cull[]; bb: [number, number, number, number] }>();
+  const center = (i: number): [number, number] => [(TI.list[i][0] + 0.5) * S, (TI.list[i][1] + 0.5) * S];
+  const d2 = (i: number, x: number, z: number) => { const [cx, cz] = center(i); return (cx - x) ** 2 + (cz - z) ** 2; };
+  let want: number[] = [], busy = false;
+  async function loadTile(i: number) {
+    const [tx, tz] = TI.list[i];
+    const res = await fetch(`/data/tiles/${tx}_${tz}.json`);
+    if (!res.ok) throw new Error(`區塊 ${tx}_${tz}：HTTP ${res.status}`);
+    const td = decodeTile(await res.json());
+    sliceStart = performance.now();
+    const group = new THREE.Group();
+    const { cull: cl, bb } = await buildTile(td, i, group, center(i));
+    busyMs += performance.now() - sliceStart;
+    built++;
+    scene.add(group);
+    for (const c of cl) { cullables.add(c); cullOne(c); }
+    loaded.set(i, { group, cull: cl, bb });
+    stream.onAdd?.(group);
   }
-  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 3, 5, 1, true).translate(0, 1.5, 0);
-  const crownGeo = new THREE.IcosahedronGeometry(1.9, q.level === 'high' ? 1 : 0).translate(0, 4.4, 0); // 高畫質：樹冠比較圓
-  const trunkMat = new THREE.MeshLambertMaterial({ color: '#5a4636' }), crownMat = new THREE.MeshLambertMaterial({ flatShading: true });
-  const leaf = ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45', '#44703a'].map((c) => new THREE.Color(c));
-  const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3();
-  // 樹影：沿太陽反方向拉長的柔邊橢圓（預先擺好，不用即時陰影）
-  const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), blobMat = bakedShadowMaterial(blobTexture());
-  blobMat.opacity = 0.28; // 樹影淡一點：大安森林公園那種密林，整片地面都在影子裡，太深會看起來像一片灰土
-  const sl = Math.hypot(SHADOW_PER_M.x, SHADOW_PER_M.z), sdx = SHADOW_PER_M.x / sl, sdz = SHADOW_PER_M.z / sl, syaw = Math.atan2(sdx, sdz);
-  const bq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), syaw), bm = new THREE.Matrix4();
-  for (const pts of byTile.values()) {
-    const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, pts.length), crown = new THREE.InstancedMesh(crownGeo, crownMat, pts.length);
-    const blob = new THREE.InstancedMesh(blobGeo, blobMat, pts.length);
-    pts.forEach(([x, z], n) => {
-      const k = 0.75 + r() * 0.6;
-      qt.setFromAxisAngle(up, r() * Math.PI * 2);
-      s.set(k, k * (0.9 + r() * 0.3), k);
-      const ty = terrainHeight(data.terrain, x, z); // 山上的樹長在坡面上
-      m.compose(new THREE.Vector3(x, -0.3 + ty, z), qt, s);
-      trunk.setMatrixAt(n, m);
-      crown.setMatrixAt(n, m);
-      // 影子長度 ≈ 樹高 × 影子比例（樹冠那團影子從樹幹往外一點開始）
-      const len = 5.5 * k * sl * 0.8;
-      bm.compose(new THREE.Vector3(x + sdx * len * 0.55, 0.035, z + sdz * len * 0.55), bq, new THREE.Vector3(3.6 * k, 1, len));
-      if (ty > 0.5) bm.makeScale(0, 0, 0); // 坡上的樹不畫地面影子（平面影子貼不住坡）
-      blob.setMatrixAt(n, bm);
-      breakables.addParts(x, z, 0.35, 0.82, [
-        { mesh: trunk, idx: n, base: m }, { mesh: crown, idx: n, base: m }, { mesh: blob, idx: n, base: bm, hide: true },
-      ]); // 撞到會倒，車速剩 82%；倒下後地上的樹影跟著消失
-      crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
+  function unload(i: number) {
+    const L = loaded.get(i)!;
+    loaded.delete(i);
+    scene.remove(L.group);
+    for (const c of L.cull) cullables.delete(c);
+    L.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (!mesh.geometry.userData.shared) mesh.geometry.dispose();
+      if ((mesh as THREE.InstancedMesh).isInstancedMesh) (mesh as THREE.InstancedMesh).dispose(); // 放掉每棵樹、每台機車的矩陣
+      for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p.userData.ownMats) { (mesh.material as THREE.Material).dispose(); break; } // 地標專屬造型自己的材質
     });
-    trunk.computeBoundingSphere();
-    crown.computeBoundingSphere();
-    blob.computeBoundingSphere();
-    scene.add(trunk, crown, blob);
-    const cx = (Math.floor(pts[0][0] / TILE) + 0.5) * TILE, cz = (Math.floor(pts[0][1] / TILE) + 0.5) * TILE;
-    cullAdd(trunk, cx, cz, 'near');
-    cullAdd(blob, cx, cz, 'near');
-    cullAdd(crown, cx, cz, 'mid');
+    // 拆開父子關係：three.js 的繪製清單會留著上幾格畫過的物件（重複使用的陣列），
+    // 只要其中一個還被參照，整個區塊（所有子物件、樹和機車的矩陣）都放不掉
+    L.group.traverse((o) => { if (o !== L.group) o.parent = null; });
+    for (const o of [L.group, ...L.group.children]) o.children.length = 0;
+    collider.removeTag(i, L.bb);
+    breakables.removeTag(i, L.bb);
+    stream.onRemove?.();
+  }
+  async function pump() {
+    if (busy) return;
+    busy = true;
+    try {
+      while (want.length) {
+        const i = want.shift()!;
+        if (loaded.has(i)) continue;
+        try { await loadTile(i); } catch (e) { console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
+      }
+    } finally { busy = false; }
+  }
+  const inRadius = (x: number, z: number, r: number) => {
+    const R = r + S * 0.71 + 100;
+    return TI.list.map((_, i) => i).filter((i) => d2(i, x, z) < R * R).sort((a, b) => d2(a, x, z) - d2(b, x, z));
+  };
+  let keepAll = !!opts.all;
+  const stream = {
+    onAdd: null as ((g: THREE.Object3D) => void) | null,
+    onRemove: null as (() => void) | null,
+    total: TI.list.length,
+    get loaded() { return loaded.size; },
+    get pending() { return want.length + (busy ? 1 : 0); },
+    get avgMs() { return built ? busyMs / built : 0; }, // 測試用：平均蓋一塊花多少毫秒
+    /** 每 0.4 秒呼叫：x, z = 鏡頭位置、r = 可視距離 */
+    update(x: number, z: number, r: number) {
+      if (keepAll) return;
+      const drop = (r + S * 0.71 + 550) ** 2; // 比載入範圍多 450 m 才卸掉，在邊界來回開不會一直重蓋
+      for (const i of [...loaded.keys()]) if (d2(i, x, z) > drop) unload(i);
+      want = inRadius(x, z, r).filter((i) => !loaded.has(i));
+      // 身邊的區塊還沒載入（剛傳送過去）：每一格畫面多花一點時間趕快蓋好
+      budget = want.length && d2(want[0], x, z) < (S * 1.2) ** 2 ? 25 : 6;
+      void pump();
+    },
+  };
+  {
+    // 開場先把起點附近（或測試時全部）的區塊蓋好再進遊戲
+    const ids = keepAll ? TI.list.map((_, i) => i) : inRadius(opts.cx, opts.cz, q.viewDist);
+    for (let k = 0; k < ids.length; k++) {
+      if (k % 3 === 0) await stage(`蓋房子、種行道樹（${k}/${ids.length} 區）`, 0.52 + (0.22 * k) / ids.length);
+      await loadTile(ids[k]);
+    }
+    budget = 6;
   }
 
   const cull = (x: number, z: number, r: number) => {
-    const R = { far: r, mid: r * 0.6, near: Math.min(r, 550), close: 300 };
-    for (const c of cullables) {
-      const inRange = (c.x - x) ** 2 + (c.z - z) ** 2 < (R[c.layer] + c.pad) ** 2;
-      c.o.userData.inRange = inRange;
-      c.o.visible = inRange && !c.o.userData.off; // off = 街道賽時藏起來的
-    }
+    lastCull = [x, z, r];
+    for (const c of cullables) cullOne(c);
   };
-  if (data.terrain && data.trails) scene.add(buildTrails(data.trails, data.terrain, data.rocks ?? []));
-  const elev = buildElevated(scene, data); // 高架道路、人行空橋、文湖線、地下道入口
-  const trains = new Trains(scene, data); // 文湖線列車
-  buildWater(scene, data); // 基隆河、池塘
-  const marketSpots = buildMarket(scene, data); // 饒河夜市
-  await stage('外圍市區', 0.72);
-  const filler = makeFiller(data);
-  buildFiller(scene, filler);
-  return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots };
+  return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots, collider, stream };
 }
 
-/** 台北 101：照真實比例的竹節造型（總高 508 m）。方形錐台 = 4 邊的圓柱轉 45°，邊對齊街道 */
 function build101(): THREE.Group {
   const g = new THREE.Group();
   const glass = new THREE.MeshLambertMaterial({ color: '#5f8f88', emissive: '#16332f' });

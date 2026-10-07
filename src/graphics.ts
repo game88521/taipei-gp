@@ -55,7 +55,7 @@ export function makeComposer(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
 }
 
 /** 平面（路面、綠地、地面）只接受陰影；有厚度的東西（建築、樹、車、人）才投射 */
-export function applyShadowFlags(scene: THREE.Scene, enabled: boolean) {
+export function applyShadowFlags(scene: THREE.Object3D, enabled: boolean) {
   if (!enabled) return;
   const box = new THREE.Box3(), size = new THREE.Vector3();
   scene.traverse((o) => {

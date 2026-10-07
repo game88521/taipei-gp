@@ -31,6 +31,18 @@ export interface CityData {
   portals?: number[]; // 地下道入口 [x, z, 朝隧道方向, 路寬, ...]
   water?: { p: number[] }[]; // 水域（基隆河、池塘）
   market?: number[][]; // 饒河夜市的街道線
+  tiles?: TileIndex; // 建築、行道樹、路邊機車拆到區塊檔（tools/split-tiles.mjs），這三個欄位在核心裡是空的
+}
+/** 區塊索引：每塊 [tx, tz, 檔案大小]，檔案在 /data/tiles/{tx}_{tz}.json；bounds = 所有建築的範圍 */
+export interface TileIndex { size: number; list: [number, number, number][]; bounds: [number, number, number, number] }
+export interface TileData { buildings: Building[]; trees: number[]; parked: number[] }
+export function decodeTile(d: TileData & { enc?: number }): TileData {
+  if (d.enc === 1) {
+    for (const b of d.buildings) b.p = dec(b.p, 2, 10);
+    d.trees = dec(d.trees, 2, 10);
+    d.parked = dec(d.parked, 4, 100);
+  }
+  return d;
 }
 export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
 
@@ -41,6 +53,7 @@ function dec(a: number[], stride: number, scale: number): number[] {
   return o;
 }
 export function decodeCity(d: CityData & { enc?: number }): CityData {
+  d.buildings ??= []; d.trees ??= [];
   if (d.enc !== 1) return d;
   for (const b of d.buildings) b.p = dec(b.p, 2, 10);
   for (const g of d.greens) g.p = dec(g.p, 2, 10);
@@ -95,6 +108,17 @@ export class Grid<T> {
       }
     return out;
   }
+  /** 刪掉範圍內符合條件的項目（區塊卸載時用） */
+  removeIf(x0: number, z0: number, x1: number, z1: number, pred: (it: T) => boolean) {
+    const s = this.size;
+    for (let cx = Math.floor(x0 / s); cx <= Math.floor(x1 / s); cx++)
+      for (let cz = Math.floor(z0 / s); cz <= Math.floor(z1 / s); cz++) {
+        const k = this.key(cx, cz), c = this.cells.get(k);
+        if (!c) continue;
+        const kept = c.filter((it) => !pred(it));
+        if (kept.length) this.cells.set(k, kept); else this.cells.delete(k);
+      }
+  }
 }
 
 export interface Seg { x1: number; z1: number; x2: number; z2: number; way: NetWay }
@@ -134,7 +158,7 @@ export function distSeg(x: number, z: number, x1: number, z1: number, x2: number
   return Math.hypot(x - x1 - dx * t, z - z1 - dz * t);
 }
 
-interface Edge { x1: number; z1: number; x2: number; z2: number }
+interface Edge { x1: number; z1: number; x2: number; z2: number; tag?: number /* 屬於哪個區塊（卸載時一起拿掉） */ }
 interface Post { x: number; z: number; r: number }
 
 /** 靜態碰撞：建築外牆（落地的）＋ 樹幹 */
@@ -146,16 +170,26 @@ export class Collider {
   private terrain: Terrain | null;
   constructor(d: CityData) {
     this.terrain = d.terrain ?? null;
-    for (const b of d.buildings) {
+    this.addBuildings(d.buildings);
+    // 行道樹、路燈不在這裡：它們會被撞倒（breakables.ts），不是固定的障礙物
+  }
+  /** 建築外牆；回傳涵蓋範圍（區塊卸載時 removeTag 用） */
+  addBuildings(list: Building[], tag?: number): [number, number, number, number] {
+    const bb: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const b of list) {
       if ((b.m ?? 0) > 2) continue; // 懸空的部件不擋車
       const p = b.p, n = p.length / 2;
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
-        const e = { x1: p[i * 2], z1: p[i * 2 + 1], x2: p[j * 2], z2: p[j * 2 + 1] };
+        const e: Edge = { x1: p[i * 2], z1: p[i * 2 + 1], x2: p[j * 2], z2: p[j * 2 + 1], tag };
         this.edges.addBox(e.x1, e.z1, e.x2, e.z2, e);
+        bb[0] = Math.min(bb[0], e.x1); bb[1] = Math.min(bb[1], e.z1); bb[2] = Math.max(bb[2], e.x1); bb[3] = Math.max(bb[3], e.z1);
       }
     }
-    // 行道樹、路燈不在這裡：它們會被撞倒（breakables.ts），不是固定的障礙物
+    return bb;
+  }
+  removeTag(tag: number, bb: [number, number, number, number]) {
+    if (bb[0] <= bb[2]) this.edges.removeIf(bb[0], bb[1], bb[2], bb[3], (e) => e.tag === tag);
   }
   addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
   /** 一面牆（高架匝道貼地那段的側邊） */

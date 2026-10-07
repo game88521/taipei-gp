@@ -19,7 +19,7 @@ import { BigMap, NavArrows } from './bigmap';
 import { RainFx } from './rainfx';
 import { DriftScore } from './drift';
 import { VEHICLES, vehicleById, buildPlayerVehicle, PAINTS, PAINT_PRICE, type PlayerVehicle, type VehicleId, type Vehicle } from './vehicles';
-import { Collider, RoadNet } from './citydata';
+import { type Collider, RoadNet } from './citydata';
 import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
@@ -109,6 +109,7 @@ let honkYield = 0, honkBack = 0, honkT = 0, honkPlaced = false;
 const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
+let cityStream: import('./city').CityStream | null = null;
 // 載入進度：選單的按鈕上顯示目前在做什麼＋進度條
 // 開始建城市之後先不重畫背景：每加進一批新東西，畫面第一次畫到它就要同步編譯著色器，載入會一直卡
 let holdRender = true; // 一開始就先不畫：開場就建好的車、警車、雨…第一次畫到也要同步編譯，等最後 compileAsync 一次編
@@ -118,9 +119,14 @@ onProgress((label, f) => {
   $('btn-free').textContent = `${label}… ${Math.round(f * 100)}%`;
   $('load-bar').style.width = `${Math.round(f * 100)}%`;
 });
-const cityLoad = loadCity(scene, track, Q).then(async (c) => {
+// 自動測試（?sim）是同步模擬，等不到背景載入：一次載入全部區塊（?alltiles 也可以）
+const ALL_TILES = new URLSearchParams(location.search).has('sim') || new URLSearchParams(location.search).has('alltiles');
+const cityLoad = loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz: track.pz[0] }).then(async (c) => {
   await stage('建立碰撞與路網', 0.76);
-  collider = new Collider(c.data);
+  collider = c.collider;
+  cityStream = c.stream;
+  c.stream.onAdd = (g) => applyShadowFlagsIn(g, Q.shadows); // 串流進來的區塊：跟載入時一樣只接受陰影
+  c.stream.onRemove = () => renderer.renderLists.dispose(); // 繪製清單會留著卸掉區塊的物件，下一格重建一份新的
   for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
   for (const [x, z, r] of c.elev.posts) collider.addPost(x, z, r); // 高架橋墩
   for (const [x1, z1, x2, z2] of c.elev.walls) collider.addWall(x1, z1, x2, z2); // 匝道貼地那段
@@ -167,6 +173,7 @@ const cityLoad = loadCity(scene, track, Q).then(async (c) => {
   scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
   try { await renderer.compileAsync(scene, camera); } catch { /* 不支援就照舊第一次畫時編 */ }
   for (const o of hidden) o.visible = false;
+  hidden.length = 0; // 這個範圍會被之後的回呼（大地圖 onPick…）一直留著：不清掉的話，卸掉的城市區塊永遠放不掉
   holdRender = false;
   await stage('完成', 1);
   $('load-bar').parentElement!.style.display = 'none';
@@ -1770,7 +1777,11 @@ renderer.setAnimationLoop(() => {
   // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
   fpsN2++; fpsT2 += dt;
   cullAcc += dt;
-  if (cullAcc > 0.4 && cityCull) { cullAcc = 0; cityCull(camera.position.x, camera.position.z, Q.viewDist); } // 遠的城市區塊不畫
+  if (cullAcc > 0.4 && cityCull) {
+    cullAcc = 0;
+    cityCull(camera.position.x, camera.position.z, Q.viewDist); // 遠的城市區塊不畫
+    if (cityReady) cityStream?.update(camera.position.x, camera.position.z, Q.viewDist); // 載入前方的區塊、卸掉遠的
+  }
   if (fpsT2 >= 0.5) {
     const el = $('fps');
     el.style.display = opts.fps ? '' : 'none';
@@ -1792,4 +1803,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, drift, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, get state() { return state; } };
