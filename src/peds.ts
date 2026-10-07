@@ -25,6 +25,7 @@ interface Ped {
   lookX: number; lookZ: number;
   shirt: THREE.Color; pants: THREE.Color; skin: THREE.Color; hair: THREE.Color; sleeve: THREE.Color; shoe: THREE.Color;
   scale: number; bag: boolean; bagColor: THREE.Color;
+  umbColor: THREE.Color; // 下雨時撐的傘
   alive: boolean;
 }
 
@@ -33,7 +34,8 @@ const PANTS = ['#2a2f3a', '#1d2e4a', '#4a4a4a', '#c8b89a', '#1a1a1a', '#5a6a7a']
 const SKIN = ['#f1d2b6', '#e3b994', '#c99a74', '#a8795a', '#f6dcc6'];
 const HAIR = ['#1a1612', '#2a2018', '#3a2a1c', '#5a3a22', '#8a6a4a', '#b8b0a8'];
 const SHOES = ['#f2f2f2', '#1a1a1a', '#5a3a22', '#c8102e', '#3a4a6a'];
-const PARTS = ['torso', 'pelvis', 'head', 'hair', 'neck', 'armL', 'armR', 'legL', 'legR', 'shoeL', 'shoeR', 'bag', 'blob'] as const;
+const PARTS = ['torso', 'pelvis', 'head', 'hair', 'neck', 'armL', 'armR', 'legL', 'legR', 'shoeL', 'shoeR', 'bag', 'blob', 'umb', 'umbPole'] as const;
+const UMBRELLAS = ['#e03b3b', '#2f6fd8', '#f2c230', '#3fae5a', '#e05fa0', '#1c1c22', '#ffffff', '#7a5ad8', '#ff7a30', '#22a8b8'];
 type Part = (typeof PARTS)[number];
 
 function rng(seed: number) {
@@ -117,10 +119,13 @@ export class Pedestrians {
       torso: pedParts.torso(), pelvis: pedParts.pelvis(), head: pedParts.head(), hair: pedParts.hair(), neck: pedParts.neck(),
       armL: pedParts.arm(), armR: pedParts.arm(), legL: pedParts.leg(), legR: pedParts.leg(), shoeL: pedParts.shoe(), shoeR: pedParts.shoe(), bag: pedParts.bag(),
       blob: new THREE.PlaneGeometry(0.9, 0.9).rotateX(-Math.PI / 2).translate(0, 0.27, 0), // 腳下的影子（比腳底高一點點，蓋在路面上）
+      // 雨傘：右手舉著，傘面在頭頂偏右前方
+      umb: new THREE.ConeGeometry(0.62, 0.26, 12, 1, true).translate(0.12, 2.12, 0.08),
+      umbPole: new THREE.CylinderGeometry(0.015, 0.015, 0.9, 5).translate(0.12, 1.62, 0.08),
     };
-    const mat = new THREE.MeshLambertMaterial();
+    const mat = new THREE.MeshLambertMaterial(), umbMat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
     for (const k of PARTS) {
-      const m = new THREE.InstancedMesh(geo[k], k === 'blob' ? bakedShadowMaterial(blobTexture()) : mat, this.max);
+      const m = new THREE.InstancedMesh(geo[k], k === 'blob' ? bakedShadowMaterial(blobTexture()) : k === 'umb' ? umbMat : mat, this.max);
       m.count = 0;
       m.frustumCulled = false;
       if (k !== 'blob') m.userData.dynamic = true; // 投射即時陰影
@@ -142,7 +147,7 @@ export class Pedestrians {
         w, s, dir: this.rand() < 0.5 ? 1 : -1, v: 1.1 + this.rand() * 0.5, x, z, h: 0, phase: this.rand() * 6,
         dodge: 0, sit: 0, scared: 0, look: 0, lookX: 0, lookZ: 0, shirt: new THREE.Color(pick(SHIRTS)), pants: new THREE.Color(pick(PANTS)), skin: new THREE.Color(pick(SKIN)),
         hair: new THREE.Color(pick(HAIR)), sleeve: new THREE.Color(), shoe: new THREE.Color(pick(SHOES)),
-        scale: 0.9 + this.rand() * 0.18, bag: this.rand() < 0.4, bagColor: new THREE.Color(), alive: true,
+        scale: 0.9 + this.rand() * 0.18, bag: this.rand() < 0.4, bagColor: new THREE.Color(), umbColor: new THREE.Color(UMBRELLAS[Math.floor(this.rand() * UMBRELLAS.length)]), alive: true,
       };
       p.sleeve.copy(this.rand() < 0.55 ? p.skin : p.shirt); // 短袖露出手臂，長袖就是衣服的顏色
       p.bagColor.copy(p.shirt).multiplyScalar(0.55);
@@ -153,6 +158,8 @@ export class Pedestrians {
   }
 
   /** 回傳被碰到的行人數（給音效用） */
+  /** 下雨（main 每格設）：撐傘、走快一點 */
+  raining = false;
   /** 尖叫（給 main 播）：位置 */
   screams: { x: number; z: number }[] = [];
   screamCount = 0; // 測試用
@@ -231,7 +238,7 @@ export class Pedestrians {
       } else if (p.look > 0 && p.scared <= 0) {
         // 被按喇叭：站著看
       } else {
-        const run = p.scared > 0 ? 2.4 : 1; // 嚇到就跑
+        const run = p.scared > 0 ? 2.4 : this.raining ? 1.3 : 1; // 嚇到就跑；下雨走快一點
         p.s += p.dir * p.v * run * dt;
         p.phase += p.v * run * dt * 5.2;
         if (p.s > w.len || p.s < 0) {
@@ -331,6 +338,9 @@ export class Pedestrians {
       put('hair', m, p.hair);
       put('blob', m, p.hair);
       put('bag', p.bag ? m : zero, p.bagColor);
+      const umb = this.raining && !sitting; // 被撞倒坐在地上時傘掉了
+      put('umb', umb ? m : zero, p.umbColor);
+      put('umbPole', umb ? m : zero, p.shoe);
       const swing = sitting || p.mode === 'wait' || (p.look > 0 && p.scared <= 0) ? 0 : Math.sin(p.phase) * (p.scared > 0 ? 0.8 : 0.5); // 等紅燈、轉頭看時站好；跑的時候擺比較大
       // 腿：髖關節 (±0.09, 0.9)；坐著時往前伸直
       for (const [leg, shoe, side, sgn] of [['legL', 'shoeL', -0.09, 1], ['legR', 'shoeR', 0.09, -1]] as const) {
@@ -340,7 +350,8 @@ export class Pedestrians {
       }
       // 手：肩關節 (±0.23, 1.44)，跟同側的腿反向擺
       for (const [arm, side, sgn] of [['armL', -0.23, -1], ['armR', 0.23, 1]] as const) {
-        const raise = p.scared > 0 && !sitting ? Math.PI - 0.35 : 0; // 嚇到：雙手舉高
+        // 嚇到：雙手舉高；下雨撐傘：右手往前上方舉著傘柄
+        const raise = p.scared > 0 && !sitting ? Math.PI - 0.35 : this.raining && !sitting && side > 0 ? 1.15 : 0;
         j.copy(m).multiply(t.makeTranslation(side, 1.44, 0)).multiply(r.makeRotationX(sitting ? -0.3 : raise ? raise : swing * sgn * 0.8)).multiply(r.makeRotationZ(side * (raise ? 0.6 : 0.25)));
         put(arm, j, p.sleeve);
       }
@@ -356,5 +367,7 @@ export class Pedestrians {
 
   set visible(v: boolean) { for (const k of PARTS) this.mesh[k].visible = v; }
   get count() { return this.peds.filter((p) => p.alive).length; }
+  /** 測試截圖用：第 i 個走在人行道上的人的位置與面向 */
+  pos(i: number) { const p = this.peds.filter((q) => q.alive && q.mode === 'walk')[i]; return p ? { x: p.x, z: p.z, h: p.h } : null; }
   get sidewalks() { return this.walks.length; }
 }

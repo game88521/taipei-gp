@@ -203,6 +203,23 @@ export class Sound {
     src.stop(t + 0.1);
   }
 
+  /** 開過積水的「唰」：高頻一點的噪音 */
+  splash(vol: number) {
+    if (!this.ctx || !this.enabled || vol <= 0.02) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2200;
+    bp.Q.value = 0.7;
+    const g = this.ctx.createGain(), t = this.ctx.currentTime;
+    g.gain.setValueAtTime(0.5 * vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    src.connect(bp).connect(g).connect(this.fx);
+    src.start(t);
+    src.stop(t + 0.4);
+  }
+
   beep(freq: number, dur = 0.18) {
     if (!this.ctx || !this.enabled) return;
     const o = this.ctx.createOscillator();
