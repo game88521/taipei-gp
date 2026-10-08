@@ -336,7 +336,8 @@ function heightOf(t, id, isPart) {
 }
 
 // 地下的建築（捷運站、地下街）：OSM 照樣畫了外框，不排除的話會變成 15~25 m 高的方塊擋在忠孝東路正中間
-const underground = (t) => (t.layer != null && Number(t.layer) < 0) || /underground/.test(t.location || '');
+// layer 為負但明確標 location=surface／overground 的是地面建築（中正紀念堂：整座在地面上，layer=-1 是因為跨過地下的捷運站）
+const underground = (t) => !/^(surface|overground|roof)$/.test(t.location || '') && ((t.layer != null && Number(t.layer) < 0) || /underground/.test(t.location || ''));
 let droppedUnder = 0;
 const parts = [], outlines = [];
 for (const e of E) {
@@ -349,7 +350,11 @@ for (const e of E) {
 // 有 building:part 的建築：外框不畫，改畫各部件（101、遠企都是這樣才有真實外形）
 // 特殊地標：執行時換成專屬模型（landmarks3d.ts）；k = hall 國父紀念館、dome 大巨蛋、arena 小巨蛋、chimney 煙囪
 // 這些保留外框、丟掉裡面的部件（反正要換模型）；市政府照部件畫，但部件套上外框的花崗岩色
-const SPECIAL = [[/^國父紀念館$/, 'hall'], [/^臺北大巨蛋$/, 'dome'], [/^臺北小巨蛋$/, 'arena']];
+// 2026-10 往西擴：cks 中正紀念堂、pres 總統府、ngate 北門（碉堡式）、gate 東門／小南門（城樓）、tms 臺北車站、
+// palace 國家戲劇院／音樂廳（宮殿式）、arch 自由廣場牌樓、redhouse 西門紅樓
+const SPECIAL = [[/^國父紀念館$/, 'hall'], [/^臺北大巨蛋$/, 'dome'], [/^臺北小巨蛋$/, 'arena'],
+  [/^中正紀念堂$/, 'cks'], [/^中華民國總統府$/, 'pres'], [/^臺北府城北門$/, 'ngate'], [/^臺北府城(東門|小南門)$/, 'gate'],
+  [/^臺北車站$/, 'tms'], [/^國家(戲劇院|音樂廳)$/, 'palace'], [/^自由廣場門$/, 'arch'], [/^西門紅樓$/, 'redhouse']];
 const isSpecial = (t) => SPECIAL.some(([re]) => re.test(t.name || '')) || t.man_made === 'chimney';
 const OUTLINE_COLOUR = [[/^臺北市政府$/, '#b8a487']];
 const partCentroids = parts.map((p) => centroid(p.rings[0]));
@@ -372,6 +377,8 @@ keep.push(...parts.filter((p) => !dropParts.has(p)));
 const BRICK_PARKS = E.filter((e) => e.type === 'way' && e.geometry && /^松山文創園區$/.test(e.tags?.name || '')).map((e) => ring(e.geometry));
 const buildings = [];
 for (const b of keep) {
+  // 多個外環的地標（總統府是 relation）：只有最大的那塊換成專屬模型，其他照一般建築
+  const biggest = b.rings.reduce((m, r) => (Math.abs(area(r)) > Math.abs(area(m)) ? r : m), b.rings[0]);
   for (const r0 of b.rings) {
     let r = r0;
     if (Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 0.5) r = r.slice(0, -1);
@@ -387,7 +394,7 @@ for (const b of keep) {
     const col = colour(b.t['building:colour']);
     if (col) o.c = col;
     if (b.t.name && (h > 25 || area(r) > 1500)) o.n = b.t.name; // 地標名稱：屋頂招牌與接近提示用
-    for (const [re, k] of SPECIAL) if (re.test(b.t.name || '')) o.k = k;
+    if (r0 === biggest) for (const [re, k] of SPECIAL) if (re.test(b.t.name || '')) o.k = k;
     if (b.t.man_made === 'chimney') o.k = 'chimney';
     const oc = OUTLINE_COLOUR.find(([re]) => re.test(b.t.name || ''));
     if (b.colour || oc) o.c = b.colour || oc[1]; // 市政府：花崗岩外牆

@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 // 範圍同 fetch-osm.mjs 的 BBOX（不 import：那支一載入就會開始下載）
-const BBOX = [25.02, 121.52, 25.068, 121.59];
+const BBOX = [25.02, 121.5, 25.068, 121.59];
 
 const bb = BBOX.join(',');
 const q = `[out:json][timeout:90];

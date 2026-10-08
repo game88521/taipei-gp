@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 // 南、西、北、東（緯度、經度）
 // 2026-10：往北擴到基隆河（25.068）、往西擴到整座大安森林公園（121.52）；
 // 原本那塊（CORE）照舊切 2×3 下載（快取沿用），新增的北側、西側長條另外切塊
-export const BBOX = [25.02, 121.52, 25.068, 121.59];
+// 2026-10：再往西擴到 121.50（台北車站、西門町、中正紀念堂、總統府、北門）
+export const BBOX = [25.02, 121.5, 25.068, 121.59];
+const OLD_W = 121.52; // 上一版的西邊界
 const CORE = [25.02, 121.53, 25.056, 121.59];
 const ROWS = 2, COLS = 3;
 
@@ -76,9 +78,11 @@ const grab = async (box, rows, cols, prefix, query = q) => {
   }
 };
 await grab(CORE, ROWS, COLS, 'part');
-await grab([CORE[2], BBOX[1], BBOX[2], BBOX[3]], 1, 3, 'ext-n'); // 北側長條（松山、基隆河）
-await grab([BBOX[0], BBOX[1], CORE[2], CORE[1]], 2, 1, 'ext-w'); // 西側長條（大安森林公園）
-await grab(BBOX, 1, 1, 'water', qWater);
+await grab([CORE[2], OLD_W, BBOX[2], BBOX[3]], 1, 3, 'ext-n'); // 北側長條（松山、基隆河）
+await grab([BBOX[0], OLD_W, CORE[2], CORE[1]], 2, 1, 'ext-w'); // 西側長條（大安森林公園）
+await grab([BBOX[0], BBOX[1], BBOX[2], OLD_W], 4, 2, 'ext-w2'); // 再往西的長條（市中心很密，切 4×2 塊）
+await grab([BBOX[0], OLD_W, BBOX[2], BBOX[3]], 1, 1, 'water', qWater);
+await grab([BBOX[0], BBOX[1], BBOX[2], OLD_W], 1, 1, 'water-w2', qWater);
 const out = fileURLToPath(new URL('./osm-raw.json', import.meta.url));
 writeFileSync(out, JSON.stringify({ elements: [...all.values()] }));
 console.log(`完成：${all.size} 筆 → ${out}`);
