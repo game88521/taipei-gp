@@ -239,6 +239,7 @@ export interface CityStream {
   readonly loaded: number;
   readonly pending: number;
   readonly avgMs: number;
+  tick(dt: number): void;
   update(x: number, z: number, r: number): void;
 }
 
@@ -693,7 +694,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   const loaded = new Map<number, { group: THREE.Group; cull: Cull[]; bb: [number, number, number, number] }>();
   const center = (i: number): [number, number] => [(TI.list[i][0] + 0.5) * S, (TI.list[i][1] + 0.5) * S];
   const d2 = (i: number, x: number, z: number) => { const [cx, cz] = center(i); return (cx - x) ** 2 + (cz - z) ** 2; };
-  let want: number[] = [], busy = false;
+  let want: number[] = [], busy = false, grow = false;
+  const growing: { g: THREE.Group; t: number }[] = [];
   async function loadTile(i: number) {
     const [tx, tz] = TI.list[i];
     const res = await fetch(`/data/tiles/${tx}_${tz}.json`);
@@ -705,6 +707,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     busyMs += performance.now() - sliceStart;
     built++;
     scene.add(group);
+    // 開場之後才載入的區塊：從地面長起來（0.9 秒），不會整片突然冒出來
+    if (grow) { group.scale.y = 0.02; growing.push({ g: group, t: 0 }); }
     for (const c of cl) { cullables.add(c); cullOne(c); }
     loaded.set(i, { group, cull: cl, bb });
     stream.onAdd?.(group);
@@ -713,6 +717,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     const L = loaded.get(i)!;
     loaded.delete(i);
     scene.remove(L.group);
+    const gi = growing.findIndex((it) => it.g === L.group);
+    if (gi >= 0) growing.splice(gi, 1);
     for (const c of L.cull) cullables.delete(c);
     L.group.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -752,6 +758,16 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     get loaded() { return loaded.size; },
     get pending() { return want.length + (busy ? 1 : 0); },
     get avgMs() { return built ? busyMs / built : 0; }, // 測試用：平均蓋一塊花多少毫秒
+    /** 每格呼叫：新區塊長起來的動畫 */
+    tick(dt: number) {
+      for (let k = growing.length - 1; k >= 0; k--) {
+        const it = growing[k];
+        it.t += dt;
+        const f = Math.min(1, it.t / 0.9);
+        it.g.scale.y = Math.max(0.02, 1 - (1 - f) ** 3);
+        if (f >= 1) { it.g.scale.y = 1; growing.splice(k, 1); }
+      }
+    },
     /** 每 0.4 秒呼叫：x, z = 鏡頭位置、r = 可視距離 */
     update(x: number, z: number, r: number) {
       if (keepAll) return;
@@ -771,6 +787,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
       await loadTile(ids[k]);
     }
     budget = 6;
+    grow = !keepAll;
   }
 
   const cull = (x: number, z: number, r: number) => {

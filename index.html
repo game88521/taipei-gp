@@ -16,6 +16,18 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   </head>
   <body>
+    <div id="boot">
+      <div class="b-glow"></div>
+      <div class="b-center">
+        <i class="b-mark"></i>
+        <h1>台北街道賽<small>TAIPEI STREET GP</small></h1>
+      </div>
+      <div class="b-load">
+        <div class="b-row"><span id="boot-label">準備中</span><b id="boot-pct">0%</b></div>
+        <div class="b-track"><i id="boot-bar"></i></div>
+        <p id="boot-tip"></p>
+      </div>
+    </div>
     <div id="app"></div>
 
     <div id="hud" class="hidden">
@@ -132,6 +144,7 @@
             <div id="car-pick">
               <div id="car-list"></div>
               <div class="m-car">
+                <div class="m-stage"><canvas id="car-3d"></canvas></div>
                 <div id="car-note"></div>
                 <button id="car-buy" class="ghost-btn" style="display: none"></button>
                 <div id="paint-list"></div>

@@ -939,6 +939,9 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu #car-list button.locked { opacity: 0.6; }
 #menu #car-list button small { color: var(--m-gold); font: 700 11px var(--mono); letter-spacing: 0.5px; }
 #menu .m-car { padding: 18px; border-radius: 16px; border: 1px solid var(--m-line); background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)); }
+#menu .m-stage { height: 168px; margin: -8px -8px 8px; border-radius: 12px; background: radial-gradient(60% 55% at 50% 78%, rgba(225, 6, 0, 0.2), transparent 70%), radial-gradient(80% 70% at 50% 40%, rgba(255, 255, 255, 0.05), transparent 70%); }
+#menu #car-3d { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#menu #car-3d:active { cursor: grabbing; }
 #menu #car-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 #menu #car-note .m-cn { display: block; color: #fff; font-size: 22px; font-weight: 900; letter-spacing: 3px; }
 #menu #car-note .m-cd { display: block; margin: 4px 0 14px; }
@@ -1043,6 +1046,7 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
   #menu #car-pick { gap: 10px; }
   #menu #car-list button { padding: 8px 10px 7px 13px; font-size: 13px; }
   #menu .m-car { padding: 12px 14px; }
+  #menu .m-stage { height: 118px; margin: -4px -4px 6px; }
   #menu #car-note .m-cn { font-size: 18px; }
   #menu #car-note .m-cd { margin-bottom: 8px; font-size: 12px; }
   #menu .m-stat { margin: 4px 0; }
@@ -1080,3 +1084,40 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 .primary { border-radius: 14px; background: linear-gradient(135deg, #ff2a1f, #b30500); box-shadow: 0 10px 26px rgba(225, 6, 0, 0.3); letter-spacing: 4px; }
 .ghost-btn { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.035); border-radius: 14px; }
 @media (hover: hover) { .ghost-btn:hover { border-color: rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.07); } }
+
+/* ================= 載入畫面 ================= */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  background: linear-gradient(180deg, #05060c 0%, #0d0b22 38%, #2a1236 64%, #6a2430 82%, #b8492c 100%);
+  transition: opacity 0.8s ease;
+}
+#boot.done { opacity: 0; pointer-events: none; }
+#boot .b-city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 58%; }
+#boot .b-far { fill: #1a1424; opacity: 0.85; }
+#boot .b-near { fill: #0a0910; }
+#boot .b-win { fill: #ffd98a; opacity: 0.75; animation: b-win 5s ease-in-out infinite alternate; }
+#boot .b-ring { stroke: #b6fff2; stroke-width: 1.2; opacity: 0.85; filter: drop-shadow(0 0 3px #7fffe9); }
+#boot .b-tip { fill: #ff4a3a; animation: b-blink 1.4s steps(2) infinite; }
+@keyframes b-win { from { opacity: 0.45; } to { opacity: 0.85; } }
+@keyframes b-blink { 50% { opacity: 0.2; } }
+#boot .b-glow { position: absolute; left: 50%; bottom: 8%; width: 70vmax; height: 40vmax; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(255, 120, 60, 0.35), transparent); pointer-events: none; }
+#boot .b-center { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); display: flex; gap: 14px; align-items: stretch; animation: b-in 0.9s ease both; }
+#boot .b-mark { flex: 0 0 5px; border-radius: 3px; background: linear-gradient(180deg, #ff2a1f, #8a0400); box-shadow: 0 0 18px rgba(225, 6, 0, 0.7); }
+#boot h1 { font-size: clamp(30px, 6vw, 54px); letter-spacing: 8px; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6); white-space: nowrap; }
+#boot h1 small { margin-top: 8px; font: 700 clamp(10px, 1.4vw, 14px) var(--mono); letter-spacing: 7px; color: rgba(255, 255, 255, 0.55); }
+@keyframes b-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+#boot .b-load { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(540px, 88vw); padding: 14px 18px 4px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(6, 6, 12, 0.68); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#boot .b-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 13px; color: rgba(255, 255, 255, 0.75); letter-spacing: 1px; }
+#boot .b-row b { font: 800 15px var(--mono); color: #fff; }
+#boot .b-track { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+#boot #boot-bar { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #ff2a1f, #f2c14e); box-shadow: 0 0 12px rgba(255, 90, 40, 0.8); transition: width 0.3s ease; }
+#boot #boot-tip { min-height: 2.6em; margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: rgba(255, 255, 255, 0.62); text-align: center; opacity: 0; transition: opacity 0.25s; }
+#boot #boot-tip.show { opacity: 1; }
+@media (max-height: 480px) {
+  #boot .b-center { top: 12%; }
+  #boot .b-city { height: 66%; }
+  #boot #boot-tip { margin-top: 8px; font-size: 12px; }
+}

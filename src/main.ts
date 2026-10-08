@@ -6,6 +6,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
+import { GaragePreview } from './garage3d';
+import { bootProgress, bootDone } from './boot';
 import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
 import { loadCity } from './city';
 import { makeF1 } from './f1model';
@@ -25,7 +27,7 @@ import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
 import { RaceField, PLAYER_LIVERY, TYRES } from './rivals';
-import { WALL_OFF } from './track';
+import { WALL_OFF, TOWER_101 } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
 import { Router } from './router';
@@ -117,6 +119,7 @@ onProgress((label, f) => {
   if (cityReady) return;
   // holdRender 從一開始就是 true；解除只在著色器編好之後（下面）
   $('free-label').textContent = `${label}… ${Math.round(f * 100)}%`;
+  bootProgress(label, f);
   $('load-bar').style.width = `${Math.round(f * 100)}%`;
 });
 // 自動測試（?sim）是同步模擬，等不到背景載入：一次載入全部區塊（?alltiles 也可以）
@@ -184,7 +187,9 @@ const cityLoad = loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz
   applyShadowFlags();
   cityReady = true;
   if (state === 'menu') showMenu(false);
+  bootDone(); // 載入畫面淡出，接上選單運鏡
 }).catch((e) => {
+  bootDone();
   console.error(e);
   holdRender = false; // 街景載入失敗：至少把賽道畫出來
   cityReady = true; // 街景載入失敗也讓人能玩（只剩賽道）
@@ -646,6 +651,48 @@ addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && (stat
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let camH = 0;
 
+// 選單背景的運鏡：四個鏡位輪流（每個 10 秒），都在起點與 101 附近（開場就載好的區塊）
+// ?menucam=2 固定在第 2 個鏡位（截圖用）；?nomenucam 關掉
+const MENU_CAM_OFF = new URLSearchParams(location.search).has('nomenucam');
+const MENU_CAM_FIX = new URLSearchParams(location.search).get('menucam');
+const SHOT_LEN = 10;
+let menuT = 0;
+function menuCamera(dt: number) {
+  menuT += dt;
+  const shot = MENU_CAM_FIX != null ? +MENU_CAM_FIX : Math.floor(menuT / SHOT_LEN) % 4, u = (menuT % SHOT_LEN) / SHOT_LEN;
+  const T = TOWER_101, N = track.N;
+  // 賽道上第 i 點（可以是小數）
+  const at = (i: number) => { const k = ((Math.floor(i) % N) + N) % N, j = (k + 1) % N, f = i - Math.floor(i); return [track.px[k] + (track.px[j] - track.px[k]) * f, track.pz[k] + (track.pz[j] - track.pz[k]) * f]; };
+  const ds = Math.hypot(track.px[1] - track.px[0], track.pz[1] - track.pz[0]) || 2; // 取樣間距
+  let fov = 50;
+  if (shot === 0) {
+    // 沿著賽道低空往前推，看向前方
+    const i = (8 + u * 16 * SHOT_LEN) / ds, [x, z] = at(i), [lx, lz] = at(i + 40 / ds);
+    camera.position.set(x, 1.8, z);
+    camera.lookAt(lx, 2.4, lz);
+    fov = 58;
+  } else if (shot === 1) {
+    // 環繞 101：高空慢慢繞
+    const a = 2.2 + u * 0.55, R = 560;
+    camera.position.set(T.x + Math.cos(a) * R, 150, T.z + Math.sin(a) * R);
+    camera.lookAt(T.x, 170, T.z);
+    fov = 46;
+  } else if (shot === 2) {
+    // 101 從低空斜看：一邊慢慢升高、一邊繞一點（仰角不要太大，會看到天空球頂）
+    const a = 4.0 + u * 0.3, R = 680;
+    camera.position.set(T.x + Math.cos(a) * R, 30 + u * 40, T.z + Math.sin(a) * R);
+    camera.lookAt(T.x, 210, T.z);
+    fov = 48;
+  } else {
+    // 沿賽道高空飛越，看前方的路
+    const i = (N * 0.5 + u * 30 * SHOT_LEN / ds), [x, z] = at(i), [lx, lz] = at(i + 320 / ds);
+    camera.position.set(x, 120, z);
+    camera.lookAt(lx, 10, lz);
+    fov = 55;
+  }
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  camSnap = true; // 離開選單時鏡頭直接跳回車後
+}
 function updateVisuals(dt: number) {
   // 車子
   // 街道賽、街頭比賽都開 F1；平常自由駕駛、計程車開選單選的車
@@ -732,6 +779,7 @@ function updateVisuals(dt: number) {
     if (Math.abs(camera.fov - 72) > 0.05) { camera.fov = 72; camera.updateProjectionMatrix(); }
     cockpit.draw(dt, f1Look || chosen.id === 'f1', weather.raining, vc.v, vc.steer);
   } else cockpit.hide();
+  if (state === 'menu' && cityReady && !CAM && !VIEW_FRONT && !MENU_CAM_OFF) menuCamera(dt);
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
   if (VIEW_FRONT) { // 截圖檢查車子外型：從左前方斜看
     const sx = Math.cos(vc.h), sz = -Math.sin(vc.h);
@@ -834,10 +882,12 @@ function earn(n: number, why: string) {
 }
 // 選車：點車子看介紹；已經有的直接換上，沒有的顯示購買按鈕
 let preview: Vehicle = chosen;
+const garage3d = new GaragePreview($<HTMLCanvasElement>('car-3d')); // 車庫分頁的 3D 預覽
 const fmtNT = (n: number) => `NT$ ${n.toLocaleString()}`;
 function refreshGarage() {
   const list = $('car-list'), have = ownedCars(), m = money();
   $('wallet').textContent = fmtNT(m);
+  garage3d.show(preview);
   for (const b of list.children) {
     const id = (b as HTMLElement).dataset.id!, v = vehicleById(id);
     b.classList.toggle('on', id === preview.id);
@@ -1786,6 +1836,9 @@ renderer.setAnimationLoop(() => {
     if (state === 'countdown') updateCountdown(dt);
   }
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
+  cityStream?.tick(dt); // 新載入的城市區塊長起來
+  // 車庫分頁看得到時才畫 3D 預覽；烤漆照遊戲裡那台
+  garage3d.frame(dt, !menu.classList.contains('hidden') && !!document.querySelector('.m-pane.on[data-pane="garage"]'), (playerCars.get(preview.id as VehicleId)?.model.root.userData.paint as THREE.MeshStandardMaterial | undefined)?.color ?? null);
   // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
   fpsN2++; fpsT2 += dt;
   cullAcc += dt;
