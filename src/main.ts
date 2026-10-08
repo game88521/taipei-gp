@@ -7,6 +7,7 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { GaragePreview } from './garage3d';
+import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
 import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
 import { loadCity } from './city';
@@ -102,6 +103,8 @@ let police: Police | null = null;
 let router: Router | null = null;
 let bigmap: BigMap | null = null;
 let rainfx: RainFx | null = null;
+let pedzones: PedZones | null = null; // 行人徒步區
+let zoneIn = false, zoneT = 0, zoneStare = false;
 let trains: import('./trains').Trains | null = null;
 const WANTED_TEST = new URLSearchParams(location.search).has('wanted');
 const PURSUIT_TEST = new URLSearchParams(location.search).has('pursuit');
@@ -151,6 +154,7 @@ const cityLoad = loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz
   cityCull = c.cull;
   trains = c.trains;
   rainfx = new RainFx(scene, c.data); // 雨天的積水與水花
+  pedzones = new PedZones(scene, c.data); // 行人徒步區（西門町…）：石板路面
   trains.frozen = new URLSearchParams(location.search).has('trainfreeze');
   await stage('車流與紅綠燈', 0.82);
   traffic = new Traffic(scene, c.data, Q.traffic, c.breakables);
@@ -591,14 +595,19 @@ function closeMap() { mapOpen = false; $('map-page').classList.add('hidden'); }
 function buildMapShortcuts() {
   const box = $('map-marks');
   const want = ['台北101', '臺北市政府', '國父紀念館', '臺北大巨蛋', '臺北小巨蛋', '臺北國際會議中心', '捷運象山站', '臺北市議會'];
+  // 往西擴的地標：有些不在地標清單裡（太小、或名字太長），直接給座標
+  const west: [string, number, number][] = [['中正紀念堂', -4063, 311], ['總統府', -5045, -276], ['台北車站', -4527, -1130], ['西門町', -5560, -470], ['北門', -5121, -1131]];
+  const addBtn = (label: string, x: number, z: number, nm: string) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', () => setNav(x, z, nm));
+    box.appendChild(b);
+  };
   for (const nm of want) {
     const l = landmarks.find((m) => m.nm === nm);
-    if (!l) continue;
-    const b = document.createElement('button');
-    b.textContent = nm.replace(/^臺北/, '');
-    b.addEventListener('click', () => setNav(l.x, l.z, l.nm));
-    box.appendChild(b);
+    if (l) addBtn(nm.replace(/^臺北/, ''), l.x, l.z, l.nm);
   }
+  for (const [nm, x, z] of west) addBtn(nm, x, z, nm);
 }
 $('btn-map').addEventListener('click', openMap);
 $('map-close').addEventListener('click', closeMap);
@@ -1592,6 +1601,21 @@ function freeStep(dt: number) {
     if (r.money) setMoney(Math.max(0, money() + r.money));
   }
 
+  // 行人徒步區：開進去提醒；開太快路人會停下來瞪你，再快就算違規
+  if (pedzones) {
+    const zn = pedzones.at(fcar.x, fcar.z), kmh = Math.abs(fcar.v) * 3.6;
+    if (zn && !zoneIn) { toast(`🚶 ${zn.nm ? zn.nm + '：' : ''}行人徒步區，請慢慢開`, ''); zoneStare = false; zoneT = 0; }
+    zoneIn = !!zn;
+    if (zn) {
+      zoneT += dt;
+      if (kmh > 25 && zoneT > 1.5) {
+        zoneT = 0;
+        peds?.honked(fcar.x, fcar.z); // 附近的人停下來轉頭看你
+        if (!zoneStare) { zoneStare = true; toast('😠 路人都在瞪你，徒步區請慢行', 'bad'); }
+        if (kmh > 40 && police && !streetRacing() && chosen.id !== 'police' && (!FREE_SIM || WANTED_TEST)) { const m = police.crime(0.3, '徒步區飆車'); if (m) toast(m, 'bad'); }
+      }
+    }
+  }
   if (impact) sound.hit(impact * 2.5);
   // 甩尾計分：入帳時換成一點錢（每 100 分 NT$1）
   {
@@ -1868,4 +1892,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, get state() { return state; } };

@@ -58,6 +58,23 @@ export function makeFiller(d: CityData): Filler {
     }
     return false;
   });
+  // 水面（淡水河、基隆河）上不蓋：河道在地圖外的那段（萬華、三重對岸）才看得到河
+  const waters = (d.water ?? []).map((w) => {
+    const p = w.p;
+    let a = Infinity, b = Infinity, c = -Infinity, e = -Infinity;
+    for (let k = 0; k < p.length; k += 2) { a = Math.min(a, p[k]); c = Math.max(c, p[k]); b = Math.min(b, p[k + 1]); e = Math.max(e, p[k + 1]); }
+    return { p, bb: [a, b, c, e] };
+  });
+  const inWater = (x: number, z: number) => waters.some(({ p, bb }) => {
+    if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3]) return false;
+    let c = false;
+    for (let i = 0, j = p.length / 2 - 1; i < p.length / 2; j = i++) {
+      const xi = p[i * 2], zi = p[i * 2 + 1], xj = p[j * 2], zj = p[j * 2 + 1];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+    }
+    return c;
+  });
+  const wetBox = (cx: number, cz: number, hw: number, hd: number) => [[0, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]].some(([sx, sz]) => inWater(cx + sx * (hw + 4), cz + sz * (hd + 4)));
   bands.forEach(([bx0, bz0, bx1, bz1], bi) => {
     // 沿 x、z 切出街廓的邊界（80~130 m 一格）
     const cuts = (a: number, b: number) => {
@@ -86,6 +103,7 @@ export function makeFiller(d: CityData): Filler {
         const w = lx1 - lx0 - sb * 2, dd = lz1 - lz0 - sb * 2;
         if (w < 8 || dd < 8) continue;
         if (onRoad((lx0 + lx1) / 2, (lz0 + lz1) / 2, w / 2, dd / 2)) continue;
+        if (wetBox((lx0 + lx1) / 2, (lz0 + lz1) / 2, w / 2, dd / 2)) continue;
         // 高度：大多 4~12 層公寓，少數 20~35 層大樓；南邊山腳都是矮房子
         let h = 10 + r() * r() * 32;
         if (bi !== 1 && r() < 0.07) h = 60 + r() * 55;
@@ -94,7 +112,18 @@ export function makeFiller(d: CityData): Filler {
       }
     }
   });
-  return { boxes, streets, bands };
+  // 街道切成 40 m 一段，落在河上的拿掉（不然河面上會有一條條馬路）
+  const dry: number[] = [];
+  for (let k = 0; k < streets.length; k += 4) {
+    const [sx0, sz0, sx1, sz1] = streets.slice(k, k + 4), alongX = sx1 - sx0 > sz1 - sz0;
+    const L = alongX ? sx1 - sx0 : sz1 - sz0, n = Math.max(1, Math.ceil(L / 40));
+    for (let i = 0; i < n; i++) {
+      const a = (L * i) / n, b = (L * (i + 1)) / n;
+      const q = alongX ? [sx0 + a, sz0, sx0 + b, sz1] : [sx0, sz0 + a, sx1, sz0 + b];
+      if (!inWater((q[0] + q[2]) / 2, (q[1] + q[3]) / 2)) dry.push(...q);
+    }
+  }
+  return { boxes, streets: dry, bands };
 }
 
 const WALLS = ['#cfc6b8', '#b9b3aa', '#d8d2c6', '#a9a49c', '#c4b49c', '#9fa7ad'].map((c) => new THREE.Color(c));

@@ -5,7 +5,7 @@ import type { CarModel } from './carModel';
 import { makeF1, TEAMS } from './f1model';
 
 // 街頭比賽的對手也開 F1：每位車手固定一支車隊塗裝（TEAMS 的索引）
-const RIVAL_TEAM: Record<string, number> = { 阿翔: 1, 小美: 5, 黑豹: 7, 老K: 2, 阿凱: 3 };
+const RIVAL_TEAM: Record<string, number> = { 阿翔: 1, 小美: 5, 黑豹: 7, 老K: 2, 阿凱: 3, 阿哲: 4, 小雨: 6, 鐵牛: 0 };
 import type { Traffic } from './traffic';
 import { FreeCar } from './freecar';
 import { TOWER_101 } from './track';
@@ -21,6 +21,11 @@ const DEFS: ChallengeDef[] = [
   { id: 'xinyi-malls', title: '信義百貨巡禮', rival: '黑豹', color: '#1c1c1e', stops: ['統一國際大樓', '新光三越A8館', 'ATT 4 FUN', TOWER_101] },
   { id: 'xinyi-loop', title: '信義大環線', rival: '老K', color: '#ff8a1a', stops: [TOWER_101, '國父紀念館', '臺北市政府', TOWER_101] },
   { id: 'ticc-a8', title: '世貿 → 國父紀念館 → 新光三越', rival: '阿凱', color: '#3fd0ff', stops: ['臺北國際會議中心', '國父紀念館', '新光三越A8館'] },
+  // 2026-10 往西擴：座標直接寫（北門、東門這些太小，不在地標清單裡）
+  { id: 'ketagalan', title: '凱道衝刺：東門 → 總統府', rival: '阿哲', color: '#9be15d', stops: [{ x: -4470, z: -168 }, { x: -4930, z: -270 }] },
+  { id: 'ximen-station', title: '西門紅樓 → 北門 → 台北車站', rival: '小雨', color: '#c39bff', stops: [{ x: -5597, z: -507 }, { x: -5121, z: -1131 }, { x: -4527, z: -1130 }] },
+  // 中山南路靠自由廣場那側被中正紀念堂的迴廊（OSM 外框壓到車道邊）擋住，路線不走那段
+  { id: 'pres-cks', title: '總統府 → 中正紀念堂', rival: '鐵牛', color: '#4f7dff', stops: [{ x: -4930, z: -270 }, { x: -4470, z: -143 }, { x: -3800, z: 230 }] },
 ];
 
 // 街頭對決的對手：最高速（m/s）與過彎能力（相對值）

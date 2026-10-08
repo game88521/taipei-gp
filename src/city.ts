@@ -3,7 +3,7 @@ import { makeFiller, buildFiller, type Filler } from './filler';
 import { buildSpecial, buildTrails } from './landmarks3d';
 import { buildElevated, type ElevatedHits } from './elevated';
 import { Trains } from './trains';
-import { buildWater, buildMarket } from './riverside';
+import { buildWater, buildMarket, buildLevee } from './riverside';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
 import { TOWER_101, CITY_SIZE, type Track } from './track';
 import { stage, fetchJson } from './loading';
@@ -383,6 +383,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   const filler = makeFiller(data);
   buildFiller(scene, filler);
   const collider = new Collider(data);
+  buildLevee(scene, data, (x1, z1, x2, z2) => collider.addWall(x1, z1, x2, z2)); // 淡水河、基隆河、新店溪的堤防與河濱自行車道
 
   // ---- 建築、頂樓、路邊機車、行道樹：依 600 m 區塊串流
   // 只載入鏡頭附近（可視距離內）的區塊；開遠了在背景載入前面的、卸掉後面的（網格、碰撞、可撞倒的東西一起拿掉），

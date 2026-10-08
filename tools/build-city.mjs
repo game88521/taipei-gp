@@ -916,7 +916,24 @@ let raisedOver = 0, droppedOver = 0;
 }
 console.log(`擋路的建築：地下結構不畫 ${droppedUnder}、跨在路上墊高 ${raisedOver}、壓在路上拿掉 ${droppedOver}`);
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market };
+// 行人徒步區（西門町、各地的徒步街與廣場）：不進車道路網；執行時鋪石板、多放行人、開進去會被路人瞪
+// w = 街道寬度（線）；w = 0 表示 p 是一塊面（廣場）
+const pedzones = [];
+for (const e of roadWays) {
+  const t = e.tags;
+  if (t.highway !== 'pedestrian' || t.tunnel === 'yes' || (t.layer && Number(t.layer) !== 0) || /underground/.test(t.location || '')) continue;
+  const r = ring(e.geometry);
+  if (r.length < 2) continue;
+  const closed = r.length > 3 && Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 0.5;
+  const isArea = t.area === 'yes' && closed;
+  const pts = isArea ? r.slice(0, -1) : r;
+  const o = { p: pts.flatMap(([x, z]) => [r1(x), r1(z)]), w: isArea ? 0 : Math.min(14, num(t.width) || 7) };
+  if (t.name) o.nm = t.name;
+  pedzones.push(o);
+}
+console.log(`行人徒步區 ${pedzones.length} 段（面 ${pedzones.filter((z) => !z.w).length}）`);
+
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market, pedzones };
 mkdirSync(here('../public/data/'), { recursive: true });
 // 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；
 // roads 執行時沒用到（路面是用 net 畫的），不輸出。解碼在 src/citydata.ts decodeCity()
@@ -938,6 +955,7 @@ packed.trails = trails.map((t) => ({ ...t, p: enc(t.p, 2, 10) }));
 packed.elevated = elevated.map((e) => ({ ...e, p: enc(e.p, 2, 10), y: enc(e.y, 1, 10) }));
 packed.water = water.map((w) => ({ p: enc(w.p, 2, 10) }));
 packed.market = market.map((m) => enc(m, 2, 10));
+packed.pedzones = pedzones.map((z) => ({ ...z, p: enc(z.p, 2, 10) }));
 const json = JSON.stringify(packed);
 {
   // 自我檢查：解回來跟原本差多少（座標應該完全一樣；路燈、機車的角度最多差 0.005 rad）

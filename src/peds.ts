@@ -57,8 +57,15 @@ export class Pedestrians {
   private mesh = {} as Record<Part, THREE.InstancedMesh>;
   readonly max: number;
 
+  private col: Collider;
+  private zoneWalks: Walk[] = []; // 徒步區的走道
+  private zoneNear: Walk[] = []; // 玩家附近的徒步區走道（每 2 秒更新）：新行人多半生在這裡，徒步區人潮才會多
+  private zoneAcc = 99;
+  private zoneAt = [1e9, 1e9]; // 上次算 zoneNear 的位置
+  private spawnTmp = [0, 0];
   constructor(scene: THREE.Scene, d: CityData, col: Collider, max: number) {
     this.max = max; // 依畫質（quality.ts）
+    this.col = col;
     const N = d.net.nodes;
     // 人行道：道路兩側、路緣外 2 m；壓到建築或別的車道的段落不要
     const tmp = [0, 0];
@@ -91,6 +98,41 @@ export class Pedestrians {
           this.walks.push(wk);
           prev = wk;
         }
+      }
+    }
+
+    // 行人徒步區（西門町…）：一條街並排 4 排走道（人潮比一般人行道多）；廣場沿邊往內 2 m 走一圈
+    const link = (list: Walk[]) => { for (let k = 0; k + 1 < list.length; k++) { list[k].next.push(list[k + 1]); list[k + 1].next.push(list[k]); } };
+    const addWalk = (x1: number, z1: number, x2: number, z2: number): Walk | null => {
+      const len = Math.hypot(x2 - x1, z2 - z1);
+      if (len < 3) return null;
+      if (col.push((x1 + x2) / 2, (z1 + z2) / 2, 0.6, tmp)) return null;
+      const wk: Walk = { x1, z1, x2, z2, len, next: [] };
+      this.walks.push(wk);
+      this.zoneWalks.push(wk);
+      return wk;
+    };
+    for (const zn of d.pedzones ?? []) {
+      const p = zn.p;
+      if (zn.w > 0) {
+        for (const f of [-0.36, -0.12, 0.12, 0.36]) {
+          const row: Walk[] = [];
+          for (let k = 0; k + 3 < p.length; k += 2) {
+            const ax = p[k], az = p[k + 1], bx = p[k + 2], bz = p[k + 3], l = Math.hypot(bx - ax, bz - az) || 1;
+            const nx = (-(bz - az) / l) * zn.w * f, nz = ((bx - ax) / l) * zn.w * f;
+            const wk = addWalk(ax + nx, az + nz, bx + nx, bz + nz);
+            if (wk) row.push(wk); else { link(row); row.length = 0; }
+          }
+          link(row);
+        }
+      } else {
+        let cx = 0, cz = 0;
+        const n = p.length / 2;
+        for (let k = 0; k < n; k++) { cx += p[k * 2] / n; cz += p[k * 2 + 1] / n; }
+        const inset = (k: number): [number, number] => { const x = p[(k % n) * 2], z = p[(k % n) * 2 + 1], l = Math.hypot(cx - x, cz - z) || 1, s = Math.min(2, l * 0.4) / l; return [x + (cx - x) * s, z + (cz - z) * s]; };
+        const ring: Walk[] = [];
+        for (let k = 0; k < n; k++) { const [x1, z1] = inset(k), [x2, z2] = inset(k + 1); const wk = addWalk(x1, z1, x2, z2); if (wk) ring.push(wk); }
+        link(ring);
       }
     }
 
@@ -136,11 +178,14 @@ export class Pedestrians {
   }
 
   private spawn(px: number, pz: number, minR: number) {
+    const pool = this.zoneNear.length && this.rand() < 0.65 ? this.zoneNear : this.walks;
     for (let t = 0; t < 15; t++) {
-      const w = this.walks[Math.floor(this.rand() * this.walks.length)];
+      const w = pool[Math.floor(this.rand() * pool.length)];
       const s = this.rand() * w.len;
       const x = w.x1 + ((w.x2 - w.x1) * s) / w.len, z = w.z1 + ((w.z2 - w.z1) * s) / w.len, d = Math.hypot(x - px, z - pz);
       if (d < minR || d > 240) continue;
+      // 城市是串流載入的：開場建走道時遠處的建築還沒有碰撞，生成時（玩家就在附近、建築已經載入）再確認一次不在牆裡
+      if (this.col.push(x, z, 0.5, this.spawnTmp)) continue;
       const pick = <T,>(a: T[]) => a[Math.floor(this.rand() * a.length)];
       const p: Ped = {
         mode: 'walk', cw: null, from: 0, ct: 0, cool: this.rand() * 10,
@@ -187,6 +232,13 @@ export class Pedestrians {
     for (const p of this.peds) {
       if (!p.alive) continue;
       if (Math.hypot(p.x - car.x, p.z - car.z) > 280) p.alive = false; else alive++;
+    }
+    this.zoneAcc += dt;
+    // 每 2 秒、或一下子移動很遠（傳送、剛開始）就重算：要在下面補人之前算好
+    if (this.zoneAcc > 2 || Math.hypot(car.x - this.zoneAt[0], car.z - this.zoneAt[1]) > 100) {
+      this.zoneAcc = 0;
+      this.zoneAt[0] = car.x; this.zoneAt[1] = car.z;
+      this.zoneNear = this.zoneWalks.filter((w) => Math.hypot(w.x1 - car.x, w.z1 - car.z) < 130);
     }
     for (let k = 0; alive < this.max && k < 4 && this.walks.length; k++, alive++) this.spawn(car.x, car.z, this.peds.length < this.max ? 15 : 150);
 

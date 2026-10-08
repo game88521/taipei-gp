@@ -31,6 +31,7 @@ export interface CityData {
   portals?: number[]; // 地下道入口 [x, z, 朝隧道方向, 路寬, ...]
   water?: { p: number[] }[]; // 水域（基隆河、池塘）
   market?: number[][]; // 饒河夜市的街道線
+  pedzones?: { p: number[]; w: number; nm?: string }[]; // 行人徒步區：w = 寬度（線）；0 = 一塊面
   tiles?: TileIndex; // 建築、行道樹、路邊機車拆到區塊檔（tools/split-tiles.mjs），這三個欄位在核心裡是空的
 }
 /** 區塊索引：每塊 [tx, tz, 檔案大小]，檔案在 /data/tiles/{tx}_{tz}.json；bounds = 所有建築的範圍 */
@@ -67,6 +68,7 @@ export function decodeCity(d: CityData & { enc?: number }): CityData {
   for (const e of d.elevated ?? []) { e.p = dec(e.p, 2, 10); e.y = dec(e.y, 1, 10); }
   for (const w of d.water ?? []) w.p = dec(w.p, 2, 10);
   if (d.market) d.market = d.market.map((m) => dec(m, 2, 10));
+  for (const z of d.pedzones ?? []) z.p = dec(z.p, 2, 10);
   d.roads ??= [];
   delete d.enc;
   return d;
