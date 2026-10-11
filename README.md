@@ -73,6 +73,8 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 `npm run build` 會自動產生 `dist/sw.js`（範本在 `src/sw-template.js`，產生邏輯在 `vite.config.ts`），核心街景資料也會一起快取（城市區塊檔是開到附近才抓、抓過的才快取）。
 玩過一次之後第二次開幾乎瞬間載入，沒網路也能玩；任何檔案改了版本號就會變，手機下次開啟自動換新版。
 `npm run dev` 時不會註冊，避免改了程式碼看不到。
+選單「開始」頁有「加到主畫面」卡片（`src/install.ts`）：Android／電腦 Chrome 攔下 `beforeinstallprompt` 給「安裝」按鈕，iPhone 顯示「分享 → 加入主畫面」；
+已經從主畫面開的、或按過 × 的 14 天內不顯示。圖示：`public/icon-180/192/512.png`（從 `icon.svg` 用無頭 Chrome 輸出）。
 
 ## 城市串流
 
@@ -80,6 +82,9 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 開遠了在背景載入前方的（每格畫面最多花 6 ms 蓋，身邊的區塊還沒好時 25 ms），超出範圍 450 m 就卸掉（網格、碰撞、可撞倒的樹一起拿掉）。
 地圖再大，同時在記憶體裡的量也只跟可視距離有關：目前的地圖（2026-10 往西擴到台北車站、西門町後）高畫質載 51／184 塊，JS 記憶體約 190 MB。
 所有區塊共用同一組材質，載入時在場景裡各放一個隱藏的代表，讓天氣系統收集得到、著色器先編好。
+區塊的計算（外牆、屋頂、招牌頂點、行道樹參數、碰撞牆線）在 Web Worker 做（`src/tilegen.ts`、`tileworker.ts`、`tilepool.ts`），
+主執行緒只建網格，蓋一塊約 3 ms（之前 20~40 ms）；開不了 Worker 時自動改在主執行緒算，結果一樣。
+可視距離外、還沒載入的區塊用遠景低模（15 m 以上的建築各一個方盒子，`tiles.lod`）頂著，地平線不會空空的（低畫質不畫）。
 自動測試（`?sim=`）與 `?alltiles` 一次載入全部區塊、不卸載（同步模擬等不到背景載入）。
 區塊檔不列入 Service Worker 的預先快取，開到附近才抓、抓過的存進快取。
 

@@ -7,6 +7,7 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { GaragePreview } from './garage3d';
+import { setupInstall } from './install';
 import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
 import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
@@ -983,6 +984,7 @@ function menuTab(t: string) {
   document.querySelector('.m-main')?.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.addEventListener('click', () => menuTab(b.dataset.tab!));
+if (!BOT) setupInstall($('m-install')); // 「加到主畫面」提示（install.ts）
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
   const free = $<HTMLButtonElement>('btn-free'), race = $<HTMLButtonElement>('btn-start');

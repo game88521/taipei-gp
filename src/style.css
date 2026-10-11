@@ -1004,6 +1004,17 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-keys b { color: #fff; font-size: 13px; letter-spacing: 2px; }
 #menu #btn-reset-best { padding: 4px 0; color: rgba(255, 255, 255, 0.4); }
 
+/* ---- 加到主畫面 */
+#menu .m-install { --c: #6ff0a4; display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px dashed rgba(111, 240, 164, 0.35); background: rgba(111, 240, 164, 0.05); }
+#menu .m-install[hidden] { display: none; }
+#menu .m-install .m-ico { flex-basis: 36px; height: 36px; }
+#menu .m-inst-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+#menu .m-inst-txt b { font-size: 14px; letter-spacing: 1px; }
+#menu .m-inst-txt small { color: var(--muted); font-size: 12px; }
+#menu .m-inst-go { padding: 7px 16px; border: 0; border-radius: 10px; background: #2fbf6c; color: #04140a; font-weight: 800; letter-spacing: 2px; }
+#menu .m-inst-go[hidden] { display: none; }
+#menu .m-inst-x { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: rgba(255, 255, 255, 0.45); font-size: 18px; }
+
 /* 滑鼠移過去的效果：只給有滑鼠的裝置（觸控螢幕點過之後 hover 會一直卡著） */
 @media (hover: hover) {
   #menu .m-tabs button:hover { color: var(--fg); background: rgba(255, 255, 255, 0.04); }
