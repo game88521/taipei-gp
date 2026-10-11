@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeFiller, buildFiller, type Filler } from './filler';
+import { makeFiller, buildFiller, fillerMaterial, WALLS, type Filler } from './filler';
 import { buildSpecial, buildTrails } from './landmarks3d';
 import { buildElevated, type ElevatedHits } from './elevated';
 import { Trains } from './trains';
@@ -643,9 +643,44 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     grow = !keepAll;
   }
 
+  // ---- 遠景低模：每塊區塊的高樓各一個方盒子（split-tiles.mjs 算好，窗戶跟外圍遠景城市同一種畫法）
+  // 真建築沒載入、或在可視距離外的區塊才畫，地平線不會空空的；剛進入範圍還在載入的區塊也先用它頂著。低畫質不畫
+  const lodRange: [number, number][] = [], lodOn = new Uint8Array(TI.list.length);
+  let lodMesh: THREE.InstancedMesh | null = null, lodBase: Float32Array | null = null, lodDirty = false;
+  if (q.level !== 'low') {
+    const L = TI.lod ?? [], total = L.reduce((n, a) => n + a.length / 6, 0);
+    if (total) {
+      lodMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), fillerMaterial(), total);
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pp = new THREE.Vector3(), ss = new THREE.Vector3();
+      let k = 0;
+      L.forEach((a, i) => {
+        lodRange[i] = [k, a.length / 6];
+        for (let j = 0; j < a.length; j += 6, k++) {
+          qq.setFromAxisAngle(up, a[j + 4] / 100); // 本地 z = 長邊
+          lodMesh!.setMatrixAt(k, m4.compose(pp.set(a[j], -0.6, a[j + 1]), qq, ss.set(Math.max(4, a[j + 3]), a[j + 5] + 0.6, Math.max(4, a[j + 2]))));
+          lodMesh!.setColorAt(k, WALLS[k % WALLS.length]);
+        }
+        lodOn[i] = 1;
+      });
+      lodBase = new Float32Array(lodMesh.instanceMatrix.array as Float32Array);
+      lodMesh.computeBoundingSphere();
+      scene.add(lodMesh);
+    }
+  }
+  const lodShow = (i: number, on: boolean) => {
+    if (!lodMesh || !lodRange[i] || lodOn[i] === +on) return;
+    lodOn[i] = +on;
+    const [k, n] = lodRange[i], arr = lodMesh.instanceMatrix.array as Float32Array;
+    if (on) arr.set(lodBase!.subarray(k * 16, (k + n) * 16), k * 16); else arr.fill(0, k * 16, (k + n) * 16); // 矩陣全 0 = 不畫
+    lodDirty = true;
+  };
+
   const cull = (x: number, z: number, r: number) => {
     lastCull = [x, z, r];
     for (const c of cullables) cullOne(c);
+    // 真建築看得到（已載入、外牆在可視距離內）的區塊，低模藏起來
+    for (let i = 0; i < TI.list.length; i++) lodShow(i, !(loaded.has(i) && d2(i, x, z) < (r + S * 0.71) ** 2));
+    if (lodDirty && lodMesh) { lodMesh.instanceMatrix.needsUpdate = true; lodDirty = false; }
   };
   return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots, collider, stream };
 }

@@ -35,7 +35,10 @@ export interface CityData {
   tiles?: TileIndex; // 建築、行道樹、路邊機車拆到區塊檔（tools/split-tiles.mjs），這三個欄位在核心裡是空的
 }
 /** 區塊索引：每塊 [tx, tz, 檔案大小]，檔案在 /data/tiles/{tx}_{tz}.json；bounds = 所有建築的範圍 */
-export interface TileIndex { size: number; list: [number, number, number][]; bounds: [number, number, number, number] }
+export interface TileIndex {
+  size: number; list: [number, number, number][]; bounds: [number, number, number, number];
+  lod?: number[][]; // 遠景低模：跟 list 同順序，每棟 [x, z, 長, 寬, 角度×100, 高]
+}
 export interface TileData { buildings: Building[]; trees: number[]; parked: number[] }
 export function decodeTile(d: TileData & { enc?: number }): TileData {
   if (d.enc === 1) {

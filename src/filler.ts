@@ -126,10 +126,10 @@ export function makeFiller(d: CityData): Filler {
   return { boxes, streets: dry, bands };
 }
 
-const WALLS = ['#cfc6b8', '#b9b3aa', '#d8d2c6', '#a9a49c', '#c4b49c', '#9fa7ad'].map((c) => new THREE.Color(c));
+export const WALLS = ['#cfc6b8', '#b9b3aa', '#d8d2c6', '#a9a49c', '#c4b49c', '#9fa7ad'].map((c) => new THREE.Color(c));
 
 /** 窗戶用世界座標算（不靠 uv），方塊怎麼縮放窗戶大小都一樣：每層 3.3 m、每開間 3.6 m，部分亮燈 */
-function fillerMaterial() {
+export function fillerMaterial() {
   const m = new THREE.MeshLambertMaterial({ color: '#ffffff' });
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
