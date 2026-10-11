@@ -190,6 +190,13 @@ export class Collider {
     }
     return bb;
   }
+  /** 牆線（tilegen.ts 在背景算好的 [x1, z1, x2, z2, ...]） */
+  addEdges(e: ArrayLike<number>, tag: number) {
+    for (let k = 0; k + 3 < e.length; k += 4) {
+      const ed: Edge = { x1: e[k], z1: e[k + 1], x2: e[k + 2], z2: e[k + 3], tag };
+      this.edges.addBox(ed.x1, ed.z1, ed.x2, ed.z2, ed);
+    }
+  }
   removeTag(tag: number, bb: [number, number, number, number]) {
     if (bb[0] <= bb[2]) this.edges.removeIf(bb[0], bb[1], bb[2], bb[3], (e) => e.tag === tag);
   }

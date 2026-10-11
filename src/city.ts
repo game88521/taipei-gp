@@ -11,16 +11,15 @@ import { stage, fetchJson } from './loading';
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
 
-import { terrainHeight, decodeCity, decodeTile, Collider, type CityData, type Building, type TileData } from './citydata';
+import { terrainHeight, decodeCity, Collider, type CityData, type Building } from './citydata';
+import { TilePool } from './tilepool';
+import type { GenOut } from './tilegen';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
 import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
 import { Breakables } from './breakables';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
-const FLOOR = 3.3; // 一層樓高
-const TILE_U = 8; // 外牆貼圖橫向每 8 m（兩個開間）重複
-const TILE_V = FLOOR * 2; // 縱向每兩層重複
 const TILE = 300; // 城市分區塊的大小（m）
 
 // 每棟樓的穩定亂數（同一份資料每次長得一樣）
@@ -284,37 +283,6 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     return [bi, Math.sqrt(bd)];
   };
 
-  // 主要道路（幹道～一般道路）的格狀索引：給騎樓店面與招牌找「面向哪條路」
-  const RG = 30, rgrid = new Map<string, [number, number, number, number, number][]>();
-  {
-    const NN = data.net.nodes;
-    for (const w of data.net.ways) {
-      if (w.c > 2) continue;
-      for (let k = 0; k + 1 < w.n.length; k++) {
-        const s: [number, number, number, number, number] = [NN[w.n[k] * 2], NN[w.n[k] * 2 + 1], NN[w.n[k + 1] * 2], NN[w.n[k + 1] * 2 + 1], w.w / 2];
-        for (let gx = Math.floor(Math.min(s[0], s[2]) / RG); gx <= Math.floor(Math.max(s[0], s[2]) / RG); gx++)
-          for (let gz = Math.floor(Math.min(s[1], s[3]) / RG); gz <= Math.floor(Math.max(s[1], s[3]) / RG); gz++) {
-            const key = `${gx},${gz}`;
-            if (!rgrid.has(key)) rgrid.set(key, []);
-            rgrid.get(key)!.push(s);
-          }
-      }
-    }
-  }
-  /** 最近的主要道路：路面邊緣的距離、道路方向、最近點 */
-  const nearestRoad = (x: number, z: number) => {
-    let best: { edge: number; ux: number; uz: number; px: number; pz: number } | null = null;
-    const cx = Math.floor(x / RG), cz = Math.floor(z / RG);
-    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      for (const [x1, z1, x2, z2, hw] of rgrid.get(`${cx + a},${cz + b}`) || []) {
-        const dx = x2 - x1, dz = z2 - z1, l = Math.hypot(dx, dz) || 1;
-        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / (l * l)));
-        const px = x1 + dx * t, pz = z1 + dz * t, edge = Math.hypot(x - px, z - pz) - hw;
-        if (!best || edge < best.edge) best = { edge, ux: dx / l, uz: dz / l, px, pz };
-      }
-    }
-    return best;
-  };
 
   // ---- 綠地
   const green = new Geo();
@@ -389,10 +357,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   // 只載入鏡頭附近（可視距離內）的區塊；開遠了在背景載入前面的、卸掉後面的（網格、碰撞、可撞倒的東西一起拿掉），
   // 地圖再大，同時在記憶體裡的量也差不多。蓋的時候每一格畫面只花幾毫秒，剩下的留到下一格，開車時不會卡一下
   const BIG = TILE * 2;
-  const sizeOf = (kind: string) => (kind === 'shop' || kind === 'sign' || kind === 'shadow' ? TILE : BIG);
-  const resTint = ['#e8e1d5', '#d9d0c3', '#cfc8bd', '#e3d6c8', '#c9cdd1', '#d8cbbd', '#bfb7aa', '#e6d9cf'].map((c) => new THREE.Color(c));
-  const roofCol = [new THREE.Color('#8b8883'), new THREE.Color('#7d8288'), new THREE.Color('#96918a')];
-  const white = new THREE.Color('#ffffff'), civic = new THREE.Color('#ddd7cc');
+  const white = new THREE.Color('#ffffff');
   // 所有區塊共用的材質與幾何（卸載區塊時不釋放）
   const mats: Record<string, THREE.Material> = {
     f00: facade('res', 1), f01: facade('res', 5), f02: facade('res', 9),
@@ -445,183 +410,70 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     sliceStart = performance.now();
   };
 
-  /** 蓋一個區塊：建築外牆、屋頂、店面招牌、地上影子、頂樓、路邊機車、行道樹，加上碰撞與可撞倒的東西 */
-  async function buildTile(td: TileData, tag: number, group: THREE.Group, [ccx, ccz]: [number, number]) {
+  // 區塊的計算（外牆、屋頂、招牌的頂點…）在背景執行緒做（tilegen.ts、tileworker.ts），這裡只建網格
+  const pool = new TilePool({
+    roads: (() => {
+      const o: number[] = [], NN = data.net.nodes;
+      for (const w of data.net.ways) if (w.c <= 2) for (let k = 0; k + 1 < w.n.length; k++) o.push(NN[w.n[k] * 2], NN[w.n[k] * 2 + 1], NN[w.n[k + 1] * 2], NN[w.n[k + 1] * 2 + 1], w.w / 2);
+      return o;
+    })(),
+    trackX: Array.from(t.px), trackZ: Array.from(t.pz), terrain: data.terrain ?? null,
+    q: { rooftops: q.rooftops, treeKeep: q.treeKeep }, tower: { x: TOWER_101.x, z: TOWER_101.z }, shadow: { x: SHADOW_PER_M.x, z: SHADOW_PER_M.z },
+  }, Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1)));
+
+  /** 用算好的結果建一個區塊：網格、地標模型、頂樓、機車、行道樹，加上碰撞與可撞倒的東西 */
+  async function buildTile(out: GenOut, tag: number, group: THREE.Group, [ccx, ccz]: [number, number]) {
     const cl: Cull[] = [];
     const add = (o: THREE.Object3D, x: number, z: number, layer: Layer, pad = TILE * 0.71) => { group.add(o); cl.push({ o, x, z, layer, pad }); };
-    const r = rng(101 + tag * 7919); // 每個區塊各自的亂數：卸掉再載入長得一樣
-    // 依 300 m 分小區塊：鏡頭（和陰影）看不到的整塊不畫
-    // 外牆、屋頂從遠處就看得到，用 600 m 的大區塊（繪製次數少 4 倍）；店面、招牌、地上影子只在近處畫，用 300 m
-    const tiles = new Map<string, Geo>();
-    const tileGeo = (kind: string, x: number, z: number) => {
-      const S = sizeOf(kind);
-      const key = `${kind}|${Math.floor(x / S)},${Math.floor(z / S)}`;
-      let g = tiles.get(key);
-      if (!g) tiles.set(key, (g = new Geo()));
-      return g;
-    };
-    const tanks: [number, number, number, number][] = [], sheds: [number, number, number, number, number, number, number][] = [];
-    const roofDetails = (ring: [number, number][], y: number) => {
-      const A = Math.abs(signedArea(ring));
-      if (A < 80) return;
-      let cx = 0, cz = 0;
-      for (const p of ring) { cx += p[0]; cz += p[1]; }
-      cx /= ring.length; cz /= ring.length;
-      const inside = (x: number, z: number) => {
-        let c = false;
-        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-          const [xi, zi] = ring[i], [xj, zj] = ring[j];
-          if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
-        }
-        return c;
-      };
-      const span = Math.sqrt(A) * 0.3;
-      const n = A > 300 ? 2 : 1;
-      for (let k = 0; k < n; k++) {
-        const x = cx + (r() - 0.5) * span, z = cz + (r() - 0.5) * span;
-        if (inside(x, z)) tanks.push([x, y, z, 0.9 + r() * 0.5]);
-      }
-      if (r() < 0.35) {
-        // 鐵皮加蓋：大約占屋頂中間的一塊，順著最長的牆
-        let bi = 0, bl = 0;
-        for (let i = 0; i < ring.length; i++) {
-          const j = (i + 1) % ring.length, l = Math.hypot(ring[j][0] - ring[i][0], ring[j][1] - ring[i][1]);
-          if (l > bl) { bl = l; bi = i; }
-        }
-        const j = (bi + 1) % ring.length;
-        const ang = Math.atan2(ring[j][0] - ring[bi][0], ring[j][1] - ring[bi][1]);
-        const w = Math.min(bl * 0.5, 9), d = Math.min(Math.sqrt(A) * 0.45, 7);
-        if (inside(cx, cz)) sheds.push([cx, y, cz, w, d, ang, Math.floor(r() * 4)]);
-      }
-    };
-    let nb = 0;
-    for (const b of td.buildings) {
-      if ((++nb & 15) === 0) await slice();
-      // 101 塔身：OSM 只有一根方柱，改用下面手工的竹節造型（裙樓購物中心照 OSM）
-      if (b.h > 100) {
-        let cx = 0, cz = 0;
-        for (let k = 0; k < b.p.length; k += 2) { cx += b.p[k]; cz += b.p[k + 1]; }
-        cx /= b.p.length / 2; cz /= b.p.length / 2;
-        if (Math.hypot(cx - TOWER_101.x, cz - TOWER_101.z) < 40) continue;
-      }
-      let ring = toRing(b.p);
-      if (signedArea(ring) > 0) ring = ring.reverse(); // 讓牆面法線朝外
-      const y0 = b.m ?? -0.6, y1 = b.h; // 落地的樓從地面（-0.6）長起
-      const tint = b.c ? new THREE.Color(b.c) : b.s === 1 ? white : b.s === 3 ? civic : resTint[Math.floor(r() * resTint.length)];
-      if (b.c && b.s === 1) tint.lerp(white, 0.5); // 玻璃帷幕不要染太重
-      const style = b.s === 2 ? 0 : b.s;
-      // 外牆變化：公寓 3 款、玻璃帷幕 2 款，同一區不會整片長一樣
-      const variant = style === 0 ? Math.floor(r() * 3) : style === 1 ? Math.floor(r() * 2) : 0;
-      const geo = tileGeo(`f${style}${variant}`, ring[0][0], ring[0][1]);
-      const roofs = tileGeo('roof', ring[0][0], ring[0][1]);
-      const shopsGeo = tileGeo('shop', ring[0][0], ring[0][1]), signsGeo = tileGeo('sign', ring[0][0], ring[0][1]);
-      if (q.rooftops && style === 0 && y0 < 0 && y1 < 45 && !b.k) roofDetails(ring, y1);
-      const aoTint = tint.clone().multiplyScalar(0.5);
-      // 預先算好的地面影子：腳印＋沿太陽反方向推出去的腳印，取凸包（高度最多算 80 m，免得 101 的影子拖到 1.5 km 外）
-      if (y0 < 0 && y1 > 3) {
-        const L = Math.min(y1, 80), ox = SHADOW_PER_M.x * L, oz = SHADOW_PER_M.z * L;
-        const hull = convexHull([...ring, ...ring.map(([x, z]) => [x + ox, z + oz] as [number, number])]);
-        const sg = tileGeo('shadow', ring[0][0], ring[0][1]);
-        for (let k = 1; k + 1 < hull.length; k++) {
-          const A = hull[0], B = hull[k], C = hull[k + 1];
-          // 讓三角形正面朝上
-          const cy = (B[1] - A[1]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[1] - A[1]);
-          const [P, Q] = cy < 0 ? [C, B] : [B, C];
-          sg.tri([A[0], 0.03, A[1]], [P[0], 0.03, P[1]], [Q[0], 0.03, Q[1]], [0, 1, 0], [0, 0], [0, 0], [0, 0]);
-        }
-      }
-      // 有專屬造型的地標：影子照外框算（上面），模型另外做
-      if (b.k) {
-        const m = buildSpecial(b);
-        if (m) { m.userData.ownMats = true; add(m, ring[0][0], ring[0][1], 'far', 200); continue; }
-      }
-      let u = 0;
-      const streetLevel = y0 < 0 && (b.s === 0 || b.s === 2) && y1 < 70;
-      for (let i = 0; i < ring.length; i++) {
-        const a = ring[i], c = ring[(i + 1) % ring.length];
-        const dx = c[0] - a[0], dz = c[1] - a[1], l = Math.hypot(dx, dz);
-        if (l < 0.05) continue;
-        const n = [-dz / l, 0, dx / l];
-        const u0 = u / TILE_U, u1 = (u + l) / TILE_U;
-        // 接地陰影：落地的牆最下面 3 m 由暗到亮（像環境光遮蔽），之上照常
-        const band = y0 < 0 && y1 - y0 > 4 ? y0 + 3.4 : y0;
-        if (band > y0) {
-          const v0 = y0 / TILE_V, vb = band / TILE_V;
-          geo.tri3([a[0], y0, a[1]], [c[0], y0, c[1]], [c[0], band, c[1]], n, [u0, v0], [u1, v0], [u1, vb], aoTint, aoTint, tint);
-          geo.tri3([a[0], y0, a[1]], [c[0], band, c[1]], [a[0], band, a[1]], n, [u0, v0], [u1, vb], [u0, vb], aoTint, tint, tint);
-        }
-        geo.tri([a[0], band, a[1]], [c[0], band, c[1]], [c[0], y1, c[1]], n, [u0, band / TILE_V], [u1, band / TILE_V], [u1, y1 / TILE_V], tint);
-        geo.tri([a[0], band, a[1]], [c[0], y1, c[1]], [a[0], y1, a[1]], n, [u0, band / TILE_V], [u1, y1 / TILE_V], [u0, y1 / TILE_V], tint);
-        u += l;
-
-        // 面向主要道路的騎樓店面與直式招牌（整個城市的大馬路兩側都有）
-        if (!streetLevel || l < 5) continue;
-        const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
-        const rd = nearestRoad(mx, mz);
-        if (!rd || rd.edge > 14) continue;
-        const toT = [rd.px - mx, rd.pz - mz], tl = Math.hypot(toT[0], toT[1]) || 1;
-        if ((n[0] * toT[0] + n[2] * toT[1]) / tl < 0.5) continue;
-        const o = 0.06, sh = Math.min(4.4, y1 - 0.5);
-        const A = [a[0] + n[0] * o, a[1] + n[2] * o], C = [c[0] + n[0] * o, c[1] + n[2] * o];
-        const su0 = (u - l) / 7, su1 = u / 7; // 每 7 m 一間店
-        shopsGeo.tri([A[0], -0.25, A[1]], [C[0], -0.25, C[1]], [C[0], sh, C[1]], n, [su0 / 6, 0], [su1 / 6, 0], [su1 / 6, 1]);
-        shopsGeo.tri([A[0], -0.25, A[1]], [C[0], sh, C[1]], [A[0], sh, A[1]], n, [su0 / 6, 0], [su1 / 6, 1], [su0 / 6, 1]);
-        if (y1 > 10 && l > 7 && r() < 0.55) {
-          const f = 0.2 + r() * 0.6, sx = a[0] + dx * f + n[0] * 1.1, sz = a[1] + dz * f + n[2] * 1.1;
-          const hgt = Math.min(7, y1 - 5), yc = 5 + hgt / 2 + r() * Math.max(0, y1 - 12 - hgt) * 0.3;
-          // 招牌垂直於騎樓、面向道路其中一個方向（雙面材質，兩邊來的車都看得到）
-          const flip = r() < 0.5 ? 1 : -1;
-          const slot = Math.floor(r() * 8), fx = rd.ux * flip, fz = rd.uz * flip;
-          const px = fz * 0.9, pz = -fx * 0.9; // 招牌寬度方向（從迎面看過去由左到右）
-          const nn = [fx, 0, fz];
-          const p1 = [sx - px, yc - hgt / 2, sz - pz], p2 = [sx + px, yc - hgt / 2, sz + pz], p3 = [sx + px, yc + hgt / 2, sz + pz], p4 = [sx - px, yc + hgt / 2, sz - pz];
-          signsGeo.tri(p1, p2, p3, nn, [slot / 8, 0], [(slot + 1) / 8, 0], [(slot + 1) / 8, 1]);
-          signsGeo.tri(p1, p3, p4, nn, [slot / 8, 0], [(slot + 1) / 8, 1], [slot / 8, 1]);
-        }
-      }
-      try {
-        flatPoly(roofs, ring, y1, true, roofCol[Math.floor(r() * roofCol.length)], () => [0, 0]);
-        if (y0 > 3) flatPoly(roofs, ring, y0, false, roofCol[0], () => [0, 0]); // 懸空的部件（101 的竹節）要有底面
-      } catch { /* 畸形多邊形就不加屋頂 */ }
+    for (const g of out.geos) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(g.pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(g.nor, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(g.uv, 2));
+      if (g.col) geo.setAttribute('color', new THREE.BufferAttribute(g.col, 3));
+      geo.computeBoundingSphere();
+      for (const k in geo.attributes) (geo.attributes[k] as THREE.BufferAttribute).onUpload(releaseArray); // 送進顯示卡就丟掉 CPU 這份
+      add(new THREE.Mesh(geo, mats[g.kind]), g.cx, g.cz, g.size === TILE ? 'near' : 'far', g.size * 0.71);
     }
-    for (const [key, g] of tiles) {
-      if (!g.pos.length) continue;
-      const mesh = new THREE.Mesh(g.build(), mats[key.split('|')[0]]);
-      const [tx, tz] = key.split('|')[1].split(',').map(Number), kind = key.split('|')[0], S = sizeOf(kind);
-      add(mesh, (tx + 0.5) * S, (tz + 0.5) * S, S === TILE ? 'near' : 'far', S * 0.71);
+    // 有專屬造型的地標（國父紀念館、中正紀念堂、總統府…）
+    for (const s of out.specials) {
+      const m = buildSpecial(s.b);
+      if (m) { m.userData.ownMats = true; add(m, s.x, s.z, 'far', 200); }
     }
-    tiles.clear();
     await slice();
 
     // ---- 頂樓水塔與鐵皮加蓋
-    if (tanks.length) {
-      const tank = new THREE.InstancedMesh(tankGeo, tankMat, tanks.length), leg = new THREE.InstancedMesh(legGeo, legMat, tanks.length);
+    const T = out.tanks, nt = T.length / 4;
+    if (nt) {
+      const tank = new THREE.InstancedMesh(tankGeo, tankMat, nt), leg = new THREE.InstancedMesh(legGeo, legMat, nt);
       const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
-      tanks.forEach(([x, y, z, k], i) => {
-        m4.compose(pos.set(x, y, z), qq, sc.setScalar(k));
+      for (let i = 0; i < nt; i++) {
+        m4.compose(pos.set(T[i * 4], T[i * 4 + 1], T[i * 4 + 2]), qq, sc.setScalar(T[i * 4 + 3]));
         tank.setMatrixAt(i, m4);
         leg.setMatrixAt(i, m4);
-      });
+      }
       tank.computeBoundingSphere();
       leg.computeBoundingSphere();
       add(tank, ccx, ccz, 'mid', BIG * 0.71);
       add(leg, ccx, ccz, 'mid', BIG * 0.71);
     }
-    if (sheds.length) {
-      const shed = new THREE.InstancedMesh(shedGeo, shedMat, sheds.length);
+    const SH = out.sheds, ns = SH.length / 7;
+    if (ns) {
+      const shed = new THREE.InstancedMesh(shedGeo, shedMat, ns);
       const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-      sheds.forEach(([x, y, z, w, d, ang, c], i) => {
-        qq.setFromAxisAngle(up, ang);
-        m4.compose(new THREE.Vector3(x, y, z), qq, new THREE.Vector3(d, 1, w));
+      for (let i = 0; i < ns; i++) {
+        const o = i * 7;
+        qq.setFromAxisAngle(up, SH[o + 5]);
+        m4.compose(new THREE.Vector3(SH[o], SH[o + 1], SH[o + 2]), qq, new THREE.Vector3(SH[o + 4], 1, SH[o + 3]));
         shed.setMatrixAt(i, m4);
-        shed.setColorAt(i, tin[c]);
-      });
+        shed.setColorAt(i, tin[SH[o + 6]]);
+      }
       shed.computeBoundingSphere();
       add(shed, ccx, ccz, 'mid', BIG * 0.71);
     }
 
     // ---- 路邊停的機車：依 300 m 小區塊分組，看不到的不畫
-    const P = td.parked;
+    const P = out.parked;
     if (q.parked && P.length) {
       const groups = new Map<string, number[]>();
       for (let i = 0; i < P.length / 4; i++) {
@@ -643,50 +495,39 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
       }
     }
 
-    // ---- 行道樹：依小區塊分成多組 InstancedMesh；離賽道遠的依畫質抽掉一些
-    const bb = collider.addBuildings(td.buildings, tag);
-    const tr = td.trees;
-    const byTile = new Map<string, [number, number][]>();
-    for (let k = 0; k < tr.length; k += 2) {
-      const [, d] = nearest(tr[k], tr[k + 1]);
-      if (d >= 90 && r() > q.treeKeep) continue;
-      const key = `${Math.floor(tr[k] / TILE)},${Math.floor(tr[k + 1] / TILE)}`;
-      if (!byTile.has(key)) byTile.set(key, []);
-      byTile.get(key)!.push([tr[k], tr[k + 1]]);
-      bb[0] = Math.min(bb[0], tr[k]); bb[1] = Math.min(bb[1], tr[k + 1]); bb[2] = Math.max(bb[2], tr[k]); bb[3] = Math.max(bb[3], tr[k + 1]);
-    }
+    // ---- 碰撞、行道樹
+    collider.addEdges(out.edges, tag);
     const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3(), bm = new THREE.Matrix4();
-    for (const pts of byTile.values()) {
+    for (const grp of out.trees) {
       await slice();
-      const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, pts.length), crown = new THREE.InstancedMesh(crownGeo, crownMat, pts.length);
-      const blob = new THREE.InstancedMesh(blobGeo, blobMat, pts.length);
-      pts.forEach(([x, z], n) => {
-        const k = 0.75 + r() * 0.6;
-        qt.setFromAxisAngle(up, r() * Math.PI * 2);
-        s.set(k, k * (0.9 + r() * 0.3), k);
-        const ty = terrainHeight(data.terrain, x, z); // 山上的樹長在坡面上
-        m.compose(new THREE.Vector3(x, -0.3 + ty, z), qt, s);
-        trunk.setMatrixAt(n, m);
-        crown.setMatrixAt(n, m);
+      const D = grp.d, n = D.length / 7;
+      const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, n), crown = new THREE.InstancedMesh(crownGeo, crownMat, n);
+      const blob = new THREE.InstancedMesh(blobGeo, blobMat, n);
+      for (let i = 0; i < n; i++) {
+        const o = i * 7, x = D[o], z = D[o + 1], k = D[o + 2], ty = D[o + 5];
+        qt.setFromAxisAngle(up, D[o + 3]);
+        s.set(k, k * D[o + 4], k);
+        m.compose(new THREE.Vector3(x, -0.3 + ty, z), qt, s); // 山上的樹長在坡面上
+        trunk.setMatrixAt(i, m);
+        crown.setMatrixAt(i, m);
         // 影子長度 ≈ 樹高 × 影子比例（樹冠那團影子從樹幹往外一點開始）
         const len = 5.5 * k * sl * 0.8;
         bm.compose(new THREE.Vector3(x + sdx * len * 0.55, 0.035, z + sdz * len * 0.55), bq, new THREE.Vector3(3.6 * k, 1, len));
         if (ty > 0.5) bm.makeScale(0, 0, 0); // 坡上的樹不畫地面影子（平面影子貼不住坡）
-        blob.setMatrixAt(n, bm);
+        blob.setMatrixAt(i, bm);
         breakables.addParts(x, z, 0.35, 0.82, [
-          { mesh: trunk, idx: n, base: m }, { mesh: crown, idx: n, base: m }, { mesh: blob, idx: n, base: bm, hide: true },
+          { mesh: trunk, idx: i, base: m }, { mesh: crown, idx: i, base: m }, { mesh: blob, idx: i, base: bm, hide: true },
         ], tag); // 撞到會倒，車速剩 82%；倒下後地上的樹影跟著消失
-        crown.setColorAt(n, leaf[Math.floor(r() * leaf.length)]);
-      });
+        crown.setColorAt(i, leaf[D[o + 6]]);
+      }
       trunk.computeBoundingSphere();
       crown.computeBoundingSphere();
       blob.computeBoundingSphere();
-      const cx = (Math.floor(pts[0][0] / TILE) + 0.5) * TILE, cz = (Math.floor(pts[0][1] / TILE) + 0.5) * TILE;
-      add(trunk, cx, cz, 'near');
-      add(blob, cx, cz, 'near');
-      add(crown, cx, cz, 'mid');
+      add(trunk, grp.cx, grp.cz, 'near');
+      add(blob, grp.cx, grp.cz, 'near');
+      add(crown, grp.cx, grp.cz, 'mid');
     }
-    return { cull: cl, bb };
+    return { cull: cl, bb: out.bb };
   }
 
   // ---- 串流：哪些區塊要載入、哪些要卸掉
@@ -697,14 +538,14 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   const d2 = (i: number, x: number, z: number) => { const [cx, cz] = center(i); return (cx - x) ** 2 + (cz - z) ** 2; };
   let want: number[] = [], busy = false, grow = false;
   const growing: { g: THREE.Group; t: number }[] = [];
-  async function loadTile(i: number) {
-    const [tx, tz] = TI.list[i];
-    const res = await fetch(`/data/tiles/${tx}_${tz}.json`);
-    if (!res.ok) throw new Error(`區塊 ${tx}_${tz}：HTTP ${res.status}`);
-    const td = decodeTile(await res.json());
+  const tileUrl = (i: number) => `/data/tiles/${TI.list[i][0]}_${TI.list[i][1]}.json`;
+  /** pre：已經先送去背景算的結果（開場、串流都會先送下一塊） */
+  async function loadTile(i: number, pre?: Promise<GenOut>) {
+    const out = await (pre ?? pool.run(tileUrl(i), i));
+    if (loaded.has(i)) return;
     sliceStart = performance.now();
     const group = new THREE.Group();
-    const { cull: cl, bb } = await buildTile(td, i, group, center(i));
+    const { cull: cl, bb } = await buildTile(out, i, group, center(i));
     busyMs += performance.now() - sliceStart;
     built++;
     scene.add(group);
@@ -740,10 +581,16 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     if (busy) return;
     busy = true;
     try {
+      let nextPre: { i: number; p: Promise<GenOut> } | null = null;
       while (want.length) {
         const i = want.shift()!;
         if (loaded.has(i)) continue;
-        try { await loadTile(i); } catch (e) { console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
+        const p = nextPre?.i === i ? nextPre.p : pool.run(tileUrl(i), i);
+        // 組這一塊的同時，下一塊先送去背景算
+        const n = want.find((j) => !loaded.has(j));
+        nextPre = n === undefined ? null : { i: n, p: pool.run(tileUrl(n), n) };
+        nextPre?.p.catch(() => {}); // 沒用到（玩家轉向了）也不要變成未處理的錯誤
+        try { await loadTile(i, p); } catch (e) { console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
       }
     } finally { busy = false; }
   }
@@ -783,9 +630,14 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   {
     // 開場先把起點附近（或測試時全部）的區塊蓋好再進遊戲
     const ids = keepAll ? TI.list.map((_, i) => i) : inRadius(opts.cx, opts.cz, q.viewDist);
+    // 背景執行緒有幾個，就先多送幾塊下去算
+    const pre = new Map<number, Promise<GenOut>>();
+    const ask = (k: number) => { if (k < ids.length && !pre.has(k)) pre.set(k, pool.run(tileUrl(ids[k]), ids[k])); };
     for (let k = 0; k < ids.length; k++) {
+      for (let j = k; j <= k + pool.size; j++) ask(j);
       if (k % 3 === 0) await stage(`蓋房子、種行道樹（${k}/${ids.length} 區）`, 0.52 + (0.22 * k) / ids.length);
-      await loadTile(ids[k]);
+      await loadTile(ids[k], pre.get(k));
+      pre.delete(k);
     }
     budget = 6;
     grow = !keepAll;
@@ -863,15 +715,6 @@ function build101(): THREE.Group {
 }
 
 /** 凸包（Andrew 單調鏈）：預先算地面影子的形狀用 */
-function convexHull(pts: [number, number][]): [number, number][] {
-  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cross = (o: number[], a: number[], b: number[]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lower: [number, number][] = [], upper: [number, number][] = [];
-  for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
-  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q); }
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
-}
-
 /** 山的網格：高度大於 0 的格子才畫；顏色依高度與坡度（低處深綠、陡坡露出岩石） */
 function terrainMesh(t: { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }): THREE.Mesh {
   const { x0, z0, step, nx, nz, h } = t;
