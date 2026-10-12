@@ -180,3 +180,13 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 | `src/main.ts` | 遊戲流程、計時、分段、影子車、鏡頭、HUD |
 
 調手感：`track.ts` 最上面的 `VMAX`、`ENGINE`、`BRAKE`、`gripAt()`。
+
+## 各國大獎賽賽道資料（準備中）
+
+`node tools/probe-circuits.mjs` 下載 2026 賽曆 23 條賽道附近的 OSM 賽道資料（快取 `tools/circuits-cache/`，不進 git），
+`node tools/build-circuits.mjs` 組出中心線 → `public/data/circuits/{id}.json`（每 4 m 一點、起跑線開始、照比賽方向），總覽圖 `tools/circuits.svg`。
+- 賽道形狀：OpenStreetMap（© OpenStreetMap contributors，ODbL）；OSM 組出來的長度跟官方差超過 1.5% 的，改用
+  [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits)（© Tomislav Bacinger，MIT，授權全文 `tools/f1-circuits.LICENSE`）
+- 賽道資訊（長度、彎數、首屆、單圈紀錄、知名彎道）：英文維基百科各賽道頁面 → `tools/circuits-info.json`（每筆附來源網址）；
+  比賽方向：維基百科（賽道頁或 List of Formula One circuits），沒寫的照 bacinger 的畫線方向
+- 遊戲裡不使用 F1 官方名稱、標誌與車隊商標；含贊助商名稱的賽道在遊戲裡用地名稱呼（例：紅牛環 → 史匹堡）
