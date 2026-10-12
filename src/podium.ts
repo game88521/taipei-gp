@@ -35,10 +35,10 @@ export class Podium {
     // （頒獎時賽車都先藏起來）
     const i = Math.round(80 / t.ds) % t.N;
     const x = t.px[i], z = t.pz[i];
-    this.g.position.set(x, 0, z);
+    this.g.position.set(x, t.py[i], z);
     this.toTrack.set(-t.tx[i], 0, -t.tz[i]); // 正面方向（鏡頭在這一側）
     this.g.rotation.y = Math.atan2(this.toTrack.x, this.toTrack.z);
-    this.center.set(x, 2.6, z);
+    this.center.set(x, 2.6 + t.py[i], z);
     const white = new THREE.MeshLambertMaterial({ color: '#f4f4f4' }), red = new THREE.MeshLambertMaterial({ color: '#d40000' });
     // 台子：中間 1 名最高；從正面看 2 名在左、3 名在右（跟真的頒獎台一樣）
     const H = [1.7, 1.15, 0.8], X = [0, -3.1, 3.1];
@@ -160,8 +160,8 @@ export class Podium {
     // 鏡頭：在台子前方慢慢左右繞、慢慢推近；往下看一點，台子和車手在畫面上半部（下半部是名單）
     const a = Math.sin(t * 0.25) * 0.45, R = 19 - Math.min(4, t * 0.5);
     const dir = this.toTrack.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
-    camera.position.set(this.center.x + dir.x * R, 2.6, this.center.z + dir.z * R);
-    camera.lookAt(this.center.x, 0.2, this.center.z);
+    camera.position.set(this.center.x + dir.x * R, this.center.y, this.center.z + dir.z * R);
+    camera.lookAt(this.center.x, this.center.y - 2.4, this.center.z);
     if (Math.abs(camera.fov - 45) > 0.05) { camera.fov = 45; camera.updateProjectionMatrix(); }
   }
 }

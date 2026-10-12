@@ -4,15 +4,21 @@ import trackData from './data/track.json' with { type: 'json' };
 export const CITY_SIZE: number = (trackData as { citySize?: number }).citySize ?? 5.5e6;
 
 // 車子性能與「建議速度曲線」共用同一組數字，輔助線才會跟手感一致
-export const VMAX = 84; // m/s ≈ 302 km/h
-export const ENGINE = 14; // 低速時的加速度 m/s²
-export const BRAKE = 38; // 煞車減速度 m/s²
+// 台北街道賽是原本的手感；各國賽道（setRealPerf）比較接近真實 F1：極速、下壓力、煞車都更強
+export let VMAX = 84; // m/s ≈ 302 km/h
+export let ENGINE = 14; // 低速時的加速度 m/s²
+export let BRAKE = 38; // 煞車減速度 m/s²
+export let GRIP0 = 20, GRIPK = 0.004, GRIPMAX = 50; // 橫向抓地力 = GRIP0 + GRIPK × v²（上限 GRIPMAX）
 export const HALF_WIDTH = 7; // 路面半寬 (m)
 export const WALL_OFF = 9.5; // 護牆到中心線的距離 (m)
 
 /** 下壓力：越快抓地力越大（m/s² 的橫向加速度上限） */
 export function gripAt(v: number): number {
-  return Math.min(50, 20 + 0.004 * v * v);
+  return Math.min(GRIPMAX, GRIP0 + GRIPK * v * v);
+}
+/** 各國賽道：接近真實 F1 的性能（要在 buildTrack 之前呼叫，建議速度曲線才會用同一組） */
+export function setRealPerf(p: { vmax: number; engine: number; brake: number; g0: number; gk: number; gmax: number }) {
+  ({ vmax: VMAX, engine: ENGINE, brake: BRAKE, g0: GRIP0, gk: GRIPK, gmax: GRIPMAX } = p);
 }
 
 // 真實台北街道：由 tools/build-city.mjs 從 OpenStreetMap 產生（x 向東、z 向南，單位公尺）
@@ -32,10 +38,18 @@ export interface Track {
   dist: Float32Array; // 從起跑線算起的距離
   curv: Float32Array; // 帶正負號的曲率，正 = 右彎
   vTarget: Float32Array; // 建議速度 (m/s)
+  py: Float32Array; // 路面高度（各國賽道有高低起伏；台北全是 0）
+  grade: Float32Array; // 坡度（每公尺升高幾公尺，上坡正）
 }
 
-/** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽 */
-export function buildTrack(points: [number, number][] = CONTROL): Track {
+/** 賽道上 s 處的路面高度（線性內插） */
+export function heightAt(t: Track, s: number): number {
+  const f = (((s / t.ds) % t.N) + t.N) % t.N, i = Math.floor(f), j = (i + 1) % t.N;
+  return t.py[i] + (t.py[j] - t.py[i]) * (f - i);
+}
+
+/** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽。elev：每個 points 的高度（相對起跑線） */
+export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]): Track {
   const curve = new THREE.CatmullRomCurve3(
     points.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     true,
@@ -73,7 +87,7 @@ export function buildTrack(points: [number, number][] = CONTROL): Track {
   }
 
   // 建議速度：先算每一點的過彎極速（留 8% 餘裕），再往回推煞車點、往前推出彎加速
-  const G0 = 20 * 0.92, GK = 0.004 * 0.92;
+  const G0 = GRIP0 * 0.92, GK = GRIPK * 0.92;
   for (let i = 0; i < N; i++) {
     const k = Math.abs(curv[i]);
     vTarget[i] = k > GK + 1e-5 ? Math.min(VMAX, Math.sqrt(G0 / (k - GK))) : VMAX;
@@ -81,17 +95,32 @@ export function buildTrack(points: [number, number][] = CONTROL): Track {
   for (let pass = 0; pass < 2; pass++) {
     for (let i = N - 1; i >= 0; i--) {
       const j = (i + 1) % N;
-      vTarget[i] = Math.min(vTarget[i], Math.sqrt(vTarget[j] ** 2 + 2 * 30 * ds));
+      vTarget[i] = Math.min(vTarget[i], Math.sqrt(vTarget[j] ** 2 + 2 * 30 * (BRAKE / 38) * ds));
     }
   }
   for (let pass = 0; pass < 2; pass++) {
     for (let i = 0; i < N; i++) {
       const j = (i - 1 + N) % N;
-      vTarget[i] = Math.min(vTarget[i], Math.sqrt(vTarget[j] ** 2 + 2 * 11 * ds));
+      vTarget[i] = Math.min(vTarget[i], Math.sqrt(vTarget[j] ** 2 + 2 * 11 * (ENGINE / 14) * ds));
     }
   }
 
-  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget };
+  // 高度：原本的點照沿線距離比例對到新的取樣點，再算坡度（前後各 4 m）
+  const py = new Float32Array(N), grade = new Float32Array(N);
+  if (elev && elev.length === points.length) {
+    const cum = [0];
+    for (let k = 1; k <= points.length; k++) { const a = points[k - 1], b = points[k % points.length]; cum.push(cum[k - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+    const L0 = cum[points.length];
+    let k = 0;
+    for (let i = 0; i < N; i++) {
+      const s = (i / N) * L0;
+      while (k < points.length - 1 && cum[k + 1] < s) k++;
+      const f = (s - cum[k]) / ((cum[k + 1] - cum[k]) || 1);
+      py[i] = elev[k] + (elev[(k + 1) % points.length] - elev[k]) * f;
+    }
+    for (let i = 0; i < N; i++) grade[i] = (py[(i + 2) % N] - py[(i - 2 + N) % N]) / (4 * ds);
+  }
+  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget, py, grade };
 }
 
 export interface Locate {

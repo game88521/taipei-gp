@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Car } from './car';
 import type { CarModel } from './carModel';
 import { makeF1, TEAMS } from './f1model';
-import { HALF_WIDTH, type Track } from './track';
+import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, type Track } from './track';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
 // 被慢車擋住就挑比較空的一側超車、尾流加速、車與車照動量交換互相撞開
@@ -64,6 +64,7 @@ export class RaceField {
   raceTime = 0;
   laps = LAPS;
   ttMode = false; // 計時賽：DRS 不用偵測前車
+  look = Number(new URLSearchParams(location.search).get('look') ?? 0.42); // AI 看多遠的路（秒）：各國賽道速度快，看太遠會切彎撞牆（main 設）
   rules: Rules = 'classic'; // 2026：主動空力＋電池＋超車模式（偵測點、區段沿用 DRS 的）
   // 天氣：wet 0 乾 … 1 全濕；rainAt = 比賽第幾秒開始下（Infinity 不下、負的＝雨戰一開始就濕）
   wet = 0;
@@ -98,7 +99,7 @@ export class RaceField {
     });
     this.racers.push({ ...fresh(), name: '你', team: TEAMS[0].team, color: TEAMS[0].livery.main, car: player, model: null, isPlayer: true, profile: null });
     // DRS 區：建議速度幾乎全油門、連續 250 m 以上的長直線
-    const fast = (i: number) => t.vTarget[i] >= 84 * 0.97;
+    const fast = (i: number) => t.vTarget[i] >= VMAX0 * 0.97;
     let start = -1;
     for (let k = 0; k <= t.N * 2; k++) {
       const i = k % t.N;
@@ -442,7 +443,7 @@ export class RaceField {
     } else if (!blocker) {
       r.lat += (0 - r.lat) * Math.min(1, 0.8 / 120); // 沒人擋：慢慢回到賽車線
     }
-    const j = (i + Math.round((8 + c.v * 0.42) / t.ds)) % N;
+    const j = (i + Math.round((8 + c.v * this.look) / t.ds)) % N;
     const off = Math.max(-(HALF_WIDTH - 1.3), Math.min(HALF_WIDTH - 1.3, this.line[j] + r.lat));
     const tx = t.px[j] - t.tz[j] * off, tz = t.pz[j] + t.tx[j] * off;
     let err = Math.atan2(tx - c.x, tz - c.z) - c.h;
@@ -453,15 +454,16 @@ export class RaceField {
     // 卡住太久（撞牆停住）就自動扶正
     r.stuck = c.v < 2 ? r.stuck + 1 / 120 : 0;
     if (r.stuck > 3) { c.placeAt(t, i); r.stuck = 0; }
-    return { steer: Math.max(-1, Math.min(1, -err * 2.6)), brake };
+    const steer = -err * 2.6;
+    return { steer: Math.max(-1, Math.min(1, steer)), brake };
   }
 
   render(dt: number) {
     for (const r of this.racers) {
       if (!r.model) continue;
       const c = r.car, m = r.model;
-      m.root.position.set(c.x, 0, c.z);
-      m.root.rotation.y = c.h;
+      m.root.position.set(c.x, this.t.py[c.pos.i], c.z);
+      m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, 0, 'YXZ');
       m.body.rotation.z = c.steer * Math.min(1, c.v / 40) * 0.04;
       for (const w of m.steer) w.rotation.y = -c.steer * 0.35;
       for (const w of m.spin) w.rotation.x += (c.v / 0.36) * dt;
@@ -511,7 +513,7 @@ function racingLine(t: Track): Float32Array {
 function speedProfile(t: Track, line: Float32Array, grip: number, brake: number): Float32Array {
   const N = t.N, px = new Float32Array(N), pz = new Float32Array(N), v = new Float32Array(N);
   for (let i = 0; i < N; i++) { px[i] = t.px[i] - t.tz[i] * line[i]; pz[i] = t.pz[i] + t.tx[i] * line[i]; }
-  const G0 = 20 * grip, GK = 0.004 * grip, VMAX = 84 * 1.03;
+  const G0 = GRIP0 * grip, GK = GRIPK * grip, VMAX = VMAX0 * 1.03;
   // 曲率：用前後各 6 點（約 24 m）量方向變化，再平滑一次；量太短會有雜訊，害 AI 在不是彎的地方亂煞車
   const kr = new Float32Array(N), ks = new Float32Array(N);
   for (let i = 0; i < N; i++) {

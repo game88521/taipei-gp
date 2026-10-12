@@ -48,6 +48,7 @@ export const CIRCUIT: CircuitMeta | null = CIRCUITS.find((c) => c.id === new URL
 export interface CircuitData {
   id: string;
   points: [number, number][];
+  elev?: number[]; // 高度（相對起跑線，公尺）
   lengthM: number;
   direction: 'clockwise' | 'anticlockwise';
   info: { lengthKm: number | null; turns: number | null; firstGp: number | null; lapRecord: { time: string; driver: string; year: number } | null; corners: string[] | null; fact: string | null; source: string };

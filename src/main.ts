@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
-import { buildTrack, VMAX } from './track';
+import { buildTrack, VMAX, setRealPerf, heightAt, locate, type Locate } from './track';
 import { buildWorld } from './world';
 import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
@@ -75,9 +75,18 @@ $('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
+// 調到 AI 排位圈速跟真實竿位差 ±5%（蒙札 +3%、鈴鹿 +5%、摩納哥 -2%）：極速 342 km/h、煞車約 5g、高速彎約 6.7g
+const REAL_PERF = { vmax: 95, engine: 16, brake: 50, g0: 23, gk: 0.0068, gmax: 66 };
 // 各國賽道（?circuit=suzuka）：先讀中心線再建賽道；不載入台北街景，改成通用的賽道場景（circuitenv.ts）
 const circuitData = await loadCircuitData();
-const track = circuitData ? buildTrack(circuitData.points) : buildTrack();
+// 各國賽道用接近真實 F1 的性能（台北街道賽維持原本的手感、線上排行榜才比得下去）；?perf=v,e,b,g0,gk,gmax 測試用
+if (circuitData) {
+  const pq = new URLSearchParams(location.search).get('perf')?.split(',').map(Number);
+  setRealPerf(pq?.length === 6 ? { vmax: pq[0], engine: pq[1], brake: pq[2], g0: pq[3], gk: pq[4], gmax: pq[5] } : REAL_PERF);
+}
+// 中心線先平滑兩次（前後各 2 點、約 16 m）：OSM 的線有細小的鋸齒，曲率會亂跳，AI 的賽車線跟著亂擺就會撞牆
+const smooth = (p: [number, number][]) => p.map((_, i) => { let x = 0, z = 0; for (let k = -2; k <= 2; k++) { const q = p[(i + k + p.length) % p.length]; x += q[0]; z += q[1]; } return [x / 5, z / 5] as [number, number]; });
+const track = circuitData ? buildTrack(smooth(smooth(circuitData.points)), circuitData.elev) : buildTrack(); // elev：高低起伏（tools/fetch-elevation.mjs）
 const world = buildWorld(scene, track, CIRCUIT?.banner);
 let circuitEnv: { center: THREE.Vector3; extent: number } | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
@@ -713,13 +722,13 @@ function menuCamera(dt: number) {
   if (shot === 0) {
     // 沿著賽道低空往前推，看向前方
     const i = (8 + u * 16 * SHOT_LEN) / ds, [x, z] = at(i), [lx, lz] = at(i + 40 / ds);
-    camera.position.set(x, 1.8, z);
-    camera.lookAt(lx, 2.4, lz);
+    camera.position.set(x, 1.8 + heightAt(track, i * ds), z);
+    camera.lookAt(lx, 2.4 + heightAt(track, (i + 40 / ds) * ds), lz);
     fov = 58;
   } else if (shot === 1) {
     // 環繞 101：高空慢慢繞
     const a = 2.2 + u * 0.55, R = big ? big * 0.6 : 560;
-    camera.position.set(T.x + Math.cos(a) * R, big ? big * 0.28 : 150, T.z + Math.sin(a) * R);
+    camera.position.set(T.x + Math.cos(a) * R, big ? big * 0.28 + track.py[0] : 150, T.z + Math.sin(a) * R);
     camera.lookAt(T.x, big ? 0 : 170, T.z);
     fov = 46;
   } else if (shot === 2) {
@@ -727,8 +736,8 @@ function menuCamera(dt: number) {
     if (big) {
       // 主看台、維修區那段直線：從賽道外側斜看起跑線
       const i0 = 0, a = 0.6 + u * 0.5;
-      camera.position.set(track.px[i0] + Math.cos(a) * 90, 22, track.pz[i0] + Math.sin(a) * 90);
-      camera.lookAt(track.px[i0], 2, track.pz[i0]);
+      camera.position.set(track.px[i0] + Math.cos(a) * 90, 22 + track.py[i0], track.pz[i0] + Math.sin(a) * 90);
+      camera.lookAt(track.px[i0], 2 + track.py[i0], track.pz[i0]);
     } else {
       const a = 4.0 + u * 0.3, R = 680;
       camera.position.set(T.x + Math.cos(a) * R, 30 + u * 40, T.z + Math.sin(a) * R);
@@ -738,8 +747,8 @@ function menuCamera(dt: number) {
   } else {
     // 沿賽道高空飛越，看前方的路
     const i = (N * 0.5 + u * 30 * SHOT_LEN / ds), [x, z] = at(i), [lx, lz] = at(i + 320 / ds);
-    camera.position.set(x, 120, z);
-    camera.lookAt(lx, 10, lz);
+    camera.position.set(x, 120 + heightAt(track, i * ds), z);
+    camera.lookAt(lx, 10 + heightAt(track, (i + 320 / ds) * ds), lz);
     fov = 55;
   }
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -765,8 +774,8 @@ function updateVisuals(dt: number) {
   scCar.model.root.visible = scOn;
   if (scOn) {
     const i = Math.floor(field.sc.s / track.ds) % track.N;
-    scCar.model.root.position.set(track.px[i], 0, track.pz[i]);
-    scCar.model.root.rotation.y = Math.atan2(track.tx[i], track.tz[i]);
+    scCar.model.root.position.set(track.px[i], track.py[i], track.pz[i]);
+    scCar.model.root.rotation.set(-Math.atan(track.grade[i]), Math.atan2(track.tx[i], track.tz[i]), 0, 'YXZ');
     const on = Math.floor(performance.now() / 250) % 2 === 0;
     scLights[0].color.set(on ? '#ffb000' : '#3a2600');
     scLights[1].color.set(on ? '#3a2600' : '#ffb000');
@@ -790,8 +799,9 @@ function updateVisuals(dt: number) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
   }
-  model.root.position.set(vc.x, mode === 'free' ? -0.25 : 0, vc.z); // 城市道路比賽道路面低 0.25 m
-  model.root.rotation.y = vc.h;
+  const ry = mode === 'race' ? track.py[car.pos.i] : 0; // 各國賽道的高低起伏
+  model.root.position.set(vc.x, mode === 'free' ? -0.25 : ry, vc.z); // 城市道路比賽道路面低 0.25 m
+  model.root.rotation.set(mode === 'race' ? -Math.atan(track.grade[car.pos.i]) : 0, vc.h, 0, 'YXZ'); // 上坡車頭抬起來
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
   for (const w of model.steer) w.rotation.y = -vc.steer * 0.45;
   for (const w of model.spin) w.rotation.x += (vc.v / 0.35) * dt;
@@ -806,7 +816,7 @@ function updateVisuals(dt: number) {
     const f = Math.max(0, Math.min(1, (lapTime - g.t[a]) / (g.t[b] - g.t[a] || 1)));
     let dh = g.h[b] - g.h[a];
     dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-    ghostModel.root.position.set(g.x[a] + (g.x[b] - g.x[a]) * f, 0.02, g.z[a] + (g.z[b] - g.z[a]) * f);
+    ghostModel.root.position.set(g.x[a] + (g.x[b] - g.x[a]) * f, 0.02 + heightAt(track, g.s[a]), g.z[a] + (g.z[b] - g.z[a]) * f);
     ghostModel.root.rotation.y = g.h[a] + dh * f;
     if (lapTime > g.t[g.t.length - 1]) ghostModel.root.visible = false;
   }
@@ -817,8 +827,8 @@ function updateVisuals(dt: number) {
   camH += camSnap ? d : d * Math.min(1, dt * 7);
   const fx = Math.sin(camH), fz = Math.cos(camH);
   const lowCar = f1Look || chosen.id === 'f1', back = lowCar ? 8 : chosen.id === 'pickup' ? 8 : 7.5, up = lowCar ? 2.9 : chosen.id === 'pickup' ? 3.7 : 3.3;
-  const target = new THREE.Vector3(vc.x - fx * back, up, vc.z - fz * back);
-  const look = new THREE.Vector3(vc.x + fx * 6, 1.2, vc.z + fz * 6);
+  const target = new THREE.Vector3(vc.x - fx * back, up + ry, vc.z - fz * back);
+  const look = new THREE.Vector3(vc.x + fx * 6, 1.2 + ry, vc.z + fz * 6);
   if (camSnap) { camPos.copy(target); camLook.copy(look); camSnap = false; }
   const k = Math.min(1, dt * 10);
   camPos.lerp(target, k);
@@ -836,7 +846,7 @@ function updateVisuals(dt: number) {
   if (inCar) {
     const [ex, ey, ez] = EYE[f1Look ? 'f1' : chosen.id] ?? EYE.sedan;
     const hx = Math.sin(vc.h), hz = Math.cos(vc.h), lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 前、左
-    const base = mode === 'free' ? -0.25 : 0;
+    const base = mode === 'free' ? -0.25 : ry;
     camera.position.set(vc.x + lx * ex + hx * ez, base + ey, vc.z + lz * ex + hz * ez);
     camera.lookAt(vc.x + lx * ex + hx * 30, base + ey - 0.8, vc.z + lz * ex + hz * 30);
     if (Math.abs(camera.fov - 72) > 0.05) { camera.fov = 72; camera.updateProjectionMatrix(); }
@@ -1373,7 +1383,7 @@ const tvCams: THREE.Vector3[] = [];
   for (let i = 0, k = 0; i < track.N; i += stepN, k++) {
     // 就架在護牆外 2 m、10 m 高：比行道樹更靠賽道，往下拍不會被樹擋住
     const off = (k % 2 ? 1 : -1) * (WALL_OFF + 2);
-    tvCams.push(new THREE.Vector3(track.px[i] - track.tz[i] * off, 10, track.pz[i] + track.tx[i] * off));
+    tvCams.push(new THREE.Vector3(track.px[i] - track.tz[i] * off, 10 + track.py[i], track.pz[i] + track.tx[i] * off));
   }
 }
 function startReplay() {
@@ -1392,6 +1402,7 @@ function endReplay() {
   $('replay-ui').classList.add('hidden');
   $('results').classList.remove('hidden');
 }
+const replayLoc = new Map<unknown, Locate>();
 function replayFrame(dt: number) {
   const len = field.replayLength;
   // 回放的是街道賽：護牆在、車流行人紅綠燈都不在
@@ -1405,8 +1416,12 @@ function replayFrame(dt: number) {
   field.replayAt(replayT, (r, x, z, h, steer, v) => {
     const m = r.isPlayer ? carModel : r.model!;
     m.root.visible = true;
-    m.root.position.set(x, 0, z);
-    m.root.rotation.y = h;
+    // 高低起伏：回放只記了平面位置，找回賽道上的點拿高度（每台車記住上次的點，搜尋很快）
+    let loc = replayLoc.get(r);
+    if (!loc) replayLoc.set(r, (loc = { i: 0, lat: 0, s: 0 }));
+    locate(track, x, z, loc);
+    m.root.position.set(x, track.py[loc.i], z);
+    m.root.rotation.set(-Math.atan(track.grade[loc.i]), h, 0, 'YXZ');
     for (const w of m.steer) w.rotation.y = -steer * 0.35;
     for (const w of m.spin) w.rotation.x += (v / 0.36) * dt * replaySpeed;
   });
@@ -1418,15 +1433,15 @@ function replayFrame(dt: number) {
     let best = tvCams[0], bd = Infinity;
     for (const c of tvCams) { const d = c.distanceTo(p); if (d < bd) { bd = d; best = c; } }
     camera.position.copy(best);
-    camera.lookAt(p.x, 0.8, p.z);
+    camera.lookAt(p.x, 0.8 + p.y, p.z);
     camera.fov = Math.max(18, Math.min(55, 900 / Math.max(bd, 10))); // 遠的時候拉近（長焦）
   } else if (camMode === 'chase') {
-    camera.position.set(p.x - Math.sin(h) * 7, 2.4, p.z - Math.cos(h) * 7);
-    camera.lookAt(p.x + Math.sin(h) * 8, 1, p.z + Math.cos(h) * 8);
+    camera.position.set(p.x - Math.sin(h) * 7, 2.4 + p.y, p.z - Math.cos(h) * 7);
+    camera.lookAt(p.x + Math.sin(h) * 8, 1 + p.y, p.z + Math.cos(h) * 8);
     camera.fov = 65;
   } else {
-    camera.position.set(p.x - Math.sin(h) * 25 + 10, 38, p.z - Math.cos(h) * 25);
-    camera.lookAt(p.x, 0, p.z);
+    camera.position.set(p.x - Math.sin(h) * 25 + 10, 38 + p.y, p.z - Math.cos(h) * 25);
+    camera.lookAt(p.x, p.y, p.z);
     camera.fov = 50;
   }
   camera.updateProjectionMatrix();
@@ -2162,4 +2177,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; } };

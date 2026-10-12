@@ -13,12 +13,6 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   const r = rng(meta.id.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 2147483647 || 1);
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (let i = 0; i < t.N; i++) { x0 = Math.min(x0, t.px[i]); x1 = Math.max(x1, t.px[i]); z0 = Math.min(z0, t.pz[i]); z1 = Math.max(z1, t.pz[i]); }
-  // 地面：顏色照環境、大小蓋住整條賽道再往外 3 km
-  const groundCol = { grass: '#5f8a45', tropical: '#4f8a3e', desert: '#c9ad7d', street: '#6d6b67' }[meta.biome];
-  (ground.material as THREE.MeshLambertMaterial).color.set(groundCol);
-  ground.position.set((x0 + x1) / 2, -0.6, (z0 + z1) / 2);
-  ground.scale.set((x1 - x0 + 6000) / 14000, (z1 - z0 + 6000) / 12000, 1);
-
   // 離賽道多遠：賽道點的格子
   const G = 40, grid = new Map<string, number[]>();
   for (let i = 0; i < t.N; i += 2) {
@@ -26,6 +20,33 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     if (!grid.has(k)) grid.set(k, []);
     grid.get(k)!.push(i);
   }
+  // 地形高度：附近賽道點的高度做距離加權平均（離賽道越遠越接近整條的平均高度）；
+  // 賽道 40 m 內一律壓在路面下 1 m（地形的三角形才不會穿出路面）
+  let mean = 0;
+  for (let i = 0; i < t.N; i++) mean += t.py[i] / t.N;
+  const hAt = (x: number, z: number) => {
+    const cx = Math.floor(x / G), cz = Math.floor(z / G), R = 7;
+    let w = 0.0004, h = mean * 0.0004, nd = Infinity, ny = 0;
+    for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) for (const i of grid.get(`${cx + a},${cz + b}`) || []) {
+      const d2 = (t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2, k = 1 / (d2 + 400);
+      w += k; h += t.py[i] * k;
+      if (d2 < nd) { nd = d2; ny = t.py[i]; }
+    }
+    h /= w;
+    return Math.sqrt(nd) < WALL_OFF + 40 ? Math.min(h, ny - 1) : h;
+  };
+  // 地面：顏色照環境、蓋住整條賽道再往外 3 km；有高低起伏
+  const groundCol = { grass: '#5f8a45', tropical: '#4f8a3e', desert: '#c9ad7d', street: '#6d6b67' }[meta.biome];
+  ground.visible = false;
+  const W = x1 - x0 + 6000, D = z1 - z0 + 6000, SEG = 180;
+  const tg = new THREE.PlaneGeometry(W, D, SEG, SEG).rotateX(-Math.PI / 2);
+  const tp = tg.attributes.position as THREE.BufferAttribute, gx = (x0 + x1) / 2, gz = (z0 + z1) / 2;
+  for (let v = 0; v < tp.count; v++) tp.setY(v, hAt(tp.getX(v) + gx, tp.getZ(v) + gz) - 0.6);
+  tg.computeVertexNormals();
+  const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ color: groundCol }));
+  terrain.position.set(gx, 0, gz);
+  terrain.userData.flat = true;
+  scene.add(terrain);
   const clear = (x: number, z: number, d: number) => {
     const cx = Math.floor(x / G), cz = Math.floor(z / G), R = Math.ceil(d / G);
     for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) for (const i of grid.get(`${cx + a},${cz + b}`) || []) if ((t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2 < d * d) return false;
@@ -51,13 +72,13 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
         const step = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.6 + k * 1.6, len), k === 3 ? standMat : [standMat, standMat, crowdMat, standMat, standMat, standMat]);
         const off = sideSign * (WALL_OFF + 6 + k * 2.6);
         const [mx, mz] = side(at(s + 6), off);
-        step.position.set(mx, (1.6 + k * 1.6) / 2 - 0.6, mz);
+        step.position.set(mx, (1.6 + k * 1.6) / 2 - 0.6 + t.py[at(s + 6)], mz);
         step.rotation.y = ang;
         g.add(step);
       }
       const roof = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, len), roofMat);
       const [rx, rz] = side(at(s + 6), sideSign * (WALL_OFF + 10));
-      roof.position.set(rx, 10.5, rz);
+      roof.position.set(rx, 10.5 + t.py[at(s + 6)], rz);
       roof.rotation.y = ang;
       g.add(roof);
     }
@@ -85,7 +106,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     const len = Math.hypot(bx - ax, bz - az) + 0.4;
     const box = new THREE.Mesh(new THREE.BoxGeometry(10, 9, len), [white, white, white, white, white, pitMat]);
     const [mx, mz] = side(at(s + 6), WALL_OFF + 12);
-    box.position.set(mx, 3.9, mz);
+    box.position.set(mx, 3.9 + t.py[at(s + 6)], mz);
     box.rotation.y = Math.atan2(bx - ax, bz - az) + Math.PI; // 有車庫門那面朝賽道
     scene.add(box);
   }
@@ -104,7 +125,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), fillerMaterial(), Math.max(1, boxes.length));
     boxes.forEach(([x, z, w, d, h, a], k) => {
       Q.setFromAxisAngle(up, a);
-      im.setMatrixAt(k, M.compose(V.set(x, -0.6, z), Q, S.set(w, h, d)));
+      im.setMatrixAt(k, M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(w, h, d)));
       im.setColorAt(k, WALLS[k % WALLS.length]);
     });
     im.count = boxes.length;
@@ -122,7 +143,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     if (!clear(x, z, WALL_OFF + 16)) continue;
     const k = 0.8 + r() * 0.7;
     Q.setFromAxisAngle(up, r() * 6.28);
-    M.compose(V.set(x, -0.6, z), Q, S.set(k, k, k));
+    M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(k, k, k));
     trunk.setMatrixAt(n, M); crown.setMatrixAt(n, M);
     crown.setColorAt(n, leaf[n % leaf.length]);
     n++;
@@ -150,12 +171,12 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       const i = at(k * 60), sg = k % 2 ? 1 : -1;
       const [x, z] = side(i, sg * (WALL_OFF + 4));
       Q.setFromAxisAngle(up, Math.atan2(t.tx[i], t.tz[i]));
-      M.compose(V.set(x, 0, z), Q, S.set(1, 1, 1));
+      M.compose(V.set(x, t.py[i], z), Q, S.set(1, 1, 1));
       pole.setMatrixAt(k, M); head.setMatrixAt(k, M);
-      M.compose(V.set(t.px[i], 0, t.pz[i]), Q, S.set(1, 1, 1));
+      M.compose(V.set(t.px[i], t.py[i], t.pz[i]), Q, S.set(1, 1, 1));
       pool.setMatrixAt(k, M);
     }
     for (const m of [pole, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
   }
-  return { center: new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0) };
+  return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0) };
 }

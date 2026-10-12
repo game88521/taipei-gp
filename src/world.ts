@@ -117,7 +117,7 @@ interface RibbonOpt {
 function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
   const pos: number[] = [], uv: number[] = [], col: number[] = [];
   const vert = (i: number, off: number, y: number, across: number, d: number) => {
-    pos.push(t.px[i] - t.tz[i] * off, y, t.pz[i] + t.tx[i] * off);
+    pos.push(t.px[i] - t.tz[i] * off, y + t.py[i], t.pz[i] + t.tx[i] * off);
     const along = d / o.along;
     if (o.alongIsU) uv.push(along, across); else uv.push(across, along);
     if (o.color) { const c = o.color(i); col.push(c.r, c.g, c.b); }
@@ -346,18 +346,18 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
     const beam = new THREE.Mesh(new THREE.BoxGeometry(off * 2 + 0.8, 1.8, 0.6), [metal, metal, metal, metal, new THREE.MeshBasicMaterial({ map: banner }), new THREE.MeshBasicMaterial({ map: banner })]);
     beam.position.y = 8.6;
     g.add(beam);
-    g.position.set(t.px[i], 0, t.pz[i]);
+    g.position.set(t.px[i], t.py[i], t.pz[i]);
     g.rotation.y = ang;
     race.add(g);
   }
 
   // ---- 路燈（InstancedMesh：幾百支只要兩次繪製）
   {
-    const lamps: { x: number; z: number; ang: number }[] = [];
+    const lamps: { x: number; z: number; ang: number; y: number }[] = [];
     for (let i = 0, k = 0; i < t.N; i += 20, k++) {
       const s = k % 2 ? 1 : -1;
       const off = s * (WALL_OFF + 0.7);
-      lamps.push({ x: t.px[i] - t.tz[i] * off, z: t.pz[i] + t.tx[i] * off, ang: Math.atan2(t.tx[i], t.tz[i]) + (s > 0 ? 0 : Math.PI) });
+      lamps.push({ x: t.px[i] - t.tz[i] * off, z: t.pz[i] + t.tx[i] * off, ang: Math.atan2(t.tx[i], t.tz[i]) + (s > 0 ? 0 : Math.PI), y: t.py[i] });
     }
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.14, 9, 6), new THREE.MeshLambertMaterial({ color: '#555a62' }), lamps.length);
     const headGeo = new THREE.BoxGeometry(1.6, 0.2, 0.45).translate(0.8, 0, 0);
@@ -365,9 +365,9 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     lamps.forEach((l, n) => {
       q.setFromAxisAngle(up, l.ang);
-      m.compose(new THREE.Vector3(l.x, 4.5, l.z), q, one);
+      m.compose(new THREE.Vector3(l.x, 4.5 + l.y, l.z), q, one);
       pole.setMatrixAt(n, m);
-      m.compose(new THREE.Vector3(l.x, 9, l.z), q, one);
+      m.compose(new THREE.Vector3(l.x, 9 + l.y, l.z), q, one);
       head.setMatrixAt(n, m);
     });
     race.add(pole, head);

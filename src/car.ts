@@ -58,6 +58,7 @@ export class Car {
     }
     let a = brake ? -BRAKE * Math.min(1, v / 2) : ENGINE * p * (1 - (v / (VMAX * p)) ** 2);
     a -= 0.4; // 滾動阻力
+    a -= 9.81 * t.grade[this.pos.i]; // 坡度：上坡掉速、下坡加速（台北的賽道是平的）
     a -= Math.abs(this.steer) * (v / VMAX) * 5; // 打滿方向會磨胎掉速
     this.v = Math.max(0, v + a * dt);
     if (this.v > this.speedCap) this.v = Math.max(this.speedCap, this.v - 14 * dt); // 安全車：超過限速就慢慢降下來
