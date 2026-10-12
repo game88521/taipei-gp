@@ -46,7 +46,8 @@ export class Sound {
 
   /** 一定要在點擊事件裡呼叫（iOS 規定） */
   start() {
-    if (this.ctx) { void this.ctx.resume(); return; }
+    playbackSession();
+    if (this.ctx) { this.unlock(); return; }
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
@@ -92,6 +93,24 @@ export class Sound {
   }
 
   suspend() { void this.ctx?.suspend(); }
+
+  /**
+   * 手機會在切到別的 App、鎖螢幕、來電時把網頁的聲音停掉（iOS 叫 interrupted），回來以後要在使用者碰螢幕時才能叫醒：
+   * main 在每次觸控、按鍵時呼叫；順便播一小段無聲的聲音（iOS 要真的播過東西才算解鎖）
+   */
+  unlock() {
+    const ctx = this.ctx;
+    if (!ctx || (ctx.state as string) === 'running') return;
+    void ctx.resume();
+    try {
+      const b = ctx.createBuffer(1, 1, 22050), src = ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(ctx.destination);
+      src.start();
+    } catch { /* 有些瀏覽器還沒 resume 完不給播 */ }
+    playbackSession();
+  }
+  get state() { return this.ctx?.state ?? 'none'; }
 
   /** 換引擎聲（車種 id，或 'f1'） */
   setEngine(key: string) {
@@ -233,4 +252,28 @@ export class Sound {
     o.start(t);
     o.stop(t + dur);
   }
+}
+
+/**
+ * iPhone 的靜音鍵切到靜音時，網頁的 Web Audio 預設會被靜音（影片不會）。
+ * 告訴系統這是「播放」類的聲音就不會：iOS 17 起有 navigator.audioSession；更舊的 iOS 改成在背景循環播一段無聲的 <audio>
+ * （有 HTML 媒體在播，整個網頁的聲音就被當成播放類）。只在第一次點擊時做一次
+ */
+let sessionDone = false;
+function playbackSession() {
+  if (sessionDone) return;
+  sessionDone = true;
+  const nav = navigator as unknown as { audioSession?: { type: string } };
+  if (nav.audioSession) { try { nav.audioSession.type = 'playback'; return; } catch { /* 不支援就用下面的方法 */ } }
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios) return;
+  // 0.5 秒、8 kHz 的無聲 WAV
+  const n = 4000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const str = (o: number, t: string) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+  const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+  a.loop = true;
+  a.setAttribute('playsinline', '');
+  a.play().catch(() => { sessionDone = false; }); // 沒成功（不在點擊事件裡）就下次點擊再試
 }
