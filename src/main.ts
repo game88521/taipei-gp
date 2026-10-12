@@ -636,8 +636,9 @@ function updateNav(dt: number) {
 function openMap() {
   if (!bigmap || state !== 'free') return;
   mapOpen = true;
-  bigmap.cx = fcar.x; bigmap.cz = fcar.z;
   $('map-page').classList.remove('hidden');
+  bigmap.setZoom(bigmap.zoom);
+  bigmap.focus(fcar.x, fcar.z);
 }
 function closeMap() { mapOpen = false; $('map-page').classList.add('hidden'); }
 function buildMapShortcuts() {
@@ -656,9 +657,13 @@ function buildMapShortcuts() {
     if (l) addBtn(nm.replace(/^臺北/, ''), l.x, l.z, l.nm);
   }
   for (const [nm, x, z] of west) addBtn(nm, x, z, nm);
+  if (bigmap) bigmap.areas = west;
 }
 $('btn-map').addEventListener('click', openMap);
 $('map-close').addEventListener('click', closeMap);
+$('map-in').addEventListener('click', () => bigmap?.setZoom(bigmap.zoom * 1.6));
+$('map-out').addEventListener('click', () => bigmap?.setZoom(bigmap.zoom / 1.6));
+$('map-all').addEventListener('click', () => bigmap?.showAll());
 $('map-clear').addEventListener('click', () => { nav = null; closeMap(); });
 addEventListener('keydown', (e) => { if (e.code === 'KeyM' && !e.repeat) { if (mapOpen) closeMap(); else openMap(); } });
 

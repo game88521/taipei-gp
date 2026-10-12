@@ -591,6 +591,8 @@ html:not(.touch) #btn-horn { display: none; }
 #map-page .map-side { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 190px; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: rgba(10, 12, 20, 0.85); }
 #map-marks { display: flex; flex-wrap: wrap; gap: 4px; }
 #map-marks button { padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); font-size: 12px; }
+#map-page .map-zoom { display: flex; gap: 4px; }
+#map-page .map-zoom button { flex: 1; padding: 6px 0; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); font-size: 14px; }
 #map-page .map-side .primary, #map-page .map-side .ghost-btn { padding: 8px; font-size: 14px; }
 #nav-hud {
   position: absolute;

@@ -49,6 +49,7 @@ export class BigMap {
       if (this.ptrs.size === 1) {
         this.cx -= (e.clientX - p.x) / this.zoom; this.cz -= (e.clientY - p.y) / this.zoom;
         this.moved += Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y);
+        this.clamp();
       }
       p.x = e.clientX; p.y = e.clientY;
       if (this.ptrs.size === 2) { const d = this.pinchDist(); if (this.pinch0) this.setZoom(this.zoom * (d / this.pinch0)); this.pinch0 = d; this.moved = 99; }
@@ -66,7 +67,24 @@ export class BigMap {
     c.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
   }
   private pinchDist() { const [a, b] = [...this.ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); }
-  setZoom(z: number) { this.zoom = Math.max(0.08, Math.min(3, z)); }
+  /** 右邊選單蓋住的寬度（px）：「看得到的畫面中心」要往左挪一半 */
+  side = 220;
+  areas: [string, number, number][] = [];
+  /** 剛好看得到整張地圖的縮放（西門町、淡水河那頭也在裡面） */
+  fitZoom() {
+    const W = Math.max(100, this.c.clientWidth - this.side), H = Math.max(100, this.c.clientHeight);
+    return 0.92 * Math.min(W / (this.x1 - this.x0), H / (this.z1 - this.z0));
+  }
+  setZoom(z: number) { this.zoom = Math.max(Math.min(0.08, this.fitZoom()), Math.min(3, z)); this.clamp(); }
+  /** 把（x, z）放到看得到的畫面正中間 */
+  focus(x: number, z: number) { this.cx = x + this.side / 2 / this.zoom; this.cz = z; this.clamp(); }
+  showAll() { this.zoom = this.fitZoom(); this.focus((this.x0 + this.x1) / 2, (this.z0 + this.z1) / 2); }
+  /** 別讓地圖被拖到畫面外面（拖丟了就找不回來） */
+  private clamp() {
+    const m = this.side / 2 / this.zoom;
+    this.cx = Math.max(this.x0, Math.min(this.x1 + m, this.cx));
+    this.cz = Math.max(this.z0, Math.min(this.z1, this.cz));
+  }
 
   draw(px: number, pz: number, h: number, dest: { x: number; z: number } | null, route: [number, number][] | null) {
     const c = this.c, g = this.g;
@@ -86,7 +104,15 @@ export class BigMap {
       if (x < -50 || y < -20 || x > W + 50 || y > H + 20) continue;
       g.fillStyle = '#ff8a1a';
       g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill();
-      if (this.zoom > 0.5 || m.r > 90) { g.fillStyle = '#f0e6d8'; g.fillText(m.nm, x, y - 6); }
+      if (this.zoom > 0.5 || (m.r > 90 && this.zoom > 0.1)) { g.fillStyle = '#f0e6d8'; g.fillText(m.nm, x, y - 6); }
+    }
+    // 區域名稱（西門町、台北車站…）：不在地標清單裡，縮小時也要看得到
+    g.font = 'bold 14px "Microsoft JhengHei","PingFang TC",sans-serif';
+    for (const [nm, ax, az] of this.areas) {
+      const x = sx(ax), y = sy(az);
+      if (x < -60 || y < -20 || x > W + 60 || y > H + 20) continue;
+      g.lineWidth = 3; g.strokeStyle = '#0c0e14'; g.strokeText(nm, x, y);
+      g.fillStyle = '#7fe6ff'; g.fillText(nm, x, y);
     }
     // 導航路線
     if (route && route.length > 1) {
