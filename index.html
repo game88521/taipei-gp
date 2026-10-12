@@ -63,6 +63,7 @@
       <button id="drs">DRS</button>
       <button id="pit" class="small-btn">進站</button>
       <div id="tyre"></div>
+      <div id="batt"></div>
       <button id="gas">油門</button>
       <div id="road"></div>
       <!-- 畫面上方的提示：載客、街頭比賽、通緝、導航，有幾個就由上往下排，不會疊在一起 -->
@@ -220,6 +221,10 @@
                 </label>
                 <label class="q">起跑輪胎
                   <select id="opt-tyre"><option value="0">軟胎</option><option value="1" selected>中性胎</option><option value="2">硬胎</option></select>
+                </label>
+                <label class="q">比賽規則
+                  <select id="opt-rules"><option value="classic">經典（DRS）</option><option value="2026">2026（主動空力＋超車模式）</option></select>
+                  <small>2026：直線區段大家都放平翼片；煞車回收電力、加速放電，前車 1 秒內可以開「超車」多放電</small>
                 </label>
                 <label class="sw">影子車（計時賽）<input type="checkbox" id="opt-ghost" /></label>
               </fieldset>

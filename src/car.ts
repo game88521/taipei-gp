@@ -17,6 +17,11 @@ export class Car {
   boost = 0; // 尾流加成
   drs = false; // DRS 打開：尾翼襟翼放平、極速提高
   gripMul = 1; // 輪胎抓地力（胎種 × 磨耗）
+  // 2026 規則：沒有 DRS，改成主動空力（直線區段大家都放平翼片）＋電池＋超車模式
+  r26 = false;
+  aeroZone = false; // 在直線模式區段裡
+  ovt = false; // 超車模式：多放電
+  energy = 1; // 電池 0~1
   pos: Locate = { i: 0, lat: 0, s: 0 };
   private hitCool = 0;
 
@@ -37,7 +42,19 @@ export class Car {
 
     const v = this.v;
     if (brake) this.drs = false; // 一踩煞車 DRS 就關
-    const p = this.power + this.boost + (this.drs ? 0.08 : 0);
+    let p = this.power + this.boost + (this.drs ? 0.08 : 0);
+    if (this.r26) {
+      // 直線模式：翼片放平少風阻（大家都有）；電力：踩油門放電、煞車回收；超車模式多放一截，電用完直線就變慢
+      p = this.power + this.boost + (this.aeroZone && !brake ? 0.05 : 0);
+      if (brake) { this.energy = Math.min(1, this.energy + 0.09 * Math.min(1, v / 40) * dt); this.ovt = false; }
+      else if (v > 25 && this.energy > 0) {
+        let drain = 0.016; // 一圈（約 54 秒、煞車約 8 秒回收）大致收支平衡
+        p += 0.03;
+        if (this.ovt) { p += 0.07; drain += 0.06; } // 一個直線區開一次超車模式約用掉 4 成電
+        this.energy = Math.max(0, this.energy - drain * dt);
+      } else if (this.energy <= 0 && v > 25) p -= 0.02; // 沒電：引擎得分一部分力去發電
+      if (this.energy <= 0) this.ovt = false;
+    }
     let a = brake ? -BRAKE * Math.min(1, v / 2) : ENGINE * p * (1 - (v / (VMAX * p)) ** 2);
     a -= 0.4; // 滾動阻力
     a -= Math.abs(this.steer) * (v / VMAX) * 5; // 打滿方向會磨胎掉速

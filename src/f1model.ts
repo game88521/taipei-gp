@@ -254,4 +254,8 @@ export const TEAMS: { team: string; livery: F1Livery }[] = [
   { team: '天藍粉 Azure Pink', livery: { main: '#0a78d4', accent: '#ff87bc', accent2: '#0a0a0a', helmet: '#ff87bc', number: 10, tyre: '#ffffff' } },
   { team: '海軍藍 Navy Grid', livery: { main: '#0b2a5a', accent: '#00a3e0', accent2: '#ffffff', helmet: '#00a3e0', number: 23, tyre: '#ffffff' } },
   { team: '螢光綠 Neon Speed', livery: { main: '#151515', accent: '#52e252', accent2: '#52e252', helmet: '#52e252', number: 27, tyre: '#ffd400' } },
+  // 2026 起 11 隊 22 台車
+  { team: '雪白 White Stallion', livery: { main: '#f2f2f2', accent: '#c8102e', accent2: '#1a1a1a', helmet: '#c8102e', number: 31, tyre: '#ffffff' } },
+  { team: '鈦灰 Titan Grey', livery: { main: '#5a5f66', accent: '#e8002d', accent2: '#c0c0c0', helmet: '#e8002d', number: 5, tyre: '#ffd400' } },
+  { team: '星夜黑 Midnight Star', livery: { main: '#101014', accent: '#d4af37', accent2: '#ffffff', helmet: '#d4af37', number: 11, tyre: '#e10600' } },
 ];

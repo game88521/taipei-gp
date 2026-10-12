@@ -725,12 +725,29 @@ html:not(.touch) #btn-horn { display: none; }
   font: 700 13px var(--mono);
 }
 #tyre.worn { animation: blink 0.8s steps(2) infinite; }
+/* 2026 規則：電池電量（在胎況下面） */
+#batt {
+  position: absolute;
+  left: calc(max(10px, env(safe-area-inset-left)) + 180px);
+  top: calc(max(10px, env(safe-area-inset-top)) + 152px);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(47, 224, 122, 0.45) var(--e, 100%), rgba(10, 12, 20, 0.7) var(--e, 100%));
+  border: 2px solid #2fe07a;
+  font: 700 13px var(--mono);
+}
+#batt.boost { border-color: #8ff0ff; background: linear-gradient(90deg, rgba(80, 200, 255, 0.6) var(--e, 100%), rgba(10, 12, 20, 0.7) var(--e, 100%)); }
+#batt.low { border-color: #ff5a4a; animation: blink 0.8s steps(2) infinite; }
+#hud[data-mode='free'] #batt { display: none !important; }
+#board li.hide { display: none; }
+#results .card { max-height: 92vh; overflow-y: auto; }
 #hud[data-mode='free'] #drs, #hud[data-mode='free'] #pit, #hud[data-mode='free'] #tyre { display: none; }
 #hud[data-kind='tt'] #pit, #hud[data-kind='tt'] #tyre { display: none; }
 html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 20px); }
 @media (max-height: 480px) {
   #drs, #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px); height: 44px; }
   #tyre { top: calc(max(10px, env(safe-area-inset-top)) + 106px); left: calc(max(10px, env(safe-area-inset-left)) + 150px); }
+  #batt { top: calc(max(10px, env(safe-area-inset-top)) + 134px); left: calc(max(10px, env(safe-area-inset-left)) + 150px); font-size: 12px; }
 }
 #replay-ui {
   position: fixed;

@@ -43,16 +43,15 @@ export interface Racer {
   stuck: number;
 }
 
-// 虛構車手；[過彎抓地力用到幾成, 煞車減速度 m/s², 引擎力]（越前面越強）
-const DRIVERS: [string, number, number, number][] = [
-  ['陳冠宇', 0.985, 36.5, 1.025],
-  ['林志豪', 0.98, 36, 1.02],
-  ['王柏翰', 0.975, 35.5, 1.015],
-  ['張家瑋', 0.97, 35, 1.01],
-  ['李承恩', 0.965, 34.5, 1.005],
-  ['黃子軒', 0.96, 34, 1.0],
-  ['吳俊傑', 0.955, 33.5, 0.995],
+// 虛構車手：11 隊 22 台（2026 起的規模），玩家在第 0 隊，隊友是李承恩
+// [名字, 車隊（TEAMS 索引）]；能力照排列順序由強到弱：過彎抓地力用到幾成、煞車減速度 m/s²、引擎力
+const DRIVERS: [string, number][] = [
+  ['陳冠宇', 1], ['林志豪', 3], ['王柏翰', 2], ['張家瑋', 1], ['李承恩', 0], ['黃子軒', 2], ['吳俊傑', 3],
+  ['劉宇翔', 4], ['蔡明哲', 5], ['楊凱文', 4], ['許書豪', 6], ['鄭宇辰', 5], ['謝承翰', 7], ['郭彥廷', 6],
+  ['洪志明', 8], ['曾柏宇', 7], ['邱冠廷', 9], ['廖哲瑋', 8], ['賴俊宏', 10], ['周家豪', 9], ['葉子豪', 10],
 ];
+const skill = (k: number): [number, number, number] => [0.985 - k * 0.002, 36.5 - k * 0.2, 1.025 - k * 0.002];
+export type Rules = 'classic' | '2026';
 
 export const PLAYER_LIVERY = TEAMS[0].livery;
 
@@ -61,6 +60,7 @@ export class RaceField {
   raceTime = 0;
   laps = LAPS;
   ttMode = false; // 計時賽：DRS 不用偵測前車
+  rules: Rules = 'classic'; // 2026：主動空力＋電池＋超車模式（偵測點、區段沿用 DRS 的）
   drsZones: DrsZone[] = [];
   private recAcc = 0;
   private line: Float32Array; // 每個取樣點的賽車線橫向位置（右正）
@@ -71,9 +71,10 @@ export class RaceField {
     const lineScale = Number(new URLSearchParams(location.search).get('line') ?? 1); // 測試用：賽車線幅度
     this.line = racingLine(t).map((v) => v * lineScale);
     const qs = new URLSearchParams(location.search), gOv = qs.get('g'), bOv = qs.get('b'); // 測試用：覆寫第一台的參數
-    DRIVERS.forEach(([name, grip0, brake0, power], k) => {
+    DRIVERS.forEach(([name, ti], k) => {
+      const [grip0, brake0, power] = skill(k);
       const grip = k === 0 && gOv ? Number(gOv) : grip0, brake = k === 0 && bOv ? Number(bOv) : brake0;
-      const { team, livery } = TEAMS[k + 1];
+      const { team, livery } = TEAMS[ti];
       const model = makeF1(livery);
       model.root.userData.dynamic = true; // 投射即時陰影
       model.root.visible = false;
@@ -117,6 +118,9 @@ export class RaceField {
       r.compound = r.isPlayer ? playerCompound : laps <= 3 ? (rnd() < 0.7 ? 0 : 1) : rnd() < 0.5 ? 1 : rnd() < 0.5 ? 0 : 2;
       r.car.drs = false;
       r.car.gripMul = TYRES[r.compound].grip;
+      r.car.r26 = this.rules === '2026';
+      r.car.energy = 1;
+      r.car.ovt = false;
     }
     const order = this.racers.filter((r) => !r.isPlayer);
     const player = this.racers.find((r) => r.isPlayer)!;
@@ -182,7 +186,8 @@ export class RaceField {
         continue;
       }
       const zi = this.drsZoneAt(c.pos.s);
-      if (zi < 0) c.drs = false;
+      if (zi < 0) { c.drs = false; c.ovt = false; }
+      c.aeroZone = zi >= 0;
       for (const z of this.drsZones) {
         // 經過偵測點：前車 1 秒內（或計時賽）→ 這個區可以開 DRS
         const d = c.pos.s - z.det;
@@ -196,8 +201,8 @@ export class RaceField {
       if (!racing || r.pitTimer > 0) { if (!racing) c.update(dt, t, 0, true); continue; } // 起跑前停在格位、進站中停住
       const prevS = c.pos.s;
       const { steer, brake } = this.drive(r, r.finish != null);
-      // AI：可以開 DRS 就開；輪胎磨太多、還有兩圈以上就準備進站
-      if (r.drsOk && this.drsZoneAt(c.pos.s) >= 0 && !brake) c.drs = true;
+      // AI：可以開 DRS 就開（2026：超車模式，電還夠才開）；輪胎磨太多、還有兩圈以上就準備進站
+      if (r.drsOk && this.drsZoneAt(c.pos.s) >= 0 && !brake) { if (this.rules === '2026') { if (c.energy > 0.25) c.ovt = true; } else c.drs = true; }
       if (!r.pitReq && r.wear > 0.7 && this.laps - r.laps >= 1 && r.finish == null) r.pitReq = true;
       if (c.update(dt, t, steer, brake) > 0) this.aiHits++;
       this.lapCheck(r, prevS);
@@ -277,7 +282,11 @@ export class RaceField {
   /** 玩家：申請 DRS（可以開才會開）、申請下次過線進站 */
   playerDrs(): boolean {
     const me = this.racers.find((r) => r.isPlayer)!;
-    if (me.drsOk && this.drsZoneAt(me.car.pos.s) >= 0) { me.car.drs = true; return true; }
+    if (me.drsOk && this.drsZoneAt(me.car.pos.s) >= 0) {
+      if (this.rules === '2026') { if (me.car.energy > 0.1) { me.car.ovt = true; return true; } return false; }
+      me.car.drs = true;
+      return true;
+    }
     return false;
   }
   playerPit() {

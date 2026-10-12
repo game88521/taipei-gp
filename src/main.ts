@@ -364,7 +364,7 @@ function applyOpts() {
 }
 applyOpts();
 // 正賽的圈數與起跑胎（記在存檔裡）
-for (const id of ['opt-laps', 'opt-tyre'] as const) {
+for (const id of ['opt-laps', 'opt-tyre', 'opt-rules'] as const) {
   const el = $<HTMLSelectElement>(id);
   const v = (save.opts as Record<string, unknown>)[id];
   if (typeof v === 'string') el.value = v;
@@ -483,11 +483,12 @@ function step(dt: number) {
   const prevS = car.pos.s;
   // DRS：計時賽在 DRS 區隨時可開；正賽要在偵測點落後前車 1 秒內
   const zone = field.drsZoneAt(car.pos.s);
-  if (zone < 0) car.drs = false;
+  if (zone < 0) { car.drs = false; car.ovt = false; }
+  car.aeroZone = zone >= 0; // 2026：直線模式區段
   if (BOT) { drsPress = true; if (raceKind === 'gp' && field.me.wear > 0.7 && !field.me.pitReq && field.laps - field.me.laps >= 1) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
   if (drsPress) {
     drsPress = false;
-    if (raceKind === 'tt' && zone >= 0) car.drs = true;
+    if (raceKind === 'tt' && zone >= 0) { if (car.r26) { if (car.energy > 0.1) car.ovt = true; } else car.drs = true; }
     else if (raceKind === 'gp') field.playerDrs();
   }
   if (pitPress) { pitPress = false; if (raceKind === 'gp') toast(field.playerPit() ? '🔧 這圈結束進站' : '取消進站', ''); }
@@ -859,13 +860,20 @@ function updateCountdown(dt: number) {
 
 function beginCountdown() {
   resetRace();
+  // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
+  field.rules = (new URLSearchParams(location.search).get('rules') ?? $<HTMLSelectElement>('opt-rules').value) === '2026' ? '2026' : 'classic';
+  hud.dataset.rules = field.rules;
+  $('drs').textContent = field.rules === '2026' ? '超車' : 'DRS';
   if (raceKind === 'gp') {
-    field.setup(5, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value); // 玩家從第 6 格起跑
+    field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value); // 22 台車，玩家從第 10 格起跑
     field.ttMode = false;
     $('lap').textContent = `0/${field.laps}`;
   } else { field.hide(); field.ttMode = true; }
   car.drs = false;
   car.gripMul = 1;
+  car.r26 = field.rules === '2026';
+  car.energy = 1;
+  car.ovt = false;
   hud.dataset.kind = raceKind;
   countdown = 0;
   litShown = 0;
@@ -1073,7 +1081,7 @@ function updateGpHud() {
   st.forEach((r, k) => {
     const li = document.createElement('li');
     if (r.isPlayer) li.className = 'me';
-    else if (k !== 0 && Math.abs(k - me) > 1) li.className = 'far'; // 矮螢幕只列領先者、前後一名（style.css）
+    else if (k !== 0 && Math.abs(k - me) > 1) li.className = k > 2 && Math.abs(k - me) > 2 ? 'far hide' : 'far'; // 矮螢幕只列領先者、前後一名；22 台時大螢幕也只列前三名＋前後兩名（style.css）
     const sw = document.createElement('i');
     sw.style.background = r.color;
     const nm = document.createElement('span');
@@ -1204,8 +1212,17 @@ addEventListener('keydown', (e) => {
 });
 function updateDrsButton() {
   const el = $('drs'), zone = field.drsZoneAt(car.pos.s) >= 0;
-  const ready = zone && (raceKind === 'tt' || field.me.drsOk);
-  el.className = car.drs ? 'on' : ready ? 'ready' : '';
+  const ready = zone && (raceKind === 'tt' || field.me.drsOk) && (!car.r26 || car.energy > 0.1);
+  el.className = car.drs || car.ovt ? 'on' : ready ? 'ready' : '';
+  // 2026：電池電量
+  const b = $('batt');
+  b.style.display = car.r26 ? '' : 'none';
+  if (car.r26) {
+    const pct = Math.round(car.energy * 100);
+    b.textContent = `${car.ovt ? '⚡' : '🔋'} ${pct}%`;
+    b.className = pct < 15 ? 'low' : car.ovt ? 'boost' : '';
+    b.style.setProperty('--e', `${pct}%`);
+  }
 }
 
 // ---------------------------------------------------------------- 計程車任務
@@ -1896,4 +1913,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; } };
