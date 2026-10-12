@@ -1021,6 +1021,10 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-keys b { color: #fff; font-size: 13px; letter-spacing: 2px; }
 #menu #btn-reset-best { padding: 4px 0; color: rgba(255, 255, 255, 0.4); }
 
+/* 自由駕駛：不要從上次的位置、改從 101 出發 */
+#menu .m-free-reset { grid-column: 1 / -1; justify-self: end; margin-top: -6px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+#menu .m-free-reset[hidden] { display: none; }
+
 /* ---- 賽道選擇、賽道資訊 */
 #menu .m-circuit { margin-bottom: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--m-line); background: var(--m-glass); }
 #menu .m-circuit label { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: 2px; color: var(--muted); }

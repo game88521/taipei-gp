@@ -165,7 +165,10 @@ async function loadCircuitScene() {
   if (state === 'menu') showMenu(false);
   bootDone();
 }
-const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz: track.pz[0] }).then(async (c) => {
+// 自由駕駛上次停在哪（save.freePos）：開場先載入那一帶的街景，一進自由駕駛四周就有房子
+const START_POS = !new URLSearchParams(location.search).has('bot') && validFreePos(save.freePos) ? save.freePos! : null;
+function validFreePos(p: { x: number; z: number; h: number } | undefined) { return !!p && [p.x, p.z, p.h].every(Number.isFinite) && Math.abs(p.x) < 20000 && Math.abs(p.z) < 20000; }
+const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all: ALL_TILES, cx: START_POS?.x ?? track.px[0], cz: START_POS?.z ?? track.pz[0] }).then(async (c) => {
   await stage('建立碰撞與路網', 0.76);
   collider = c.collider;
   cityStream = c.stream;
@@ -1101,6 +1104,7 @@ function showMenu(paused: boolean) {
     b.disabled = !cityReady;
     b.style.display = cityReady ? '' : 'none';
   }
+  $('free-reset').hidden = !!CIRCUIT || !validFreePos(save.freePos) || !cityReady; // 有記住的位置才顯示「從 101 出發」
   // 各國賽道：沒有城市，自由駕駛、計程車、街頭對決不能玩
   if (CIRCUIT) for (const id of ['btn-free', 'btn-taxi', 'btn-duel']) $(id).style.display = 'none';
   $('menu-best').textContent = save.best != null ? `${CIRCUIT ? CIRCUIT.name : '街道賽'}最快圈 ${fmt(save.best)}` : '';
@@ -1578,6 +1582,12 @@ $('btn-taxi').addEventListener('click', async () => {
   toast('🚕 出車囉！到綠色光柱載乘客', '');
 });
 
+$('free-reset').addEventListener('click', async () => {
+  delete save.freePos;
+  writeSave();
+  $('free-reset').hidden = true;
+  $('btn-free').click();
+});
 $('btn-free').addEventListener('click', async () => {
   await userStart();
   if (!save.tutDone && !BOT) showTut(0);
@@ -1596,6 +1606,7 @@ $('btn-resume').addEventListener('click', async () => {
 let pausedFrom: State = 'race';
 function pause() {
   if (state !== 'race' && state !== 'countdown' && state !== 'free') return;
+  if (state === 'free') saveFreePos();
   pausedFrom = state;
   state = 'paused';
   sound.engine(0, 0, false);
@@ -1840,9 +1851,11 @@ function srBot() {
 // ---------------------------------------------------------------- 自由駕駛
 let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
 function beginFree() {
-  // 從 101 前的信義路出發
-  fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
+  // 從上次停的地方出發（沒有就從 101 前的信義路）；測試一律從起點，結果才可重現
+  const p = !BOT && validFreePos(save.freePos) ? save.freePos! : null;
+  if (p) fcar.place(p.x, p.z, p.h); else fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
   unstick(); // 對齊到真實車道中心
+  if (p && roadNet) { const w = roadNet.nearestNamed(fcar.x, fcar.z, 60); toast(`📍 從上次的位置出發${w?.nm ? `：${w.nm}` : ''}`, ''); }
   camSnap = true;
   state = 'free';
   roadShown = '';
@@ -1881,7 +1894,16 @@ let heavyAcc = 0, heliAcc = 0;
 function streetRacing() {
   return mode === 'free' && !!sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer';
 }
+let posSaveAcc = 0;
+/** 記下自由駕駛的位置（下次從這裡出發） */
+function saveFreePos() {
+  if (BOT || CIRCUIT || mode !== 'free' || !Number.isFinite(fcar.x)) return;
+  save.freePos = { x: Math.round(fcar.x * 10) / 10, z: Math.round(fcar.z * 10) / 10, h: Math.round(fcar.h * 1000) / 1000 };
+  writeSave();
+}
 function freeStep(dt: number) {
+  posSaveAcc += dt;
+  if (posSaveAcc > 5) { posSaveAcc = 0; saveFreePos(); }
   fcar.spec = streetRacing() ? DEFAULT_SPEC : damage.speedMul < 1 ? { ...chosen.spec, vmax: chosen.spec.vmax * damage.speedMul } : chosen.spec;
   if (PURSUIT_TEST && police && !police.suspect && policeLog.length === 0) startPursuit();
   if (HONK_TEST && traffic && FREE_SIM) {
