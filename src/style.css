@@ -1210,3 +1210,16 @@ html:not(.touch) #radio { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 
   #podium-ui h2 { font-size: 15px; margin-bottom: 4px; }
   #podium-names b { font-size: 17px; }
 }
+
+/* ================= 賽季模式 ================= */
+#menu .m-season { margin-bottom: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(242, 193, 78, 0.4); background: linear-gradient(135deg, rgba(242, 193, 78, 0.14), rgba(242, 193, 78, 0.03)); font-size: 14px; }
+#menu .m-season[hidden] { display: none; }
+#menu .m-season b { color: #f2c14e; font-size: 15px; letter-spacing: 1px; }
+#season-page { z-index: 6; }
+#season-page .card { max-height: 92vh; overflow-y: auto; }
+.season-table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 13px; }
+.season-table th { color: var(--muted); font-weight: 600; font-size: 12px; text-align: left; padding: 4px 6px; }
+.season-table td { padding: 4px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+.season-table td:nth-child(4) { font: 800 14px var(--mono); color: #f2c14e; }
+.season-table tr.me td { background: rgba(225, 6, 0, 0.35); }
+#season-res h3 { margin: 4px 0; font-size: 15px; color: #f2c14e; }

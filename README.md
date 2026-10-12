@@ -193,6 +193,12 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 高低起伏：`node tools/fetch-elevation.mjs` 沿賽道每 40 m 查 SRTM 30 m 海拔（OpenTopoData），平滑、限制坡度後寫進中心線的 `elev`；
 路面、護牆、車子、鏡頭跟著高度走，上坡掉速、下坡加速，周圍地形照賽道高度長出來（斯帕高低差約 100 m、史匹堡 57 m、摩納哥 47 m）。
 
+### 賽季模式
+
+選單「賽季模式」照 2026 賽曆 23 站一站一站比（每站帶 `?circuit=…&season=1` 重新載入），名次照 F1 計分（25-18-15-12-10-8-6-4-2-1）
+累積車手與車隊積分（`src/season.ts`，進度存在 `save.season`）。賽後成績表下面顯示積分榜與「下一站」；賽季中同一站不能重比。
+「紀錄」分頁有完整積分榜、可以重新開始賽季。測試：`?circuit=australia&season=1&bot&gp&sim=420`（沒有賽季存檔時直接從這一站開始）。
+
 ### 賽道資料
 
 `node tools/probe-circuits.mjs` 下載 2026 賽曆 23 條賽道附近的 OSM 賽道資料（快取 `tools/circuits-cache/`，不進 git），

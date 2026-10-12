@@ -114,6 +114,7 @@
               <div id="menu-best"></div>
             </header>
             <div id="load"><i id="load-bar"></i></div>
+            <div id="season-banner" class="m-season" hidden></div>
             <div class="m-circuit">
               <label>賽道<select id="circuit-pick"></select></label>
               <div id="circuit-info"></div>
@@ -140,6 +141,10 @@
               <button id="btn-start" class="m-mode tt">
                 <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5" /><path d="M12 9.5v4l2.6 2.4M9.5 2.8h5M18.6 6.4l1.5-1.5" /></svg></span>
                 <span class="m-txt"><b>計時賽</b><small>單圈挑戰最快圈</small></span>
+              </button>
+              <button id="btn-season" class="m-mode gold season">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5.2a3 3 0 0 0 2.9 4M16 6h2.8a3 3 0 0 1-2.9 4M12 13v4M8.5 21h7M10 17h4" /></svg></span>
+                <span class="m-txt"><b>賽季模式</b><small id="season-sub">2026 賽曆 23 站 · 累積車手與車隊積分</small></span>
               </button>
             </div>
             <div id="m-install" class="m-install" hidden>
@@ -254,6 +259,10 @@
                 <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg></span>
                 <span class="m-txt"><b>線上排行榜</b><small>計時賽最快圈</small></span>
               </button>
+              <button id="btn-season-table" class="m-mode gold">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></span>
+                <span class="m-txt"><b>賽季積分榜</b><small>車手與車隊積分</small></span>
+              </button>
               <button id="btn-tut" class="m-mode">
                 <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15z" /><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5M8.5 7.5h7M8.5 11h5" /></svg></span>
                 <span class="m-txt"><b>操作教學</b><small>一步步看怎麼玩</small></span>
@@ -289,10 +298,26 @@
       <button id="podium-skip" class="ghost-btn">查看成績 ›</button>
     </div>
 
+    <div id="season-page" class="overlay hidden">
+      <div class="card wide">
+        <h1 id="season-title">2026 賽季</h1>
+        <p class="sub" id="season-page-sub"></p>
+        <h3>車手積分</h3>
+        <table id="season-drivers" class="season-table"></table>
+        <h3>車隊積分</h3>
+        <table id="season-teams" class="season-table"></table>
+        <button id="season-continue" class="primary">繼續賽季</button>
+        <button id="season-reset" class="ghost-btn">重新開始賽季</button>
+        <button id="season-close" class="ghost-btn">關閉</button>
+      </div>
+    </div>
+
     <div id="results" class="overlay hidden">
       <div class="card wide">
         <h1 id="res-title">比賽結果</h1>
         <table id="res-table"></table>
+        <div id="season-res" hidden><h3 id="season-res-title"></h3><table id="season-res-table" class="season-table"></table></div>
+        <button id="btn-next-round" class="primary" style="display: none">下一站 ›</button>
         <button id="btn-again" class="primary">再比一次</button>
         <button id="btn-replay" class="ghost-btn">🎬 觀看回放</button>
         <button id="btn-menu" class="ghost-btn">回選單</button>
