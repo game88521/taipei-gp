@@ -43,4 +43,5 @@ function serviceWorker(): Plugin {
 
 export default defineConfig({
   plugins: [serviceWorker()],
+  build: { target: 'es2022' }, // main.ts 用 top-level await 先讀各國賽道的中心線
 });

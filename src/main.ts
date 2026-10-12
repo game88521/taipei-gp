@@ -7,6 +7,8 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, VMAX } from './track';
 import { buildWorld } from './world';
 import { GaragePreview } from './garage3d';
+import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
+import { buildCircuitEnv } from './circuitenv';
 import { setupInstall } from './install';
 import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
@@ -73,8 +75,11 @@ $('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
-const track = buildTrack();
-const world = buildWorld(scene, track);
+// 各國賽道（?circuit=suzuka）：先讀中心線再建賽道；不載入台北街景，改成通用的賽道場景（circuitenv.ts）
+const circuitData = await loadCircuitData();
+const track = circuitData ? buildTrack(circuitData.points) : buildTrack();
+const world = buildWorld(scene, track, CIRCUIT?.banner);
+let circuitEnv: { center: THREE.Vector3; extent: number } | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
 // 陰影：只涵蓋玩家周圍（每幀跟著移動），範圍越小越清楚
 {
@@ -130,7 +135,27 @@ onProgress((label, f) => {
 });
 // 自動測試（?sim）是同步模擬，等不到背景載入：一次載入全部區塊（?alltiles 也可以）
 const ALL_TILES = new URLSearchParams(location.search).has('sim') || new URLSearchParams(location.search).has('alltiles');
-const cityLoad = loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz: track.pz[0] }).then(async (c) => {
+/** 賽道模式：蓋場景、準備畫面（跟台北街景載完之後同一套：陰影旗標、天氣、著色器先編好） */
+async function loadCircuitScene() {
+  await stage('蓋賽道場景', 0.4);
+  circuitEnv = buildCircuitEnv(scene, track, CIRCUIT!, world.ground);
+  await stage('準備畫面', 0.9);
+  applyShadowFlags();
+  weather.collect();
+  applyWeather();
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+  try { await renderer.compileAsync(scene, camera); } catch { /* 不支援就照舊第一次畫時編 */ }
+  for (const o of hidden) o.visible = false;
+  holdRender = false;
+  await stage('完成', 1);
+  $('load-bar').parentElement!.style.display = 'none';
+  refreshGarage();
+  cityReady = true;
+  if (state === 'menu') showMenu(false);
+  bootDone();
+}
+const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all: ALL_TILES, cx: track.px[0], cz: track.pz[0] }).then(async (c) => {
   await stage('建立碰撞與路網', 0.76);
   collider = c.collider;
   cityStream = c.stream;
@@ -238,7 +263,8 @@ const weather = new Weather(scene, world, Q.level === 'high' ? 3000 : Q.level ==
   weather.headlights.push(h);
 }
 const TIMES = Object.keys(TIME_NAME) as TimeKind[];
-let timeKind: TimeKind = TIMES.includes(new URLSearchParams(location.search).get('time') as TimeKind) ? new URLSearchParams(location.search).get('time') as TimeKind : TIMES.includes(save.time as TimeKind) ? save.time as TimeKind : 'dusk';
+// 各國賽道照那一站的時段（新加坡、拉斯維加斯、卡達是夜賽、阿布達比黃昏）
+let timeKind: TimeKind = TIMES.includes(new URLSearchParams(location.search).get('time') as TimeKind) ? new URLSearchParams(location.search).get('time') as TimeKind : CIRCUIT ? CIRCUIT.time : TIMES.includes(save.time as TimeKind) ? save.time as TimeKind : 'dusk';
 // 自動日夜循環：從白天開始（cycleT 秒），每 0.25 秒漸變一次；環境反射只在每段開始時重做（很花時間）
 let cycleT = +(new URLSearchParams(location.search).get('cyclet') ?? 0), cycleAcc = 0, cycleSeg = -1; // 測試：&cyclet=520 直接跳到循環第 520 秒
 let envFor = 'dusk'; // 環境反射目前是照哪個時段做的（開場的 buildEnv() 是黃昏）
@@ -437,7 +463,7 @@ function completeLap() {
     save.ghost = rec;
     $('best').textContent = fmt(t);
     toast(first ? `完成第一圈！${fmt(t)}` : `最快圈！${fmt(t)}`, 'purple');
-    if (!BOT) void submitLap(t); // 新的最快圈：上傳線上排行榜
+    if (!BOT && !CIRCUIT) void submitLap(t); // 新的最快圈：上傳線上排行榜（只收台北信義街道賽）
   } else {
     toast(`${fmt(t)}（${fmtDelta(t - save.best)}）`, '');
   }
@@ -678,7 +704,8 @@ let menuT = 0;
 function menuCamera(dt: number) {
   menuT += dt;
   const shot = MENU_CAM_FIX != null ? +MENU_CAM_FIX : Math.floor(menuT / SHOT_LEN) % 4, u = (menuT % SHOT_LEN) / SHOT_LEN;
-  const T = TOWER_101, N = track.N;
+  const N = track.N, T = circuitEnv ? { x: circuitEnv.center.x, z: circuitEnv.center.z } : TOWER_101;
+  const big = circuitEnv ? circuitEnv.extent : 0; // 各國賽道：繞整條賽道拍（沒有 101）
   // 賽道上第 i 點（可以是小數）
   const at = (i: number) => { const k = ((Math.floor(i) % N) + N) % N, j = (k + 1) % N, f = i - Math.floor(i); return [track.px[k] + (track.px[j] - track.px[k]) * f, track.pz[k] + (track.pz[j] - track.pz[k]) * f]; };
   const ds = Math.hypot(track.px[1] - track.px[0], track.pz[1] - track.pz[0]) || 2; // 取樣間距
@@ -691,15 +718,22 @@ function menuCamera(dt: number) {
     fov = 58;
   } else if (shot === 1) {
     // 環繞 101：高空慢慢繞
-    const a = 2.2 + u * 0.55, R = 560;
-    camera.position.set(T.x + Math.cos(a) * R, 150, T.z + Math.sin(a) * R);
-    camera.lookAt(T.x, 170, T.z);
+    const a = 2.2 + u * 0.55, R = big ? big * 0.6 : 560;
+    camera.position.set(T.x + Math.cos(a) * R, big ? big * 0.28 : 150, T.z + Math.sin(a) * R);
+    camera.lookAt(T.x, big ? 0 : 170, T.z);
     fov = 46;
   } else if (shot === 2) {
     // 101 從低空斜看：一邊慢慢升高、一邊繞一點（仰角不要太大，會看到天空球頂）
-    const a = 4.0 + u * 0.3, R = 680;
-    camera.position.set(T.x + Math.cos(a) * R, 30 + u * 40, T.z + Math.sin(a) * R);
-    camera.lookAt(T.x, 210, T.z);
+    if (big) {
+      // 主看台、維修區那段直線：從賽道外側斜看起跑線
+      const i0 = 0, a = 0.6 + u * 0.5;
+      camera.position.set(track.px[i0] + Math.cos(a) * 90, 22, track.pz[i0] + Math.sin(a) * 90);
+      camera.lookAt(track.px[i0], 2, track.pz[i0]);
+    } else {
+      const a = 4.0 + u * 0.3, R = 680;
+      camera.position.set(T.x + Math.cos(a) * R, 30 + u * 40, T.z + Math.sin(a) * R);
+      camera.lookAt(T.x, 210, T.z);
+    }
     fov = 48;
   } else {
     // 沿賽道高空飛越，看前方的路
@@ -720,7 +754,7 @@ function updateVisuals(dt: number) {
   for (const p of playerCars.values()) p.model.root.visible = !f1Look && p === pv;
   if (pv.taxiSign) pv.taxiSign.visible = taxiOn(); // 開別台車載客：車頂加 TAXI 燈箱
   pv.tick(performance.now() / 1000);
-  world.race.visible = mode === 'race';
+  world.race.visible = mode === 'race' || !!CIRCUIT; // 各國賽道：選單時也看得到賽道
   if (traffic) {
     traffic.visible = mode === 'free';
     if (mode === 'free') traffic.render(dt);
@@ -1021,6 +1055,28 @@ function menuTab(t: string) {
   document.querySelector('.m-main')?.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.addEventListener('click', () => menuTab(b.dataset.tab!));
+// 賽道：台北信義街道賽＋2026 賽曆 23 站；換賽道＝帶 ?circuit= 重新載入
+{
+  const sel = $<HTMLSelectElement>('circuit-pick');
+  const opt = (v: string, text: string) => { const o = document.createElement('option'); o.value = v; o.textContent = text; sel.appendChild(o); };
+  opt('', '🇹🇼 台北街道賽｜信義區真實街道');
+  CIRCUITS.forEach((c, k) => opt(c.id, `${String(k + 1).padStart(2, '0')} ${c.flag} ${c.gp}｜${c.name}`));
+  sel.value = CIRCUIT?.id ?? '';
+  sel.addEventListener('change', () => { location.search = sel.value ? `?circuit=${sel.value}` : ''; });
+  const info = $('circuit-info');
+  if (CIRCUIT && circuitData) {
+    const f = circuitData.info, rec = f.lapRecord;
+    info.innerHTML = '';
+    const line = (k: string, v: string) => { const d = document.createElement('div'); const b = document.createElement('small'); b.textContent = k; const e = document.createElement('b'); e.textContent = v; d.append(b, e); info.appendChild(d); };
+    line('地點', CIRCUIT.place);
+    line('長度', `${(f.lengthKm ?? circuitData.lengthM / 1000).toFixed(3)} km`);
+    line('彎道', f.turns != null ? `${f.turns} 個・${circuitData.direction === 'clockwise' ? '順時針' : '逆時針'}` : '—');
+    line('首屆大獎賽', f.firstGp != null ? String(f.firstGp) : '—');
+    if (rec) line('單圈紀錄', `${rec.time}（${rec.driver}，${rec.year}）`);
+    if (f.corners?.length) line('知名彎道', f.corners.slice(0, 4).join('、'));
+    document.querySelector('[data-pane="play"] .m-eyebrow')!.textContent = `${CIRCUIT.flag} ${CIRCUIT.gp} · ${CIRCUIT.place}`;
+  } else info.style.display = 'none';
+}
 if (!BOT) setupInstall($('m-install')); // 「加到主畫面」提示（install.ts）
 function showMenu(paused: boolean) {
   $('menu-best').textContent = save.best != null ? `街道賽最快圈 ${fmt(save.best)}` : '';
@@ -1034,6 +1090,9 @@ function showMenu(paused: boolean) {
     b.disabled = !cityReady;
     b.style.display = cityReady ? '' : 'none';
   }
+  // 各國賽道：沒有城市，自由駕駛、計程車、街頭對決不能玩
+  if (CIRCUIT) for (const id of ['btn-free', 'btn-taxi', 'btn-duel']) $(id).style.display = 'none';
+  $('menu-best').textContent = save.best != null ? `${CIRCUIT ? CIRCUIT.name : '街道賽'}最快圈 ${fmt(save.best)}` : '';
   menu.classList.remove('hidden');
   hud.classList.add('hidden');
 }

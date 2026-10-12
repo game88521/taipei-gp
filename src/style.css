@@ -1021,6 +1021,15 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-keys b { color: #fff; font-size: 13px; letter-spacing: 2px; }
 #menu #btn-reset-best { padding: 4px 0; color: rgba(255, 255, 255, 0.4); }
 
+/* ---- 賽道選擇、賽道資訊 */
+#menu .m-circuit { margin-bottom: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--m-line); background: var(--m-glass); }
+#menu .m-circuit label { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: 2px; color: var(--muted); }
+#menu #circuit-pick { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--m-line2); color: var(--fg); font: 700 14px var(--font); background: #161922 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23a9adba' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") right 10px center / 10px no-repeat; }
+#menu #circuit-info { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin-top: 10px; }
+#menu #circuit-info small { display: block; font-size: 10px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.45); }
+#menu #circuit-info b { font-size: 13px; }
+@media (max-height: 480px) { #menu .m-circuit { padding: 7px 10px; margin-bottom: 8px; } #menu #circuit-info { margin-top: 6px; } }
+
 /* ---- 加到主畫面 */
 #menu .m-install { --c: #6ff0a4; display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px dashed rgba(111, 240, 164, 0.35); background: rgba(111, 240, 164, 0.05); }
 #menu .m-install[hidden] { display: none; }

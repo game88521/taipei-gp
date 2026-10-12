@@ -34,9 +34,10 @@ export interface Track {
   vTarget: Float32Array; // 建議速度 (m/s)
 }
 
-export function buildTrack(): Track {
+/** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽 */
+export function buildTrack(points: [number, number][] = CONTROL): Track {
   const curve = new THREE.CatmullRomCurve3(
-    CONTROL.map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    points.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     true,
     'centripetal',
   );

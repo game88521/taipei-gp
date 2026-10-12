@@ -181,7 +181,15 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 
 調手感：`track.ts` 最上面的 `VMAX`、`ENGINE`、`BRAKE`、`gripAt()`。
 
-## 各國大獎賽賽道資料（準備中）
+## 各國大獎賽賽道（賽道模式）
+
+選單「開始」頁的「賽道」可以選台北信義街道賽或 2026 賽曆 23 站；選了就帶 `?circuit=suzuka` 重新載入，進入賽道模式：
+不載入台北街景，改成通用的賽道場景（`src/circuitenv.ts`：草地／熱帶／沙漠的地面、主看台與彎道看台、維修區、樹林，
+街道賽四周是城市方塊；新加坡、拉斯維加斯、卡達是夜賽、阿布達比黃昏，有照明燈柱）。只有大獎賽與計時賽（沒有城市可以自由駕駛）；
+最快圈、分段、影子車各賽道分開記（`save.circuits`），線上排行榜只收台北。賽道清單與名稱在 `src/circuits.ts`。
+測試：`?circuit=italy&bot&sim=220`（計時賽）、`?circuit=japan&bot&gp&sim=400`（正賽）。
+
+### 賽道資料
 
 `node tools/probe-circuits.mjs` 下載 2026 賽曆 23 條賽道附近的 OSM 賽道資料（快取 `tools/circuits-cache/`，不進 git），
 `node tools/build-circuits.mjs` 組出中心線 → `public/data/circuits/{id}.json`（每 4 m 一點、起跑線開始、照比賽方向），總覽圖 `tools/circuits.svg`。

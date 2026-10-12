@@ -143,6 +143,7 @@ export interface World {
   mountains: THREE.Group;
   assist: THREE.Mesh;
   race: THREE.Group;
+  ground: THREE.Mesh;
   sun: THREE.DirectionalLight;
   sunDir: THREE.Vector3;
   hemi: THREE.HemisphereLight;
@@ -154,7 +155,8 @@ export interface World {
   setMountains: (layers: [string, string][]) => void;
 }
 
-export function buildWorld(scene: THREE.Scene, t: Track): World {
+/** ads：護牆廣告看板的字（各國賽道換成當地的） */
+export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): World {
   const rand = rng(20261001);
 
   // ---- 天空（黃昏漸層）與霧
@@ -297,7 +299,7 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
   ));
 
   // ---- 護牆 + 廣告看板
-  const ads = ['台北街道賽', 'TAIPEI STREET GP', '珍珠奶茶', '信義區', '夜市美食', 'XINYI 2026', '鹹酥雞', 'NIGHT RACE'];
+  const ads = adsIn ? [...adsIn, '台北街道賽', 'TAIPEI STREET GP', ...adsIn].slice(0, 8) : ['台北街道賽', 'TAIPEI STREET GP', '珍珠奶茶', '信義區', '夜市美食', 'XINYI 2026', '鹹酥雞', 'NIGHT RACE'];
   const adCols = ['#d81e2a', '#13306b', '#0f7a4a', '#f2f2f2', '#ff7a00', '#5a1a8a'];
   const wallTex = canvasTex(2048, 64, (g) => {
     for (let k = 0; k < 8; k++) {
@@ -379,5 +381,5 @@ export function buildWorld(scene: THREE.Scene, t: Track): World {
       col.needsUpdate = true;
     });
   };
-  return { sky, mountains, assist, race, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains };
+  return { sky, mountains, assist, race, ground, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains };
 }
