@@ -14,7 +14,11 @@ export const TYRES = [
   { name: '軟胎', short: '軟', grip: 1.03, wear: 0.16, color: '#e10600' },
   { name: '中性胎', short: '中', grip: 1.0, wear: 0.1, color: '#ffd400' },
   { name: '硬胎', short: '硬', grip: 0.975, wear: 0.065, color: '#f2f2f2' },
+  { name: '雨胎', short: '雨', grip: 0.97, wear: 0.1, color: '#2fbf6c' }, // 濕地才好用；乾地抓地力差、磨很快
 ];
+export const RAIN = 3;
+export type GpWeather = 'dry' | 'maybe' | 'wet';
+const SC_SPEED = 40, SC_CATCHUP = 55; // 安全車期間：跟在車隊裡的限速、還沒追上車隊的限速（m/s）
 const PIT_TIME = 6; // 進站停多久（含進出維修區的時間損失）
 
 /** DRS 區：長直線；偵測點在區間起點前 80 m */
@@ -61,6 +65,15 @@ export class RaceField {
   laps = LAPS;
   ttMode = false; // 計時賽：DRS 不用偵測前車
   rules: Rules = 'classic'; // 2026：主動空力＋電池＋超車模式（偵測點、區段沿用 DRS 的）
+  // 天氣：wet 0 乾 … 1 全濕；rainAt = 比賽第幾秒開始下（Infinity 不下、負的＝雨戰一開始就濕）
+  wet = 0;
+  rainAt = Infinity;
+  // 安全車：out 帶隊中、in 這圈進站、off 沒有；lapAt = 出動（或準備進站）時領先者的圈數；s = 安全車在賽道上的位置
+  sc = { phase: 'off' as 'off' | 'out' | 'in', t: 0, lapAt: 0, used: false, s: 0 };
+  scChance = 0.5; // 重撞時出動的機率（測試可設 1）
+  /** 給 main 的事件（安全車出動、進站、綠旗、開始下雨），main 每格拿走 */
+  events: string[] = [];
+  private solo = false; // 排位賽模擬：只算自己，不看別台車
   drsZones: DrsZone[] = [];
   private recAcc = 0;
   private line: Float32Array; // 每個取樣點的賽車線橫向位置（右正）
@@ -106,10 +119,17 @@ export class RaceField {
     return this.drsZones.findIndex((z) => (z.s0 < z.s1 ? s >= z.s0 && s <= z.s1 : s >= z.s0 || s <= z.s1));
   }
 
-  /** 排發車格：兩列交錯，每格 8 m；玩家排在第 playerSlot 格（0 = 竿位） */
-  setup(playerSlot: number, playerCompound = 1, laps = LAPS) {
+  /**
+   * 排發車格：兩列交錯，每格 8 m；grid = 排位賽的順序（沒有就照實力排、玩家在第 playerSlot 格）
+   * weather：dry 晴天、maybe 中途可能下雨（四成）、wet 雨戰（全部雨胎起跑）
+   */
+  setup(playerSlot: number, playerCompound = 1, laps = LAPS, grid?: Racer[], weather: GpWeather = 'dry') {
     this.laps = laps;
     this.recAcc = 0;
+    this.events = [];
+    this.sc = { phase: 'off', t: 0, lapAt: 0, used: false, s: 0 };
+    this.wet = weather === 'wet' ? 1 : 0;
+    this.rainAt = weather === 'wet' ? -1 : weather === 'maybe' && Math.random() < 0.4 ? laps * 55 * (0.3 + Math.random() * 0.3) : Infinity;
     // AI 的起跑胎：短比賽多用軟胎、長比賽多用中性胎
     let seed = 7;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -121,10 +141,15 @@ export class RaceField {
       r.car.r26 = this.rules === '2026';
       r.car.energy = 1;
       r.car.ovt = false;
+      r.car.speedCap = Infinity;
+      if (weather === 'wet') { r.compound = RAIN; r.car.gripMul = TYRES[RAIN].grip; }
     }
-    const order = this.racers.filter((r) => !r.isPlayer);
-    const player = this.racers.find((r) => r.isPlayer)!;
-    order.splice(Math.min(playerSlot, order.length), 0, player);
+    let order: Racer[];
+    if (grid) order = grid;
+    else {
+      order = this.racers.filter((r) => !r.isPlayer);
+      order.splice(Math.min(playerSlot, order.length), 0, this.racers.find((r) => r.isPlayer)!);
+    }
     const t = this.t;
     order.forEach((r, k) => {
       const back = 14 + k * 8;
@@ -163,6 +188,12 @@ export class RaceField {
   update(dt: number, racing: boolean): number {
     const t = this.t;
     if (racing) this.raceTime += dt;
+    // 下雨：開始下之後 40 秒內賽道慢慢變濕
+    if (racing && this.raceTime >= this.rainAt && this.wet < 1) {
+      if (this.wet === 0) this.events.push('rain');
+      this.wet = Math.min(1, this.wet + dt / 40);
+    }
+    if (racing) this.safetyCar(dt);
     // 尾流：前方 25 m 內、橫向 2.5 m 內有車 → 引擎多 5% 力
     for (const r of this.racers) {
       r.car.boost = 0;
@@ -176,8 +207,16 @@ export class RaceField {
     // 輪胎磨耗 → 抓地力；DRS 偵測與開關；進站中的車停住
     for (const r of this.racers) {
       const c = r.car, ty = TYRES[r.compound];
-      if (racing && r.pitTimer <= 0) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * (1 + Math.abs(c.steer) * 0.6));
-      c.gripMul = ty.grip * (1 - 0.18 * r.wear ** 1.5);
+      const onRain = r.compound === RAIN;
+      if (racing && r.pitTimer <= 0) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
+      // 濕地：乾地胎打滑（抓地力最多少 28%）；雨胎在濕地只少一點、在乾地反而差
+      const wetK = onRain ? (1 - 0.04 * this.wet) * (1 - 0.08 * (1 - this.wet)) : 1 - 0.28 * this.wet;
+      c.gripMul = ty.grip * (1 - 0.18 * r.wear ** 1.5) * wetK;
+      // 安全車：跟在車隊裡的、領先者限速；還沒追上的可以開快一點追上來（差距縮小）；不能開 DRS／超車
+      if (this.sc.phase !== 'off' && r.finish == null) {
+        c.speedCap = this.gapAhead(r) < 30 || r === this.leader() ? SC_SPEED : SC_CATCHUP;
+        r.drsOk = false; c.drs = false; c.ovt = false;
+      } else c.speedCap = Infinity;
       if (r.pitTimer > 0) {
         r.pitTimer -= dt;
         c.v = 0;
@@ -204,7 +243,11 @@ export class RaceField {
       // AI：可以開 DRS 就開（2026：超車模式，電還夠才開）；輪胎磨太多、還有兩圈以上就準備進站
       if (r.drsOk && this.drsZoneAt(c.pos.s) >= 0 && !brake) { if (this.rules === '2026') { if (c.energy > 0.25) c.ovt = true; } else c.drs = true; }
       if (!r.pitReq && r.wear > 0.7 && this.laps - r.laps >= 1 && r.finish == null) r.pitReq = true;
-      if (c.update(dt, t, steer, brake) > 0) this.aiHits++;
+      // 下雨了還穿乾地胎 → 這圈進站換雨胎
+      if (!r.pitReq && r.finish == null && this.laps - r.laps >= 1 && this.wet > 0.35 && r.compound !== RAIN) r.pitReq = true;
+      const hit = c.update(dt, t, steer, brake);
+      if (hit > 0) this.aiHits++;
+      if (hit > 20 && racing) this.incident();
       this.lapCheck(r, prevS);
     }
     // 回放紀錄（每 0.05 秒）
@@ -219,6 +262,7 @@ export class RaceField {
     let playerHit = 0;
     for (let a = 0; a < this.racers.length; a++) for (let b = a + 1; b < this.racers.length; b++) {
       const A = this.racers[a].car, B = this.racers[b].car;
+      if (this.racers[a].pitTimer > 0 || this.racers[b].pitTimer > 0) continue; // 停在維修區裡的車不會被撞
       if (Math.abs(A.x - B.x) > 8 || Math.abs(A.z - B.z) > 8) continue;
       for (const oa of [1.6, -1.6]) for (const ob of [1.6, -1.6]) {
         const ax = A.x + Math.sin(A.h) * oa, az = A.z + Math.cos(A.h) * oa;
@@ -240,12 +284,71 @@ export class RaceField {
     return playerHit;
   }
 
+  /** 領先者（還沒完賽、跑最遠的） */
+  leader(): Racer {
+    let best = this.racers[0], bp = -Infinity;
+    for (const r of this.racers) { const p = r.finish != null ? Infinity : this.progress(r); if (p > bp) { bp = p; best = r; } }
+    return best;
+  }
+
+  /** 有車重撞：一半機率安全車出動（一場最多一次；第一圈還沒跑完、最後一圈不出） */
+  incident(force = false) {
+    if (this.sc.used || this.sc.phase !== 'off') return;
+    const L = this.leader();
+    if (!force && (L.laps < 1 || L.laps >= this.laps || Math.random() > this.scChance)) return;
+    this.sc = { phase: 'out', t: 0, lapAt: L.laps, used: true, s: L.car.pos.s + 35 };
+    this.events.push('sc-out');
+  }
+
+  /** 安全車：帶隊 18 秒後宣布「本圈進站」，領先者過線就綠旗 */
+  private safetyCar(dt: number) {
+    const sc = this.sc;
+    if (sc.phase === 'off') return;
+    sc.t += dt;
+    const L = this.leader();
+    sc.s = (L.car.pos.s + 35) % this.t.length;
+    if (sc.phase === 'out' && sc.t > 18) { sc.phase = 'in'; sc.lapAt = L.laps; this.events.push('sc-in'); }
+    else if (sc.phase === 'in' && L.laps > sc.lapAt) { sc.phase = 'off'; this.events.push('green'); }
+  }
+
+  /**
+   * 排位賽：每台 AI 自己跑一圈（跟玩家一樣從起跑線後原地起步、中性胎、DRS／超車模式在直線區隨便開），
+   * 用一樣的物理同步算，回傳圈速（加一點點隨機，每次排位結果不完全一樣）
+   */
+  qualify(): Map<Racer, number> {
+    const t = this.t, out = new Map<Racer, number>(), dt = 1 / 120;
+    this.solo = true;
+    for (const r of this.racers) {
+      if (r.isPlayer) continue;
+      const c = r.car;
+      c.placeAt(t, 1);
+      Object.assign(c, { gripMul: 1, boost: 0, drs: false, ovt: false, energy: 1, r26: this.rules === '2026', speedCap: Infinity });
+      r.lat = 0; r.stuck = 0;
+      let time = 0, prevS = c.pos.s;
+      for (let n = 0; n < 150 / dt; n++) {
+        const { steer, brake } = this.drive(r, false);
+        const zi = this.drsZoneAt(c.pos.s);
+        c.aeroZone = zi >= 0;
+        if (zi < 0) { c.drs = false; c.ovt = false; } else if (!brake) { if (c.r26) { if (c.energy > 0.1) c.ovt = true; } else c.drs = true; }
+        c.update(dt, t, steer, brake);
+        time += dt;
+        const sNow = c.pos.s;
+        if (prevS > t.length - 40 && sNow < 40) break;
+        prevS = sNow;
+      }
+      out.set(r, time * (1 + (Math.random() - 0.5) * 0.006));
+    }
+    this.solo = false;
+    return out;
+  }
+
   /** 玩家的計圈（main 在玩家的物理之後呼叫） */
   playerLap(prevS: number) { this.lapCheck(this.racers.find((r) => r.isPlayer)!, prevS); }
 
   private lapCheck(r: Racer, prevS: number) {
     const L = this.t.length, s = r.car.pos.s;
     if (!(prevS > L - 40 && s < 40)) return;
+    if (r.laps >= 1 && this.raceTime - r.lapStart < 20) return; // 在起跑線附近被撞得前後來回：不重複計圈
     if (r.laps >= 1) {
       const lt = this.raceTime - r.lapStart;
       if (r.bestLap == null || lt < r.bestLap) r.bestLap = lt;
@@ -258,7 +361,7 @@ export class RaceField {
       r.pitReq = false;
       r.pitTimer = PIT_TIME;
       const left = this.laps - r.laps + 1;
-      r.compound = left <= 2 ? 0 : r.compound === 1 ? 2 : 1;
+      r.compound = this.wet > 0.3 ? RAIN : left <= 2 ? 0 : r.compound === 1 ? 2 : 1; // 濕地換雨胎
       const i = r.car.pos.i, t = this.t;
       r.car.x = t.px[i] - t.tz[i] * 6;
       r.car.z = t.pz[i] + t.tx[i] * 6;
@@ -270,6 +373,7 @@ export class RaceField {
 
   /** 正前方最近一台車的距離（m） */
   gapAhead(r: Racer): number {
+    if (this.solo) return Infinity;
     let best = Infinity;
     for (const o of this.racers) {
       if (o === r) continue;
@@ -315,7 +419,7 @@ export class RaceField {
     // 前方擋路的車：同一條線上、前面 24 m 內
     let blocker: Racer | null = null, gap = Infinity;
     for (const o of this.racers) {
-      if (o === r) continue;
+      if (o === r || this.solo) continue;
       let d = o.car.pos.s - c.pos.s;
       if (d < -t.length / 2) d += t.length;
       if (d > 0 && d < 24 && Math.abs(o.car.pos.lat - c.pos.lat) < 2.4 && d < gap) { gap = d; blocker = o; }
@@ -324,7 +428,7 @@ export class RaceField {
     // 輪胎磨耗後抓地力變小：過彎速度照 √(抓地力) 下修；完賽後跑慢速收車圈
     const tyreK = Math.sqrt(c.gripMul / 0.985);
     const want = cooldown ? Math.min(25, r.profile![ahead]) : r.profile![ahead] * Math.min(1.02, tyreK);
-    if (blocker && blocker.car.v < want + 2) {
+    if (blocker && blocker.car.v < want + 2 && this.sc.phase === 'off') { // 安全車期間不超車
       // 換到比較空的一側超車（相對賽車線，不超出路面）
       const crowd = (side: number) => this.racers.reduce((n, o) => {
         if (o === r || o === blocker) return n;

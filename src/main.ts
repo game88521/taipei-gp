@@ -12,7 +12,9 @@ import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
 import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
 import { loadCity } from './city';
-import { makeF1 } from './f1model';
+import { makeF1, TEAMS } from './f1model';
+import { TeamRadio } from './radio';
+import { Podium } from './podium';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
 import { stage, marks, onProgress } from './loading';
 import { Weather, headlightRig, TIME_NAME, cycleAt, CYCLE_LEN, type TimeKind } from './weather';
@@ -28,7 +30,7 @@ import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
-import { RaceField, PLAYER_LIVERY, TYRES } from './rivals';
+import { RaceField, PLAYER_LIVERY, TYRES, RAIN, type Racer, type GpWeather } from './rivals';
 import { WALL_OFF, TOWER_101 } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
@@ -349,6 +351,7 @@ const opts = {
   ghost: save.opts.ghost ?? true,
   sound: save.opts.sound ?? true,
   fps: save.opts.fps ?? false,
+  quali: save.opts.quali ?? true, // 大獎賽先跑排位賽
 };
 for (const k of Object.keys(opts) as (keyof typeof opts)[]) {
   const el = $<HTMLInputElement>('opt-' + k);
@@ -364,7 +367,7 @@ function applyOpts() {
 }
 applyOpts();
 // 正賽的圈數與起跑胎（記在存檔裡）
-for (const id of ['opt-laps', 'opt-tyre', 'opt-rules'] as const) {
+for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx'] as const) {
   const el = $<HTMLSelectElement>(id);
   const v = (save.opts as Record<string, unknown>)[id];
   if (typeof v === 'string') el.value = v;
@@ -372,7 +375,7 @@ for (const id of ['opt-laps', 'opt-tyre', 'opt-rules'] as const) {
 }
 
 // ---------------------------------------------------------------- 比賽狀態
-type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results' | 'replay';
+type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results' | 'replay' | 'podium';
 let state: State = 'menu';
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
@@ -424,6 +427,7 @@ function sectorDone(k: number, time: number) {
 
 function completeLap() {
   const t = lapTime;
+  if (qualiRun) { finishQuali(t); return; } // 排位賽：跑完一圈就排名
   sectorDone(2, t - sectorStart);
   lastLap = t;
   $('last').textContent = fmt(t);
@@ -485,7 +489,7 @@ function step(dt: number) {
   const zone = field.drsZoneAt(car.pos.s);
   if (zone < 0) { car.drs = false; car.ovt = false; }
   car.aeroZone = zone >= 0; // 2026：直線模式區段
-  if (BOT) { drsPress = true; if (raceKind === 'gp' && field.me.wear > 0.7 && !field.me.pitReq && field.laps - field.me.laps >= 1) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
+  if (BOT) { drsPress = true; if (raceKind === 'gp' && (field.me.wear > 0.7 || (field.wet > 0.35 && field.me.compound !== RAIN)) && !field.me.pitReq && field.me.pitTimer <= 0 && field.laps - field.me.laps >= 1) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
   if (drsPress) {
     drsPress = false;
     if (raceKind === 'tt' && zone >= 0) { if (car.r26) { if (car.energy > 0.1) car.ovt = true; } else car.drs = true; }
@@ -497,9 +501,12 @@ function step(dt: number) {
   if (inPit) car.v = 0;
   if (raceKind === 'gp') {
     impact = Math.max(impact, field.update(dt, true));
+    if (impact > 22) field.incident(); // 玩家重撞也可能出安全車
+    if (SC_AT != null && field.raceTime >= SC_AT) field.incident(true); // 測試：&scat=秒數 強制出安全車
+    for (const ev of field.events.splice(0)) gpEvent(ev);
     field.playerLap(prevS);
     const me = field.racers.find((r) => r.isPlayer)!;
-    if (me.finish != null && state === 'race') { showResults(); return; }
+    if (me.finish != null && state === 'race') { if (BOT && !new URLSearchParams(location.search).has('podium')) showResults(); else startPodium(); return; } // 測試：&podium 也播頒獎典禮
   }
   if (impact && performance.now() - lastHitSound > 250) { sound.hit(impact); lastHitSound = performance.now(); botHits++; }
   lapTime += dt;
@@ -719,6 +726,17 @@ function updateVisuals(dt: number) {
     if (mode === 'free') traffic.render(dt);
   }
   if (mode === 'race' && raceKind === 'gp') field.render(dt);
+  // 安全車：在領先者前面 35 m 帶隊，車頂黃燈閃
+  const scOn = mode === 'race' && raceKind === 'gp' && field.sc.phase !== 'off' && (state === 'race' || state === 'paused');
+  scCar.model.root.visible = scOn;
+  if (scOn) {
+    const i = Math.floor(field.sc.s / track.ds) % track.N;
+    scCar.model.root.position.set(track.px[i], 0, track.pz[i]);
+    scCar.model.root.rotation.y = Math.atan2(track.tx[i], track.tz[i]);
+    const on = Math.floor(performance.now() / 250) % 2 === 0;
+    scLights[0].color.set(on ? '#ffb000' : '#3a2600');
+    scLights[1].color.set(on ? '#3a2600' : '#ffb000');
+  }
   if (sr && mode === 'free') sr.render(dt);
   trains?.update(dt);
   // 下雨：路人撐傘、路上積水、開過去噴水花
@@ -865,7 +883,18 @@ function beginCountdown() {
   hud.dataset.rules = field.rules;
   $('drs').textContent = field.rules === '2026' ? '超車' : 'DRS';
   if (raceKind === 'gp') {
-    field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value); // 22 台車，玩家從第 10 格起跑
+    // 發車格：剛跑完的排位賽（或上一場的）；沒跑排位就從第 10 格起跑
+    const grid = qualiGrid ?? lastGrid;
+    lastGrid = grid;
+    qualiGrid = null;
+    const wx = (BOT ? new URLSearchParams(location.search).get('gpwx') ?? 'dry' : $<HTMLSelectElement>('opt-gpwx').value) as GpWeather;
+    field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value, grid ?? undefined, wx);
+    if (new URLSearchParams(location.search).has('sc')) field.scChance = 1; // 測試：重撞一定出安全車
+    if (new URLSearchParams(location.search).get('rainat')) field.rainAt = +new URLSearchParams(location.search).get('rainat')!; // 測試：比賽第幾秒開始下雨
+    setRaceRain(field.wet > 0);
+    radio.reset(PLAYER_LIVERY.main);
+    lastPos = -1;
+    scBanner('');
     field.ttMode = false;
     $('lap').textContent = `0/${field.laps}`;
   } else { field.hide(); field.ttMode = true; }
@@ -1039,6 +1068,8 @@ $('btn-gp').addEventListener('click', async () => {
   await userStart();
   taxi?.stop();
   mode = 'race';
+  lastGrid = null;
+  if (opts.quali) { startQuali(); return; }
   raceKind = 'gp';
   hideMenu();
   beginCountdown();
@@ -1052,10 +1083,162 @@ $('btn-again').addEventListener('click', async () => {
 $('btn-menu').addEventListener('click', () => {
   $('results').classList.add('hidden');
   state = 'menu';
+  setRaceRain(false);
   sound.engine(0, 0, false);
   sound.sirenAt(0, 0);
   showMenu(false);
 });
+
+// ---------------------------------------------------------------- 排位賽、安全車、無線電、天氣、頒獎台
+const QUALI_TEST = new URLSearchParams(location.search).has('quali');
+const SC_AT = new URLSearchParams(location.search).get('scat') != null ? +new URLSearchParams(location.search).get('scat')! : null;
+let qualiRun = false, qualiGrid: Racer[] | null = null, lastGrid: Racer[] | null = null, QUALI_POS: number | null = null;
+const radio = new TeamRadio($('radio'));
+radio.onSay = () => sound.beep(1500, 0.05);
+let lastPos = -1, radioAcc = 0;
+// 安全車：超跑造型、銀色，車頂兩顆輪流閃的黃燈
+const scCar = buildPlayerVehicle(vehicleById('super'));
+scCar.setPaint('#d9dde2');
+const scLights = [new THREE.MeshBasicMaterial({ color: '#ffb000', toneMapped: false }), new THREE.MeshBasicMaterial({ color: '#3a2600', toneMapped: false })];
+{
+  const geo = new THREE.BoxGeometry(0.45, 0.14, 0.24);
+  const a = new THREE.Mesh(geo, scLights[0]), b = new THREE.Mesh(geo, scLights[1]);
+  a.position.set(-0.28, 1.32, -0.2); b.position.set(0.28, 1.32, -0.2);
+  scCar.model.body.add(a, b);
+  scCar.model.root.visible = false;
+  scene.add(scCar.model.root);
+}
+let podium: Podium | null = null, podiumT = 0;
+
+function startQuali() {
+  qualiRun = true;
+  raceKind = 'tt';
+  hideMenu();
+  beginCountdown();
+  setRaceRain(false);
+  toast('🏁 排位賽：跑一圈，圈速決定發車位置', 'purple');
+}
+/** 排位賽跑完：AI 用同一套物理各跑一圈，大家照圈速排發車格 */
+function finishQuali(t: number) {
+  qualiRun = false;
+  state = 'results';
+  sound.engine(0, 0, false);
+  const times = field.qualify();
+  times.set(field.me, t);
+  const grid = [...field.racers].sort((a, b) => times.get(a)! - times.get(b)!);
+  qualiGrid = grid;
+  const pos = grid.indexOf(field.me) + 1, pole = times.get(grid[0])!;
+  QUALI_POS = pos;
+  const tb = $('quali-table');
+  tb.innerHTML = '<tr><th>位置</th><th>車手</th><th>車隊</th><th>圈速</th><th>差距</th></tr>';
+  grid.forEach((r, k) => {
+    const tr = document.createElement('tr');
+    if (r.isPlayer) tr.className = 'me';
+    if (k === 0) tr.className += ' pole';
+    for (const v of [String(k + 1), r.name, r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
+      const td = document.createElement('td');
+      td.textContent = v;
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  });
+  $('quali-title').textContent = pos === 1 ? '🏁 竿位！' : `排位賽：第 ${pos} 位發車`;
+  $('quali-sub').textContent = `你的圈速 ${fmt(t)}${pos > 1 ? `，落後竿位 ${(t - pole).toFixed(3)} 秒` : ''}`;
+  if (BOT && !new URLSearchParams(location.search).has('qualistop')) { startGpAfterQuali(); return; } // 測試：&qualistop 停在排位成績表（截圖用）
+  $('quali-res').classList.remove('hidden');
+}
+function startGpAfterQuali() {
+  $('quali-res').classList.add('hidden');
+  raceKind = 'gp';
+  mode = 'race';
+  hideMenu();
+  beginCountdown();
+}
+$('quali-go').addEventListener('click', async () => { await userStart(); startGpAfterQuali(); });
+$('quali-again').addEventListener('click', async () => { await userStart(); $('quali-res').classList.add('hidden'); startQuali(); });
+$('quali-menu').addEventListener('click', () => { $('quali-res').classList.add('hidden'); qualiGrid = null; state = 'menu'; showMenu(false); });
+
+/** 正賽中下雨：天空、雨滴、路面換成雨天（夜晚就是雨夜）；比賽結束回到選單的時段天氣 */
+function setRaceRain(on: boolean) {
+  if (on) weather.apply(timeKind === 'night' || timeKind === 'rainnight' ? 'rainnight' : 'rain', Q.fogFar, bloom, gradePass, cycleT);
+  else applyWeather();
+}
+function scBanner(text: string, green = false) {
+  const el = $('sc-banner');
+  el.textContent = text;
+  el.className = text ? (green ? 'show green' : 'show') : '';
+}
+function gpEvent(ev: string) {
+  if (ev === 'sc-out') { scBanner('🟡 安全車'); radio.say('sc', '安全車出動！保持車距、不要超車，DRS 關閉', Infinity); sound.beep(660, 0.3); }
+  else if (ev === 'sc-in') { scBanner('🟡 安全車本圈進站'); radio.say('sc-in', '安全車這圈進站，準備重新起跑', Infinity); }
+  else if (ev === 'green') { scBanner('🟢 綠旗！', true); setTimeout(() => scBanner(''), 3000); radio.say('green', '綠旗！衝！', Infinity); }
+  else if (ev === 'rain') { setRaceRain(true); toast('🌧️ 開始下雨了', ''); radio.say('rain', '開始下雨了，賽道會越來越濕——準備進站換雨胎', Infinity); }
+}
+/** 車隊無線電：每 0.5 秒看一次狀況，有事就說（同一件事有冷卻時間） */
+function radioTick(dt: number) {
+  radioAcc += dt;
+  if (radioAcc < 0.5) return;
+  radioAcc = 0;
+  const st = field.standings(), k = st.findIndex((r) => r.isPlayer), me = st[k];
+  if (me.finish != null) return;
+  if (field.raceTime < 4) radio.say('start', '燈號熄滅！第一個彎小心，別跟人擠', Infinity);
+  if (me.laps === field.laps && field.laps > 1) radio.say('last', '最後一圈！全力推！', Infinity);
+  if (me.pitTimer <= 0 && me.wear > 0.62 && !me.pitReq && field.laps - me.laps >= 1) radio.say('tyre', `輪胎剩 ${Math.round((1 - me.wear) * 100)}%，考慮這圈進站（按「進站」）`, Infinity);
+  if (me.wear < 0.1) radio.rearm('tyre');
+  const ahead = st[k - 1], behind = st[k + 1];
+  if (ahead && ahead.wear > 0.7 && field.progress(ahead) - field.progress(me) < 80) radio.say('ahead-tyre', `前車 ${ahead.name} 的輪胎快不行了，準備攻擊！`, 40);
+  if (behind && field.sc.phase === 'off' && field.raceTime > 15 && field.progress(me) - field.progress(behind) < Math.max(15, car.v)) radio.say('behind', `後面的 ${behind.name} 在 1 秒內，守住內線`, 35);
+  if (car.r26 && car.energy < 0.2) radio.say('batt', '電量剩 20%，先別開超車，煞車多回收一點', Infinity);
+  if (car.energy > 0.5) radio.rearm('batt');
+  if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && me.pitTimer <= 0 && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
+  // 名次創新高才報（在兩個名次之間跳來跳去不要一直說）；掉了兩名以上之後重新算
+  if (lastPos < 0) lastPos = k;
+  if (k < lastPos && field.raceTime > 5) { radio.say('gain', `漂亮！上到第 ${k + 1} 名`, 12); lastPos = k; }
+  else if (k > lastPos + 1) lastPos = k;
+}
+/** 頒獎典禮：前三名站上台、噴香檳；12 秒後（或按「查看成績」）看成績表 */
+function startPodium() {
+  state = 'podium';
+  podiumT = 0;
+  sound.engine(0, 0, false);
+  radio.hide();
+  scBanner('');
+  hud.classList.add('hidden');
+  podium ??= new Podium(scene, track);
+  field.hide(); // 頒獎台搭在賽道上：賽車先收起來
+  const st = field.standings().slice(0, 3);
+  const helmetOf = (r: Racer) => (r.isPlayer ? PLAYER_LIVERY.helmet : TEAMS.find((t) => t.team === r.team)?.livery.helmet ?? '#ffffff');
+  podium.show(st.map((r) => ({ suit: r.color, helmet: helmetOf(r) })));
+  const ol = $('podium-names');
+  ol.innerHTML = '';
+  st.forEach((r, k) => {
+    const li = document.createElement('li');
+    if (r.isPlayer) li.className = 'me';
+    li.style.setProperty('--c', r.color);
+    const b = document.createElement('b'), n = document.createElement('span'), t = document.createElement('small');
+    b.textContent = `P${k + 1}`; n.textContent = r.name; t.textContent = r.team;
+    li.append(b, n, t);
+    ol.appendChild(li);
+  });
+  $('podium-ui').classList.remove('hidden');
+  [523, 659, 784, 1047].forEach((f, k) => setTimeout(() => sound.beep(f, 0.18), k * 160)); // 小小的勝利號角
+}
+function endPodium() {
+  if (state !== 'podium') return;
+  podium?.hide();
+  $('podium-ui').classList.add('hidden');
+  hud.classList.remove('hidden');
+  showResults();
+}
+function podiumFrame(dt: number) {
+  podiumT += dt;
+  carModel.root.visible = false; // updateVisuals 每格會把玩家的車打開
+  podium!.frame(dt, camera);
+  world.sky.position.copy(camera.position);
+  world.mountains.position.y = -camera.position.y;
+  if (podiumT > 12) endPodium();
+}
+$('podium-skip').addEventListener('click', endPodium);
 
 // ---------------------------------------------------------------- 正賽：名次、排行榜、成績表
 let boardAcc = 0;
@@ -1121,7 +1304,7 @@ function showResults() {
     if (me === 1) stats.gpWins++;
   }
   $('results').classList.remove('hidden');
-  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s`;
+  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? '有' : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}`;
 }
 // ---------------------------------------------------------------- 回放：轉播機位（賽道外側每 220 m 一台）與追車鏡頭輪流
 let replayT = 0, replaySpeed = 1, camCut = 0, camMode: 'tv' | 'chase' | 'heli' = 'tv';
@@ -1823,7 +2006,7 @@ if (BOT && !FREE) void cityLoad.then(() => {
   const lapQ = new URLSearchParams(location.search).get('laps'); // 測試：?bot&gp&laps=6
   if (lapQ) $<HTMLSelectElement>('opt-laps').value = lapQ;
   hideMenu();
-  beginCountdown();
+  if (raceKind === 'gp' && QUALI_TEST) startQuali(); else beginCountdown(); // ?bot&gp&quali：先跑排位賽
   runSim();
 });
 if (FREE) void cityLoad.then(() => {
@@ -1860,7 +2043,12 @@ function runSim() {
     document.title = `SOLO ${r0.name} 圈${r0.laps} 最快${r0.bestLap?.toFixed(2)} 撞牆${field.aiHits} 曲線最低${(pmin * 3.6).toFixed(0)} 建議最低${(tmin * 3.6).toFixed(0)} 曲線長${pr.length}/${track.N}`;
     return;
   }
-  for (let n = 0; n < SIM / STEP && state === 'race'; n++) step(STEP); // 完賽就停（不然計時賽的計圈會覆寫結果）
+  for (let n = 0; n < SIM / STEP; n++) {
+    if ((state as State) === 'countdown') state = 'race'; // 排位賽跑完接正賽：測試不等五燈
+    if ((state as State) !== 'race') break; // 完賽就停（不然計時賽的計圈會覆寫結果）
+    step(STEP);
+    if ((state as State) === 'race' && raceKind === 'gp') { radioTick(STEP); radio.update(STEP); }
+  }
   // ?…&replay=秒數：直接進回放並停在那一刻（截圖檢查回放鏡頭）
   const rq = new URLSearchParams(location.search).get('replay');
   if (rq && (state as State) === 'results') { startReplay(); replaySpeed = 0; replayT = +rq; camMode = (new URLSearchParams(location.search).get('cam2') as 'tv' | 'chase' | 'heli') ?? 'tv'; camCut = 99; replayFrame(0); }
@@ -1881,6 +2069,8 @@ renderer.setAnimationLoop(() => {
     if (state === 'countdown') updateCountdown(dt);
   }
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
+  if (state === 'podium') podiumFrame(dt);
+  if (state === 'race' && raceKind === 'gp' && !SIM) { radioTick(dt); radio.update(dt); }
   cityStream?.tick(dt); // 新載入的城市區塊長起來
   // 車庫分頁看得到時才畫 3D 預覽；烤漆照遊戲裡那台
   garage3d.frame(dt, !menu.classList.contains('hidden') && !!document.querySelector('.m-pane.on[data-pane="garage"]'), (playerCars.get(preview.id as VehicleId)?.model.root.userData.paint as THREE.MeshStandardMaterial | undefined)?.color ?? null);

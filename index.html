@@ -46,6 +46,7 @@
       <div class="tc">
         <div class="sectors"><i id="s0"></i><i id="s1"></i><i id="s2"></i></div>
         <div id="delta"></div>
+        <div id="sc-banner"></div>
       </div>
       <div class="tr">
         <button id="btn-map" class="small" aria-label="大地圖">🗺</button>
@@ -64,6 +65,7 @@
       <button id="pit" class="small-btn">進站</button>
       <div id="tyre"></div>
       <div id="batt"></div>
+      <div id="radio"><b>📻 工程師</b><span></span></div>
       <button id="gas">油門</button>
       <div id="road"></div>
       <!-- 畫面上方的提示：載客、街頭比賽、通緝、導航，有幾個就由上往下排，不會疊在一起 -->
@@ -226,6 +228,10 @@
                   <select id="opt-rules"><option value="classic">經典（DRS）</option><option value="2026">2026（主動空力＋超車模式）</option></select>
                   <small>2026：直線區段大家都放平翼片；煞車回收電力、加速放電，前車 1 秒內可以開「超車」多放電</small>
                 </label>
+                <label class="sw">排位賽（決定發車位置）<input type="checkbox" id="opt-quali" /></label>
+                <label class="q">正賽天氣
+                  <select id="opt-gpwx"><option value="maybe">可能下雨</option><option value="dry">晴天</option><option value="wet">雨戰</option></select>
+                </label>
                 <label class="sw">影子車（計時賽）<input type="checkbox" id="opt-ghost" /></label>
               </fieldset>
             </div>
@@ -260,6 +266,23 @@
           <p class="credit"><span class="author">作者 Rex Chiu</span> ｜ 地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者</p>
         </main>
       </div>
+    </div>
+
+    <div id="quali-res" class="overlay hidden">
+      <div class="card wide">
+        <h1 id="quali-title">排位賽結果</h1>
+        <p class="sub" id="quali-sub"></p>
+        <table id="quali-table"></table>
+        <button id="quali-go" class="primary">開始正賽</button>
+        <button id="quali-again" class="ghost-btn">重跑排位</button>
+        <button id="quali-menu" class="ghost-btn">回選單</button>
+      </div>
+    </div>
+
+    <div id="podium-ui" class="hidden">
+      <h2>🏆 頒獎典禮</h2>
+      <ol id="podium-names"></ol>
+      <button id="podium-skip" class="ghost-btn">查看成績 ›</button>
     </div>
 
     <div id="results" class="overlay hidden">

@@ -22,6 +22,7 @@ export class Car {
   aeroZone = false; // 在直線模式區段裡
   ovt = false; // 超車模式：多放電
   energy = 1; // 電池 0~1
+  speedCap = Infinity; // 安全車期間的限速（m/s）
   pos: Locate = { i: 0, lat: 0, s: 0 };
   private hitCool = 0;
 
@@ -59,6 +60,7 @@ export class Car {
     a -= 0.4; // 滾動阻力
     a -= Math.abs(this.steer) * (v / VMAX) * 5; // 打滿方向會磨胎掉速
     this.v = Math.max(0, v + a * dt);
+    if (this.v > this.speedCap) this.v = Math.max(this.speedCap, this.v - 14 * dt); // 安全車：超過限速就慢慢降下來
 
     const yawMax = Math.min(1.5, (gripAt(v) * this.gripMul) / Math.max(v, 3)) * Math.min(1, v / 4);
     this.h -= this.steer * yawMax * dt;
