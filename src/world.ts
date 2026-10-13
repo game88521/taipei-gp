@@ -153,11 +153,16 @@ export interface World {
   setSky: (top: string, mid: string, hor: string) => void;
   /** 重新上色遠山：每層 [稜線色, 山腳色]（遠層、近層） */
   setMountains: (layers: [string, string][]) => void;
+  /** 街道賽的路燈（常設賽道沒有，circuitenv 會關掉） */
+  lamps: THREE.Object3D[];
+  /** 門架起跑燈亮幾盞（0 = 全熄） */
+  setStartLights: (n: number) => void;
 }
 
-/** ads：護牆廣告看板的字（各國賽道換成當地的） */
-export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): World {
+/** ads：護牆廣告看板的字（各國賽道換成當地的）；title：起點門架上的字 */
+export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title?: string): World {
   const rand = rng(20261001);
+  const lampMeshes: THREE.Object3D[] = [], startLights: THREE.MeshBasicMaterial[] = [];
 
   // ---- 天空（黃昏漸層）與霧
   const skyGeo = new THREE.SphereGeometry(2500, 32, 16);
@@ -298,6 +303,30 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
     new THREE.MeshLambertMaterial({ map: checker, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 }),
   ));
 
+  // ---- 發車格：22 格，兩列交錯（跟 rivals.ts setup 的位置一樣：起跑線後 14 m 起、每格 8 m、左右 2.6 m）
+  {
+    const pos: number[] = [];
+    const quad = (i: number, f0: number, f1: number, l0: number, l1: number) => {
+      // f：沿賽道方向的前後（m），l：橫向（m）
+      const P = (f: number, l: number) => {
+        const j = (((i + Math.round(f / t.ds)) % t.N) + t.N) % t.N, ff = f - Math.round(f / t.ds) * t.ds;
+        return [t.px[j] + t.tx[j] * ff - t.tz[j] * l, t.py[j] + 0.035, t.pz[j] + t.tz[j] * ff + t.tx[j] * l];
+      };
+      const a = P(f0, l0), b = P(f0, l1), c = P(f1, l1), d = P(f1, l0);
+      pos.push(...a, ...c, ...b, ...a, ...d, ...c);
+    };
+    for (let k = 0; k < 22; k++) {
+      const i = Math.round((t.length - (14 + k * 8)) / t.ds) % t.N, lat = k % 2 === 0 ? -2.6 : 2.6;
+      quad(i, 2.6, 2.9, lat - 1.4, lat + 1.4); // 前緣橫線
+      quad(i, 1.2, 2.9, lat - 1.4, lat - 1.15); // 兩側短線（「[」形，開口朝後）
+      quad(i, 1.2, 2.9, lat + 1.15, lat + 1.4);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    race.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#e8e8e8', side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 })));
+  }
+
   // ---- 護牆 + 廣告看板
   const ads = adsIn ? [...adsIn, '台北街道賽', 'TAIPEI STREET GP', ...adsIn].slice(0, 8) : ['台北街道賽', 'TAIPEI STREET GP', '珍珠奶茶', '信義區', '夜市美食', 'XINYI 2026', '鹹酥雞', 'NIGHT RACE'];
   const adCols = ['#d81e2a', '#13306b', '#0f7a4a', '#f2f2f2', '#ff7a00', '#5a1a8a'];
@@ -341,11 +370,26 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
       c.fillStyle = '#fff';
       c.font = 'bold 60px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
       c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText('台北街道賽  TAIPEI GP', 512, 52);
+      c.fillText(title ?? '台北街道賽  TAIPEI GP', 512, 52);
     }, false);
     const beam = new THREE.Mesh(new THREE.BoxGeometry(off * 2 + 0.8, 1.8, 0.6), [metal, metal, metal, metal, new THREE.MeshBasicMaterial({ map: banner }), new THREE.MeshBasicMaterial({ map: banner })]);
     beam.position.y = 8.6;
     g.add(beam);
+    // 起跑燈：五組，面向發車格（門架後方 = -z），倒數時一盞一盞亮（setStartLights）
+    const pod = new THREE.BoxGeometry(0.9, 1.7, 0.35);
+    for (let k = 0; k < 5; k++) {
+      const x = (2 - k) * 1.25; // 第 1 盞在車手看過去的最左邊（往前看時 +x 在左手邊）
+      const box = new THREE.Mesh(pod, metal);
+      box.position.set(x, 7, -0.25);
+      g.add(box);
+      const m = new THREE.MeshBasicMaterial({ color: '#2a0606', toneMapped: false });
+      startLights.push(m);
+      for (const y of [6.6, 7.4]) {
+        const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.32, 14).rotateY(Math.PI), m);
+        lamp.position.set(x, y, -0.43);
+        g.add(lamp);
+      }
+    }
     g.position.set(t.px[i], t.py[i], t.pz[i]);
     g.rotation.y = ang;
     race.add(g);
@@ -371,6 +415,7 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
       head.setMatrixAt(n, m);
     });
     race.add(pole, head);
+    lampMeshes.push(pole, head);
   }
 
   const setMountains = (layers: [string, string][]) => {
@@ -381,5 +426,6 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[]): Worl
       col.needsUpdate = true;
     });
   };
-  return { sky, mountains, assist, race, ground, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains };
+  const setStartLights = (n: number) => startLights.forEach((m, k) => m.color.set(k < n ? '#ff1a12' : '#2a0606'));
+  return { sky, mountains, assist, race, ground, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains, lamps: lampMeshes, setStartLights };
 }

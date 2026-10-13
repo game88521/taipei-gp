@@ -1,16 +1,28 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WALL_OFF, type Track } from './track';
 import { fillerMaterial, WALLS } from './filler';
-import { canvasTex } from './world';
+import { canvasTex, type World } from './world';
 import type { CircuitMeta } from './circuits';
+import { TEAMS } from './f1model';
 
-// 各國賽道的通用場景（不載入真實街景）：草地／沙漠的地面、主看台與彎道看台、維修區建築、
-// 樹林（熱帶是棕櫚樹）或街道賽的城市方塊、夜賽的照明燈柱與路面光圈。都離賽道中心線夠遠，不會擋到車
+// 各國賽道的通用場景（不載入真實街景）：有紋理的地面、彎道外側的碎石緩衝區、主看台與彎道看台（斜坡座位＋懸臂屋頂）、
+// 維修道與車隊車庫、大螢幕、工作人員崗亭、成片的樹林（熱帶是棕櫚樹）或街道賽的城市方塊、夜賽的照明燈柱與路面光圈。
+// 都離賽道中心線夠遠，不會擋到車。看台、維修區這些建物全部合併成「一種材質一次繪製」，手機才跑得動
 
 function rng(seed: number) { return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
 
-export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta, ground: THREE.Mesh) {
+/** 截面的一段：從 pts[k] 到 pts[k+1]（u = 往外的橫向距離、v = 高度，公尺）用 mats[k] 這個材質（-1 = 不蓋）；
+ *  unit[k]：貼圖 v 方向從 0 到 1 剛好蓋滿這一段（看台座位、車庫門）；rep[k]：貼圖沿賽道多少公尺重複一次；
+ *  cap：兩端封口用的材質（截面要是封閉的多邊形，最後一點 = 第一點） */
+interface Part { pts: [number, number][]; mats: number[]; unit?: boolean[]; rep?: number[]; cap?: number }
+
+const ni = (g: THREE.BufferGeometry) => (g.index ? g.toNonIndexed() : g);
+
+export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta, world: World) {
   const r = rng(meta.id.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 2147483647 || 1);
+  // 常設賽道沒有城市路燈（街道賽才留著）
+  if (meta.biome !== 'street') for (const l of world.lamps) l.visible = false;
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (let i = 0; i < t.N; i++) { x0 = Math.min(x0, t.px[i]); x1 = Math.max(x1, t.px[i]); z0 = Math.min(z0, t.pz[i]); z1 = Math.max(z1, t.pz[i]); }
   // 離賽道多遠：賽道點的格子
@@ -35,15 +47,30 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     h /= w;
     return Math.sqrt(nd) < WALL_OFF + 40 ? Math.min(h, ny - 1) : h;
   };
-  // 地面：顏色照環境、蓋住整條賽道再往外 3 km；有高低起伏
-  const groundCol = { grass: '#5f8a45', tropical: '#4f8a3e', desert: '#c9ad7d', street: '#6d6b67' }[meta.biome];
-  ground.visible = false;
+  // ---- 地面：照環境畫紋理（草地有割草條紋、沙漠有沙紋、街道是石板），蓋住整條賽道再往外 3 km；有高低起伏
+  const grassy = meta.biome === 'grass' || meta.biome === 'tropical';
+  const groundTex = canvasTex(512, 512, (g) => {
+    g.fillStyle = { grass: '#5f8a45', tropical: '#4f8a3e', desert: '#c9ad7d', street: '#6d6b67' }[meta.biome];
+    g.fillRect(0, 0, 512, 512);
+    if (grassy) { g.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = 0; y < 512; y += 128) g.fillRect(0, y, 512, 64); }
+    for (let k = 0; k < 9000; k++) {
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
+      g.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    }
+    if (meta.biome === 'desert') {
+      g.strokeStyle = 'rgba(120,88,50,0.14)'; g.lineWidth = 2;
+      for (let y = 0; y < 512; y += 22) { g.beginPath(); for (let x = 0; x <= 512; x += 8) g.lineTo(x, y + Math.sin((x / 512) * Math.PI * 4 + y) * 5); g.stroke(); }
+    }
+    if (meta.biome === 'street') { g.fillStyle = 'rgba(0,0,0,0.09)'; for (let k = 0; k < 512; k += 64) { g.fillRect(k, 0, 2, 512); g.fillRect(0, k, 512, 2); } }
+  });
+  world.ground.visible = false;
   const W = x1 - x0 + 6000, D = z1 - z0 + 6000, SEG = 180;
+  groundTex.repeat.set(W / 48, D / 48);
   const tg = new THREE.PlaneGeometry(W, D, SEG, SEG).rotateX(-Math.PI / 2);
   const tp = tg.attributes.position as THREE.BufferAttribute, gx = (x0 + x1) / 2, gz = (z0 + z1) / 2;
   for (let v = 0; v < tp.count; v++) tp.setY(v, hAt(tp.getX(v) + gx, tp.getZ(v) + gz) - 0.6);
   tg.computeVertexNormals();
-  const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ color: groundCol }));
+  const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ map: groundTex }));
   terrain.position.set(gx, 0, gz);
   terrain.userData.flat = true;
   scene.add(terrain);
@@ -52,67 +79,288 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) for (const i of grid.get(`${cx + a},${cz + b}`) || []) if ((t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2 < d * d) return false;
     return true;
   };
-  const at = (s: number) => { const i = ((Math.round(s / t.ds) % t.N) + t.N) % t.N; return i; };
+  const at = (s: number) => ((Math.round(s / t.ds) % t.N) + t.N) % t.N;
   const side = (i: number, lat: number): [number, number] => [t.px[i] - t.tz[i] * lat, t.pz[i] + t.tx[i] * lat];
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 
-  // ---- 看台：沿著賽道一段一段的階梯（觀眾是一格一格的彩色點點）
-  const crowd = canvasTex(256, 64, (g) => {
-    g.fillStyle = '#2a2d36'; g.fillRect(0, 0, 256, 64);
-    const C = ['#e10600', '#ffffff', '#ffd400', '#2f6cff', '#ff8a00', '#2fbf6c', '#ff6fa8', '#202020'];
-    for (let y = 4; y < 64; y += 8) for (let x = 2; x < 256; x += 5) { g.fillStyle = C[Math.floor(Math.random() * C.length)]; g.fillRect(x + (y % 16 ? 2 : 0), y, 3, 4); }
-  });
-  const crowdMat = new THREE.MeshLambertMaterial({ map: crowd }), standMat = new THREE.MeshLambertMaterial({ color: '#c8ccd2' }), roofMat = new THREE.MeshLambertMaterial({ color: '#3a3f48' });
-  const stand = (s0: number, s1: number, sideSign: number) => {
-    const g = new THREE.Group();
-    for (let s = s0; s < s1; s += 12) {
-      const i = at(s), j = at(s + 12);
-      const [ax, az] = side(i, sideSign * (WALL_OFF + 6)), [bx, bz] = side(j, sideSign * (WALL_OFF + 6));
-      const len = Math.hypot(bx - ax, bz - az) + 0.5, ang = Math.atan2(bx - ax, bz - az);
-      for (let k = 0; k < 4; k++) { // 四階，越往外越高
-        const step = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.6 + k * 1.6, len), k === 3 ? standMat : [standMat, standMat, crowdMat, standMat, standMat, standMat]);
-        const off = sideSign * (WALL_OFF + 6 + k * 2.6);
-        const [mx, mz] = side(at(s + 6), off);
-        step.position.set(mx, (1.6 + k * 1.6) / 2 - 0.6 + t.py[at(s + 6)], mz);
-        step.rotation.y = ang;
-        g.add(step);
+  // ---- 彎道外側的碎石緩衝區（護牆外，從 TV 鏡頭、俯瞰看得到）；會蓋到別段賽道的地方不鋪
+  const GRAVEL_IN = WALL_OFF + 3, GRAVEL_OUT = WALL_OFF + 26;
+  const gravelSide = new Int8Array(t.N);
+  {
+    const span = Math.round(45 / t.ds);
+    const strength = new Float32Array(t.N);
+    for (let i = 0; i < t.N; i++) {
+      const c = Math.abs(t.curv[i]);
+      if (c < 1 / 110) continue;
+      for (let k = -span; k <= span; k++) {
+        const j = (i + k + t.N) % t.N;
+        if (c > strength[j]) { strength[j] = c; gravelSide[j] = t.curv[i] > 0 ? -1 : 1; }
       }
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, len), roofMat);
-      const [rx, rz] = side(at(s + 6), sideSign * (WALL_OFF + 10));
-      roof.position.set(rx, 10.5 + t.py[at(s + 6)], rz);
-      roof.rotation.y = ang;
-      g.add(roof);
     }
-    scene.add(g);
-  };
-  // 主看台：起跑線前後、維修區的對面（維修區在右側）
-  stand(-160, 160, -1);
-  // 彎道看台：最急的三個彎的外側
-  const corners: number[] = [];
-  const order = [...Array(t.N).keys()].sort((a, b) => Math.abs(t.curv[b]) - Math.abs(t.curv[a]));
-  for (const i of order) { if (corners.length >= 3) break; if (corners.every((c) => Math.abs(c - i) > 120 && Math.abs(c - i) < t.N - 120)) corners.push(i); }
-  for (const i of corners) stand(i * t.ds - 50, i * t.ds + 50, t.curv[i] > 0 ? -1 : 1);
-
-  // ---- 維修區建築：起跑線旁、右側（跟 AI 進站那側一樣）
-  const pitTex = canvasTex(256, 64, (g) => {
-    g.fillStyle = '#eceef1'; g.fillRect(0, 0, 256, 64);
-    for (let x = 6; x < 256; x += 32) { g.fillStyle = '#23262d'; g.fillRect(x, 22, 24, 42); g.fillStyle = '#e10600'; g.fillRect(x, 16, 24, 4); }
-    g.fillStyle = '#9fd0ff'; g.fillRect(0, 2, 256, 10);
-  });
-  pitTex.wrapS = THREE.RepeatWrapping;
-  const pitMat = new THREE.MeshLambertMaterial({ map: pitTex, color: '#b9bcc2' }), white = new THREE.MeshLambertMaterial({ color: '#a9adb4' }); // 灰一點：白牆在白天加光暈會過曝
-  for (let s = -120; s < 120; s += 12) {
-    const i = at(s), j = at(s + 12);
-    const [ax, az] = side(i, WALL_OFF + 12), [bx, bz] = side(j, WALL_OFF + 12);
-    const len = Math.hypot(bx - ax, bz - az) + 0.4;
-    const box = new THREE.Mesh(new THREE.BoxGeometry(10, 9, len), [white, white, white, white, white, pitMat]);
-    const [mx, mz] = side(at(s + 6), WALL_OFF + 12);
-    box.position.set(mx, 3.9 + t.py[at(s + 6)], mz);
-    box.rotation.y = Math.atan2(bx - ax, bz - az) + Math.PI; // 有車庫門那面朝賽道
-    scene.add(box);
+    for (let i = 0; i < t.N; i++) {
+      const sg = gravelSide[i];
+      if (!sg) continue;
+      const [ox, oz] = side(i, sg * GRAVEL_OUT), [mx, mz] = side(i, sg * (GRAVEL_IN + 10));
+      if (!clear(ox, oz, 20) || !clear(mx, mz, 9)) gravelSide[i] = 0;
+    }
+  }
+  {
+    const gravelTex = canvasTex(128, 128, (g) => {
+      g.fillStyle = '#cbb68b'; g.fillRect(0, 0, 128, 128);
+      for (let k = 0; k < 2600; k++) {
+        const v = Math.random();
+        g.fillStyle = v < 0.4 ? 'rgba(90,70,40,0.25)' : v < 0.8 ? 'rgba(255,250,235,0.3)' : 'rgba(60,55,50,0.3)';
+        g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1 + Math.random() * 2);
+      }
+    });
+    const pos: number[] = [], uv: number[] = [];
+    const vert = (i: number, lat: number, y: number, d: number) => {
+      const [x, z] = side(i, lat);
+      pos.push(x, y, z); uv.push(lat / 4, d / 4);
+    };
+    for (let i = 0; i < t.N; i++) {
+      const j = (i + 1) % t.N, sg = gravelSide[i];
+      if (!sg || gravelSide[j] !== sg) continue;
+      const d0 = t.dist[i], d1 = j === 0 ? t.length : t.dist[j];
+      const yo = (k: number) => { const [x, z] = side(k, sg * GRAVEL_OUT); return hAt(x, z) - 0.5; };
+      vert(i, sg * GRAVEL_IN, t.py[i] - 0.02, d0); vert(i, sg * GRAVEL_OUT, yo(i), d0); vert(j, sg * GRAVEL_IN, t.py[j] - 0.02, d1);
+      vert(i, sg * GRAVEL_OUT, yo(i), d0); vert(j, sg * GRAVEL_OUT, yo(j), d1); vert(j, sg * GRAVEL_IN, t.py[j] - 0.02, d1);
+    }
+    if (pos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: gravelTex, side: THREE.DoubleSide }));
+      m.userData.flat = true;
+      scene.add(m);
+    }
   }
 
+  // ---- 建物用的材質（編號 = bins 的 key）
+  const C_CONCRETE = 0, C_CROWD = 1, C_ROOF = 2, C_BANNER = 3, C_GARAGE = 4, C_GLASS = 5, C_PITLANE = 6, C_SCREEN = 7;
+  const crowdTex = canvasTex(512, 320, (g) => {
+    // 20 排座位：每排下面是混凝土階、上面是坐著的觀眾（頭＋上衣），偶爾空位
+    // 上衣以深色、白色居多，再混一些車隊色（紅、橘、藍）
+    const shirts = ['#1d1f24', '#2b2f38', '#1d1f24', '#e8e8e8', '#d9d9d9', '#c41a1a', '#e10600', '#ff7a00', '#24489a', '#5a6270', '#ffd400', '#2f7a4a'];
+    const skin = ['#f1c9a5', '#d9a77e', '#a87452', '#6e4a33'];
+    for (let row = 0; row < 20; row++) {
+      const y = row * 16;
+      g.fillStyle = '#4a5468'; g.fillRect(0, y, 512, 11); // 座椅
+      g.fillStyle = '#9a9ea6'; g.fillRect(0, y + 11, 512, 5); // 階梯
+      for (let x = 1; x < 512; x += 8) {
+        if (Math.random() < 0.18) continue;
+        const dx = x + Math.floor(Math.random() * 2);
+        g.fillStyle = shirts[Math.floor(Math.random() * shirts.length)]; g.fillRect(dx, y + 5, 6, 6);
+        g.fillStyle = skin[Math.floor(Math.random() * skin.length)]; g.fillRect(dx + 1, y + 1, 4, 4);
+      }
+    }
+  });
+  const bannerTex = canvasTex(1024, 64, (g) => {
+    const cols = ['#d81e2a', '#13306b', '#0f7a4a', '#141414'];
+    meta.banner.forEach((txt, k) => {
+      g.fillStyle = cols[k % cols.length]; g.fillRect(k * 256, 0, 256, 64);
+      g.fillStyle = '#fff'; g.font = 'bold 34px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, k * 256 + 128, 34, 236);
+    });
+  });
+  const garageTex = canvasTex(2048, 128, (g) => {
+    // 11 隊的車庫：車隊色的門楣＋隊名、亮著燈的車庫內部
+    const w = 2048 / TEAMS.length;
+    g.fillStyle = '#d9dce0'; g.fillRect(0, 0, 2048, 128);
+    TEAMS.forEach((tm, k) => {
+      const x = k * w;
+      g.fillStyle = tm.livery.main; g.fillRect(x + 6, 6, w - 12, 22);
+      g.fillStyle = tm.livery.accent; g.fillRect(x + 6, 26, w - 12, 3);
+      g.fillStyle = tm.livery.main === '#f2f2f2' ? '#c8102e' : '#fff';
+      g.font = 'bold 15px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(tm.team.split(' ')[0], x + w / 2, 18, w - 20);
+      const grd = g.createLinearGradient(0, 34, 0, 128);
+      grd.addColorStop(0, '#f2f5fa'); grd.addColorStop(0.08, '#3a3e46'); grd.addColorStop(1, '#16181c');
+      g.fillStyle = grd; g.fillRect(x + 12, 34, w - 24, 94);
+      g.fillStyle = tm.livery.main; g.globalAlpha = 0.35; g.fillRect(x + 12, 112, w - 24, 16); g.globalAlpha = 1; // 地板反光
+    });
+  });
+  const glassTex = canvasTex(256, 64, (g) => {
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, '#a9cbe6'); grd.addColorStop(0.55, '#4f7393'); grd.addColorStop(1, '#2c445c');
+    g.fillStyle = grd; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = '#20262e';
+    for (let x = 0; x < 256; x += 32) g.fillRect(x, 0, 3, 64);
+    g.fillRect(0, 0, 256, 3); g.fillRect(0, 40, 256, 2);
+  });
+  const pitTex = canvasTex(64, 256, (g) => {
+    g.fillStyle = '#45474c'; g.fillRect(0, 0, 64, 256);
+    for (let k = 0; k < 500; k++) { const v = 55 + Math.random() * 30; g.fillStyle = `rgb(${v},${v},${v + 4})`; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
+    g.fillStyle = '#f0f0f0'; g.fillRect(0, 244, 64, 6); // 靠賽道那側的白線
+    g.fillRect(0, 112, 32, 4); // 快車道／作業區的虛線
+  });
+  const screenTex = canvasTex(512, 288, (g) => {
+    g.fillStyle = '#05070c'; g.fillRect(0, 0, 512, 288);
+    g.fillStyle = '#e10600'; g.fillRect(0, 0, 512, 44);
+    g.fillStyle = '#fff'; g.font = 'bold 28px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    g.textBaseline = 'middle'; g.fillText(meta.banner[0], 16, 23);
+    g.textAlign = 'right'; g.fillText('● LIVE', 496, 23); g.textAlign = 'left';
+    g.font = 'bold 24px "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    for (let k = 0; k < 6; k++) {
+      const y = 70 + k * 36, tm = TEAMS[(k * 3) % TEAMS.length];
+      g.fillStyle = '#1b1f2a'; g.fillRect(12, y - 15, 488, 30);
+      g.fillStyle = tm.livery.main; g.fillRect(12, y - 15, 8, 30);
+      g.fillStyle = '#fff'; g.fillText(`P${k + 1}`, 32, y);
+      g.fillText(tm.team.split(' ')[0], 90, y);
+      g.fillStyle = '#ffd400'; g.textAlign = 'right'; g.fillText(k ? `+${(k * 1.7 + 0.4).toFixed(1)}` : '領先', 496, y); g.textAlign = 'left';
+    }
+  });
+  const mats: Record<number, THREE.Material> = {
+    [C_CONCRETE]: new THREE.MeshLambertMaterial({ color: '#b2b6bd', side: THREE.DoubleSide }),
+    [C_CROWD]: new THREE.MeshLambertMaterial({ map: crowdTex, side: THREE.DoubleSide }),
+    [C_ROOF]: new THREE.MeshLambertMaterial({ color: '#c3c8cf', side: THREE.DoubleSide }), // 淺色膜屋頂：從空中看才不會是一大塊黑
+    [C_BANNER]: new THREE.MeshLambertMaterial({ map: bannerTex, side: THREE.DoubleSide }),
+    [C_GARAGE]: new THREE.MeshLambertMaterial({ map: garageTex, side: THREE.DoubleSide }),
+    [C_GLASS]: new THREE.MeshLambertMaterial({ map: glassTex, side: THREE.DoubleSide, emissive: '#0d1622' }),
+    [C_PITLANE]: new THREE.MeshLambertMaterial({ map: pitTex, side: THREE.DoubleSide }),
+    [C_SCREEN]: new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }),
+  };
+  const bins = new Map<number, THREE.BufferGeometry[]>();
+  const push = (m: number, g: THREE.BufferGeometry) => { if (!bins.has(m)) bins.set(m, []); bins.get(m)!.push(g); };
+  /** 一個方塊（世界座標、繞 y 轉 ang）丟進某個材質 */
+  const box = (m: number, w: number, h: number, d: number, x: number, y: number, z: number, ang: number) => {
+    Q.setFromAxisAngle(up, ang);
+    push(m, ni(new THREE.BoxGeometry(w, h, d)).applyMatrix4(M.compose(V.set(x, y, z), Q, S.set(1, 1, 1))));
+  };
+
+  /** 沿賽道 s0~s1（公尺）、在 sg 那側離中心線 base 公尺外，把截面拉成長條建物 */
+  const sweep = (s0: number, s1: number, sg: number, base: number, parts: Part[], step = 4) => {
+    const ss: number[] = [];
+    for (let s = s0; s < s1; s += step) ss.push(s);
+    ss.push(s1);
+    const fr = ss.map(at);
+    const P = (i: number, u: number, v: number): [number, number, number] => {
+      const lat = sg * (base + u);
+      return [t.px[i] - t.tz[i] * lat, t.py[i] + v, t.pz[i] + t.tx[i] * lat];
+    };
+    for (const part of parts) {
+      const per = new Map<number, { pos: number[]; uv: number[] }>();
+      const get = (m: number) => { let b = per.get(m); if (!b) per.set(m, (b = { pos: [], uv: [] })); return b; };
+      for (let e = 0; e < part.pts.length - 1; e++) {
+        const m = part.mats[e];
+        if (m < 0) continue;
+        const [ua, va] = part.pts[e], [ub, vb] = part.pts[e + 1];
+        const tb = part.unit?.[e] ? 1 : Math.hypot(ub - ua, vb - va) / 4, rep = part.rep?.[e] ?? 16;
+        const b = get(m);
+        for (let k = 0; k < ss.length - 1; k++) {
+          // 右側（sg = 1）從賽道上看是由右往左排，貼圖要翻過來字才是正的
+          const d0 = (-sg * (ss[k] - s0)) / rep, d1 = (-sg * (ss[k + 1] - s0)) / rep;
+          const a0 = P(fr[k], ua, va), b0 = P(fr[k], ub, vb), a1 = P(fr[k + 1], ua, va), b1 = P(fr[k + 1], ub, vb);
+          b.pos.push(...a0, ...b0, ...a1, ...b0, ...b1, ...a1);
+          b.uv.push(d0, 0, d0, tb, d1, 0, d0, tb, d1, tb, d1, 0);
+        }
+      }
+      if (part.cap != null) {
+        const ring = part.pts.slice(0, -1).map(([u, v]) => new THREE.Vector2(u, v));
+        const tris = THREE.ShapeUtils.triangulateShape(ring, []);
+        const b = get(part.cap);
+        for (const i of [fr[0], fr[fr.length - 1]]) for (const tri of tris) for (const k of tri) {
+          b.pos.push(...P(i, ring[k].x, ring[k].y));
+          b.uv.push(ring[k].x / 4, ring[k].y / 4);
+        }
+      }
+      for (const [m, b] of per) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+        g.computeVertexNormals();
+        push(m, g);
+      }
+    }
+    return P;
+  };
+
+  // ---- 看台：斜坡座位區（前牆有廣告）＋懸臂屋頂（後排柱子撐著）
+  const BOT = -4; // 底部埋進地面，地形低一點也不會懸空
+  const stand = (s0: number, s1: number, sg: number, base: number) => {
+    const P = sweep(s0, s1, sg, base, [
+      { pts: [[0, BOT], [0, 0.6], [0, 2.4], [0.7, 2.4], [14, 11], [14.8, 11], [14.8, BOT], [0, BOT]], mats: [C_CONCRETE, C_BANNER, C_CONCRETE, C_CROWD, C_CONCRETE, C_CONCRETE, C_CONCRETE], unit: [false, true, false, true, false, false, false], rep: [16, 60, 16, 32, 16, 16, 16], cap: C_CONCRETE },
+      { pts: [[-1.5, 15.6], [15.2, 13.4]], mats: [C_ROOF] },
+      { pts: [[-1.5, 14.6], [-1.5, 15.6]], mats: [C_BANNER], unit: [true], rep: [60] },
+    ]);
+    for (let s = s0; s <= s1; s += 16) {
+      const i = at(s), [x, y, z] = P(i, 14.4, (BOT + 13.6) / 2);
+      box(C_ROOF, 0.5, 13.6 - BOT, 0.5, x, y, z, Math.atan2(t.tx[i], t.tz[i]));
+    }
+  };
+  // 主看台：起跑線前後、維修區的對面（維修區在右側）
+  stand(-160, 160, -1, WALL_OFF + 5);
+  // 彎道看台：最急的五個彎的外側（碎石區再過去）；旁邊立一面大螢幕
+  const corners: number[] = [];
+  const order = [...Array(t.N).keys()].sort((a, b) => Math.abs(t.curv[b]) - Math.abs(t.curv[a]));
+  for (const i of order) {
+    if (corners.length >= 5) break;
+    const s = i * t.ds;
+    if (s < 260 || s > t.length - 260) continue; // 主看台附近不要
+    if (corners.every((c) => Math.abs(c - i) > 120 && Math.abs(c - i) < t.N - 120)) corners.push(i);
+  }
+  const screenGeo: THREE.BufferGeometry[] = [];
+  corners.forEach((i, n) => {
+    const sg = t.curv[i] > 0 ? -1 : 1, s = i * t.ds, base = WALL_OFF + 28;
+    const len = n < 3 ? 50 : 32;
+    stand(s - len, s + len, sg, base);
+    // 大螢幕：看台尾端再過去一點，面向賽道
+    const j = at(s + len + 18), [x, z] = side(j, sg * (base + 4)), y = t.py[j];
+    const ang = Math.atan2(sg * t.tz[j], -sg * t.tx[j]);
+    for (const l of [-5, 5]) box(C_ROOF, 0.6, 10, 0.6, x + Math.cos(ang) * l, y + 3, z - Math.sin(ang) * l, ang);
+    box(C_ROOF, 16.8, 9.8, 0.6, x, y + 12.4, z, ang);
+    Q.setFromAxisAngle(up, ang);
+    screenGeo.push(new THREE.PlaneGeometry(16, 9).applyMatrix4(M.compose(V.set(x + Math.sin(ang) * 0.32, y + 12.4, z + Math.cos(ang) * 0.32), Q, S.set(1, 1, 1))));
+  });
+  if (screenGeo.length) { const m = new THREE.Mesh(mergeGeometries(screenGeo), mats[C_SCREEN]); scene.add(m); }
+
+  // ---- 維修區：起跑線旁、右側（跟 AI 進站那側一樣）——維修道、11 隊車庫、二樓玻璃帷幕、屋頂廣告
+  sweep(-130, 130, 1, WALL_OFF + 3, [
+    { pts: [[0, -0.01], [10, -0.01], [10, BOT]], mats: [C_PITLANE, C_CONCRETE], unit: [true, false], rep: [12, 16] },
+    {
+      pts: [[10, BOT], [10, 0], [10, 5.2], [8.6, 5.2], [8.6, 9.4], [8.6, 10.2], [26, 10.2], [26, BOT], [10, BOT]],
+      mats: [C_CONCRETE, C_GARAGE, C_CONCRETE, C_GLASS, C_BANNER, C_ROOF, C_CONCRETE, C_CONCRETE],
+      unit: [false, true, false, true, true, false, false, false],
+      rep: [16, 132, 16, 24, 60, 16, 16, 16],
+      cap: C_CONCRETE,
+    },
+  ]);
+
+  // 維修區屋頂上的空調箱、轉播棚（從空中看才不會是一整片平的）
+  for (let s = -115; s <= 115; s += 23) {
+    const i = at(s), ang = Math.atan2(t.tx[i], t.tz[i]);
+    const [x, z] = side(i, WALL_OFF + 3 + 20 + (Math.abs(s) % 2) * 2);
+    box(Math.abs(s) % 46 === 0 ? C_GLASS : C_CONCRETE, 5, 1.8, 6, x, t.py[i] + 11.1, z, ang);
+  }
+
+  // ---- 工作人員崗亭：每 280 m 一個，左右交錯，在護牆外
+  {
+    const huts: [number, number, number, number][] = [];
+    for (let s = 200, k = 0; s < t.length - 200; s += 280, k++) {
+      const i = at(s), sg = k % 2 ? 1 : -1;
+      if (gravelSide[i] === sg) continue;
+      const [x, z] = side(i, sg * (WALL_OFF + 4.5));
+      if (!clear(x, z, WALL_OFF + 2)) continue;
+      huts.push([x, t.py[i], z, Math.atan2(t.tx[i], t.tz[i])]);
+    }
+    const hut = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 2.6, 2.4).translate(0, 1.3 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#e6e8ea' }), Math.max(1, huts.length));
+    const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 0.3, 3).translate(0, 2.15, 0), new THREE.MeshLambertMaterial({ color: '#ff7a1a' }), Math.max(1, huts.length));
+    huts.forEach(([x, y, z, a], k) => {
+      Q.setFromAxisAngle(up, a);
+      M.compose(V.set(x, y, z), Q, S.set(1, 1, 1));
+      hut.setMatrixAt(k, M); cap.setMatrixAt(k, M);
+    });
+    hut.count = cap.count = huts.length;
+    hut.computeBoundingSphere(); cap.computeBoundingSphere();
+    scene.add(hut, cap);
+  }
+
+  // 建物合併：一種材質一次繪製
+  for (const [m, geos] of bins) scene.add(new THREE.Mesh(mergeGeometries(geos), mats[m]));
+
   // ---- 周圍：樹林，或街道賽的城市方塊
-  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   if (meta.biome === 'street') {
     const boxes: number[][] = [];
     for (let s = 0; s < t.length; s += 22) for (const sg of [-1, 1]) {
@@ -132,25 +380,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     im.computeBoundingSphere();
     scene.add(im);
   }
-  const nTrees = { grass: 2200, tropical: 1800, desert: 260, street: 500 }[meta.biome];
-  const palm = meta.biome === 'tropical' || meta.biome === 'desert';
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(palm ? 0.18 : 0.25, palm ? 0.26 : 0.35, palm ? 7 : 3, 6).translate(0, palm ? 3.5 : 1.5, 0), new THREE.MeshLambertMaterial({ color: palm ? '#7a6248' : '#5a4636' }), nTrees);
-  const crown = new THREE.InstancedMesh(palm ? new THREE.ConeGeometry(2.6, 1.4, 7).translate(0, 7.4, 0) : new THREE.IcosahedronGeometry(2.4, 0).translate(0, 4.6, 0), new THREE.MeshLambertMaterial({ flatShading: true }), nTrees);
-  const leaf = (palm ? ['#3f7a3a', '#4f8a3e', '#5c8f45'] : ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45']).map((c) => new THREE.Color(c));
-  let n = 0;
-  for (let tries = 0; n < nTrees && tries < nTrees * 6; tries++) {
-    const x = x0 - 500 + r() * (x1 - x0 + 1000), z = z0 - 500 + r() * (z1 - z0 + 1000);
-    if (!clear(x, z, WALL_OFF + 16)) continue;
-    const k = 0.8 + r() * 0.7;
-    Q.setFromAxisAngle(up, r() * 6.28);
-    M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(k, k, k));
-    trunk.setMatrixAt(n, M); crown.setMatrixAt(n, M);
-    crown.setColorAt(n, leaf[n % leaf.length]);
-    n++;
-  }
-  trunk.count = crown.count = n;
-  trunk.computeBoundingSphere(); crown.computeBoundingSphere();
-  scene.add(trunk, crown);
+  buildTrees(scene, meta, r, { x0, z0, x1, z1 }, clear, hAt);
 
   // ---- 夜賽、黃昏賽：照明燈柱（燈頭會亮）＋晚上照在路面上的光圈
   if (meta.time === 'night' || meta.time === 'dusk') {
@@ -179,4 +409,74 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     for (const m of [pole, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
   }
   return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0) };
+}
+
+/** 樹：成片的樹林（一群一群）加零星散樹；草地是闊葉樹混針葉樹，熱帶、沙漠是棕櫚樹 */
+function buildTrees(
+  scene: THREE.Scene, meta: CircuitMeta, r: () => number, b: { x0: number; z0: number; x1: number; z1: number },
+  clear: (x: number, z: number, d: number) => boolean, hAt: (x: number, z: number) => number,
+) {
+  const nTrees = { grass: 2400, tropical: 1800, desert: 260, street: 500 }[meta.biome];
+  const palm = meta.biome === 'tropical' || meta.biome === 'desert';
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  // 樹冠形狀
+  let kinds: THREE.BufferGeometry[];
+  if (palm) {
+    const fr: THREE.BufferGeometry[] = [];
+    // 葉子是兩段往下垂的薄片（雙面材質），比方塊省三角形
+    for (let k = 0; k < 8; k++) {
+      const droop = 0.35 + (k % 2) * 0.2, yaw = (k / 8) * Math.PI * 2;
+      fr.push(ni(new THREE.PlaneGeometry(0.9, 2).rotateX(-Math.PI / 2).translate(0, 0, 1).rotateX(droop).rotateY(yaw).translate(0, 7.3, 0)));
+      const z0 = 2 * Math.cos(droop), y0 = -2 * Math.sin(droop);
+      fr.push(ni(new THREE.PlaneGeometry(0.7, 1.8).rotateX(-Math.PI / 2).translate(0, 0, 0.9).rotateX(droop + 0.5).translate(0, y0, z0).rotateY(yaw).translate(0, 7.3, 0)));
+    }
+    fr.push(ni(new THREE.IcosahedronGeometry(0.55, 0).translate(0, 7.1, 0)));
+    kinds = [mergeGeometries(fr)];
+  } else {
+    // 闊葉：二十面體細分一次、頂點隨機往內外推（一樣的頂點推一樣多，才不會裂開）
+    const broad = new THREE.IcosahedronGeometry(2.4, 1);
+    const p = broad.attributes.position as THREE.BufferAttribute, push = new Map<string, number>();
+    for (let v = 0; v < p.count; v++) {
+      const key = `${p.getX(v).toFixed(2)},${p.getY(v).toFixed(2)},${p.getZ(v).toFixed(2)}`;
+      if (!push.has(key)) push.set(key, 0.82 + r() * 0.36);
+      const k = push.get(key)!;
+      p.setXYZ(v, p.getX(v) * k, p.getY(v) * k * 0.85, p.getZ(v) * k);
+    }
+    broad.translate(0, 4.6, 0).computeVertexNormals();
+    const conifer = mergeGeometries([ni(new THREE.ConeGeometry(2.1, 4.4, 8).translate(0, 4.1, 0)), ni(new THREE.ConeGeometry(1.5, 3.4, 8).translate(0, 6.4, 0))]);
+    conifer.computeVertexNormals();
+    kinds = [broad, conifer];
+  }
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(palm ? 0.18 : 0.25, palm ? 0.28 : 0.35, palm ? 7.2 : 3, 6).translate(0, palm ? 3.6 : 1.5, 0), new THREE.MeshLambertMaterial({ color: palm ? '#7a6248' : '#5a4636' }), nTrees);
+  const crowns = kinds.map((g) => new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ flatShading: true, side: palm ? THREE.DoubleSide : THREE.FrontSide }), nTrees));
+  const leaf = (palm ? ['#3f7a3a', '#4f8a3e', '#5c8f45'] : ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45']).map((c) => new THREE.Color(c));
+  const pine = ['#2d5230', '#365e36', '#2a4a2c'].map((c) => new THREE.Color(c));
+  const col = new THREE.Color();
+  // 樹林的中心：散在賽道周圍
+  const pad = 500, W = b.x1 - b.x0 + pad * 2, D = b.z1 - b.z0 + pad * 2;
+  const groves = Array.from({ length: Math.max(8, Math.round(nTrees / 30)) }, () => ({ x: b.x0 - pad + r() * W, z: b.z0 - pad + r() * D, rad: 40 + r() * 90, pine: r() < 0.4 }));
+  let n = 0;
+  const cn = crowns.map(() => 0);
+  for (let tries = 0; n < nTrees && tries < nTrees * 8; tries++) {
+    let x: number, z: number, gr: (typeof groves)[number] | null = null;
+    if (r() < 0.72) {
+      gr = groves[Math.floor(r() * groves.length)];
+      const a = r() * 6.283, d = gr.rad * Math.sqrt(r());
+      x = gr.x + Math.cos(a) * d; z = gr.z + Math.sin(a) * d;
+    } else { x = b.x0 - pad + r() * W; z = b.z0 - pad + r() * D; }
+    if (!clear(x, z, WALL_OFF + 30)) continue;
+    const k = 0.75 + r() * 0.75, kind = palm ? 0 : (gr ? gr.pine : r() < 0.3) ? 1 : 0;
+    Q.setFromAxisAngle(up, r() * 6.28);
+    M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(k, k * (0.9 + r() * 0.25), k));
+    trunk.setMatrixAt(n, M);
+    const cm = crowns[kind], ci = cn[kind]++;
+    cm.setMatrixAt(ci, M);
+    const base = kind === 1 ? pine : leaf;
+    cm.setColorAt(ci, col.copy(base[ci % base.length]).offsetHSL(0, 0, (r() - 0.5) * 0.06));
+    n++;
+  }
+  trunk.count = n;
+  crowns.forEach((m, k) => { m.count = cn[k]; m.computeBoundingSphere(); });
+  trunk.computeBoundingSphere();
+  scene.add(trunk, ...crowns);
 }

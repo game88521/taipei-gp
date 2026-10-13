@@ -88,7 +88,7 @@ if (circuitData) {
 // 中心線先平滑兩次（前後各 2 點、約 16 m）：OSM 的線有細小的鋸齒，曲率會亂跳，AI 的賽車線跟著亂擺就會撞牆
 const smooth = (p: [number, number][]) => p.map((_, i) => { let x = 0, z = 0; for (let k = -2; k <= 2; k++) { const q = p[(i + k + p.length) % p.length]; x += q[0]; z += q[1]; } return [x / 5, z / 5] as [number, number]; });
 const track = circuitData ? buildTrack(smooth(smooth(circuitData.points)), circuitData.elev) : buildTrack(); // elev：高低起伏（tools/fetch-elevation.mjs）
-const world = buildWorld(scene, track, CIRCUIT?.banner);
+const world = buildWorld(scene, track, CIRCUIT?.banner, CIRCUIT ? `${CIRCUIT.banner[1]}  ${CIRCUIT.banner[0]}` : undefined);
 let circuitEnv: { center: THREE.Vector3; extent: number } | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
 // 陰影：只涵蓋玩家周圍（每幀跟著移動），範圍越小越清楚
@@ -148,7 +148,7 @@ const ALL_TILES = new URLSearchParams(location.search).has('sim') || new URLSear
 /** 賽道模式：蓋場景、準備畫面（跟台北街景載完之後同一套：陰影旗標、天氣、著色器先編好） */
 async function loadCircuitScene() {
   await stage('蓋賽道場景', 0.4);
-  circuitEnv = buildCircuitEnv(scene, track, CIRCUIT!, world.ground);
+  circuitEnv = buildCircuitEnv(scene, track, CIRCUIT!, world);
   await stage('準備畫面', 0.9);
   applyShadowFlags();
   weather.collect();
@@ -917,11 +917,13 @@ function updateCountdown(dt: number) {
   if (lit !== litShown) {
     litShown = lit;
     lights.forEach((l, n) => l.classList.toggle('on', n < lit));
+    world.setStartLights(lit);
     if (lit > 0) sound.beep(440);
   }
   sound.engine(0.25 + (lit / 5) * 0.3, 0.4, true);
   if (countdown >= lightsOutAt) {
     lights.forEach((l) => l.classList.remove('on'));
+    world.setStartLights(0);
     $('lights').classList.add('go');
     setTimeout(() => $('lights').classList.remove('go'), 900);
     sound.beep(880, 0.35);
@@ -931,6 +933,7 @@ function updateCountdown(dt: number) {
 
 function beginCountdown() {
   resetRace();
+  world.setStartLights(0); // 倒數到一半離開的話燈還亮著
   // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
   field.rules = (new URLSearchParams(location.search).get('rules') ?? $<HTMLSelectElement>('opt-rules').value) === '2026' ? '2026' : 'classic';
   hud.dataset.rules = field.rules;
