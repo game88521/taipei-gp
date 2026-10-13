@@ -234,6 +234,27 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     [C_SCREEN]: new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }),
     [C_LAMP]: lampMat,
   };
+  // ---- 觀眾會動（著色器裡算，不花 CPU）：平時少數人在動；興奮時（起跑、超車、衝線）全場跳起來，還有沿看台跑的人浪
+  // 座位貼圖一排 8 px 一個人、一張 64 人寬 × 20 排；取樣時把某些「人格子」往下挪幾 px = 那個人往上跳
+  const crowdU = { uTime: { value: 0 }, uExcite: { value: 0 } };
+  mats[C_CROWD].onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, crowdU);
+    sh.fragmentShader = 'uniform float uTime;\nuniform float uExcite;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', `
+        vec2 cuv = vMapUv;
+        {
+          float col = floor(cuv.x * 64.0), row = floor(cuv.y * 20.0);
+          float h = fract(sin(col * 12.9898 + row * 78.233) * 43758.5453);
+          float idle = step(0.84, h) * pow(max(0.0, sin(uTime * (4.0 + h * 4.0) + h * 40.0)), 3.0) * 0.5;
+          float hop = pow(max(0.0, sin(uTime * 9.0 + h * 30.0)), 2.0);
+          float wave = pow(max(0.0, sin(col * 0.3 - uTime * 3.2)), 8.0);
+          cuv.y -= max(idle, uExcite * max(hop * step(0.35, h), wave)) * 3.0 / 320.0;
+        }
+        diffuseColor *= texture2D( map, cuv );`)
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= texture2D( emissiveMap, cuv ).rgb;');
+  };
+  // 揮旗：看台上一面一面的小旗（頂點著色器讓旗面飄，越興奮揮得越快）
+  const flagSpots: [number, number, number, number][] = [], standSpots: [number, number][] = [];
   const bins = new Map<number, THREE.BufferGeometry[]>();
   const push = (m: number, g: THREE.BufferGeometry) => { if (!bins.has(m)) bins.set(m, []); bins.get(m)!.push(g); };
   /** 一個方塊（世界座標、繞 y 轉 ang）丟進某個材質 */
@@ -302,6 +323,12 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       const i = at(s), [x, y, z] = P(i, 14.4, (BOT + 13.6) / 2);
       box(C_ROOF, 0.5, 13.6 - BOT, 0.5, x, y, z, Math.atan2(t.tx[i], t.tz[i]));
     }
+    for (let s = s0 + 3; s < s1; s += 4 + r() * 4) {
+      const i = at(s), u = 1.5 + r() * 11.5, [x, y, z] = P(i, u, 2.4 + ((u - 0.7) / 13.3) * 8.6 + 0.8);
+      flagSpots.push([x, y, z, Math.atan2(sg * t.tz[i], -sg * t.tx[i])]);
+    }
+    const mid = at((s0 + s1) / 2), [cx, , cz] = P(mid, 7, 0);
+    standSpots.push([cx, cz]);
   };
   // 主看台：起跑線前後、維修區的對面（維修區在右側）
   stand(-160, 160, -1, WALL_OFF + 5);
@@ -328,6 +355,28 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     screenGeo.push(new THREE.PlaneGeometry(16, 9).applyMatrix4(M.compose(V.set(x + Math.sin(ang) * 0.32, y + 12.4, z + Math.cos(ang) * 0.32), Q, S.set(1, 1, 1))));
   });
   if (screenGeo.length) { const m = new THREE.Mesh(mergeGeometries(screenGeo), mats[C_SCREEN]); scene.add(m); }
+  {
+    // 旗面 0.9 × 0.6 m，左緣是旗桿（x = 0），越往右飄得越大
+    const flagMat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
+    flagMat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, crowdU);
+      sh.vertexShader = 'uniform float uTime;\nuniform float uExcite;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
+        vec3 transformed = vec3( position );
+        float fid = float( gl_InstanceID );
+        transformed.z += sin( uTime * (5.0 + uExcite * 6.0) + position.x * 5.0 + fid * 1.7 ) * 0.16 * position.x * (0.6 + uExcite);
+        transformed.y += sin( uTime * (2.0 + uExcite * 5.0) + fid * 2.3 ) * 0.25 * uExcite;`);
+    };
+    const flags = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.9, 0.6, 4, 1).translate(0.45, 0, 0), flagMat, Math.max(1, flagSpots.length));
+    const fc = [...TEAMS.map((tm) => tm.livery.main), '#ffffff', '#e10600', '#ffd400'].map((c) => new THREE.Color(c));
+    flagSpots.forEach(([x, y, z, a], k) => {
+      Q.setFromAxisAngle(up, a);
+      flags.setMatrixAt(k, M.compose(V.set(x, y, z), Q, S.set(1, 1, 1)));
+      flags.setColorAt(k, fc[Math.floor(r() * fc.length)]);
+    });
+    flags.count = flagSpots.length;
+    flags.computeBoundingSphere();
+    scene.add(flags);
+  }
 
   // ---- 維修區：起跑線旁、右側（跟 AI 進站那側一樣）——維修道、11 隊車庫、二樓玻璃帷幕、屋頂廣告
   sweep(-130, 130, 1, WALL_OFF + 3, [
@@ -422,7 +471,19 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     }
     for (const m of [pole, head, pool]) { m.computeBoundingSphere(); scene.add(m); }
   }
-  return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0) };
+  // 觀眾的情緒：cheer() 一下子拉滿、慢慢退；車子（或鏡頭）在看台 150 m 內時一直有點興奮
+  let cheerLv = 0;
+  const crowd = {
+    cheer(k = 1) { cheerLv = Math.max(cheerLv, k); },
+    tick(dt: number, px: number, pz: number) {
+      crowdU.uTime.value += dt;
+      cheerLv = Math.max(0, cheerLv - dt * 0.22);
+      const near = standSpots.some(([x, z]) => (x - px) ** 2 + (z - pz) ** 2 < 150 * 150);
+      const want = Math.max(cheerLv, near ? 0.35 : 0);
+      crowdU.uExcite.value += (want - crowdU.uExcite.value) * Math.min(1, dt * 3);
+    },
+  };
+  return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0), crowd };
 }
 
 /** 樹：成片的樹林（一群一群）加零星散樹；草地是闊葉樹混針葉樹，熱帶、沙漠是棕櫚樹 */

@@ -89,7 +89,7 @@ if (circuitData) {
 const smooth = (p: [number, number][]) => p.map((_, i) => { let x = 0, z = 0; for (let k = -2; k <= 2; k++) { const q = p[(i + k + p.length) % p.length]; x += q[0]; z += q[1]; } return [x / 5, z / 5] as [number, number]; });
 const track = circuitData ? buildTrack(smooth(smooth(circuitData.points)), circuitData.elev) : buildTrack(); // elev：高低起伏（tools/fetch-elevation.mjs）
 const world = buildWorld(scene, track, CIRCUIT?.banner, CIRCUIT ? `${CIRCUIT.banner[1]}  ${CIRCUIT.banner[0]}` : undefined);
-let circuitEnv: { center: THREE.Vector3; extent: number } | null = null;
+let circuitEnv: ReturnType<typeof buildCircuitEnv> | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
 // 陰影：只涵蓋玩家周圍（每幀跟著移動），範圍越小越清楚
 {
@@ -926,6 +926,7 @@ function updateCountdown(dt: number) {
   if (countdown >= lightsOutAt) {
     lights.forEach((l) => l.classList.remove('on'));
     world.setStartLights(0);
+    circuitEnv?.crowd.cheer(1); // 燈號熄滅：全場歡呼
     $('lights').classList.add('go');
     setTimeout(() => $('lights').classList.remove('go'), 900);
     sound.beep(880, 0.35);
@@ -1346,7 +1347,7 @@ function radioTick(dt: number) {
   if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && me.pitTimer <= 0 && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
   // 名次創新高才報（在兩個名次之間跳來跳去不要一直說）；掉了兩名以上之後重新算
   if (lastPos < 0) lastPos = k;
-  if (k < lastPos && field.raceTime > 5) { radio.say('gain', `漂亮！上到第 ${k + 1} 名`, 12); lastPos = k; }
+  if (k < lastPos && field.raceTime > 5) { radio.say('gain', `漂亮！上到第 ${k + 1} 名`, 12); lastPos = k; circuitEnv?.crowd.cheer(0.8); }
   else if (k > lastPos + 1) lastPos = k;
 }
 /** 頒獎典禮：前三名站上台、噴香檳；12 秒後（或按「查看成績」）看成績表 */
@@ -2246,7 +2247,8 @@ renderer.setAnimationLoop(() => {
     if (state === 'countdown') updateCountdown(dt);
   }
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
-  if (state === 'podium') podiumFrame(dt);
+  if (state === 'podium') { podiumFrame(dt); circuitEnv?.crowd.cheer(1); }
+  circuitEnv?.crowd.tick(dt, camera.position.x, camera.position.z); // 看台觀眾：鏡頭靠近時興奮一點
   if (state === 'race' && raceKind === 'gp' && !SIM) { radioTick(dt); radio.update(dt); }
   cityStream?.tick(dt); // 新載入的城市區塊長起來
   // 車庫分頁看得到時才畫 3D 預覽；烤漆照遊戲裡那台
