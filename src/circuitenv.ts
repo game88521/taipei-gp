@@ -212,15 +212,27 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       g.fillStyle = '#ffd400'; g.textAlign = 'right'; g.fillText(k ? `+${(k * 1.7 + 0.4).toFixed(1)}` : '領先', 496, y); g.textAlign = 'left';
     }
   });
+  // 夜間照明：看台被屋簷下的燈照亮、廣告看板與車庫打燈、玻璃帷幕裡的辦公室亮著
+  // （nightEmissive = [白天, 晚上] 的自發光顏色，weather.ts 照時段漸變；emissiveMap 用同一張貼圖，亮起來才看得到內容）
+  const lit = (m: THREE.MeshLambertMaterial, night: string, day = '#000000') => {
+    if (m.map) m.emissiveMap = m.map;
+    m.emissive.set(day);
+    m.userData.nightEmissive = [day, night];
+    return m;
+  };
+  const C_LAMP = 8;
+  const lampMat = new THREE.MeshBasicMaterial({ color: '#fff2d8', toneMapped: false, side: THREE.DoubleSide });
+  lampMat.userData.lamp = true; // 白天暗、晚上亮（weather.ts）
   const mats: Record<number, THREE.Material> = {
-    [C_CONCRETE]: new THREE.MeshLambertMaterial({ color: '#b2b6bd', side: THREE.DoubleSide }),
-    [C_CROWD]: new THREE.MeshLambertMaterial({ map: crowdTex, side: THREE.DoubleSide }),
-    [C_ROOF]: new THREE.MeshLambertMaterial({ color: '#c3c8cf', side: THREE.DoubleSide }), // 淺色膜屋頂：從空中看才不會是一大塊黑
-    [C_BANNER]: new THREE.MeshLambertMaterial({ map: bannerTex, side: THREE.DoubleSide }),
-    [C_GARAGE]: new THREE.MeshLambertMaterial({ map: garageTex, side: THREE.DoubleSide }),
-    [C_GLASS]: new THREE.MeshLambertMaterial({ map: glassTex, side: THREE.DoubleSide, emissive: '#0d1622' }),
-    [C_PITLANE]: new THREE.MeshLambertMaterial({ map: pitTex, side: THREE.DoubleSide }),
+    [C_CONCRETE]: lit(new THREE.MeshLambertMaterial({ color: '#b2b6bd', side: THREE.DoubleSide }), '#2a2c32'),
+    [C_CROWD]: lit(new THREE.MeshLambertMaterial({ map: crowdTex, side: THREE.DoubleSide }), '#8a8a90'),
+    [C_ROOF]: lit(new THREE.MeshLambertMaterial({ color: '#c3c8cf', side: THREE.DoubleSide }), '#22252b'), // 淺色膜屋頂：從空中看才不會是一大塊黑
+    [C_BANNER]: lit(new THREE.MeshLambertMaterial({ map: bannerTex, side: THREE.DoubleSide }), '#c8c8c8'),
+    [C_GARAGE]: lit(new THREE.MeshLambertMaterial({ map: garageTex, side: THREE.DoubleSide }), '#b4b4b4'),
+    [C_GLASS]: lit(new THREE.MeshLambertMaterial({ map: glassTex, side: THREE.DoubleSide }), '#d0dcec', '#0d1622'),
+    [C_PITLANE]: lit(new THREE.MeshLambertMaterial({ map: pitTex, side: THREE.DoubleSide }), '#5a5a5e'),
     [C_SCREEN]: new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }),
+    [C_LAMP]: lampMat,
   };
   const bins = new Map<number, THREE.BufferGeometry[]>();
   const push = (m: number, g: THREE.BufferGeometry) => { if (!bins.has(m)) bins.set(m, []); bins.get(m)!.push(g); };
@@ -284,6 +296,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       { pts: [[0, BOT], [0, 0.6], [0, 2.4], [0.7, 2.4], [14, 11], [14.8, 11], [14.8, BOT], [0, BOT]], mats: [C_CONCRETE, C_BANNER, C_CONCRETE, C_CROWD, C_CONCRETE, C_CONCRETE, C_CONCRETE], unit: [false, true, false, true, false, false, false], rep: [16, 60, 16, 32, 16, 16, 16], cap: C_CONCRETE },
       { pts: [[-1.5, 15.6], [15.2, 13.4]], mats: [C_ROOF] },
       { pts: [[-1.5, 14.6], [-1.5, 15.6]], mats: [C_BANNER], unit: [true], rep: [60] },
+      { pts: [[-1.1, 15.25], [-0.3, 15.2]], mats: [C_LAMP] }, // 屋簷下的燈條：晚上照亮看台
     ]);
     for (let s = s0; s <= s1; s += 16) {
       const i = at(s), [x, y, z] = P(i, 14.4, (BOT + 13.6) / 2);
@@ -326,6 +339,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       rep: [16, 132, 16, 24, 60, 16, 16, 16],
       cap: C_CONCRETE,
     },
+    { pts: [[9.0, 5.12], [9.8, 5.12]], mats: [C_LAMP] }, // 雨遮下的燈條：晚上照亮車庫門口
   ]);
 
   // 維修區屋頂上的空調箱、轉播棚（從空中看才不會是一整片平的）
