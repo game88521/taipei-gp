@@ -128,6 +128,7 @@ export class Weather {
   private windows: (THREE.MeshLambertMaterial | THREE.MeshStandardMaterial)[] = [];
   private lamps: THREE.MeshBasicMaterial[] = [];
   private nightOnly: THREE.Object3D[] = [];
+  private rainOnly: THREE.Object3D[] = []; // 只有下雨才出現（賽道上的積水）
   private roads: { mesh: THREE.Mesh; dry: THREE.Material; wet?: THREE.Material }[] = [];
   private shadowMats: THREE.MeshBasicMaterial[] = [];
   private nightGlow: THREE.MeshBasicMaterial[] = []; // 晚上變亮的招牌、燈圈（userData.nightScale）
@@ -140,10 +141,11 @@ export class Weather {
 
   /** 城市載入後掃一遍：有標記的材質（窗戶、路燈、道路、只在晚上出現的東西） */
   collect() {
-    this.windows = []; this.lamps = []; this.nightOnly = []; this.roads = []; this.shadowMats = []; this.nightGlow = []; this.nightEmis = []; this.tickers = [];
+    this.windows = []; this.lamps = []; this.nightOnly = []; this.rainOnly = []; this.roads = []; this.shadowMats = []; this.nightGlow = []; this.nightEmis = []; this.tickers = [];
     const seen = new Set<THREE.Material>();
     this.scene.traverse((o) => {
       if (o.userData.nightOnly) this.nightOnly.push(o);
+      if (o.userData.rainOnly) this.rainOnly.push(o);
       if (o.userData.ticker && !this.tickers.includes(o.userData.ticker)) this.tickers.push(o.userData.ticker);
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (!m || Array.isArray(m)) return;
@@ -195,6 +197,7 @@ export class Weather {
     if (bloom) bloom.strength = p.bloom;
     if (grade) (grade.uniforms.tint.value as THREE.Vector3).set(...p.tint);
     this.rain.mesh.visible = p.rain;
+    for (const o of this.rainOnly) o.visible = p.rain;
     // 濕路面：換成會反光（映出天空與燈）的材質，顏色暗一點
     for (const r of this.roads) {
       if (p.rain) {

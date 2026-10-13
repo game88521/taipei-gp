@@ -523,7 +523,7 @@ function kick(c: Car, dvx: number, dvz: number) {
 }
 
 /** 賽車線：彎道往內側切（最多離中心 5.2 m），再大範圍平滑，讓進彎外側→彎心內側→出彎外側的形狀自然出現 */
-function racingLine(t: Track): Float32Array {
+export function racingLine(t: Track): Float32Array {
   const N = t.N, raw = new Float32Array(N), out = new Float32Array(N);
   const MAX = HALF_WIDTH - Number(new URLSearchParams(location.search).get('lm') ?? 1.8); // 離路緣留多少（測試可調）
   // 曲率正 = 右彎，內側在右邊（橫向正）

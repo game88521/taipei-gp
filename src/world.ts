@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HALF_WIDTH, WALL_OFF, VMAX, type Track } from './track';
+import { racingLine } from './rivals';
 
 // 賽道本身（路面、路緣、護牆、門架、路燈）與天空光線；城市建築在 city.ts（真實 OpenStreetMap 資料）
 // 沒有外部模型、沒有圖片檔，貼圖全用 canvas 畫
@@ -111,12 +112,14 @@ interface RibbonOpt {
   alongIsU?: boolean; // 沿賽道方向放在 u（看板文字用）
   mask?: (i: number) => boolean;
   color?: (i: number) => THREE.Color;
+  center?: ArrayLike<number>; // 每個點的橫向基準（賽車線上的胎痕用）；a、b 是相對它的偏移
 }
 
 /** 沿著賽道拉一條帶狀網格：路面、路緣、護牆、輔助線都用它 */
 function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
   const pos: number[] = [], uv: number[] = [], col: number[] = [];
   const vert = (i: number, off: number, y: number, across: number, d: number) => {
+    off += o.center ? o.center[i] : 0;
     pos.push(t.px[i] - t.tz[i] * off, y + t.py[i], t.pz[i] + t.tx[i] * off);
     const along = d / o.along;
     if (o.alongIsU) uv.push(along, across); else uv.push(across, along);
@@ -253,13 +256,13 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
     g.fillRect(5, 0, 7, 512);
     g.fillRect(244, 0, 7, 512);
   });
-  race.add(new THREE.Mesh(
-    ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }),
-    // 城市道路的標線有往鏡頭偏移（避免閃爍），賽道路面要偏移得更多，才不會被底下的雙黃線透出來
-    new THREE.MeshLambertMaterial({ map: asphalt, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 }),
-  ));
+  // 城市道路的標線有往鏡頭偏移（避免閃爍），賽道路面要偏移得更多，才不會被底下的雙黃線透出來
+  const trackMat = new THREE.MeshLambertMaterial({ map: asphalt, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
+  trackMat.userData.road = true; // 下雨時換成會反光的濕路面（weather.ts）
+  race.add(new THREE.Mesh(ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }), trackMat));
   // 路肩（路緣外到護牆外 3 m，路燈立在上面）
   const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
+  shoulder.userData.road = true;
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
   }
@@ -273,6 +276,54 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   const inCorner = (i: number) => Math.abs(t.curv[i]) > 1 / 200;
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * (HALF_WIDTH - 0.6), b: s * (HALF_WIDTH + 1.2), ya: 0.02, yb: 0.02, along: 4, mask: inCorner }), kerbMat));
+  }
+
+  // ---- 路面細節：賽車線上一條被輪胎磨深的橡膠痕、煞車區兩道胎痕
+  {
+    const line = racingLine(t);
+    const streaks = (n: number, a0: number, a1: number) => canvasTex(64, 256, (g) => {
+      // 橫向 64 px × 沿賽道 256 px：一條一條細長的黑色胎痕
+      g.clearRect(0, 0, 64, 256);
+      for (let k = 0; k < n; k++) {
+        g.fillStyle = `rgba(8,8,10,${a0 + Math.random() * (a1 - a0)})`;
+        g.fillRect(4 + Math.random() * 56, Math.random() * 256, 1 + Math.random() * 2.5, 10 + Math.random() * 60);
+      }
+    });
+    const darken = (map: THREE.Texture, opacity: number, u: number) => new THREE.MeshBasicMaterial({ map, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: u });
+    race.add(new THREE.Mesh(ribbon(t, { a: -1.1, b: 1.1, ya: 0.01, yb: 0.01, along: 14, center: line }), darken(streaks(2200, 0.05, 0.16), 1, -64)));
+    // 煞車區：前方 30 m 內建議速度掉 3 m/s 以上的地方（輪距 ±0.8 m 兩道）
+    const braking = (i: number) => t.vTarget[i] - t.vTarget[(i + Math.round(30 / t.ds)) % t.N] > 3;
+    const skid = darken(streaks(900, 0.25, 0.6), 1, -66);
+    for (const sg of [-1, 1]) race.add(new THREE.Mesh(ribbon(t, { a: sg * 0.8 - 0.22, b: sg * 0.8 + 0.22, ya: 0.012, yb: 0.012, along: 9, center: line, mask: braking }), skid));
+  }
+
+  // ---- 下雨才出現的積水：路面低窪處一定有、其他地方零星幾灘；會映出天空與燈（weather.ts 照 rainOnly 開關）
+  {
+    const spots: number[] = [];
+    const step = Math.max(1, Math.round(9 / t.ds));
+    for (let i = 0; i < t.N; i += step) {
+      const a = t.py[(i - step + t.N) % t.N], b = t.py[(i + step) % t.N];
+      const dip = t.py[i] < a - 0.05 && t.py[i] < b - 0.05;
+      if (dip || rand() < 0.12) spots.push(i);
+    }
+    const alpha = canvasTex(64, 64, (g) => {
+      const grd = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+      grd.addColorStop(0, '#fff'); grd.addColorStop(0.65, '#bbb'); grd.addColorStop(1, '#000');
+      g.fillStyle = '#000'; g.fillRect(0, 0, 64, 64); g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    }, false);
+    const mat = new THREE.MeshStandardMaterial({ color: '#b8c0cc', roughness: 0.02, metalness: 0.9, envMapIntensity: 1.6, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -72 });
+    const pud = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), mat, Math.max(1, spots.length));
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    spots.forEach((i, k) => {
+      const lat = (rand() - 0.5) * 2 * (HALF_WIDTH - 1.5);
+      q.setFromAxisAngle(up, Math.atan2(t.tx[i], t.tz[i]));
+      pud.setMatrixAt(k, m.compose(v.set(t.px[i] - t.tz[i] * lat, t.py[i] + 0.02, t.pz[i] + t.tx[i] * lat), q, sc.set(1.2 + rand() * 1.6, 1, 2.5 + rand() * 4)));
+    });
+    pud.count = spots.length;
+    pud.computeBoundingSphere();
+    pud.userData.rainOnly = true;
+    pud.visible = false;
+    race.add(pud);
   }
 
   // ---- 行車輔助線：綠 = 可以全油門，黃 = 彎中，紅 = 該煞車
