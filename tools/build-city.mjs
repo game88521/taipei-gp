@@ -473,6 +473,77 @@ for (const e of roadWays) {
   if (t.tunnel === 'building_passage' || t.covered === 'yes') passWays.add(way); // 穿過建築底下的路（騎樓、門洞）
 }
 
+// ---------------------------------------------------------------- 主要道路淨空：建築外框伸進幹道、次要道路車道的部分往外推
+// OSM 的建築和道路中心線是分開畫的，路寬又是照等級估的，常有幾公尺的牆伸進車道（例：中山南路旁的中正紀念堂迴廊）。
+// 只推「伸進去 3.5 m 以內」的點；伸更深的多半是真的跨在路上（騎樓、門洞另外處理），整棟不動
+{
+  const CLEAR = 0.4, MAX_PUSH = 3.5, G = 50;
+  const segGrid = new Map();
+  for (const w of netWays) {
+    if (w.c > 1 || passWays.has(w)) continue;
+    for (let k = 1; k < w.n.length; k++) {
+      const s = { ax: netNodes[w.n[k - 1] * 2], az: netNodes[w.n[k - 1] * 2 + 1], bx: netNodes[w.n[k] * 2], bz: netNodes[w.n[k] * 2 + 1], half: w.w / 2 };
+      const pad = s.half + MAX_PUSH + 6;
+      for (let gx = Math.floor((Math.min(s.ax, s.bx) - pad) / G); gx <= Math.floor((Math.max(s.ax, s.bx) + pad) / G); gx++)
+        for (let gz = Math.floor((Math.min(s.az, s.bz) - pad) / G); gz <= Math.floor((Math.max(s.az, s.bz) + pad) / G); gz++) {
+          const key = gx + ',' + gz;
+          if (!segGrid.has(key)) segGrid.set(key, []);
+          segGrid.get(key).push(s);
+        }
+    }
+  }
+  const near = (x, z) => segGrid.get(Math.floor(x / G) + ',' + Math.floor(z / G)) || [];
+  const closest = (x, z, s) => {
+    const dx = s.bx - s.ax, dz = s.bz - s.az, l = dx * dx + dz * dz || 1;
+    const u = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / l));
+    const cx = s.ax + dx * u, cz = s.az + dz * u;
+    return { d: Math.hypot(x - cx, z - cz), cx, cz };
+  };
+  // 這個點最深伸進哪條路、要推多少
+  const worst = (x, z) => {
+    let best = null;
+    for (const s of near(x, z)) {
+      const c = closest(x, z, s), need = s.half + CLEAR - c.d;
+      if (need > 0 && (!best || need > best.need)) best = { need, ...c };
+    }
+    return best;
+  };
+  let moved = 0, skipped = 0;
+  for (const o of buildings) {
+    if (o.raised || (o.m ?? 0) > 2) continue;
+    let r = [];
+    for (let i = 0; i < o.p.length; i += 2) r.push([o.p[i], o.p[i + 1]]);
+    if (!r.some(([x, z]) => near(x, z).length)) continue;
+    // 長邊切細（每 3 m 一點），牆中間伸進路的部分才推得到
+    const fine = [];
+    let touched = false;
+    for (let i = 0; i < r.length; i++) {
+      const a = r[i], b = r[(i + 1) % r.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      fine.push(a);
+      const n = Math.floor(L / 3);
+      for (let k = 1; k < n; k++) {
+        const p = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
+        if (worst(p[0], p[1])) { fine.push(p); touched = true; }
+      }
+      if (worst(a[0], a[1])) touched = true;
+    }
+    if (!touched) continue;
+    const pushes = fine.map(([x, z]) => worst(x, z));
+    if (pushes.some((w) => w && (w.need > MAX_PUSH || w.d < 0.05))) { skipped++; continue; }
+    r = fine.map(([x, z], i) => {
+      const w = pushes[i];
+      if (!w) return [x, z];
+      const ux = (x - w.cx) / w.d, uz = (z - w.cz) / w.d;
+      return [x + ux * w.need, z + uz * w.need];
+    });
+    // 推完面積縮太多（推歪了）就不改
+    if (Math.abs(area(r)) < Math.abs(area(fine)) * 0.5) { skipped++; continue; }
+    o.p = r.flatMap(([x, z]) => [r1(x), r1(z)]);
+    moved++;
+  }
+  console.log(`主要道路淨空：建築往外推 ${moved} 棟（伸太深、像是跨在路上的不動：${skipped} 棟）`);
+}
+
 // ---------------------------------------------------------------- 高架道路、人行空橋、文湖線高架、地下道入口
 // 高度：接到地面道路的節點 = 0；高架主線照 layer（一層約 6.5 m）；匝道沿線依距離從地面升到高架
 // k：0 道路、1 人行空橋、2 捷運高架；車子不能開上去（物理是平面的），從底下過，橋墩會擋
