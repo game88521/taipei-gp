@@ -338,6 +338,25 @@ timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind;
   const showSens = () => { $('sens-val').textContent = `${(+sens.value).toFixed(1)}×`; };
   showSens();
   sens.addEventListener('input', () => { input.sens = save.sens = +sens.value; showSens(); writeSave(); });
+  // 觸控按鈕：大小、透明度、位置（CSS 變數 --tc-scale、--tc-op、--tc-lift；html.tc-swap 左右對調）
+  const tc: NonNullable<typeof save.tc> = save.tc ?? { size: 1, op: 1, pos: 'std' };
+  const tcSize = $<HTMLInputElement>('opt-tc-size'), tcOp = $<HTMLInputElement>('opt-tc-op'), tcPos = $<HTMLSelectElement>('opt-tc-pos');
+  const applyTc = () => {
+    const st = document.documentElement.style;
+    st.setProperty('--tc-scale', String(tc.size));
+    st.setProperty('--tc-op', String(tc.op));
+    st.setProperty('--tc-lift', tc.pos.endsWith('lift') ? '46px' : '0px');
+    document.documentElement.classList.toggle('tc-swap', tc.pos.startsWith('swap'));
+    document.documentElement.classList.toggle('tc-radio-top', tc.size > 1.05 || tc.pos !== 'std');
+    $('tc-size-val').textContent = `${Math.round(tc.size * 100)}%`;
+    $('tc-op-val').textContent = `${Math.round(tc.op * 100)}%`;
+  };
+  tcSize.value = String(tc.size); tcOp.value = String(tc.op); tcPos.value = tc.pos;
+  const saveTc = () => { save.tc = { ...tc }; writeSave(); applyTc(); };
+  tcSize.addEventListener('input', () => { tc.size = +tcSize.value; saveTc(); });
+  tcOp.addEventListener('input', () => { tc.op = +tcOp.value; saveTc(); });
+  tcPos.addEventListener('change', () => { tc.pos = tcPos.value as typeof tc.pos; saveTc(); });
+  applyTc();
   const vol = save.vol ?? { master: 1, engine: 1, fx: 1 };
   sound.setVolume(vol);
   for (const k of ['master', 'engine', 'fx'] as const) {

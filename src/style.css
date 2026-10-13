@@ -1230,3 +1230,24 @@ html:not(.touch) #radio { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 
 .season-table td:nth-child(4) { font: 800 14px var(--mono); color: #f2c14e; }
 .season-table tr.me td { background: rgba(225, 6, 0, 0.35); }
 #season-res h3 { margin: 4px 0; font-size: 15px; color: #f2c14e; }
+
+/* ---------------- 觸控按鈕自訂（設定 → 操作）：--tc-scale 大小、--tc-op 透明度、--tc-lift 抬高；html.tc-swap 左右對調
+   每顆按鈕照自己貼邊的那個角縮放，按鈕之間的間距也乘上同一個倍數，放大時才不會疊在一起 */
+html.touch #steer-btns, html.touch #pad { scale: var(--tc-scale, 1); transform-origin: left bottom; opacity: var(--tc-op, 1); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px)); }
+html.touch #brake, html.touch #gas, html.touch #drs, html.touch #pit, html.touch #btn-drift, html.touch #btn-horn { scale: var(--tc-scale, 1); transform-origin: right bottom; opacity: var(--tc-op, 1); }
+html.touch #brake { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px)); }
+html.touch #gas, html.touch #drs { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 132px * var(--tc-scale, 1)); }
+html.touch #pit { right: calc(max(14px, env(safe-area-inset-right)) + 96px * var(--tc-scale, 1)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 132px * var(--tc-scale, 1)); }
+html.touch #btn-drift { right: calc(max(14px, env(safe-area-inset-right)) + 132px * var(--tc-scale, 1)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 72px * var(--tc-scale, 1)); }
+html.touch #btn-horn { right: calc(max(14px, env(safe-area-inset-right)) + 132px * var(--tc-scale, 1)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 150px * var(--tc-scale, 1)); }
+/* 左右對調：轉向到右手、油門煞車（還有 DRS、進站、甩尾、喇叭）到左手 */
+html.touch.tc-swap #steer-btns, html.touch.tc-swap #pad { left: auto; right: max(14px, env(safe-area-inset-right)); transform-origin: right bottom; }
+html.touch.tc-swap #brake, html.touch.tc-swap #gas, html.touch.tc-swap #drs { right: auto; left: max(14px, env(safe-area-inset-left)); transform-origin: left bottom; }
+html.touch.tc-swap #pit { right: auto; left: calc(max(14px, env(safe-area-inset-left)) + 96px * var(--tc-scale, 1)); transform-origin: left bottom; }
+html.touch.tc-swap #btn-drift, html.touch.tc-swap #btn-horn { right: auto; left: calc(max(14px, env(safe-area-inset-left)) + 132px * var(--tc-scale, 1)); transform-origin: left bottom; }
+/* 矮螢幕：DRS、進站原本就放低一點（煞車上方 112 px） */
+@media (max-height: 480px) {
+  html.touch #drs, html.touch #pit { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 112px * var(--tc-scale, 1)); }
+}
+/* 按鈕放大或換位置後，左下角放不下無線電框：改到畫面上方中央（translate 跟淡入動畫的 transform 分開） */
+html.touch.tc-radio-top #radio { left: 50%; right: auto; top: calc(max(10px, env(safe-area-inset-top)) + 28px); bottom: auto; translate: -50% 0; }

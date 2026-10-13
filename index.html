@@ -217,6 +217,16 @@
                   </select>
                 </label>
                 <label class="q rng">轉向靈敏度<input type="range" id="opt-sens" min="0.5" max="1.5" step="0.1" /><small id="sens-val"></small></label>
+                <label class="q rng">按鈕大小<input type="range" id="opt-tc-size" min="0.7" max="1.4" step="0.05" /><small id="tc-size-val"></small></label>
+                <label class="q rng">按鈕透明度<input type="range" id="opt-tc-op" min="0.3" max="1" step="0.05" /><small id="tc-op-val"></small></label>
+                <label class="q">按鈕位置
+                  <select id="opt-tc-pos">
+                    <option value="std">標準（左手轉向、右手油門煞車）</option>
+                    <option value="swap">左右對調</option>
+                    <option value="lift">抬高一點（避開手機邊緣）</option>
+                    <option value="swap-lift">對調＋抬高</option>
+                  </select>
+                </label>
                 <label class="sw">行車輔助線<input type="checkbox" id="opt-assist" /></label>
               </fieldset>
               <fieldset>
