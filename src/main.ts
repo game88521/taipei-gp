@@ -584,6 +584,8 @@ function step(dt: number) {
     if (car.v > track.vTarget[ahead] + 5) warnText = '煞車！';
   }
 
+  // 這一步裡比賽結束了（排位賽跑完一圈會切到成績表）：別再把引擎聲打開，不然之後不再步進，聲音就一直卡著
+  if (state !== 'race') return;
   const gear = gearOf(car.v);
   sound.setEngine('f1');
   sound.engine(gear.rpm, inp.brake ? 0.15 : 1, true);
