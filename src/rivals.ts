@@ -45,7 +45,27 @@ export interface Racer {
   profile: Float32Array | null; // 這台 AI 的速度曲線（m/s）
   lat: number; // 超車用的橫向偏移（相對賽車線）
   stuck: number;
+  persona: Persona; // 個性：超車積不積極、會不會卡位、顧不顧輪胎、雨天強不強
+  defT: number; // 卡位的冷卻（秒）：一次防守只換一次線
 }
+
+/** AI 個性（玩家用「均衡」）。aggr：超車的積極程度；defend：被追時換線卡位；tyre：輪胎磨耗倍率；wet：濕地抓地力損失少幾成 */
+export interface Persona { tag: string; icon: string; aggr: number; defend: number; tyre: number; wet: number }
+export const PERSONAS: Record<string, Persona> = {
+  aggr: { tag: '激進', icon: '🔥', aggr: 0.9, defend: 0.5, tyre: 1.12, wet: 0 },
+  defend: { tag: '防守', icon: '🛡️', aggr: 0.35, defend: 0.95, tyre: 1, wet: 0 },
+  smooth: { tag: '穩健', icon: '🧊', aggr: 0.25, defend: 0.4, tyre: 0.85, wet: 0 },
+  rain: { tag: '雨戰', icon: '🌧️', aggr: 0.5, defend: 0.5, tyre: 1, wet: 0.4 },
+  even: { tag: '均衡', icon: '', aggr: 0.43, defend: 0.3, tyre: 1, wet: 0 }, // 跟加個性之前的行為一樣
+};
+// 每位車手的個性（照名字）；沒列的是均衡
+const PERSONA_OF: Record<string, keyof typeof PERSONAS> = {
+  林志豪: 'aggr', 王柏翰: 'aggr', 吳俊傑: 'aggr', 謝承翰: 'aggr', 賴俊宏: 'aggr',
+  陳冠宇: 'defend', 張家瑋: 'defend', 許書豪: 'defend', 廖哲瑋: 'defend',
+  李承恩: 'smooth', 蔡明哲: 'smooth', 郭彥廷: 'smooth', 周家豪: 'smooth',
+  劉宇翔: 'rain', 鄭宇辰: 'rain', 洪志明: 'rain',
+};
+export const personaOf = (name: string): Persona => PERSONAS[PERSONA_OF[name] ?? 'even'];
 
 // 虛構車手：11 隊 22 台（2026 起的規模），玩家在第 0 隊，隊友是李承恩
 // [名字, 車隊（TEAMS 索引）]；能力照排列順序由強到弱：過彎抓地力用到幾成、煞車減速度 m/s²、引擎力
@@ -95,9 +115,9 @@ export class RaceField {
       scene.add(model.root);
       const car = new Car();
       car.power = power;
-      this.racers.push({ ...fresh(), name, team, color: livery.main, car, model, isPlayer: false, profile: speedProfile(t, this.line, grip, brake) });
+      this.racers.push({ ...fresh(), name, team, color: livery.main, car, model, isPlayer: false, profile: speedProfile(t, this.line, grip, brake), persona: personaOf(name) });
     });
-    this.racers.push({ ...fresh(), name: '你', team: TEAMS[0].team, color: TEAMS[0].livery.main, car: player, model: null, isPlayer: true, profile: null });
+    this.racers.push({ ...fresh(), name: '你', team: TEAMS[0].team, color: TEAMS[0].livery.main, car: player, model: null, isPlayer: true, profile: null, persona: PERSONAS.even });
     // DRS 區：建議速度幾乎全油門、連續 250 m 以上的長直線
     const fast = (i: number) => t.vTarget[i] >= VMAX0 * 0.97;
     let start = -1;
@@ -209,9 +229,10 @@ export class RaceField {
     for (const r of this.racers) {
       const c = r.car, ty = TYRES[r.compound];
       const onRain = r.compound === RAIN;
-      if (racing && r.pitTimer <= 0) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
-      // 濕地：乾地胎打滑（抓地力最多少 28%）；雨胎在濕地只少一點、在乾地反而差
-      const wetK = onRain ? (1 - 0.04 * this.wet) * (1 - 0.08 * (1 - this.wet)) : 1 - 0.28 * this.wet;
+      if (racing && r.pitTimer <= 0) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * r.persona.tyre * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
+      // 濕地：乾地胎打滑（抓地力最多少 28%）；雨胎在濕地只少一點、在乾地反而差；雨戰型車手濕地少掉的抓地力少幾成
+      const wetLoss = 1 - r.persona.wet;
+      const wetK = (onRain ? (1 - 0.04 * this.wet * wetLoss) * (1 - 0.08 * (1 - this.wet)) : 1 - 0.28 * this.wet * wetLoss) * (1 + 0.06 * this.wet * r.persona.wet);
       c.gripMul = ty.grip * (1 - 0.18 * r.wear ** 1.5) * wetK;
       // 安全車：跟在車隊裡的、領先者限速；還沒追上的可以開快一點追上來（差距縮小）；不能開 DRS／超車
       if (this.sc.phase !== 'off' && r.finish == null) {
@@ -416,20 +437,27 @@ export class RaceField {
   get replayLength() { return (this.me.rec.length / 5) * 0.05; }
 
   private drive(r: Racer, cooldown: boolean) {
-    const t = this.t, c = r.car, i = c.pos.i, N = t.N;
-    // 前方擋路的車：同一條線上、前面 24 m 內
-    let blocker: Racer | null = null, gap = Infinity;
+    const t = this.t, c = r.car, i = c.pos.i, N = t.N, P = r.persona;
+    // 前方擋路的車：同一條線上、前面一段距離內（激進的看得遠、早一點開始找空檔）
+    const range = 18 + 14 * P.aggr;
+    let blocker: Racer | null = null, gap = Infinity, attacker: Racer | null = null, agap = Infinity;
     for (const o of this.racers) {
       if (o === r || this.solo) continue;
       let d = o.car.pos.s - c.pos.s;
       if (d < -t.length / 2) d += t.length;
-      if (d > 0 && d < 24 && Math.abs(o.car.pos.lat - c.pos.lat) < 2.4 && d < gap) { gap = d; blocker = o; }
+      if (d > t.length / 2) d -= t.length;
+      if (d > 0 && d < range && Math.abs(o.car.pos.lat - c.pos.lat) < 2.4 && d < gap) { gap = d; blocker = o; }
+      // 後面追上來的車（比我快、18 m 內）
+      if (d < -2 && d > -18 && o.car.v > c.v - 0.5 && -d < agap) { agap = -d; attacker = o; }
     }
     const ahead = (i + Math.round((c.v * 0.45) / t.ds)) % N;
     // 輪胎磨耗後抓地力變小：過彎速度照 √(抓地力) 下修；完賽後跑慢速收車圈
     const tyreK = Math.sqrt(c.gripMul / 0.985);
-    const want = cooldown ? Math.min(25, r.profile![ahead]) : r.profile![ahead] * Math.min(1.02, tyreK);
-    if (blocker && blocker.car.v < want + 2 && this.sc.phase === 'off') { // 安全車期間不超車
+    let want = cooldown ? Math.min(25, r.profile![ahead]) : r.profile![ahead] * Math.min(1.02, tyreK);
+    // 激進型：跟前車並排纏鬥時晚煞車（多帶一點速度進彎，可能跑寬）
+    if (blocker && P.aggr > 0.6 && gap < 10 && Math.abs(blocker.car.pos.lat - c.pos.lat) > 1.2) want += (P.aggr - 0.6) * 4;
+    r.defT = Math.max(0, r.defT - 1 / 120);
+    if (blocker && blocker.car.v < want + 1 + P.aggr * 2.3 && this.sc.phase === 'off') { // 安全車期間不超車
       // 換到比較空的一側超車（相對賽車線，不超出路面）
       const crowd = (side: number) => this.racers.reduce((n, o) => {
         if (o === r || o === blocker) return n;
@@ -440,7 +468,11 @@ export class RaceField {
       const bl = blocker.car.pos.lat - this.line[i];
       const pref = bl > 0 ? -3.4 : 3.4, other = -pref;
       r.lat = crowd(this.line[i] + pref) <= crowd(this.line[i] + other) ? pref : other;
-    } else if (!blocker) {
+    } else if (!blocker && attacker && P.defend > 0.6 && r.defT <= 0 && this.sc.phase === 'off' && r.finish == null && t.vTarget[ahead] >= t.vTarget[i] - 0.1) {
+      // 防守型：後車在旁邊找空檔 → 換到它那一側卡位（一次防守只換一次線，之後 3 秒不再動）
+      const side = attacker.car.pos.lat - this.line[i];
+      if (Math.abs(side - r.lat) > 1.2) { r.lat = Math.max(-2.6, Math.min(2.6, side)) * P.defend; r.defT = 3; }
+    } else if (!blocker && r.defT <= 0) {
       r.lat += (0 - r.lat) * Math.min(1, 0.8 / 120); // 沒人擋：慢慢回到賽車線
     }
     const j = (i + Math.round((8 + c.v * this.look) / t.ds)) % N;
@@ -450,7 +482,8 @@ export class RaceField {
     err = Math.atan2(Math.sin(err), Math.cos(err));
     let brake = c.v > want + 0.5;
     // 換邊來不及就跟著前車速度（約 0.2 秒的跟車距離）
-    if (blocker && gap < 6 + c.v * 0.12 && Math.abs(blocker.car.pos.lat - c.pos.lat) < 1.8 && c.v > blocker.car.v - 1) brake = true;
+    // 跟車距離：激進的貼得近、穩健的留多一點
+    if (blocker && gap < 7.29 - 3 * P.aggr + c.v * (0.1415 - 0.05 * P.aggr) && Math.abs(blocker.car.pos.lat - c.pos.lat) < 1.8 && c.v > blocker.car.v - 1) brake = true;
     // 卡住太久（撞牆停住）就自動扶正
     r.stuck = c.v < 2 ? r.stuck + 1 / 120 : 0;
     if (r.stuck > 3) { c.placeAt(t, i); r.stuck = 0; }
@@ -473,7 +506,7 @@ export class RaceField {
 
 /** 每台車比賽開始時的狀態 */
 function fresh() {
-  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, compound: 1, wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] as number[] };
+  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] as number[] };
 }
 
 /**

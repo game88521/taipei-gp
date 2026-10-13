@@ -33,7 +33,7 @@ import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
-import { RaceField, PLAYER_LIVERY, TYRES, RAIN, type Racer, type GpWeather } from './rivals';
+import { RaceField, PLAYER_LIVERY, TYRES, RAIN, PERSONAS, type Racer, type GpWeather } from './rivals';
 import { WALL_OFF, TOWER_101 } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
@@ -1262,6 +1262,8 @@ function startQuali() {
   setRaceRain(false);
   toast('🏁 排位賽：跑一圈，圈速決定發車位置', 'purple');
 }
+/** 車手名字後面加個性圖示（🔥 激進、🛡️ 防守…；均衡的不加） */
+const withPersona = (r: Racer) => (r.persona.icon ? `${r.name} ${r.persona.icon}` : r.name);
 /** 排位賽跑完：AI 用同一套物理各跑一圈，大家照圈速排發車格 */
 function finishQuali(t: number) {
   qualiRun = false;
@@ -1279,7 +1281,7 @@ function finishQuali(t: number) {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
     if (k === 0) tr.className += ' pole';
-    for (const v of [String(k + 1), r.name, r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
+    for (const v of [String(k + 1), withPersona(r), r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
@@ -1287,6 +1289,7 @@ function finishQuali(t: number) {
     tb.appendChild(tr);
   });
   $('quali-title').textContent = pos === 1 ? '🏁 竿位！' : `排位賽：第 ${pos} 位發車`;
+  $('quali-legend').textContent = Object.values(PERSONAS).filter((p) => p.icon).map((p) => `${p.icon} ${p.tag}`).join('　');
   $('quali-sub').textContent = `你的圈速 ${fmt(t)}${pos > 1 ? `，落後竿位 ${(t - pole).toFixed(3)} 秒` : ''}`;
   if (BOT && !new URLSearchParams(location.search).has('qualistop')) { startGpAfterQuali(); return; } // 測試：&qualistop 停在排位成績表（截圖用）
   $('quali-res').classList.remove('hidden');
@@ -1331,7 +1334,13 @@ function radioTick(dt: number) {
   if (me.wear < 0.1) radio.rearm('tyre');
   const ahead = st[k - 1], behind = st[k + 1];
   if (ahead && ahead.wear > 0.7 && field.progress(ahead) - field.progress(me) < 80) radio.say('ahead-tyre', `前車 ${ahead.name} 的輪胎快不行了，準備攻擊！`, 40);
-  if (behind && field.sc.phase === 'off' && field.raceTime > 15 && field.progress(me) - field.progress(behind) < Math.max(15, car.v)) radio.say('behind', `後面的 ${behind.name} 在 1 秒內，守住內線`, 35);
+  // 對手的個性：追到防守型要用假動作、被激進型追要小心晚煞車
+  if (ahead && field.sc.phase === 'off' && field.raceTime > 15 && field.progress(ahead) - field.progress(me) < Math.max(15, car.v) && ahead.persona.tag === '防守') radio.say('ahead-def', `${ahead.name} 很會卡位，先假裝走一邊、等他換線再從另一邊過`, 60);
+  if (behind && field.sc.phase === 'off' && field.raceTime > 15 && field.progress(me) - field.progress(behind) < Math.max(15, car.v)) {
+    const p = behind.persona.tag;
+    const hint = p === '激進' ? '，他很敢晚煞車，進彎前守好內線' : p === '雨戰' && field.wet > 0.3 ? '，他雨天特別快，別犯錯' : '，守住內線';
+    radio.say('behind', `後面的 ${behind.name} 在 1 秒內${hint}`, 35);
+  }
   if (car.r26 && car.energy < 0.2) radio.say('batt', '電量剩 20%，先別開超車，煞車多回收一點', Infinity);
   if (car.energy > 0.5) radio.rearm('batt');
   if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && me.pitTimer <= 0 && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
@@ -1432,7 +1441,7 @@ function showResults() {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
     const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : `差 ${Math.max(1, field.laps + 1 - r.laps)} 圈內`;
-    for (const v of [String(k + 1), r.name, r.team, time, fmt(r.bestLap), `${r.pits} 次`]) {
+    for (const v of [String(k + 1), withPersona(r), r.team, time, fmt(r.bestLap), `${r.pits} 次`]) {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
