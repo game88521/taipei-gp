@@ -149,6 +149,7 @@ const ALL_TILES = new URLSearchParams(location.search).has('sim') || new URLSear
 async function loadCircuitScene() {
   await stage('蓋賽道場景', 0.4);
   circuitEnv = buildCircuitEnv(scene, track, CIRCUIT!, world);
+  circuitEnv.setDetail(level); // 手機預設「中」、上次自動降過級的話照那一級
   await stage('準備畫面', 0.9);
   applyShadowFlags();
   weather.collect();
@@ -2108,26 +2109,48 @@ function updateFreeHud(dt: number) {
   }
 }
 
-// ---------------------------------------------------------------- 畫質：選單設定、開局太卡自動降一級
-let fpsT = 0, fpsN = 0, fpsChecked = false;
-function watchFps(dt: number) {
-  if (fpsChecked || BOT || (state !== 'free' && state !== 'race')) return;
-  fpsT += dt;
+// ---------------------------------------------------------------- 畫質：選單設定、自動調整（只在選「自動」時）
+// 比賽、自由駕駛中每 4 秒量一次平均 FPS：連兩次低於 30 → 降一級（光暈、陰影、解析度、可視距離、霧、賽道的樹與旗子，不用重新載入）；
+// 已經是「低」還是卡 → 再降渲染解析度（最低 0.7 倍）；很順（55 以上）就慢慢把解析度加回這一級的上限
+let fpsT = 0, fpsN = 0, slowWin = 0, dynRatio = 1;
+const updatePixelRatio = () => {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pixelRatio) * dynRatio);
+  composer?.setPixelRatio(renderer.getPixelRatio());
+};
+/** 賽道場景的細節跟著畫質（函式裡才不會被 TS 當成「一定是 null」） */
+function circuitDetail(lv: Level) { circuitEnv?.setDetail(lv); }
+const showQualityNow = () => { $('quality-now').textContent = `目前：${LEVEL_NAME[level]}${dynRatio < 1 ? `（解析度 ${Math.round(dynRatio * 100)}%）` : ''}`; };
+function watchFps() {
+  // 用真實時間量（每格的 dt 有上限，很卡的時候加起來會比實際短，量出來的 FPS 會太樂觀）
+  const now = performance.now();
+  if (BOT || qPref !== 'auto' || (state !== 'free' && state !== 'race')) { fpsT = fpsN = 0; return; }
+  if (!fpsT) { fpsT = now; fpsN = 0; return; }
   fpsN++;
-  if (fpsT < 6) return;
-  fpsChecked = true;
-  const fps = fpsN / fpsT;
-  if (fps >= 32 || level === 'low' || qPref !== 'auto') return;
-  // 先做不用重新載入就能生效的：關光暈、降解析度、關陰影
-  level = LOWER[level];
-  const nq = qualityFor(level);
-  if (!nq.bloom) { composer = null; bloom = null; }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, nq.pixelRatio));
-  if (!nq.shadows) { world.sun.castShadow = false; renderer.shadowMap.enabled = false; }
-  save.quality = 'auto';
-  save.opts = { ...save.opts, ...opts };
-  try { localStorage.setItem(KEY + '-auto-level', level); } catch { /* 不重要 */ }
-  toast(`畫面有點卡（${fps.toFixed(0)} fps），已自動調成「${LEVEL_NAME[level]}」畫質`, '');
+  if (now - fpsT < 4000) return;
+  const fps = (fpsN * 1000) / (now - fpsT);
+  fpsT = now; fpsN = 0;
+  slowWin = fps < 30 ? slowWin + 1 : 0;
+  if (slowWin >= 2) {
+    slowWin = 0;
+    if (level !== 'low') {
+      level = LOWER[level];
+      Object.assign(Q, qualityFor(level));
+      if (!Q.bloom) { composer = null; bloom = null; }
+      if (!Q.shadows) { world.sun.castShadow = false; renderer.shadowMap.enabled = false; }
+      circuitDetail(level);
+      applyWeather(); // 霧的距離跟著新的畫質
+      updatePixelRatio();
+      try { localStorage.setItem(KEY + '-auto-level', level); } catch { /* 不重要 */ }
+      toast(`畫面有點卡（${fps.toFixed(0)} fps），已自動調成「${LEVEL_NAME[level]}」畫質`, '');
+    } else if (dynRatio > 0.7) {
+      dynRatio = Math.max(0.7, +(dynRatio - 0.1).toFixed(2));
+      updatePixelRatio();
+    }
+  } else if (fps > 55 && dynRatio < 1) {
+    dynRatio = Math.min(1, +(dynRatio + 0.05).toFixed(2));
+    updatePixelRatio();
+  }
+  showQualityNow();
 }
 {
   // 上次自動降過級就沿用
@@ -2143,6 +2166,7 @@ function watchFps(dt: number) {
         renderer.shadowMap.enabled = nq.shadows;
         world.sun.castShadow = nq.shadows;
         (scene.fog as THREE.Fog).far = nq.fogFar;
+        circuitDetail(level);
       }
     }
   } catch { /* 不重要 */ }
@@ -2150,7 +2174,7 @@ function watchFps(dt: number) {
 if (Q.bloom) setupBloom();
 const qSel = $<HTMLSelectElement>('opt-quality');
 qSel.value = qPref;
-$('quality-now').textContent = `目前：${LEVEL_NAME[level]}`;
+showQualityNow();
 qSel.addEventListener('change', () => {
   save.quality = qSel.value as Level | 'auto';
   try { localStorage.removeItem(KEY + '-auto-level'); } catch { /* 不重要 */ }
@@ -2292,7 +2316,7 @@ renderer.setAnimationLoop(() => {
   tickStats(dt);
   if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
-  watchFps(dt);
+  watchFps();
 });
 
 // 離線快取：只在正式版註冊（npm run dev 時不要，否則改了程式碼看不到）

@@ -255,6 +255,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   };
   // 揮旗：看台上一面一面的小旗（頂點著色器讓旗面飄，越興奮揮得越快）
   const flagSpots: [number, number, number, number][] = [], standSpots: [number, number][] = [];
+  let flagMesh: THREE.Object3D | null = null;
   const bins = new Map<number, THREE.BufferGeometry[]>();
   const push = (m: number, g: THREE.BufferGeometry) => { if (!bins.has(m)) bins.set(m, []); bins.get(m)!.push(g); };
   /** 一個方塊（世界座標、繞 y 轉 ang）丟進某個材質 */
@@ -376,6 +377,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     flags.count = flagSpots.length;
     flags.computeBoundingSphere();
     scene.add(flags);
+    flagMesh = flags;
   }
 
   // ---- 維修區：起跑線旁、右側（跟 AI 進站那側一樣）——維修道、11 隊車庫、二樓玻璃帷幕、屋頂廣告
@@ -443,7 +445,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     im.computeBoundingSphere();
     scene.add(im);
   }
-  buildTrees(scene, meta, r, { x0, z0, x1, z1 }, clear, hAt);
+  const treeKeep = buildTrees(scene, meta, r, { x0, z0, x1, z1 }, clear, hAt);
 
   // ---- 夜賽、黃昏賽：照明燈柱（燈頭會亮）＋晚上照在路面上的光圈
   if (meta.time === 'night' || meta.time === 'dusk') {
@@ -473,6 +475,11 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   }
   // 觀眾的情緒：cheer() 一下子拉滿、慢慢退；車子（或鏡頭）在看台 150 m 內時一直有點興奮
   let cheerLv = 0;
+  /** 畫質（main 自動降級時呼叫）：中 = 樹留八成，低 = 樹留一半、不畫旗子 */
+  const setDetail = (lv: 'high' | 'medium' | 'low') => {
+    treeKeep(lv === 'high' ? 1 : lv === 'medium' ? 0.8 : 0.5);
+    if (flagMesh) flagMesh.visible = lv !== 'low';
+  };
   const crowd = {
     cheer(k = 1) { cheerLv = Math.max(cheerLv, k); },
     tick(dt: number, px: number, pz: number) {
@@ -483,7 +490,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       crowdU.uExcite.value += (want - crowdU.uExcite.value) * Math.min(1, dt * 3);
     },
   };
-  return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0), crowd };
+  return { center: new THREE.Vector3((x0 + x1) / 2, mean, (z0 + z1) / 2), extent: Math.max(x1 - x0, z1 - z0), crowd, setDetail };
 }
 
 /** 樹：成片的樹林（一群一群）加零星散樹；草地是闊葉樹混針葉樹，熱帶、沙漠是棕櫚樹 */
@@ -522,7 +529,9 @@ function buildTrees(
     conifer.computeVertexNormals();
     kinds = [broad, conifer];
   }
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(palm ? 0.18 : 0.25, palm ? 0.28 : 0.35, palm ? 7.2 : 3, 6).translate(0, palm ? 3.6 : 1.5, 0), new THREE.MeshLambertMaterial({ color: palm ? '#7a6248' : '#5a4636' }), nTrees);
+  // 每種樹各一份樹幹：畫質降低時兩邊一起減量（第 k 棵的樹幹和樹冠編號一樣），才不會有幹沒冠
+  const trunkGeo = new THREE.CylinderGeometry(palm ? 0.18 : 0.25, palm ? 0.28 : 0.35, palm ? 7.2 : 3, 6).translate(0, palm ? 3.6 : 1.5, 0), trunkMat = new THREE.MeshLambertMaterial({ color: palm ? '#7a6248' : '#5a4636' });
+  const trunks = kinds.map(() => new THREE.InstancedMesh(trunkGeo, trunkMat, nTrees));
   const crowns = kinds.map((g) => new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ flatShading: true, side: palm ? THREE.DoubleSide : THREE.FrontSide }), nTrees));
   const leaf = (palm ? ['#3f7a3a', '#4f8a3e', '#5c8f45'] : ['#3e6b35', '#4a7a3a', '#355f30', '#5b8a45']).map((c) => new THREE.Color(c));
   const pine = ['#2d5230', '#365e36', '#2a4a2c'].map((c) => new THREE.Color(c));
@@ -543,15 +552,15 @@ function buildTrees(
     const k = 0.75 + r() * 0.75, kind = palm ? 0 : (gr ? gr.pine : r() < 0.3) ? 1 : 0;
     Q.setFromAxisAngle(up, r() * 6.28);
     M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(k, k * (0.9 + r() * 0.25), k));
-    trunk.setMatrixAt(n, M);
     const cm = crowns[kind], ci = cn[kind]++;
+    trunks[kind].setMatrixAt(ci, M);
     cm.setMatrixAt(ci, M);
     const base = kind === 1 ? pine : leaf;
     cm.setColorAt(ci, col.copy(base[ci % base.length]).offsetHSL(0, 0, (r() - 0.5) * 0.06));
     n++;
   }
-  trunk.count = n;
-  crowns.forEach((m, k) => { m.count = cn[k]; m.computeBoundingSphere(); });
-  trunk.computeBoundingSphere();
-  scene.add(trunk, ...crowns);
+  crowns.forEach((m, k) => { m.count = trunks[k].count = cn[k]; m.computeBoundingSphere(); trunks[k].computeBoundingSphere(); });
+  scene.add(...trunks, ...crowns);
+  /** 只畫前 keep 比例的樹（樹是隨機撒的，取前面一段就是均勻變稀疏） */
+  return (keep: number) => crowns.forEach((m, k) => { m.count = trunks[k].count = Math.round(cn[k] * keep); });
 }
