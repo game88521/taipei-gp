@@ -33,7 +33,7 @@ import { shortEn, type Landmark } from './decor';
 import { Minimap } from './minimap';
 import { Traffic } from './traffic';
 import { Pedestrians } from './peds';
-import { RaceField, PLAYER_LIVERY, TYRES, RAIN, PERSONAS, type Racer, type GpWeather } from './rivals';
+import { RaceField, PLAYER_LIVERY, TYRES, RAIN, PERSONAS, type Racer, type GpWeather, type Difficulty, DIFFICULTY } from './rivals';
 import { WALL_OFF, TOWER_101 } from './track';
 import { StreetRace, type Challenge } from './streetrace';
 import type { Breakables } from './breakables';
@@ -426,7 +426,7 @@ function applyOpts() {
 }
 applyOpts();
 // 正賽的圈數與起跑胎（記在存檔裡）
-for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx'] as const) {
+for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx', 'opt-diff'] as const) {
   const el = $<HTMLSelectElement>(id);
   const v = (save.opts as Record<string, unknown>)[id];
   if (typeof v === 'string') el.value = v;
@@ -958,6 +958,8 @@ function beginCountdown() {
   resetRace();
   world.setStartLights(0); // 倒數到一半離開的話燈還亮著
   // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
+  // AI 難度（設定頁；測試可用 ?diff=easy|normal|hard）
+  field.setDifficulty((new URLSearchParams(location.search).get('diff') ?? $<HTMLSelectElement>('opt-diff').value) as Difficulty);
   field.rules = (new URLSearchParams(location.search).get('rules') ?? $<HTMLSelectElement>('opt-rules').value) === '2026' ? '2026' : 'classic';
   hud.dataset.rules = field.rules;
   $('drs').textContent = field.rules === '2026' ? '超車' : 'DRS';
@@ -1311,7 +1313,7 @@ function finishQuali(t: number) {
   });
   $('quali-title').textContent = pos === 1 ? '🏁 竿位！' : `排位賽：第 ${pos} 位發車`;
   $('quali-legend').textContent = Object.values(PERSONAS).filter((p) => p.icon).map((p) => `${p.icon} ${p.tag}`).join('　');
-  $('quali-sub').textContent = `你的圈速 ${fmt(t)}${pos > 1 ? `，落後竿位 ${(t - pole).toFixed(3)} 秒` : ''}`;
+  $('quali-sub').textContent = `你的圈速 ${fmt(t)}${pos > 1 ? `，落後竿位 ${(t - pole).toFixed(3)} 秒` : ''}${field.difficulty !== 'normal' ? `（AI 難度：${DIFFICULTY[field.difficulty].name}）` : ''}`;
   if (BOT && !new URLSearchParams(location.search).has('qualistop')) { startGpAfterQuali(); return; } // 測試：&qualistop 停在排位成績表（截圖用）
   $('quali-res').classList.remove('hidden');
 }

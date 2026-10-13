@@ -76,6 +76,13 @@ const DRIVERS: [string, number][] = [
 ];
 const skill = (k: number): [number, number, number] => [0.985 - k * 0.002, 36.5 - k * 0.2, 1.025 - k * 0.002];
 export type Rules = 'classic' | '2026';
+/** AI 難度：整個車陣的過彎抓地力、煞車減速度、引擎力一起乘倍數（每位車手之間的強弱順序不變） */
+export type Difficulty = 'easy' | 'normal' | 'hard';
+export const DIFFICULTY: Record<Difficulty, { name: string; grip: number; brake: number; power: number }> = {
+  easy: { name: '簡單', grip: 0.95, brake: 0.88, power: 0.96 },
+  normal: { name: '普通', grip: 1, brake: 1, power: 1 },
+  hard: { name: '困難', grip: 1.012, brake: 1.06, power: 1.012 },
+};
 
 export const PLAYER_LIVERY = TEAMS[0].livery;
 
@@ -98,8 +105,10 @@ export class RaceField {
   drsZones: DrsZone[] = [];
   private recAcc = 0;
   private line: Float32Array; // 每個取樣點的賽車線橫向位置（右正）
+  private base: [number, number, number][] = []; // 每位 AI 普通難度的 [抓地力, 煞車, 引擎力]
 
   aiHits = 0; // 測試用：AI 撞牆次數
+  difficulty: Difficulty = 'normal';
 
   constructor(private scene: THREE.Scene, private t: Track, player: Car) {
     const lineScale = Number(new URLSearchParams(location.search).get('line') ?? 1); // 測試用：賽車線幅度
@@ -116,6 +125,7 @@ export class RaceField {
       const car = new Car();
       car.power = power;
       this.racers.push({ ...fresh(), name, team, color: livery.main, car, model, isPlayer: false, profile: speedProfile(t, this.line, grip, brake), persona: personaOf(name) });
+      this.base.push([grip, brake, power]);
     });
     this.racers.push({ ...fresh(), name: '你', team: TEAMS[0].team, color: TEAMS[0].livery.main, car: player, model: null, isPlayer: true, profile: null, persona: PERSONAS.even });
     // DRS 區：建議速度幾乎全油門、連續 250 m 以上的長直線
@@ -133,6 +143,18 @@ export class RaceField {
         start = -1;
       }
     }
+  }
+
+  /** 換難度：重算每台 AI 的速度曲線與引擎力（跟上次一樣就不算） */
+  setDifficulty(d: Difficulty) {
+    if (d === this.difficulty || !DIFFICULTY[d]) return;
+    this.difficulty = d;
+    const D = DIFFICULTY[d];
+    this.base.forEach(([g, b, p], k) => {
+      const r = this.racers[k];
+      r.profile = speedProfile(this.t, this.line, g * D.grip, b * D.brake);
+      r.car.power = p * D.power;
+    });
   }
 
   /** s 在不在某個 DRS 區裡（處理跨過起跑線的區間） */
