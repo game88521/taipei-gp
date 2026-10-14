@@ -47,7 +47,7 @@ import { physicsTest } from './physicstest';
 import { initLeaderboard, submitLap } from './leaderboard-ui';
 
 
-import { save, writeSave, KEY, type Ghost, type SteerMode } from './save';
+import { save, writeSave, KEY, bestLapOf, type Ghost, type SteerMode } from './save';
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -1102,27 +1102,96 @@ function menuTab(t: string) {
   document.querySelector('.m-main')?.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.addEventListener('click', () => menuTab(b.dataset.tab!));
-// 賽道：台北信義街道賽＋2026 賽曆 23 站；換賽道＝帶 ?circuit= 重新載入
-{
-  const sel = $<HTMLSelectElement>('circuit-pick');
-  const opt = (v: string, text: string) => { const o = document.createElement('option'); o.value = v; o.textContent = text; sel.appendChild(o); };
-  opt('', '🇹🇼 台北街道賽｜信義區真實街道');
-  CIRCUITS.forEach((c, k) => opt(c.id, `${String(k + 1).padStart(2, '0')} ${c.flag} ${c.gp}｜${c.name}`));
-  sel.value = CIRCUIT?.id ?? '';
-  sel.addEventListener('change', () => { location.search = sel.value ? `?circuit=${sel.value}` : ''; });
-  const info = $('circuit-info');
+// 賽道：台北信義街道賽＋2026 賽曆 23 站。按「大獎賽」「計時賽」先進選賽道頁：上面是目前這條（直接開始），
+// 下面是全部賽道的卡片；換賽道＝帶 ?circuit=…&pick=gp|tt 重新載入，載完直接回到選賽道頁
+let pickMode: 'gp' | 'tt' = 'gp';
+let outlines: Record<string, { d: string; start: [number, number] }> | null = null;
+const loadOutlines = () => (outlines ? Promise.resolve(outlines) : fetch('/data/circuits/outlines.json').then((r) => r.json()).then((o) => (outlines = o)).catch(() => (outlines = {})));
+const SVGNS = 'http://www.w3.org/2000/svg';
+const elx = (tag: string, cls = '', text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+/** 賽道外型（tools/build-outlines.mjs 產生）：發光底線＋賽道線＋起點 */
+function outlineSvg(id: string, cls: string) {
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('class', cls);
+  const o = outlines?.[id];
+  if (o) {
+    for (const c of ['glow', 'line']) { const p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', o.d); p.setAttribute('class', c); svg.appendChild(p); }
+    const s = document.createElementNS(SVGNS, 'circle');
+    s.setAttribute('cx', String(o.start[0])); s.setAttribute('cy', String(o.start[1])); s.setAttribute('r', '3.2');
+    svg.appendChild(s);
+  }
+  return svg;
+}
+function renderPicker() {
+  const cur = CIRCUIT?.id ?? '';
+  $('cp-eyebrow').textContent = pickMode === 'gp' ? '大獎賽 · 排位賽＋正賽 · 22 台車' : '計時賽 · 單圈挑戰最快圈';
+  // 目前這條賽道：外型大圖＋資料＋開始
+  const hero = $('cp-hero');
+  hero.innerHTML = '';
+  hero.appendChild(outlineSvg(cur || 'taipei', 'cp-map'));
+  const box = elx('div', 'cp-info');
+  const round = CIRCUIT ? `第 ${String(CIRCUITS.indexOf(CIRCUIT) + 1).padStart(2, '0')} 站 · ${CIRCUIT.flag} ${CIRCUIT.place}` : '🇹🇼 主場 · 台北市信義區';
+  box.append(elx('small', 'cp-round', round), elx('h3', '', CIRCUIT ? CIRCUIT.gp : '台北街道賽'), elx('p', 'cp-name', CIRCUIT ? CIRCUIT.name : '信義區真實街道 · 101 腳下'));
+  const facts = elx('div', 'cp-facts');
+  const fact = (k: string, v: string) => { const d = elx('div'); d.append(elx('small', '', k), elx('b', '', v)); facts.appendChild(d); };
   if (CIRCUIT && circuitData) {
     const f = circuitData.info, rec = f.lapRecord;
-    info.innerHTML = '';
-    const line = (k: string, v: string) => { const d = document.createElement('div'); const b = document.createElement('small'); b.textContent = k; const e = document.createElement('b'); e.textContent = v; d.append(b, e); info.appendChild(d); };
-    line('地點', CIRCUIT.place);
-    line('長度', `${(f.lengthKm ?? circuitData.lengthM / 1000).toFixed(3)} km`);
-    line('彎道', f.turns != null ? `${f.turns} 個・${circuitData.direction === 'clockwise' ? '順時針' : '逆時針'}` : '—');
-    line('首屆大獎賽', f.firstGp != null ? String(f.firstGp) : '—');
-    if (rec) line('單圈紀錄', `${rec.time}（${rec.driver}，${rec.year}）`);
-    if (f.corners?.length) line('知名彎道', f.corners.slice(0, 4).join('、'));
-    document.querySelector('[data-pane="play"] .m-eyebrow')!.textContent = `${CIRCUIT.flag} ${CIRCUIT.gp} · ${CIRCUIT.place}`;
-  } else info.style.display = 'none';
+    fact('長度', `${(f.lengthKm ?? circuitData.lengthM / 1000).toFixed(3)} km`);
+    fact('彎道', f.turns != null ? `${f.turns} 個・${circuitData.direction === 'clockwise' ? '順時針' : '逆時針'}` : '—');
+    fact('首屆大獎賽', f.firstGp != null ? String(f.firstGp) : '—');
+    if (rec) fact('單圈紀錄', `${rec.time}（${rec.driver}，${rec.year}）`);
+    if (f.corners?.length) fact('知名彎道', f.corners.slice(0, 3).join('、'));
+  } else {
+    fact('長度', `${(track.length / 1000).toFixed(3)} km`);
+    fact('特色', '真實街道、高樓夾道');
+  }
+  const best = bestLapOf(cur);
+  fact('你的最快圈', best != null ? fmt(best) : '還沒跑過');
+  box.appendChild(facts);
+  const go = elx('button', 'primary cp-go', !cityReady ? '載入中…' : pickMode === 'gp' ? '▶ 開始大獎賽' : '▶ 開始計時賽') as HTMLButtonElement;
+  go.disabled = !cityReady;
+  go.addEventListener('click', () => void (pickMode === 'gp' ? startGp() : startTt()));
+  box.appendChild(go);
+  hero.appendChild(box);
+  // 全部賽道
+  const grid = $('cp-grid');
+  grid.innerHTML = '';
+  const card = (id: string, no: string, flag: string, gp: string, name: string) => {
+    const b = elx('button', 'cp-card' + (id === cur ? ' on' : '')) as HTMLButtonElement;
+    b.appendChild(outlineSvg(id || 'taipei', 'cp-thumb'));
+    const t = elx('span', 'cp-txt');
+    t.append(elx('small', '', `${no} ${flag}`), elx('b', '', gp), elx('em', '', name));
+    const bl = bestLapOf(id);
+    if (bl != null) t.appendChild(elx('i', '', `最快 ${fmt(bl)}`));
+    b.appendChild(t);
+    if (id === cur) b.appendChild(elx('span', 'cp-tag', '目前'));
+    b.addEventListener('click', () => {
+      if (id === cur) { hero.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      const q = new URLSearchParams();
+      if (id) q.set('circuit', id);
+      q.set('pick', pickMode);
+      location.search = q.toString();
+    });
+    grid.appendChild(b);
+  };
+  card('', '主場', '🇹🇼', '台北街道賽', '信義區真實街道');
+  CIRCUITS.forEach((c, k) => card(c.id, String(k + 1).padStart(2, '0'), c.flag, c.gp, c.name));
+}
+function openPicker(m: 'gp' | 'tt') {
+  pickMode = m;
+  renderPicker();
+  void loadOutlines().then(renderPicker);
+  menuTab('circuits');
+  document.querySelector('.m-tabs button[data-tab="play"]')?.classList.add('on'); // 選賽道頁屬於「開始」
+}
+$('cp-back').addEventListener('click', () => menuTab('play'));
+if (CIRCUIT) document.querySelector('[data-pane="play"] .m-eyebrow')!.textContent = `${CIRCUIT.flag} ${CIRCUIT.gp} · ${CIRCUIT.place}`;
+// 各國賽道沒有城市：自由駕駛、計程車、街頭對決改成「回台北」（重新載入台北街景）；要比其他程式的點擊先處理
+if (CIRCUIT) for (const id of ['btn-free', 'btn-taxi', 'btn-duel']) $(id).addEventListener('click', (e) => { e.stopImmediatePropagation(); location.search = ''; }, { capture: true });
+{
+  const p = new URLSearchParams(location.search).get('pick');
+  if (p === 'gp' || p === 'tt') openPicker(p); // 剛換完賽道：回到選賽道頁
 }
 if (!BOT) setupInstall($('m-install')); // 「加到主畫面」提示（install.ts）
 function showMenu(paused: boolean) {
@@ -1138,8 +1207,12 @@ function showMenu(paused: boolean) {
     b.style.display = cityReady ? '' : 'none';
   }
   $('free-reset').hidden = !!CIRCUIT || !validFreePos(save.freePos) || !cityReady; // 有記住的位置才顯示「從 101 出發」
-  // 各國賽道：沒有城市，自由駕駛、計程車、街頭對決不能玩
-  if (CIRCUIT) for (const id of ['btn-free', 'btn-taxi', 'btn-duel']) $(id).style.display = 'none';
+  // 各國賽道：沒有城市，自由駕駛、計程車、街頭對決改成「回台北」（按了重新載入台北街景）
+  if (CIRCUIT) {
+    $('free-label').textContent = '回台北自由駕駛';
+    for (const id of ['btn-free', 'btn-taxi', 'btn-duel']) { const b = $<HTMLButtonElement>(id); b.style.display = ''; b.disabled = false; }
+  }
+  if (document.querySelector('.m-pane.on[data-pane="circuits"]')) renderPicker(); // 載入完成：開始按鈕可以按了
   $('menu-best').textContent = save.best != null ? `${CIRCUIT ? CIRCUIT.name : '街道賽'}最快圈 ${fmt(save.best)}` : '';
   updateSeasonUi();
   menu.classList.remove('hidden');
@@ -1164,14 +1237,15 @@ async function userStart() {
     }
   } catch { /* iPhone 沒有全螢幕 API，略過 */ }
 }
-$('btn-start').addEventListener('click', async () => {
+async function startTt() {
   await userStart();
   taxi?.stop();
   mode = 'race';
   raceKind = 'tt';
   hideMenu();
   beginCountdown();
-});
+}
+$('btn-start').addEventListener('click', () => openPicker('tt'));
 async function startGp() {
   await userStart();
   taxi?.stop();
@@ -1182,7 +1256,7 @@ async function startGp() {
   hideMenu();
   beginCountdown();
 }
-$('btn-gp').addEventListener('click', startGp);
+$('btn-gp').addEventListener('click', () => openPicker('gp'));
 
 // ---------------------------------------------------------------- 賽季模式（season.ts）
 const SEASON = new URLSearchParams(location.search).has('season');

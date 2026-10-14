@@ -1027,14 +1027,65 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-free-reset { grid-column: 1 / -1; justify-self: end; margin-top: -6px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; letter-spacing: 1px; }
 #menu .m-free-reset[hidden] { display: none; }
 
-/* ---- 賽道選擇、賽道資訊 */
-#menu .m-circuit { margin-bottom: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--m-line); background: var(--m-glass); }
-#menu .m-circuit label { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: 2px; color: var(--muted); }
-#menu #circuit-pick { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; padding: 8px 30px 8px 12px; border-radius: 10px; border: 1px solid var(--m-line2); color: var(--fg); font: 700 14px var(--font); background: #161922 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23a9adba' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") right 10px center / 10px no-repeat; }
-#menu #circuit-info { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin-top: 10px; }
-#menu #circuit-info small { display: block; font-size: 10px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.45); }
-#menu #circuit-info b { font-size: 13px; }
-@media (max-height: 480px) { #menu .m-circuit { padding: 7px 10px; margin-bottom: 8px; } #menu #circuit-info { margin-top: 6px; } }
+/* ---- 選賽道頁（按「大獎賽」「計時賽」進來） */
+#menu .cp-back { display: inline-block; margin: 0 0 10px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--m-line2); background: var(--m-glass); color: #d8dbe4; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+/* 目前這條賽道：左邊外型大圖、右邊資料與開始 */
+#menu .cp-hero {
+  display: grid;
+  grid-template-columns: minmax(150px, 34%) 1fr;
+  gap: 20px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 90, 80, 0.32);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(225, 6, 0, 0.22), transparent 60%),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+#menu .cp-map { width: 100%; height: auto; max-width: 280px; aspect-ratio: 1; margin: 0 auto; } /* 選單通用的 svg 高度是 20 px（分頁圖示），這裡要蓋掉 */
+#menu .cp-map .glow, #menu .cp-thumb .glow { fill: none; stroke: rgba(255, 60, 40, 0.35); stroke-width: 7; stroke-linejoin: round; filter: blur(2.5px); }
+#menu .cp-map .line, #menu .cp-thumb .line { fill: none; stroke: #ff5246; stroke-width: 2.6; stroke-linejoin: round; }
+#menu .cp-map circle, #menu .cp-thumb circle { fill: #fff; stroke: #e10600; stroke-width: 1.4; }
+#menu .cp-info { min-width: 0; }
+#menu .cp-round { display: block; font: 700 11px var(--mono); letter-spacing: 3px; color: var(--m-gold); }
+#menu .cp-info h3 { margin: 6px 0 2px; font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+#menu .cp-name { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+#menu .cp-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 16px; margin-bottom: 16px; }
+#menu .cp-facts small { display: block; font-size: 10px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.45); }
+#menu .cp-facts b { font-size: 13px; }
+#menu .cp-go { width: 100%; max-width: 340px; padding: 13px; border-radius: 14px; font-size: 18px; letter-spacing: 4px; background: linear-gradient(135deg, #ff2a1f, #b30500); box-shadow: 0 10px 26px rgba(225, 6, 0, 0.35); }
+#menu .cp-go:disabled { filter: saturate(0.4) brightness(0.75); }
+/* 全部賽道 */
+#menu .cp-sub { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 10px; font-size: 15px; letter-spacing: 2px; }
+#menu .cp-sub small { color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 1px; }
+#menu .cp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+#menu .cp-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--m-line);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+  text-align: left;
+  transition: transform 0.18s, border-color 0.18s;
+}
+#menu .cp-card.on { border-color: rgba(255, 90, 80, 0.65); box-shadow: inset 0 0 0 1px rgba(255, 90, 80, 0.35); }
+#menu .cp-card:active { transform: scale(0.98); }
+#menu .cp-thumb { flex: 0 0 52px; height: 52px; }
+#menu .cp-thumb .glow { stroke-width: 6; }
+#menu .cp-thumb .line { stroke-width: 3.4; }
+#menu .cp-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#menu .cp-txt small { font: 700 10px var(--mono); letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.5); }
+#menu .cp-txt b { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#menu .cp-txt em { font-style: normal; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#menu .cp-txt i { font: 700 10px var(--mono); font-style: normal; color: var(--m-gold); }
+#menu .cp-tag { position: absolute; top: 6px; right: 8px; padding: 1px 6px; border-radius: 6px; background: #e10600; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+@media (hover: hover) { #menu .cp-card:hover { transform: translateY(-2px); border-color: var(--m-line2); } }
+@media (max-width: 640px) { #menu .cp-hero { grid-template-columns: 1fr; } #menu .cp-map { max-width: 180px; margin: 0 auto; } }
+@media (max-height: 480px) { #menu .cp-hero { grid-template-columns: 130px 1fr; padding: 12px 14px; gap: 14px; } #menu .cp-info h3 { font-size: 20px; } #menu .cp-facts { margin-bottom: 10px; } }
 
 /* ---- 加到主畫面 */
 #menu .m-install { --c: #6ff0a4; display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px dashed rgba(111, 240, 164, 0.35); background: rgba(111, 240, 164, 0.05); }

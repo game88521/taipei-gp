@@ -115,10 +115,6 @@
             </header>
             <div id="load"><i id="load-bar"></i></div>
             <div id="season-banner" class="m-season" hidden></div>
-            <div class="m-circuit">
-              <label>賽道<select id="circuit-pick"></select></label>
-              <div id="circuit-info"></div>
-            </div>
             <button id="btn-resume" class="primary" style="display: none">繼續</button>
             <div class="m-modes">
               <button id="btn-free" class="m-mode hero">
@@ -154,6 +150,20 @@
               <button class="m-inst-go" hidden>安裝</button>
               <button class="m-inst-x" aria-label="不要再提醒">×</button>
             </div>
+          </section>
+
+          <!-- 選賽道：點「大獎賽」或「計時賽」之後進來；上面是目前這條賽道（可以直接開始），下面是 24 條賽道的卡片 -->
+          <section class="m-pane" data-pane="circuits">
+            <header class="m-head">
+              <div>
+                <button id="cp-back" class="cp-back">‹ 返回</button>
+                <small class="m-eyebrow" id="cp-eyebrow">大獎賽</small>
+                <h2>選擇賽道</h2>
+              </div>
+            </header>
+            <div id="cp-hero" class="cp-hero"></div>
+            <h3 class="cp-sub">全部賽道<small>點一下切換（會重新載入）</small></h3>
+            <div id="cp-grid" class="cp-grid"></div>
           </section>
 
           <section class="m-pane" data-pane="garage">

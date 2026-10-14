@@ -27,3 +27,9 @@ if (CIRCUIT_ID) {
   taipei = { best: save.best, sectors: save.sectors, ghost: save.ghost };
   Object.assign(save, save.circuits?.[CIRCUIT_ID] ?? { best: null, sectors: [null, null, null], ghost: null });
 }
+/** 某條賽道的最快圈（id 空字串 = 台北信義街道賽）；選賽道頁用 */
+export function bestLapOf(id: string): number | null {
+  if (id === (CIRCUIT_ID ?? '')) return save.best;
+  if (!id) return taipei?.best ?? null;
+  return save.circuits?.[id]?.best ?? null;
+}
