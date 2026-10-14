@@ -1,21 +1,22 @@
 <!-- 圖示的圖案（不含底板）：香檳金的台北 101 剪影＋從塔前劃過的紅色賽道弧線；座標 512 × 512 -->
+<!-- 101 照實際比例：塔尖 12%、頂部三小節 12%、八節往上外擴的塔身 53%、往下變寬的塔基 23%；塔基上方立面有如意圓 -->
 <defs>
-  <radialGradient id="glow" cx="300" cy="250" r="230" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#ff5a3c" stop-opacity="0.32"/>
-    <stop offset="0.45" stop-color="#c2410c" stop-opacity="0.12"/>
+  <radialGradient id="glow" cx="262" cy="240" r="230" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ff5a3c" stop-opacity="0.3"/>
+    <stop offset="0.45" stop-color="#c2410c" stop-opacity="0.11"/>
     <stop offset="1" stop-color="#000" stop-opacity="0"/>
   </radialGradient>
   <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0" stop-color="#8a6326"/>
-    <stop offset="0.38" stop-color="#f6e3b0"/>
-    <stop offset="0.62" stop-color="#e2bf74"/>
-    <stop offset="1" stop-color="#7a5520"/>
+    <stop offset="0.36" stop-color="#f6e3b0"/>
+    <stop offset="0.6" stop-color="#e2bf74"/>
+    <stop offset="1" stop-color="#76521e"/>
   </linearGradient>
   <linearGradient id="goldV" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#fff4d6" stop-opacity="0.55"/>
-    <stop offset="1" stop-color="#fff4d6" stop-opacity="0"/>
+    <stop offset="0" stop-color="#fff4d6" stop-opacity="0.6"/>
+    <stop offset="1" stop-color="#fff4d6" stop-opacity="0.05"/>
   </linearGradient>
-  <linearGradient id="red" x1="36" y1="0" x2="480" y2="0" gradientUnits="userSpaceOnUse">
+  <linearGradient id="red" x1="26" y1="0" x2="490" y2="0" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#7a0000"/>
     <stop offset="0.55" stop-color="#e10600"/>
     <stop offset="1" stop-color="#ff5a3c"/>
@@ -26,34 +27,41 @@
     <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
   </linearGradient>
 </defs>
-<circle cx="300" cy="250" r="230" fill="url(#glow)"/>
-<!-- 台北 101：塔尖、頂部、八節往上外擴的塔身、下段、基座（整座往左移一點，跟弧線平衡） -->
-<g transform="translate(-26 0)">
-  <path d="M297 22 L303 22 L304.5 92 L295.5 92 Z" fill="url(#gold)"/>
-  <path d="M283 92 H317 L321 112 H279 Z" fill="url(#gold)"/>
-  <path d="M276 112 H324 L319 128 H281 Z" fill="url(#gold)"/>
-  <g fill="url(#gold)">
-    <path d="M273 128 H327 L337 156 H263 Z"/>
-    <path d="M273 158 H327 L337 186 H263 Z"/>
-    <path d="M273 188 H327 L337 216 H263 Z"/>
-    <path d="M273 218 H327 L337 246 H263 Z"/>
-    <path d="M273 248 H327 L337 276 H263 Z"/>
-    <path d="M273 278 H327 L337 306 H263 Z"/>
-    <path d="M273 308 H327 L337 336 H263 Z"/>
-    <path d="M273 338 H327 L337 366 H263 Z"/>
-  </g>
-  <path d="M273 366 H327 L332 440 H268 Z" fill="url(#gold)"/>
-  <path d="M252 440 H348 L354 458 H246 Z" fill="url(#gold)"/>
-  <!-- 中央一道亮面＋每節之間的暗縫 -->
-  <rect x="293" y="96" width="9" height="344" fill="url(#goldV)"/>
-  <g fill="#3a2a10" opacity="0.55">
-    <rect x="263" y="156" width="74" height="2"/><rect x="263" y="186" width="74" height="2"/><rect x="263" y="216" width="74" height="2"/>
-    <rect x="263" y="246" width="74" height="2"/><rect x="263" y="276" width="74" height="2"/><rect x="263" y="306" width="74" height="2"/>
-    <rect x="263" y="336" width="74" height="2"/>
-  </g>
+<circle cx="262" cy="240" r="230" fill="url(#glow)"/>
+<g fill="url(#gold)">
+  <!-- 塔尖 -->
+  <path d="M260.6 24 H263.4 L265 80 H259 Z"/>
+  <!-- 頂部三小節（由上往下越來越寬，每節也是上寬下窄） -->
+  <path d="M254 80 H270 L268.5 95 H255.5 Z"/>
+  <path d="M247 96.5 H277 L274.5 111 H249.5 Z"/>
+  <path d="M241 112.5 H283 L279.5 132 H244.5 Z"/>
+  <!-- 八節塔身：每節上寬下窄（外牆往外斜），節與節之間留一條細縫 -->
+  <path d="M236 133.3 H288 L283 161.2 H241 Z"/>
+  <path d="M236 162.7 H288 L283 190.6 H241 Z"/>
+  <path d="M236 192.1 H288 L283 220 H241 Z"/>
+  <path d="M236 221.5 H288 L283 249.4 H241 Z"/>
+  <path d="M236 250.9 H288 L283 278.8 H241 Z"/>
+  <path d="M236 280.3 H288 L283 308.2 H241 Z"/>
+  <path d="M236 309.7 H288 L283 337.6 H241 Z"/>
+  <path d="M236 339.1 H288 L283 367 H241 Z"/>
+  <!-- 塔基：往下變寬的梯形＋地面的平台 -->
+  <path d="M239 368.5 H285 L296 452 H228 Z"/>
+  <path d="M212 452 H312 L316 468 H208 Z"/>
 </g>
+<!-- 中央一道亮面（玻璃帷幕的反光） -->
+<rect x="258.5" y="82" width="7" height="370" fill="url(#goldV)"/>
+<!-- 每節頂端的亮邊 -->
+<g fill="#fff6dc" opacity="0.5">
+  <rect x="237" y="133.3" width="50" height="1.6"/><rect x="237" y="162.7" width="50" height="1.6"/><rect x="237" y="192.1" width="50" height="1.6"/>
+  <rect x="237" y="221.5" width="50" height="1.6"/><rect x="237" y="250.9" width="50" height="1.6"/><rect x="237" y="280.3" width="50" height="1.6"/>
+  <rect x="237" y="309.7" width="50" height="1.6"/><rect x="237" y="339.1" width="50" height="1.6"/>
+</g>
+<!-- 如意圓：塔基上方立面的大圓形裝飾 -->
+<circle cx="262" cy="384" r="9.5" fill="#6e4a18"/>
+<circle cx="262" cy="384" r="9.5" fill="none" stroke="#fbe7b4" stroke-width="2.4"/>
+<circle cx="262" cy="384" r="3.6" fill="#fbe7b4"/>
 <!-- 賽道弧線：兩頭尖、中間厚的新月形，從左下劃到右上；上緣一道白色速度線、下方一道細紅線 -->
-<g>
+<g transform="translate(0 38)">
   <path d="M26 420 C 150 352, 300 402, 490 256 C 330 436, 150 412, 26 420 Z" fill="#000" opacity="0.45" transform="translate(0 12)"/>
   <path d="M26 420 C 150 352, 300 402, 490 256 C 330 436, 150 412, 26 420 Z" fill="url(#red)"/>
   <path d="M26 420 C 150 352, 300 402, 490 256 C 330 436, 150 412, 26 420 Z" fill="url(#redShade)"/>
