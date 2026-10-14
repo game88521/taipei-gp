@@ -63,7 +63,7 @@ export class Car {
     this.v = Math.max(0, v + a * dt);
     if (this.v > this.speedCap) this.v = Math.max(this.speedCap, this.v - 14 * dt); // 安全車：超過限速就慢慢降下來
 
-    const yawMax = Math.min(1.5, (gripAt(v) * this.gripMul) / Math.max(v, 3)) * Math.min(1, v / 4);
+    const yawMax = Math.min(1.5, (gripAt(v) * this.gripMul * t.bankGrip[this.pos.i]) / Math.max(v, 3)) * Math.min(1, v / 4); // 傾斜彎抓地力比較大
     this.h -= this.steer * yawMax * dt;
     this.x += Math.sin(this.h) * this.v * dt;
     this.z += Math.cos(this.h) * this.v * dt;

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { Car } from './car';
 import type { CarModel } from './carModel';
 import { makeF1, TEAMS } from './f1model';
-import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, type Track } from './track';
+import { CIRCUIT } from './circuits';
+import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, type Track } from './track';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
 // 被慢車擋住就挑比較空的一側超車、尾流加速、車與車照動量交換互相撞開
@@ -128,21 +129,34 @@ export class RaceField {
       this.base.push([grip, brake, power]);
     });
     this.racers.push({ ...fresh(), name: '你', team: TEAMS[0].team, color: TEAMS[0].livery.main, car: player, model: null, isPlayer: true, profile: null, persona: PERSONAS.even });
-    // DRS 區：建議速度幾乎全油門、連續 250 m 以上的長直線
-    const fast = (i: number) => t.vTarget[i] >= VMAX0 * 0.97;
-    let start = -1;
-    for (let k = 0; k <= t.N * 2; k++) {
-      const i = k % t.N;
-      if (fast(i) && start < 0 && !fast((i - 1 + t.N) % t.N)) start = k;
-      if (!fast(i) && start >= 0) {
-        const len = (k - start) * t.ds;
-        if (len >= 250 && start < t.N) {
-          const s0 = ((start * t.ds + 40) % t.length), s1 = ((k * t.ds - 30) % t.length);
-          if (!this.drsZones.some((z) => Math.abs(z.s0 - s0) < 1)) this.drsZones.push({ s0, s1, det: (s0 - 80 + t.length) % t.length });
+    // DRS 區：建議速度幾乎全油門（frac）、連續 minLen 以上的直線
+    const find = (minLen: number, frac: number) => {
+      const out: DrsZone[] = [];
+      const fast = (i: number) => t.vTarget[i] >= VMAX0 * frac;
+      let start = -1;
+      for (let k = 0; k <= t.N * 2; k++) {
+        const i = k % t.N;
+        if (fast(i) && start < 0 && !fast((i - 1 + t.N) % t.N)) start = k;
+        if (!fast(i) && start >= 0) {
+          const len = (k - start) * t.ds;
+          if (len >= minLen && start < t.N) {
+            const s0 = ((start * t.ds + 40) % t.length), s1 = ((k * t.ds - 30) % t.length);
+            if (!out.some((z) => Math.abs(z.s0 - s0) < 1)) out.push({ s0, s1, det: (s0 - 80 + t.length) % t.length });
+          }
+          start = -1;
         }
-        start = -1;
       }
+      return out;
+    };
+    let zones = find(250, 0.97);
+    // 實際的 DRS 區數量（circuits.ts）：找到的不夠就放寬（短一點、帶點彎的直線也算，像摩納哥、墨西哥）；太多就留最長的那幾段
+    const want = CIRCUIT?.drs;
+    for (const [L, f] of [[200, 0.92], [150, 0.85], [120, 0.8]]) { if (!want || zones.length >= want) break; zones = find(L, f); }
+    if (want && zones.length > want) {
+      const len = (z: DrsZone) => (z.s1 - z.s0 + t.length) % t.length;
+      zones = [...zones].sort((p, q) => len(q) - len(p)).slice(0, want).sort((p, q) => p.s0 - q.s0);
     }
+    this.drsZones = zones;
   }
 
   /** 換難度：重算每台 AI 的速度曲線與引擎力（跟上次一樣就不算） */
@@ -517,8 +531,8 @@ export class RaceField {
     for (const r of this.racers) {
       if (!r.model) continue;
       const c = r.car, m = r.model;
-      m.root.position.set(c.x, this.t.py[c.pos.i], c.z);
-      m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, 0, 'YXZ');
+      m.root.position.set(c.x, surfaceY(this.t, c.pos.i, c.pos.lat), c.z);
+      m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, bankRoll(this.t, c.pos.i, c.pos.lat), 'YXZ');
       m.body.rotation.z = c.steer * Math.min(1, c.v / 40) * 0.04;
       for (const w of m.steer) w.rotation.y = -c.steer * 0.35;
       for (const w of m.spin) w.rotation.x += (c.v / 0.36) * dt;
@@ -581,8 +595,8 @@ function speedProfile(t: Track, line: Float32Array, grip: number, brake: number)
   }
   for (let i = 0; i < N; i++) { let s = 0; for (let k = -3; k <= 3; k++) s += kr[(i + k + N) % N]; ks[i] = s / 7; }
   for (let i = 0; i < N; i++) {
-    const k = ks[i];
-    v[i] = k > GK + 1e-5 ? Math.min(VMAX, Math.sqrt(G0 / (k - GK))) : VMAX;
+    const k = ks[i], g0 = G0 * t.bankGrip[i], gk = GK * t.bankGrip[i]; // 傾斜彎過得比較快
+    v[i] = k > gk + 1e-5 ? Math.min(VMAX, Math.sqrt(g0 / (k - gk))) : VMAX;
   }
   const sm = v;
   for (let pass = 0; pass < 2; pass++) {

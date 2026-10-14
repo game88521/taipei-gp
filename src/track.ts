@@ -40,6 +40,20 @@ export interface Track {
   vTarget: Float32Array; // 建議速度 (m/s)
   py: Float32Array; // 路面高度（各國賽道有高低起伏；台北全是 0）
   grade: Float32Array; // 坡度（每公尺升高幾公尺，上坡正）
+  bank: Float32Array; // 傾斜彎：路面橫向每公尺升高幾公尺（橫向正 = 右邊；外側比較高），0 = 平的
+  bankGrip: Float32Array; // 傾斜彎的抓地力倍率（平的 = 1）
+}
+
+/** 傾斜彎：at = 彎心在一圈的幾成處（0~1）、deg = 傾斜角度、len = 傾斜的長度（公尺，前後各有 30 m 漸變） */
+export interface Bank { at: number; deg: number; len: number }
+
+/** 第 i 點、橫向 lat 處的路面高度：只有路面（±HALF_WIDTH）傾斜，路面外維持路緣的高度 */
+export function surfaceY(t: Track, i: number, lat: number): number {
+  return t.py[i] + Math.max(-HALF_WIDTH, Math.min(HALF_WIDTH, lat)) * t.bank[i];
+}
+/** 車子在傾斜路面上的側傾角（模型的 rotation.z；模型 +x 是車子左邊） */
+export function bankRoll(t: Track, i: number, lat: number): number {
+  return Math.abs(lat) <= HALF_WIDTH ? Math.atan(-t.bank[i]) : 0;
 }
 
 /** 賽道上 s 處的路面高度（線性內插） */
@@ -48,8 +62,8 @@ export function heightAt(t: Track, s: number): number {
   return t.py[i] + (t.py[j] - t.py[i]) * (f - i);
 }
 
-/** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽。elev：每個 points 的高度（相對起跑線） */
-export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]): Track {
+/** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽。elev：每個 points 的高度（相對起跑線）；banks：傾斜彎 */
+export function buildTrack(points: [number, number][] = CONTROL, elev?: number[], banks: Bank[] = []): Track {
   const curve = new THREE.CatmullRomCurve3(
     points.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     true,
@@ -86,11 +100,24 @@ export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]
     curv[i] = s / 9;
   }
 
+  // 傾斜彎：彎心前後 len/2 全傾斜、再往外 30 m 漸變回平的；外側（彎的反方向）比較高。
+  // 抓地力加成 1 + 0.9·sinθ（19° 約多三成；真實的公式在 F1 這麼大的下壓力下會算出不合理的數字，取保守的經驗值）
+  const bank = new Float32Array(N), bankGrip = new Float32Array(N).fill(1);
+  for (const b of banks) {
+    const c = Math.round(b.at * N) % N, half = b.len / 2 / ds, ramp = 30 / ds;
+    const sg = Math.sign(curv[c]) || 1, tan = Math.tan((b.deg * Math.PI) / 180), sin = Math.sin((b.deg * Math.PI) / 180);
+    for (let k = -Math.ceil(half + ramp); k <= Math.ceil(half + ramp); k++) {
+      const i = (c + k + N) % N, d = Math.abs(k);
+      const w = d <= half ? 1 : 0.5 + 0.5 * Math.cos(((d - half) / ramp) * Math.PI); // 漸變
+      bank[i] = -sg * tan * w;
+      bankGrip[i] = 1 + 0.9 * sin * w;
+    }
+  }
   // 建議速度：先算每一點的過彎極速（留 8% 餘裕），再往回推煞車點、往前推出彎加速
   const G0 = GRIP0 * 0.92, GK = GRIPK * 0.92;
   for (let i = 0; i < N; i++) {
-    const k = Math.abs(curv[i]);
-    vTarget[i] = k > GK + 1e-5 ? Math.min(VMAX, Math.sqrt(G0 / (k - GK))) : VMAX;
+    const k = Math.abs(curv[i]), g0 = G0 * bankGrip[i], gk = GK * bankGrip[i];
+    vTarget[i] = k > gk + 1e-5 ? Math.min(VMAX, Math.sqrt(g0 / (k - gk))) : VMAX;
   }
   for (let pass = 0; pass < 2; pass++) {
     for (let i = N - 1; i >= 0; i--) {
@@ -118,9 +145,11 @@ export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]
       const f = (s - cum[k]) / ((cum[k + 1] - cum[k]) || 1);
       py[i] = elev[k] + (elev[(k + 1) % points.length] - elev[k]) * f;
     }
-    for (let i = 0; i < N; i++) grade[i] = (py[(i + 2) % N] - py[(i - 2 + N) % N]) / (4 * ds);
   }
-  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget, py, grade };
+  // 傾斜的軸在路面內側邊緣：中心線跟著抬高半個路寬，內側路緣維持原本高度（旁邊的地面才不會穿出路面）
+  for (let i = 0; i < N; i++) py[i] += HALF_WIDTH * Math.abs(bank[i]);
+  for (let i = 0; i < N; i++) grade[i] = (py[(i + 2) % N] - py[(i - 2 + N) % N]) / (4 * ds);
+  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget, py, grade, bank, bankGrip };
 }
 
 export interface Locate {

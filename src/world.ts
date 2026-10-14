@@ -120,7 +120,8 @@ function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
   const pos: number[] = [], uv: number[] = [], col: number[] = [];
   const vert = (i: number, off: number, y: number, across: number, d: number) => {
     off += o.center ? o.center[i] : 0;
-    pos.push(t.px[i] - t.tz[i] * off, y + t.py[i], t.pz[i] + t.tx[i] * off);
+    // 傾斜彎：只有路面傾斜，路面外（路肩、護牆）維持路緣的高度
+    pos.push(t.px[i] - t.tz[i] * off, y + t.py[i] + Math.max(-HALF_WIDTH, Math.min(HALF_WIDTH, off)) * t.bank[i], t.pz[i] + t.tx[i] * off);
     const along = d / o.along;
     if (o.alongIsU) uv.push(along, across); else uv.push(across, along);
     if (o.color) { const c = o.color(i); col.push(c.r, c.g, c.b); }
@@ -266,6 +267,28 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
   }
+  // 傾斜彎外側抬高了：路肩外緣補一道擋土牆，往下接到原本的地面（地形在原本路面下 1.6 m）
+  {
+    const pos: number[] = [];
+    for (let i = 0; i < t.N; i++) {
+      const j = (i + 1) % t.N;
+      if (!t.bank[i] && !t.bank[j]) continue;
+      for (const s of [-1, 1]) {
+        const off = s * (WALL_OFF + 3);
+        const top = (k: number) => t.py[k] + Math.max(-HALF_WIDTH, Math.min(HALF_WIDTH, off)) * t.bank[k] - 0.01;
+        const bot = (k: number) => t.py[k] - HALF_WIDTH * Math.abs(t.bank[k]) - 2;
+        if (top(i) - bot(i) < 2.2 && top(j) - bot(j) < 2.2) continue; // 內側：沒有抬高
+        const X = (k: number) => t.px[k] - t.tz[k] * off, Z = (k: number) => t.pz[k] + t.tx[k] * off;
+        pos.push(X(i), top(i), Z(i), X(i), bot(i), Z(i), X(j), top(j), Z(j), X(j), top(j), Z(j), X(i), bot(i), Z(i), X(j), bot(j), Z(j));
+      }
+    }
+    if (pos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.computeVertexNormals();
+      race.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#6a6d73', side: THREE.DoubleSide })));
+    }
+  }
 
   // ---- 紅白路緣：只鋪在彎道
   const kerbTex = canvasTex(16, 64, (g) => {
@@ -317,7 +340,7 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
     spots.forEach((i, k) => {
       const lat = (rand() - 0.5) * 2 * (HALF_WIDTH - 1.5);
       q.setFromAxisAngle(up, Math.atan2(t.tx[i], t.tz[i]));
-      pud.setMatrixAt(k, m.compose(v.set(t.px[i] - t.tz[i] * lat, t.py[i] + 0.02, t.pz[i] + t.tx[i] * lat), q, sc.set(1.2 + rand() * 1.6, 1, 2.5 + rand() * 4)));
+      pud.setMatrixAt(k, m.compose(v.set(t.px[i] - t.tz[i] * lat, t.py[i] + lat * t.bank[i] + 0.02, t.pz[i] + t.tx[i] * lat), q, sc.set(1.2 + rand() * 1.6, 1, 2.5 + rand() * 4)));
     });
     pud.count = spots.length;
     pud.computeBoundingSphere();

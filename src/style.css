@@ -700,8 +700,42 @@ html:not(.touch) #btn-horn { display: none; }
   letter-spacing: 2px;
   touch-action: none;
 }
-#drs.ready { color: #fff; border-color: #fff; background: rgba(40, 160, 90, 0.45); }
-#drs.on { color: #fff; border-color: #2fe07a; background: rgba(47, 224, 122, 0.85); }
+/* 可以開：綠框一閃一閃（提示「按吧」）；開著：亮綠、白字、外圈發光，開的那一下彈一下 */
+#drs { white-space: nowrap; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+#drs.ready { color: #fff; border-color: #2fe07a; background: rgba(40, 160, 90, 0.45); animation: drs-ready 0.9s ease-in-out infinite; }
+#drs.on {
+  color: #fff;
+  border-color: #eafff2;
+  background: linear-gradient(180deg, #4dff9a, #12b85a);
+  text-shadow: 0 1px 2px rgba(0, 60, 20, 0.6);
+  font-size: 17px;
+  letter-spacing: 1px;
+  animation: drs-pop 0.28s ease-out, drs-glow 1s ease-in-out 0.28s infinite;
+}
+@keyframes drs-ready { 50% { box-shadow: 0 0 0 4px rgba(47, 224, 122, 0.45); border-color: #fff; } }
+@keyframes drs-pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes drs-glow { 0%, 100% { box-shadow: 0 0 14px 2px rgba(47, 224, 122, 0.75); } 50% { box-shadow: 0 0 26px 6px rgba(47, 224, 122, 0.95); } }
+/* 時速表上方的「DRS 開啟」：手指蓋住按鈕也看得到 */
+#drs-ind {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 62px);
+  translate: -50% 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #4dff9a, #12b85a);
+  color: #fff;
+  font: 900 15px var(--mono);
+  letter-spacing: 2px;
+  text-shadow: 0 1px 2px rgba(0, 60, 20, 0.6);
+  box-shadow: 0 0 18px rgba(47, 224, 122, 0.8);
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+#drs-ind.show { opacity: 1; transform: none; }
+#hud[data-mode='free'] #drs-ind { display: none; }
 #pit {
   position: absolute;
   right: calc(max(14px, env(safe-area-inset-right)) + 96px);

@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
-import { buildTrack, VMAX, setRealPerf, heightAt, locate, type Locate } from './track';
+import { buildTrack, VMAX, setRealPerf, heightAt, locate, surfaceY, bankRoll, type Locate } from './track';
 import { buildWorld } from './world';
 import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
@@ -81,13 +81,33 @@ const REAL_PERF = { vmax: 95, engine: 16, brake: 50, g0: 23, gk: 0.0068, gmax: 6
 // 各國賽道（?circuit=suzuka）：先讀中心線再建賽道；不載入台北街景，改成通用的賽道場景（circuitenv.ts）
 const circuitData = await loadCircuitData();
 // 各國賽道用接近真實 F1 的性能（台北街道賽維持原本的手感、線上排行榜才比得下去）；?perf=v,e,b,g0,gk,gmax 測試用
+// 海拔：空氣稀薄 → 空氣阻力小、下壓力小（墨西哥城 2,235 m 的空氣密度只有海平面的 77%）。
+// 車隊會換最大下壓力的翼片、渦輪也會補回大部分馬力，所以只算一部分：極速多 1/4 的阻力減少量、高速下壓力少一半的密度減少量、煞車稍微變長
+const AIR = Math.exp(-(circuitData?.alt ?? 0) / 8434);
+const atAltitude = (p: typeof REAL_PERF) => ({ ...p, vmax: p.vmax * (1 + 0.25 * (1 - AIR)), gk: p.gk * (0.55 + 0.45 * AIR), brake: p.brake * (0.94 + 0.06 * AIR) });
 if (circuitData) {
   const pq = new URLSearchParams(location.search).get('perf')?.split(',').map(Number);
-  setRealPerf(pq?.length === 6 ? { vmax: pq[0], engine: pq[1], brake: pq[2], g0: pq[3], gk: pq[4], gmax: pq[5] } : REAL_PERF);
+  setRealPerf(pq?.length === 6 ? { vmax: pq[0], engine: pq[1], brake: pq[2], g0: pq[3], gk: pq[4], gmax: pq[5] } : atAltitude(REAL_PERF));
 }
 // 中心線先平滑兩次（前後各 2 點、約 16 m）：OSM 的線有細小的鋸齒，曲率會亂跳，AI 的賽車線跟著亂擺就會撞牆
 const smooth = (p: [number, number][]) => p.map((_, i) => { let x = 0, z = 0; for (let k = -2; k <= 2; k++) { const q = p[(i + k + p.length) % p.length]; x += q[0]; z += q[1]; } return [x / 5, z / 5] as [number, number]; });
-const track = circuitData ? buildTrack(smooth(smooth(circuitData.points)), circuitData.elev) : buildTrack(); // elev：高低起伏（tools/fetch-elevation.mjs）
+/** 圈長照官方：OSM 中心線平滑後會差一點（巴庫短 1.2%），整條等比例縮放到官方長度 */
+const toOfficial = (p: [number, number][], km: number | null) => {
+  if (!km) return p;
+  let L = 0;
+  for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; L += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  const k = (km * 1000) / L;
+  return p.map(([x, z]) => [x * k, z * k] as [number, number]);
+};
+const track = (() => {
+  if (!circuitData) return buildTrack();
+  // elev：高低起伏（tools/fetch-elevation.mjs）；bank：傾斜彎。建賽道時會再做曲線平滑、長度又短一點 → 建好量一次再縮放重建
+  const pts = toOfficial(smooth(smooth(circuitData.points)), circuitData.info.lengthKm);
+  const t0 = buildTrack(pts, circuitData.elev, CIRCUIT?.bank), km = circuitData.info.lengthKm;
+  if (!km) return t0;
+  const k = (km * 1000) / t0.length;
+  return buildTrack(pts.map(([x, z]) => [x * k, z * k] as [number, number]), circuitData.elev, CIRCUIT?.bank);
+})();
 const world = buildWorld(scene, track, CIRCUIT?.banner, CIRCUIT ? `${CIRCUIT.banner[1]}  ${CIRCUIT.banner[0]}` : undefined);
 let circuitEnv: ReturnType<typeof buildCircuitEnv> | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
@@ -830,9 +850,9 @@ function updateVisuals(dt: number) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
   }
-  const ry = mode === 'race' ? track.py[car.pos.i] : 0; // 各國賽道的高低起伏
+  const ry = mode === 'race' ? surfaceY(track, car.pos.i, car.pos.lat) : 0; // 各國賽道的高低起伏（傾斜彎跟著路面）
   model.root.position.set(vc.x, mode === 'free' ? -0.25 : ry, vc.z); // 城市道路比賽道路面低 0.25 m
-  model.root.rotation.set(mode === 'race' ? -Math.atan(track.grade[car.pos.i]) : 0, vc.h, 0, 'YXZ'); // 上坡車頭抬起來
+  model.root.rotation.set(mode === 'race' ? -Math.atan(track.grade[car.pos.i]) : 0, vc.h, mode === 'race' ? bankRoll(track, car.pos.i, car.pos.lat) : 0, 'YXZ'); // 上坡車頭抬起來、傾斜彎車身跟著斜
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
   for (const w of model.steer) w.rotation.y = -vc.steer * 0.45;
   for (const w of model.spin) w.rotation.x += (vc.v / 0.35) * dt;
@@ -1602,8 +1622,8 @@ function replayFrame(dt: number) {
     let loc = replayLoc.get(r);
     if (!loc) replayLoc.set(r, (loc = { i: 0, lat: 0, s: 0 }));
     locate(track, x, z, loc);
-    m.root.position.set(x, track.py[loc.i], z);
-    m.root.rotation.set(-Math.atan(track.grade[loc.i]), h, 0, 'YXZ');
+    m.root.position.set(x, surfaceY(track, loc.i, loc.lat), z);
+    m.root.rotation.set(-Math.atan(track.grade[loc.i]), h, bankRoll(track, loc.i, loc.lat), 'YXZ');
     for (const w of m.steer) w.rotation.y = -steer * 0.35;
     for (const w of m.spin) w.rotation.x += (v / 0.36) * dt * replaySpeed;
   });
@@ -1649,10 +1669,25 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE' || e.code === 'ControlLeft' || e.code === 'ControlRight') drsPress = true;
   if (e.code === 'KeyB') pitPress = true;
 });
+let drsWasOn = false;
 function updateDrsButton() {
   const el = $('drs'), zone = field.drsZoneAt(car.pos.s) >= 0;
   const ready = zone && (raceKind === 'tt' || field.me.drsOk) && (!car.r26 || car.energy > 0.1);
-  el.className = car.drs || car.ovt ? 'on' : ready ? 'ready' : '';
+  const on = car.drs || car.ovt, r26 = field.rules === '2026';
+  // 三種樣子：灰（不能開）、閃綠框（這段可以開，按吧）、亮綠發光（開著）；開的那一下按鈕彈一下＋震動＋提示音
+  const cls = on ? 'on' : ready ? 'ready' : '';
+  if (el.className !== cls) el.className = cls;
+  const label = r26 ? (on ? '⚡ 超車中' : '超車') : on ? 'DRS 開' : 'DRS';
+  if (el.textContent !== label) el.textContent = label;
+  // 手指會蓋住按鈕：時速表上方另外亮一個提示
+  const ind = $('drs-ind');
+  ind.classList.toggle('show', on);
+  if (on && !drsWasOn) {
+    ind.textContent = r26 ? '⚡ 超車模式' : 'DRS 開啟';
+    navigator.vibrate?.(25);
+    sound.beep(1320, 0.05);
+  }
+  drsWasOn = on;
   // 2026：電池電量
   const b = $('batt');
   b.style.display = car.r26 ? '' : 'none';
