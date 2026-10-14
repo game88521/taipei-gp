@@ -446,7 +446,7 @@ function applyOpts() {
 }
 applyOpts();
 // 正賽的圈數與起跑胎（記在存檔裡）
-for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx', 'opt-diff'] as const) {
+for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx', 'opt-diff', 'opt-sc'] as const) {
   const el = $<HTMLSelectElement>(id);
   const v = (save.opts as Record<string, unknown>)[id];
   if (typeof v === 'string') el.value = v;
@@ -580,7 +580,7 @@ function step(dt: number) {
   if (inPit) car.v = 0;
   if (raceKind === 'gp') {
     impact = Math.max(impact, field.update(dt, true));
-    if (impact > 22) field.incident(); // 玩家重撞也可能出安全車
+    if (impact > 22 && car.v < 3) field.incident(); // 玩家重撞、車停住了也可能出安全車
     if (SC_AT != null && field.raceTime >= SC_AT) field.incident(true); // 測試：&scat=秒數 強制出安全車
     for (const ev of field.events.splice(0)) gpEvent(ev);
     field.playerLap(prevS);
@@ -990,7 +990,9 @@ function beginCountdown() {
     qualiGrid = null;
     const wx = (BOT ? new URLSearchParams(location.search).get('gpwx') ?? 'dry' : $<HTMLSelectElement>('opt-gpwx').value) as GpWeather;
     field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value, grid ?? undefined, wx);
-    if (new URLSearchParams(location.search).has('sc')) field.scChance = 1; // 測試：重撞一定出安全車
+    // 安全車（設定 → 比賽）：正常＝有車撞停六成機率出、少見＝兩成五、關閉；測試 ?sc 一定出
+    field.scChance = ({ normal: 0.6, rare: 0.25, off: 0 } as Record<string, number>)[$<HTMLSelectElement>('opt-sc').value] ?? 0.6;
+    if (new URLSearchParams(location.search).has('sc')) field.scChance = 1;
     if (new URLSearchParams(location.search).get('rainat')) field.rainAt = +new URLSearchParams(location.search).get('rainat')!; // 測試：比賽第幾秒開始下雨
     setRaceRain(field.wet > 0);
     radio.reset(PLAYER_LIVERY.main);
@@ -1575,7 +1577,7 @@ function showResults() {
   }
   recordSeason(st);
   $('results').classList.remove('hidden');
-  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? '有' : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}${save.season ? ` 賽季已比${save.season.round}站 你${driverStandings(save.season, teamOf).find((r) => r.name === '你')?.pts ?? 0}分 領先${driverStandings(save.season, teamOf)[0]?.name}${driverStandings(save.season, teamOf)[0]?.pts}分` : ''}`;
+  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? `有（第 ${field.scAt.toFixed(0)} 秒）` : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}${save.season ? ` 賽季已比${save.season.round}站 你${driverStandings(save.season, teamOf).find((r) => r.name === '你')?.pts ?? 0}分 領先${driverStandings(save.season, teamOf)[0]?.name}${driverStandings(save.season, teamOf)[0]?.pts}分` : ''}`;
 }
 // ---------------------------------------------------------------- 回放：轉播機位（賽道外側每 220 m 一台）與追車鏡頭輪流
 let replayT = 0, replaySpeed = 1, camCut = 0, camMode: 'tv' | 'chase' | 'heli' = 'tv';

@@ -46,6 +46,8 @@ export interface Racer {
   profile: Float32Array | null; // 這台 AI 的速度曲線（m/s）
   lat: number; // 超車用的橫向偏移（相對賽車線）
   stuck: number;
+  crashAt: number; // 最近一次重撞是比賽第幾秒
+  slowT: number; // 車速一直很慢（< 8 m/s）多久了
   persona: Persona; // 個性：超車積不積極、會不會卡位、顧不顧輪胎、雨天強不強
   defT: number; // 卡位的冷卻（秒）：一次防守只換一次線
 }
@@ -100,6 +102,7 @@ export class RaceField {
   // 安全車：out 帶隊中、in 這圈進站、off 沒有；lapAt = 出動（或準備進站）時領先者的圈數；s = 安全車在賽道上的位置
   sc = { phase: 'off' as 'off' | 'out' | 'in', t: 0, lapAt: 0, used: false, s: 0 };
   scChance = 0.5; // 重撞時出動的機率（測試可設 1）
+  scAt = -1; // 安全車在比賽第幾秒出動（-1 = 沒出；測試、無線電用）
   /** 給 main 的事件（安全車出動、進站、綠旗、開始下雨），main 每格拿走 */
   events: string[] = [];
   private solo = false; // 排位賽模擬：只算自己，不看別台車
@@ -185,6 +188,7 @@ export class RaceField {
     this.recAcc = 0;
     this.events = [];
     this.sc = { phase: 'off', t: 0, lapAt: 0, used: false, s: 0 };
+    this.scAt = -1;
     this.wet = weather === 'wet' ? 1 : 0;
     this.rainAt = weather === 'wet' ? -1 : weather === 'maybe' && Math.random() < 0.4 ? laps * 55 * (0.3 + Math.random() * 0.3) : Infinity;
     // AI 的起跑胎：短比賽多用軟胎、長比賽多用中性胎
@@ -305,7 +309,11 @@ export class RaceField {
       if (!r.pitReq && r.finish == null && this.laps - r.laps >= 1 && this.wet > 0.35 && r.compound !== RAIN) r.pitReq = true;
       const hit = c.update(dt, t, steer, brake);
       if (hit > 0) this.aiHits++;
-      if (hit > 20 && racing) this.incident();
+      // 安全車：重撞「而且車子幾乎停在賽道上」才可能出（高速擦牆的力道也會超過 20，但車還能跑，真的 F1 不會為這個出安全車）
+      // 撞後 6 秒內，車速低於 8 m/s（約 29 km/h）超過 1.2 秒 = 撞停了
+      if (hit > 18) r.crashAt = this.raceTime;
+      r.slowT = c.v < 8 ? r.slowT + dt : 0;
+      if (racing && r.slowT > 1.2 && this.raceTime - r.crashAt < 6) this.incident();
       this.lapCheck(r, prevS);
     }
     // 回放紀錄（每 0.05 秒）
@@ -349,12 +357,14 @@ export class RaceField {
     return best;
   }
 
-  /** 有車重撞：一半機率安全車出動（一場最多一次；第一圈還沒跑完、最後一圈不出） */
+  /** 有車撞停在賽道上：照 scChance 的機率安全車出動（一場最多一次；第一圈還沒跑完、最後一圈不出） */
   incident(force = false) {
     if (this.sc.used || this.sc.phase !== 'off') return;
     const L = this.leader();
-    if (!force && (L.laps < 1 || L.laps >= this.laps || Math.random() > this.scChance)) return;
+    // laps 是過線次數：發車格在起跑線後，一起步就變 1，所以「跑完第一圈」是 laps >= 2
+    if (!force && (L.laps < 2 || L.laps >= this.laps || Math.random() > this.scChance)) return; // laps = 總圈數 = 最後一圈
     this.sc = { phase: 'out', t: 0, lapAt: L.laps, used: true, s: L.car.pos.s + 35 };
+    this.scAt = this.raceTime;
     this.events.push('sc-out');
   }
 
@@ -542,7 +552,7 @@ export class RaceField {
 
 /** 每台車比賽開始時的狀態 */
 function fresh() {
-  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] as number[] };
+  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, crashAt: -99, slowT: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] as number[] };
 }
 
 /**
