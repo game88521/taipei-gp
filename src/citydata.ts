@@ -9,6 +9,8 @@ export interface NetWay {
   l?: number; // 車道數
   nm?: string;
   en?: string;
+  e?: 1 | 2; // 1 = 高架、2 = 隧道（decodeCity 會分到 net.decks；net.ways 只留地面道路）
+  ms?: number; // OSM 速限（km/h）
 }
 export interface StreetSign { x: number; z: number; b: { nm: string; en: string; a: number }[] }
 export interface CityData {
@@ -17,7 +19,10 @@ export interface CityData {
   roads: { p: number[]; w: number }[];
   greens: { p: number[]; k: number }[];
   trees: number[];
-  net: { nodes: number[]; ways: NetWay[] };
+  // nodes [x, z, …]；y 每個節點的高度（地面 = 地面高度、高架 = 橋面、隧道 = 隧道路面）；
+  // ways 只有地面道路（解碼時把高架、隧道分到 decks，原本用路網的程式都不用改）
+  net: { nodes: number[]; ways: NetWay[]; y?: number[]; decks?: NetWay[] };
+  ground?: Terrain | null; // 全圖的地面高度場（tools/fetch-ground.mjs → build-city.mjs）
   signals: number[];
   crossings: number[];
   signs: StreetSign[];
@@ -64,6 +69,10 @@ export function decodeCity(d: CityData & { enc?: number }): CityData {
   d.trees = dec(d.trees, 2, 10);
   d.net.nodes = dec(d.net.nodes, 2, 10);
   for (const w of d.net.ways) w.n = dec(w.n, 1, 1);
+  if (d.net.y) d.net.y = dec(d.net.y, 1, 10);
+  if (d.ground) d.ground.h = dec(d.ground.h, 1, 2);
+  d.net.decks = d.net.ways.filter((w) => w.e);
+  d.net.ways = d.net.ways.filter((w) => !w.e);
   if (d.lamps) d.lamps = dec(d.lamps, 3, 100);
   if (d.parked) d.parked = dec(d.parked, 4, 100);
   if (d.terrain) d.terrain.h = dec(d.terrain.h, 1, 2);

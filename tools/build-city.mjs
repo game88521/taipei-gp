@@ -434,14 +434,19 @@ const places = [];
 }
 
 // ---------------------------------------------------------------- 周邊道路（畫路面用）＋ 路網（車流、路名、紅綠燈用）
-const RW = { trunk: 12, primary: 11, secondary: 10, tertiary: 8, unclassified: 7, residential: 6, living_street: 5, service: 4.5, primary_link: 7, secondary_link: 7, tertiary_link: 6 };
+// 快速道路（motorway）與匝道（motorway_link、trunk_link）以前沒列，很多匝道接不上路網
+const RW = { motorway: 12, trunk: 12, primary: 11, secondary: 10, tertiary: 8, unclassified: 7, residential: 6, living_street: 5, service: 4.5, motorway_link: 7, trunk_link: 7, primary_link: 7, secondary_link: 7, tertiary_link: 6 };
 // 道路等級代碼：0 主要幹道、1 次要、2 一般、3 巷弄、4 服務道路
-const CLS = { trunk: 0, primary: 0, primary_link: 0, secondary: 1, secondary_link: 1, tertiary: 2, tertiary_link: 2, unclassified: 2, residential: 3, living_street: 3, service: 4 };
+const CLS = { motorway: 0, motorway_link: 0, trunk: 0, trunk_link: 0, primary: 0, primary_link: 0, secondary: 1, secondary_link: 1, tertiary: 2, tertiary_link: 2, unclassified: 2, residential: 3, living_street: 3, service: 4 };
 const roads = [];
 const netIndex = new Map(); // OSM node id → 路網節點編號
 const netNodes = [];
-const netWays = [];
+const netWays = []; // 地面道路（路燈、路邊機車、路名牌、擋路建築…這些「地面擺設」只看這份）
+const deckWays = []; // 高架（e: 1）與隧道（e: 2）：一樣進路網（車流、導航、開上去），但不在地面擺東西；輸出時接在 netWays 後面
+const deckY = new Map(); // 高架、隧道節點的高度（路網節點編號 → 公尺）；其他節點 = 地面高度
 const passWays = new Set();
+/** OSM 的 maxspeed（km/h）；沒有就不填 */
+const maxspeed = (t) => { const v = parseInt(t.maxspeed || '', 10); return v > 0 && v < 200 ? v : 0; };
 const nodeOf = (id, g) => {
   if (!netIndex.has(id)) {
     const [x, z] = proj(g.lat, g.lon);
@@ -469,9 +474,11 @@ for (const e of roadWays) {
   if (lanes) way.l = lanes;
   if (t.name) way.nm = t.name;
   if (t['name:en']) way.en = t['name:en'];
+  if (maxspeed(t)) way.ms = maxspeed(t);
   netWays.push(way);
   if (t.tunnel === 'building_passage' || t.covered === 'yes') passWays.add(way); // 穿過建築底下的路（騎樓、門洞）
 }
+const groundNodeIds = new Set(netIndex.keys()); // 地面路網的 OSM 節點（高架、隧道的節點等一下才加進 netIndex）
 
 // ---------------------------------------------------------------- 主要道路淨空：建築外框伸進幹道、次要道路車道的部分往外推
 // OSM 的建築和道路中心線是分開畫的，路寬又是照等級估的，常有幾公尺的牆伸進車道（例：中山南路旁的中正紀念堂迴廊）。
@@ -547,6 +554,59 @@ for (const e of roadWays) {
 // ---------------------------------------------------------------- 高架道路、人行空橋、文湖線高架、地下道入口
 // 高度：接到地面道路的節點 = 0；高架主線照 layer（一層約 6.5 m）；匝道沿線依距離從地面升到高架
 // k：0 道路、1 人行空橋、2 捷運高架；車子不能開上去（物理是平面的），從底下過，橋墩會擋
+// ---------------------------------------------------------------- 地面高度場（全圖；tools/fetch-ground.mjs 抓的 SRTM 30 m）
+// SRTM 量的是「表面」高度（含大樓、樹冠）：先取每格 ±90 m 內的第 25 百分位排掉大樓 → 扣掉信義區（賽道一帶）的基準 →
+// 3 m 以下當平地（盆地的雜訊）→ 平滑；賽道 80 m 內壓成 0、到 260 m 漸變（台北街道賽的賽道是平的，比賽模式不受影響）
+let ground = null;
+const groundAt = (x, z) => {
+  if (!ground) return 0;
+  const G = ground, fx = (x - G.x0) / G.step, fz = (z - G.z0) / G.step;
+  const i = Math.max(0, Math.min(G.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(G.nz - 2, Math.floor(fz)));
+  const a = Math.max(0, Math.min(1, fx - i)), b = Math.max(0, Math.min(1, fz - j)), H = G.h, n = G.nx;
+  return (H[j * n + i] * (1 - a) + H[j * n + i + 1] * a) * (1 - b) + (H[(j + 1) * n + i] * (1 - a) + H[(j + 1) * n + i + 1] * a) * b;
+};
+{
+  const f = here('./ground-cache/srtm30-30m.json');
+  if (existsSync(f)) {
+    const g = JSON.parse(readFileSync(f, 'utf8')), { nx, nz, step } = g;
+    const at = (i, j) => g.h[Math.max(0, Math.min(nz - 1, j)) * nx + Math.max(0, Math.min(nx - 1, i))];
+    // 1. 局部第 25 百分位（±3 格）
+    let h = new Float32Array(nx * nz);
+    const win = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      win.length = 0;
+      for (let b = -3; b <= 3; b++) for (let a = -3; a <= 3; a++) win.push(at(i + a, j + b));
+      win.sort((p, q) => p - q);
+      h[j * nx + i] = win[Math.floor(win.length * 0.25)];
+    }
+    // 2. 基準：賽道 400 m 內的中位數
+    const near = [];
+    for (let j = 0; j < nz; j += 2) for (let i = 0; i < nx; i += 2) if (distToTrack(g.x0 + i * step, g.z0 + j * step, 420) < 400) near.push(h[j * nx + i]);
+    near.sort((p, q) => p - q);
+    const base = near.length ? near[Math.floor(near.length / 2)] : 0;
+    // 3. 3 m 以下當平地、平滑三次
+    for (let k = 0; k < h.length; k++) h[k] = Math.max(0, h[k] - base - 3);
+    for (let pass = 0; pass < 3; pass++) {
+      const o = new Float32Array(nx * nz);
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        let s = 0, c = 0;
+        for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue; s += h[jj * nx + ii]; c++; }
+        o[j * nx + i] = s / c;
+      }
+      h = o;
+    }
+    // 4. 賽道附近壓平
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const d = distToTrack(g.x0 + i * step, g.z0 + j * step, 280);
+      if (d < 260) h[j * nx + i] *= Math.max(0, Math.min(1, (d - 80) / 180)) ** 2;
+    }
+    ground = { x0: g.x0, z0: g.z0, step, nx, nz, h: [...h].map((v) => Math.round(v * 2) / 2) };
+    let maxG = 0, hilly = 0;
+    for (const v of ground.h) { maxG = Math.max(maxG, v); if (v > 2) hilly++; }
+    console.log(`地面高度場：${nx}×${nz} 格（每 ${step} m），基準海拔 ${base.toFixed(1)} m，最高 ${maxG.toFixed(0)} m，起伏 > 2 m 的格子 ${hilly}`);
+  } else console.log('地面高度場：沒有 tools/ground-cache/srtm30-30m.json（先跑 node tools/fetch-ground.mjs），全圖當平地');
+}
+
 const elevated = [];
 const portals = [];
 {
@@ -577,7 +637,7 @@ const portals = [];
     if (k === 1) ys = r.map(() => 6);
     else {
       // 錨點：地面節點 0、主線節點＝主線高度、自己的端點＝自己的高度；中間照距離內插
-      const anchor = e.nodes.map((id, i) => (netIndex.has(id) ? 0 : deckOf.has(id) ? deckOf.get(id) : i === 0 || i === e.nodes.length - 1 ? layerH : null));
+      const anchor = e.nodes.map((id, i) => (groundNodeIds.has(id) ? 0 : deckOf.has(id) ? deckOf.get(id) : i === 0 || i === e.nodes.length - 1 ? layerH : null));
       if (!/_link$/.test(t.highway)) for (let i = 0; i < anchor.length; i++) if (anchor[i] == null) anchor[i] = layerH;
       const s = [0];
       for (let i = 1; i < r.length; i++) s.push(s[i - 1] + Math.hypot(r[i][0] - r[i - 1][0], r[i][1] - r[i - 1][1]));
@@ -592,6 +652,18 @@ const portals = [];
     }
     const w = k === 1 ? 3.5 : (RW[t.highway] ?? 8) * (t.oneway !== 'yes' && !/_link$/.test(t.highway) ? 1.6 : 1);
     elevated.push({ p: r.flatMap(([x, z]) => [r1(x), r1(z)]), y: ys.map(r1), w: r1(w), k });
+    // 車道的高架：也進路網（e: 1），節點高度 = 橋面離地多高（輸出時再加上地面高度）
+    if (k === 0 && RW[t.highway]) {
+      const way = { n: e.nodes.map((id, i) => nodeOf(id, e.geometry[i])), w: r1(w), c: CLS[t.highway] ?? 2, e: 1 };
+      const ow = t.oneway === 'yes' ? 1 : t.oneway === '-1' ? -1 : 0;
+      if (ow) way.o = ow;
+      if (num(t.lanes)) way.l = num(t.lanes);
+      if (t.name) way.nm = t.name;
+      if (t['name:en']) way.en = t['name:en'];
+      if (maxspeed(t)) way.ms = maxspeed(t);
+      way.n.forEach((ni, i) => { if (!groundNodeIds.has(e.nodes[i])) deckY.set(ni, { rel: ys[i] }); });
+      deckWays.push(way);
+    }
   }
   // 捷運文湖線高架（另外下載的 osm-rail.json；沒有就略過）
   const railFile = here('./osm-rail.json');
@@ -617,6 +689,50 @@ const portals = [];
       portals.push(r1(r[i][0]), r1(r[i][1]), Math.round(ang * 1000) / 1000, r1(w));
     }
   }
+  // 車行隧道、地下道也進路網（e: 2）：隧道段連成一張圖，從洞口（接地面的節點）往裡面算距離，
+  // 高度 = 洞口的地面高度 − min(7 m, 距離 × 6.5%)；山裡的隧道維持在洞口高度附近，不會跟著山頂起伏
+  {
+    const tunnels = roadWays.filter((e) => {
+      const t = e.tags;
+      return e.geometry && RW[t.highway] && t.area !== 'yes' && (t.tunnel === 'yes' || Number(t.layer) < 0) && !e.geometry.every((g) => { const [x, z] = proj(g.lat, g.lon); return farFromTrack(x, z); });
+    });
+    const adj = new Map(), pos = new Map();
+    for (const e of tunnels) {
+      e.nodes.forEach((id, i) => { pos.set(id, proj(e.geometry[i].lat, e.geometry[i].lon)); if (!adj.has(id)) adj.set(id, []); });
+      for (let i = 1; i < e.nodes.length; i++) {
+        const a = e.nodes[i - 1], b = e.nodes[i], [ax, az] = pos.get(a), [bx, bz] = pos.get(b), l = Math.hypot(bx - ax, bz - az);
+        adj.get(a).push([b, l]); adj.get(b).push([a, l]);
+      }
+    }
+    // 多起點最短距離（洞口 = 也在地面路網的節點）
+    const dist = new Map(), portalY = new Map(), todo = [];
+    for (const id of adj.keys()) if (groundNodeIds.has(id)) { const [x, z] = pos.get(id); dist.set(id, 0); portalY.set(id, groundAt(x, z)); todo.push(id); }
+    while (todo.length) {
+      todo.sort((a, b) => dist.get(b) - dist.get(a));
+      const u = todo.pop();
+      for (const [v, l] of adj.get(u)) {
+        const d = dist.get(u) + l;
+        if (d < (dist.get(v) ?? Infinity)) { dist.set(v, d); portalY.set(v, portalY.get(u)); todo.push(v); }
+      }
+    }
+    let added = 0;
+    for (const e of tunnels) {
+      if (!e.nodes.every((id) => dist.has(id))) continue; // 接不到洞口（地圖外）的不做
+      const t = e.tags;
+      const w = RW[t.highway] * (t.oneway !== 'yes' && /primary|secondary|tertiary/.test(t.highway) ? 1.6 : 1);
+      const way = { n: e.nodes.map((id, i) => nodeOf(id, e.geometry[i])), w: r1(w), c: CLS[t.highway] ?? 2, e: 2 };
+      const ow = t.oneway === 'yes' ? 1 : t.oneway === '-1' ? -1 : 0;
+      if (ow) way.o = ow;
+      if (num(t.lanes)) way.l = num(t.lanes);
+      if (t.name) way.nm = t.name;
+      if (t['name:en']) way.en = t['name:en'];
+      if (maxspeed(t)) way.ms = maxspeed(t);
+      way.n.forEach((ni, i) => { const id = e.nodes[i]; if (!groundNodeIds.has(id)) deckY.set(ni, { abs: portalY.get(id) - Math.min(7, dist.get(id) * 0.065) }); });
+      deckWays.push(way);
+      added++;
+    }
+    console.log(`隧道、地下道進路網 ${added} 段（共 ${tunnels.length} 段）`);
+  }
   console.log(`高架 ${elevated.filter((e) => e.k === 0).length} 段、人行空橋 ${elevated.filter((e) => e.k === 1).length}、文湖線 ${elevated.filter((e) => e.k >= 2).length}、地下道入口 ${portals.length / 4}`);
 }
 
@@ -624,7 +740,7 @@ const portals = [];
 const signals = [];
 const crossings = [];
 for (const e of E) {
-  if (e.type !== 'node' || !netIndex.has(e.id)) continue;
+  if (e.type !== 'node' || !groundNodeIds.has(e.id)) continue; // 只要地面的（高架、隧道上不會有紅綠燈）
   if (e.tags?.highway === 'traffic_signals') signals.push(netIndex.get(e.id));
   if (e.tags?.highway === 'crossing') crossings.push(netIndex.get(e.id));
 }
@@ -1004,7 +1120,14 @@ for (const e of roadWays) {
 }
 console.log(`行人徒步區 ${pedzones.length} 段（面 ${pedzones.filter((z) => !z.w).length}）`);
 
-const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: netWays }, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market, pedzones };
+// 路網：地面道路接著高架、隧道；每個節點的高度（地面 = 地面高度場；高架 = 地面＋橋面離地高度；隧道 = 洞口往裡下沉）
+const allWays = [...netWays, ...deckWays];
+const netY = [];
+for (let i = 0; i < netNodes.length / 2; i++) {
+  const d = deckY.get(i), g = groundAt(netNodes[i * 2], netNodes[i * 2 + 1]);
+  netY.push(r1(d ? d.abs ?? g + d.rel : g));
+}
+const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: allWays, y: netY }, ground, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market, pedzones };
 mkdirSync(here('../public/data/'), { recursive: true });
 // 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；
 // roads 執行時沒用到（路面是用 net 畫的），不輸出。解碼在 src/citydata.ts decodeCity()
@@ -1018,7 +1141,9 @@ delete packed.roads;
 packed.buildings = buildings.map((b) => ({ ...b, p: enc(b.p, 2, 10) }));
 packed.greens = greens.map((g) => ({ ...g, p: enc(g.p, 2, 10) }));
 packed.trees = enc(trees, 2, 10);
-packed.net = { nodes: enc(netNodes, 2, 10), ways: netWays.map((w) => ({ ...w, n: enc(w.n, 1, 1) })) };
+packed.net = { nodes: enc(netNodes, 2, 10), ways: allWays.map((w) => ({ ...w, n: enc(w.n, 1, 1) })), y: enc(netY, 1, 10) };
+if (ground) packed.ground = { ...ground, h: enc(ground.h, 1, 2) };
+else delete packed.ground;
 packed.lamps = enc(lamps, 3, 100);
 packed.parked = enc(parked, 4, 100);
 if (terrain) packed.terrain = { ...terrain, h: enc(terrain.h, 1, 2) };
@@ -1036,7 +1161,8 @@ const json = JSON.stringify(packed);
   const worst = Math.max(
     ...P.buildings.map((b, i) => maxDiff(dec(b.p, 2, 10), buildings[i].p)),
     maxDiff(dec(P.trees, 2, 10), trees), maxDiff(dec(P.net.nodes, 2, 10), netNodes),
-    ...P.net.ways.map((w, i) => maxDiff(dec(w.n, 1, 1), netWays[i].n)),
+    ...P.net.ways.map((w, i) => maxDiff(dec(w.n, 1, 1), allWays[i].n)),
+    maxDiff(dec(P.net.y, 1, 10), netY),
     terrain ? maxDiff(dec(P.terrain.h, 1, 2), terrain.h) : 0,
   );
   console.log(`瘦身格式自我檢查：座標最大誤差 ${worst.toExponential(1)}，路燈角度最大誤差 ${maxDiff(dec(P.lamps, 3, 100), lamps).toFixed(4)}`);
@@ -1047,5 +1173,5 @@ writeFileSync(here('../src/data/track.json'), JSON.stringify({ ...trackOut, city
 // 建築、行道樹、路邊機車拆到區塊檔（遊戲只載入鏡頭附近的），citySize 也改成核心的大小
 (await import('./split-tiles.mjs')).splitTiles(here('../public/data/city.json'), here('../public/data/tiles'), here('../src/data/track.json'));
 console.log(`建築 ${buildings.length}（外框改畫部件 ${skippedOutline}、壓到賽道刪掉 ${droppedTrack}）、道路 ${roads.length}、綠地 ${greens.length}、樹 ${trees.length / 2}`);
-console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、地標 ${places.length}、路燈 ${lamps.length / 3}、路邊機車 ${parked.length / 4}`);
+console.log(`路網 ${netNodes.length / 2} 節點 ${netWays.length} 條地面＋高架 ${deckWays.filter((w) => w.e === 1).length} 條＋隧道 ${deckWays.filter((w) => w.e === 2).length} 條（節點高度 ${Math.min(...netY).toFixed(1)} ~ ${Math.max(...netY).toFixed(1)} m）、紅綠燈 ${signals.length}、斑馬線 ${crossings.length}、路名牌 ${signs.length}、地標 ${places.length}、路燈 ${lamps.length / 3}、路邊機車 ${parked.length / 4}`);
 console.log(`city.json ${(json.length / 1024).toFixed(0)} KB`);
