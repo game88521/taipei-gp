@@ -41,6 +41,21 @@ export class BigMap {
       }
       b.stroke();
     }
+    // 隧道虛線、高架（深色描邊＋珊瑚紅）畫在最上層
+    const deckLine = (e: 1 | 2) => {
+      b.beginPath();
+      for (const w of net.decks) {
+        if (w.e !== e) continue;
+        for (let k = 0; k < w.n.length; k++) {
+          const x = (N[w.n[k] * 2] - this.x0) * this.bs, y = (N[w.n[k] * 2 + 1] - this.z0) * this.bs;
+          if (k) b.lineTo(x, y); else b.moveTo(x, y);
+        }
+      }
+      b.stroke();
+    };
+    b.setLineDash([4, 3]); b.strokeStyle = '#8fa3c0'; b.lineWidth = 2; deckLine(2);
+    b.setLineDash([]); b.strokeStyle = '#14171f'; b.lineWidth = 4.6; deckLine(1);
+    b.strokeStyle = '#ef7a62'; b.lineWidth = 2.8; deckLine(1);
     // 拖曳、縮放、點選
     c.addEventListener('pointerdown', (e) => { c.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.moved = 0; if (this.ptrs.size === 2) this.pinch0 = this.pinchDist(); });
     c.addEventListener('pointermove', (e) => {
@@ -152,7 +167,7 @@ export class NavArrows {
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);
   }
-  update(route: [number, number][] | null, px: number, pz: number, t: number) {
+  update(route: [number, number][] | null, px: number, pz: number, t: number, ys: number[] | null = null) {
     if (!route || route.length < 2) { this.mesh.count = 0; return; }
     // 從離玩家最近的點開始，往前放
     let bi = 0, bd = Infinity;
@@ -166,7 +181,7 @@ export class NavArrows {
       let s = carry;
       for (; s < l && n < 40; s += 9) {
         q.setFromAxisAngle(up, h);
-        { const xx = ax + ((bx - ax) * s) / l, zz = az + ((bz - az) * s) / l; m.compose(p.set(xx, groundH(xx, zz) - 0.18, zz), q, sc); }
+        { const xx = ax + ((bx - ax) * s) / l, zz = az + ((bz - az) * s) / l, yy = ys ? ys[i] + ((ys[i + 1] - ys[i]) * s) / l : groundH(xx, zz); m.compose(p.set(xx, yy - 0.18, zz), q, sc); } // 路線上高架：箭頭跟著上橋
         this.mesh.setMatrixAt(n++, m);
       }
       carry = s - l;

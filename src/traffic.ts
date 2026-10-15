@@ -5,6 +5,7 @@ import { sedanGeo, busGeo, scooterGeo } from './models';
 import { FreeCar } from './freecar';
 import type { Breakables } from './breakables';
 import { bakedShadowMaterial, blobTexture } from './world';
+import { ROAD_Y } from './surface';
 
 // 車流與紅綠燈：沿真實路網的車道行駛，路口隨機轉彎，跟車用 IDM（智慧駕駛模型），紅燈停在停止線前
 
@@ -13,6 +14,7 @@ interface DEdge {
   a: number; b: number; // 起訖節點
   ax: number; az: number; ux: number; uz: number; len: number;
   way: NetWay;
+  ya: number; yb: number; // 兩端的路面高度（高架、隧道用；地面道路照地面高度場）
   lanes: number; // 這個方向的車道數
   laneW: number;
   base: number; // 第 0 車道離道路中心線的距離（往右為正）
@@ -30,9 +32,18 @@ const KIND_INERTIA = [1.9, 1.9, 10, 0.35, 1.6];
 const KIND_R = [1.0, 1.0, 1.3, 0.5, 1.0];
 const KIND_STUN = [2.5, 2.5, 1.2, 4.5, 2.5];
 const KNOCK_VMAX = [12, 12, 4, 11, 12]; // 被撞出去的速度上限（避免撞一下就飛出畫面）
+/** 同一層：高度差 2.5 m 內（橋上、橋下的車互不相干） */
+const LAYER = 2.5;
+/** 這條路的期望車速：高架、隧道、快速道路照速限（沒標的當 80 km/h），市區照車種 */
+function roadV(kind: Kind, w: NetWay) {
+  if (!w.e && w.c !== 0) return KIND_V[kind];
+  return Math.min(kind === 2 ? 20 : 30, ((w.ms ?? 80) / 3.6) * 0.95);
+}
 
 export interface Agent {
   e: DEdge; s: number; lane: number; v: number; v0: number;
+  vf: number; // 這個駕駛開多快（道路期望車速的幾倍）
+  y: number; // 路面高度：橋上、橋下的車不會互撞、互相跟車
   kind: Kind; color: THREE.Color;
   x: number; z: number; h: number; vh: number; // vh = 畫面上平滑過的車頭方向
   inC: Cluster | null; // 已經進入的路口（同一個路口其他號誌節點不再停）
@@ -92,7 +103,7 @@ export class Traffic {
   private lampAcc = 1;
   private rand = rng(2026);
   private grid = new Map<number, Agent[]>();
-  private extras: { x: number; z: number; v: number }[] = [];
+  private extras: { x: number; z: number; v: number; y?: number }[] = [];
   private signalMeshes: THREE.Object3D[] = [];
   private blob!: THREE.InstancedMesh;
   readonly max: number;
@@ -105,10 +116,10 @@ export class Traffic {
   private pushOut = [0, 0];
   constructor(scene: THREE.Scene, d: CityData, max: number, private breakables: Breakables | null = null) {
     this.max = max; // 依畫質（quality.ts）
-    const N = d.net.nodes;
-    // ---- 有方向的車道
+    const N = d.net.nodes, Y = d.net.y ?? [];
+    // ---- 有方向的車道（地面道路＋高架、隧道：匝道的端點就是地面路網的節點，自然接得上）
     const outOf = new Map<number, DEdge[]>();
-    for (const w of d.net.ways) {
+    for (const w of [...d.net.ways, ...(d.net.decks ?? [])]) {
       if (w.c > 3) continue;
       const total = Math.min(6, lanesOf(w));
       const dirs: (1 | -1)[] = w.o === 1 ? [1] : w.o === -1 ? [-1] : [1, -1];
@@ -121,7 +132,7 @@ export class Traffic {
           const a = seq[k], b = seq[k + 1];
           const ax = N[a * 2], az = N[a * 2 + 1], dx = N[b * 2] - ax, dz = N[b * 2 + 1] - az, len = Math.hypot(dx, dz);
           if (len < 0.5) continue;
-          const e: DEdge = { id: this.edges.length, a, b, ax, az, ux: dx / len, uz: dz / len, len, way: w, lanes, laneW, base, out: [] };
+          const e: DEdge = { id: this.edges.length, a, b, ax, az, ux: dx / len, uz: dz / len, len, way: w, ya: (Y[a] ?? 0) + ROAD_Y, yb: (Y[b] ?? 0) + ROAD_Y, lanes, laneW, base, out: [] };
           this.edges.push(e);
           if (!outOf.has(a)) outOf.set(a, []);
           outOf.get(a)!.push(e);
@@ -272,14 +283,16 @@ export class Traffic {
       const lane = Math.floor(this.rand() * e.lanes);
       if (this.agents.some((a) => a.alive && a.e === e && a.lane === lane && Math.abs(a.s - s) < 12)) continue;
       const r = this.rand();
-      const kind: Kind = e.way.c <= 1 && r < 0.06 ? 2 : r < 0.36 ? 3 : r < 0.52 ? 1 : r < 0.66 ? 4 : 0;
+      let kind: Kind = e.way.c <= 1 && r < 0.06 ? 2 : r < 0.36 ? 3 : r < 0.52 ? 1 : r < 0.66 ? 4 : 0;
+      if (kind === 3 && e.way.e) kind = 0; // 機車不能上高架、進隧道
       const color = new THREE.Color(kind === 1 ? '#f5c518' : kind === 2 ? (this.rand() < 0.5 ? '#2a7fd4' : '#e8e8e8') : kind === 3 ? SCOOTER_COLORS[Math.floor(this.rand() * SCOOTER_COLORS.length)] : CAR_COLORS[Math.floor(this.rand() * CAR_COLORS.length)]);
       const a: Agent = {
-        e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: KIND_V[kind] * 0.6, v0: KIND_V[kind] * (0.85 + this.rand() * 0.3),
+        e, s, lane: kind === 3 ? e.lanes - 1 : lane, v: roadV(kind, e.way) * 0.6, v0: 0, vf: 0.85 + this.rand() * 0.3, y: 0,
         kind, color, x, z, h: Math.atan2(e.ux, e.uz), vh: Math.atan2(e.ux, e.uz), inC: null, stunned: 0, kx: 0, kz: 0, kh: 0, kvx: 0, kvz: 0, kw: 0, down: 0, fall: 0, lo: NaN, blockT: 0, honkT: 0, next: null, blink: 0, laneCool: 3, laneBlink: 0, laneSide: 0, alive: true,
       };
       const dead = this.agents.findIndex((q) => !q.alive);
       if (dead >= 0) this.agents[dead] = a; else this.agents.push(a);
+      a.v0 = roadV(kind, e.way) * a.vf;
       this.place(a);
       a.vh = a.h;
       return true;
@@ -289,7 +302,7 @@ export class Traffic {
 
   /** 路口要往哪走：比較常沿同一條路直走 */
   private choose(a: Agent): DEdge | null {
-    const outs = a.e.out;
+    const outs = a.kind === 3 ? a.e.out.filter((o) => !o.way.e) : a.e.out; // 機車不上匝道
     if (!outs.length) return null;
     if (outs.length === 1) return outs[0];
     const straight = outs.filter((o) => o.way.nm && o.way.nm === a.e.way.nm);
@@ -317,6 +330,7 @@ export class Traffic {
     a.x = e.ax + e.ux * a.s - e.uz * off;
     a.z = e.az + e.uz * a.s + e.ux * off;
     a.h = Math.atan2(e.ux, e.uz);
+    a.y = e.way.e ? e.ya + ((e.yb - e.ya) * Math.max(0, Math.min(e.len, a.s))) / e.len : groundH(a.x, a.z) + ROAD_Y;
   }
 
   laneChanges = 0; // 測試統計：超車換車道次數
@@ -324,11 +338,11 @@ export class Traffic {
   honks: { x: number; z: number; angry: boolean }[] = [];
 
   /** 玩家按喇叭：前方 40 m 內同方向的車，多車道的換到旁邊車道讓路，單線道讓不了的回按喇叭；回傳讓路的台數 */
-  honk(px: number, pz: number, ph: number): number {
+  honk(px: number, pz: number, ph: number, py?: number): number {
     const fx = Math.sin(ph), fz = Math.cos(ph);
     let yielded = 0;
     for (const a of this.agents) {
-      if (!a.alive || a.stunned > 0) continue;
+      if (!a.alive || a.stunned > 0 || (py !== undefined && Math.abs(a.y - py) > LAYER)) continue;
       const dx = a.x - px, dz = a.z - pz, ahead = dx * fx + dz * fz, lat = Math.abs(-dx * fz + dz * fx);
       if (ahead < 2 || ahead > 40 || lat > 4 || Math.cos(a.h - ph) < 0.6) continue;
       if (a.e.lanes > 1 && a.kind !== 2) {
@@ -342,12 +356,13 @@ export class Traffic {
   private key(x: number, z: number) { return (Math.floor(x / 20) + 1000) * 4000 + Math.floor(z / 20) + 1000; }
 
   /** 前方最近的障礙物距離（同方向、橫向 1.8 m 內）與它的速度 */
-  private leader(a: Agent, player: { x: number; z: number; v: number }) {
+  private leader(a: Agent, player: { x: number; z: number; v: number; y?: number }) {
     const fx = Math.sin(a.h), fz = Math.cos(a.h);
     let gap = 80, lv = 0, isPlayer = false;
-    const consider = (x: number, z: number, len: number, v: number, w: number, p = false) => {
+    const consider = (x: number, z: number, len: number, v: number, w: number, p = false, y?: number) => {
       const dx = x - a.x, dz = z - a.z, ahead = dx * fx + dz * fz, lat = Math.abs(-dx * fz + dz * fx);
       if (ahead <= 0 || lat > w) return;
+      if (Math.abs((y ?? groundH(x, z) + ROAD_Y) - a.y) > LAYER) return; // 別層（橋上／橋下）的不算
       const g = ahead - (KIND_LEN[a.kind] + len) / 2;
       if (g < gap) { gap = g; lv = v; isPlayer = p; }
     };
@@ -356,11 +371,11 @@ export class Traffic {
       for (const b of this.grid.get((cx + i + 1000) * 4000 + cz + j + 1000) || []) {
         if (b === a || !b.alive) continue;
         if (Math.cos(b.h - a.h) < 0.3) continue; // 對向或橫向的車不算
-        consider(b.x + b.kx, b.z + b.kz, KIND_LEN[b.kind], b.v, a.kind === 3 || b.kind === 3 ? 1.1 : 1.8); // 被撞開的車看它實際在哪
+        consider(b.x + b.kx, b.z + b.kz, KIND_LEN[b.kind], b.v, a.kind === 3 || b.kind === 3 ? 1.1 : 1.8, false, b.y); // 被撞開的車看它實際在哪
       }
     }
-    consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2, true);
-    for (const o of this.extras) consider(o.x, o.z, 4.6, Math.max(0, o.v), 2.0);
+    consider(player.x, player.z, 4.6, Math.max(0, player.v), 2.2, true, player.y);
+    for (const o of this.extras) consider(o.x, o.z, 4.6, Math.max(0, o.v), 2.0, false, o.y);
     return { gap, lv, isPlayer };
   }
 
@@ -392,7 +407,7 @@ export class Traffic {
     return this.agents.filter((a) => a.alive && Math.abs(a.x - x) < r && Math.abs(a.z - z) < r);
   }
 
-  update(dt: number, player: { x: number; z: number; h: number; v: number }, extras: { x: number; z: number; v: number }[] = []) {
+  update(dt: number, player: { x: number; z: number; h: number; v: number; y?: number }, extras: { x: number; z: number; v: number; y?: number }[] = []) {
     this.extras = extras;
     this.t += dt;
     // 生成／回收：保持在玩家周圍
@@ -422,6 +437,8 @@ export class Traffic {
         a.kvx *= k; a.kvz *= k;
         a.kw *= Math.exp(-dt * 2.2);
         if (sp < 0.05 && Math.abs(a.kw) < 0.05) a.kvx = a.kvz = a.kw = 0;
+        // 高架、隧道：護欄、側牆擋住，不會被撞出路面
+        if (a.e.way.e) { const ko = Math.hypot(a.kx, a.kz), lim = a.e.way.w / 2; if (ko > lim) { a.kx *= lim / ko; a.kz *= lim / ko; a.kvx *= 0.3; a.kvz *= 0.3; } }
         if (this.collider && this.collider.push(a.x + a.kx, a.z + a.kz, KIND_R[a.kind], this.pushOut)) {
           const [ox, oz] = this.pushOut, ol = Math.hypot(ox, oz) || 1, nx = ox / ol, nz = oz / ol;
           a.kx += ox; a.kz += oz;
@@ -498,6 +515,7 @@ export class Traffic {
         else if (a.inC && !a.inC.nodes.has(next.a)) a.inC = null;
         a.lane = Math.min(a.lane, next.lanes - 1);
         a.e = next;
+        a.v0 = roadV(a.kind, next.way) * a.vf; // 上了高架就開快一點
       }
       if (a.alive) this.place(a);
     }
@@ -514,7 +532,7 @@ export class Traffic {
     let impact = 0;
     const pr = FreeCar.RADIUS;
     for (const a of this.agents) {
-      if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9) continue;
+      if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9 || Math.abs(a.y - p.y) > 2) continue;
       const half = KIND_LEN[a.kind] / 2 - 0.9, ar = KIND_R[a.kind];
       const inv = p.spec.mass / KIND_MASS[a.kind]; // 對方質量倒數 ÷ 玩家的（玩家開越重的車，撞得越遠）
       for (const [px, pz] of p.circles()) for (const ao of [-half, 0, half]) {
@@ -559,7 +577,7 @@ export class Traffic {
     const cx = Math.floor(ax / 20), cz = Math.floor(az / 20);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
       for (const b of this.grid.get((cx + i + 1000) * 4000 + cz + j + 1000) || []) {
-        if (b === a || !b.alive) continue;
+        if (b === a || !b.alive || Math.abs(b.y - a.y) > LAYER) continue;
         const bx = b.x + b.kx, bz = b.z + b.kz, dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz);
         const r = KIND_R[a.kind] + KIND_R[b.kind] + 0.9;
         if (d >= r || d < 1e-3) continue;
@@ -582,7 +600,7 @@ export class Traffic {
   render(dt: number) {
     const counts = [0, 0, 0, 0, 0];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
-    const fwd = new THREE.Vector3(0, 0, 1), roll = new THREE.Quaternion();
+    const fwd = new THREE.Vector3(0, 0, 1), side = new THREE.Vector3(1, 0, 0), roll = new THREE.Quaternion();
     for (const a of this.agents) {
       if (!a.alive) continue;
       let d = a.h - a.vh;
@@ -590,8 +608,9 @@ export class Traffic {
       a.vh += d * Math.min(1, dt * 8);
       const i = counts[a.kind]++;
       q.setFromAxisAngle(up, a.vh + a.kh);
+      if (a.e.way.e && a.e.ya !== a.e.yb) q.multiply(roll.setFromAxisAngle(side, -Math.atan((a.e.yb - a.e.ya) / a.e.len))); // 匝道、隧道的坡：車頭跟著抬、低
       if (a.fall > 0.01) q.multiply(roll.setFromAxisAngle(fwd, a.fall * 1.4)); // 機車倒地：沿車身方向側躺
-      m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.25, a.z + a.kz), q, one);
+      m.compose(pos.set(a.x + a.kx, a.y, a.z + a.kz), q, one);
       const mm = this.meshes[a.kind];
       mm.paint.setMatrixAt(i, m);
       mm.fixed.setMatrixAt(i, m);
@@ -603,7 +622,7 @@ export class Traffic {
       if (!a.alive) continue;
       const wide = a.kind === 3 ? 0.9 : a.kind === 2 ? 3.2 : 2.4;
       q.setFromAxisAngle(up, a.vh + a.kh);
-      m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.21, a.z + a.kz), q, bs.set(wide, 1, KIND_LEN[a.kind] + 1));
+      m.compose(pos.set(a.x + a.kx, a.y + 0.04, a.z + a.kz), q, bs.set(wide, 1, KIND_LEN[a.kind] + 1));
       this.blob.setMatrixAt(nb++, m);
     }
     this.blob.count = nb;
@@ -620,7 +639,7 @@ export class Traffic {
         if (!this.lightsOn && !(side && blinkOn)) continue;
         if (nl + 6 > cap) break;
         q.setFromAxisAngle(up, a.vh + a.kh);
-        m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.25, a.z + a.kz), q, one);
+        m.compose(pos.set(a.x + a.kx, a.y, a.z + a.kz), q, one);
         const L = KIND_LEN[a.kind] / 2 + 0.03, sides = a.kind === 3 ? [0] : a.kind === 2 ? [-0.9, 0.9] : [-0.6, 0.6], y = a.kind === 2 ? 0.85 : a.kind === 3 ? 0.95 : 0.75;
         if (this.lightsOn) for (const s of sides) {
           lm.multiplyMatrices(m, off.makeTranslation(s, y, L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, head);

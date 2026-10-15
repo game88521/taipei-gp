@@ -1,23 +1,26 @@
-import { Grid, type CityData } from './citydata';
+import { Grid, groundH, type CityData } from './citydata';
 
-// 導航：照真實路網（含單行方向）找最短路線，路口轉角平滑成弧線
+// 導航：照真實路網（含單行方向）找最短路線，路口轉角平滑成弧線。
+// 高架、隧道也在路網裡（長途比較常走高架）；起點、終點吸附節點時比高度：在橋上就從橋上出發
 
 export class Router {
   private N: number[];
+  private Y: number[];
   private adj = new Map<number, [number, number][]>();
   private grid = new Grid<number>(40);
   private tmp: number[] = [];
 
   constructor(d: CityData) {
     this.N = d.net.nodes;
+    this.Y = d.net.y ?? [];
     const N = this.N;
     const snap = new Set<number>();
-    for (const w of d.net.ways) {
+    for (const w of [...d.net.ways, ...(d.net.decks ?? [])]) {
       if (w.c > 3) continue;
       for (let k = 0; k + 1 < w.n.length; k++) {
         const a = w.n[k], b = w.n[k + 1], l = Math.hypot(N[b * 2] - N[a * 2], N[b * 2 + 1] - N[a * 2 + 1]);
-        // 巷弄成本加重：導航偏好大馬路
-        const cost = l * (w.c >= 3 ? 1.6 : 1);
+        // 巷弄成本加重：導航偏好大馬路；高架、隧道（沒有紅綠燈）再便宜一點
+        const cost = l * (w.e ? 0.75 : w.c >= 3 ? 1.6 : 1);
         const add = (u: number, v: number) => { let list = this.adj.get(u); if (!list) this.adj.set(u, (list = [])); list.push([v, cost]); };
         if (w.o !== -1) add(a, b);
         if (w.o !== 1) add(b, a);
@@ -43,13 +46,13 @@ export class Router {
     for (const n of snap) if (fwd.has(n) && bwd.has(n)) this.grid.addBox(N[n * 2], N[n * 2 + 1], N[n * 2], N[n * 2 + 1], n);
   }
 
-  /** 最近的主要道路節點 */
-  nearest(x: number, z: number): number {
-    const N = this.N;
+  /** 最近的主要道路節點；y = 現在的高度（沒給就當在地面）：高度差 1 m 算 8 m 遠，橋上、橋下不會吸錯層 */
+  nearest(x: number, z: number, y?: number): number {
+    const N = this.N, Y = this.Y, yy = y ?? groundH(x, z);
     for (const r of [60, 150, 400]) {
       let best = -1, bd = Infinity;
       for (const n of this.grid.query(x, z, r, this.tmp)) {
-        const d = (N[n * 2] - x) ** 2 + (N[n * 2 + 1] - z) ** 2;
+        const d = (N[n * 2] - x) ** 2 + (N[n * 2 + 1] - z) ** 2 + (((Y[n] ?? 0) - yy) * 8) ** 2;
         if (d < bd) { bd = d; best = n; }
       }
       if (best >= 0) return best;
@@ -57,9 +60,9 @@ export class Router {
     return -1;
   }
 
-  /** 從 (x0, z0) 到 (x1, z1) 的路線（平滑後的點列）與長度；找不到回傳 null */
-  route(x0: number, z0: number, x1: number, z1: number): { path: [number, number][]; length: number } | null {
-    const from = this.nearest(x0, z0), to = this.nearest(x1, z1);
+  /** 從 (x0, z0) 到 (x1, z1) 的路線（平滑後的點列、每點的路面高度）與長度；找不到回傳 null。y0、y1 = 起訖的高度（沒給 = 地面） */
+  route(x0: number, z0: number, x1: number, z1: number, y0?: number, y1?: number): { path: [number, number][]; ys: number[]; length: number } | null {
+    const from = this.nearest(x0, z0, y0), to = this.nearest(x1, z1, y1);
     if (from < 0 || to < 0) return null;
     // Dijkstra（二元堆積）
     const dist = new Map<number, number>([[from, 0]]), prev = new Map<number, number>();
@@ -100,17 +103,21 @@ export class Router {
     while (ids[0] !== from) ids.unshift(prev.get(ids[0])!);
     const N = this.N;
     let path: [number, number][] = ids.map((n) => [N[n * 2], N[n * 2 + 1]]);
+    let ys = ids.map((n) => this.Y[n] ?? 0);
     for (let it = 0; it < 2 && path.length > 2; it++) {
-      const out: [number, number][] = [path[0]];
+      const out: [number, number][] = [path[0]], oy = [ys[0]];
       for (let i = 0; i + 1 < path.length; i++) {
         const [a, b] = [path[i], path[i + 1]];
         out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+        oy.push(ys[i] * 0.75 + ys[i + 1] * 0.25, ys[i] * 0.25 + ys[i + 1] * 0.75);
       }
       out.push(path[path.length - 1]);
+      oy.push(ys[ys.length - 1]);
       path = out;
+      ys = oy;
     }
     let length = 0;
     for (let i = 1; i < path.length; i++) length += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
-    return { path, length };
+    return { path, ys, length };
   }
 }

@@ -10,6 +10,7 @@ const WIDTH = [4, 3.2, 2.6, 1.6, 1.2];
 export class Minimap {
   private g: CanvasRenderingContext2D;
   private tmp: Seg[] = [];
+  private tmp2: Seg[] = [];
   constructor(private canvas: HTMLCanvasElement, private net: RoadNet) {
     const dpr = Math.min(devicePixelRatio, 2);
     canvas.width = canvas.clientWidth * dpr || 300;
@@ -45,6 +46,15 @@ export class Minimap {
       }
       g.stroke();
     }
+    // 隧道：虛線；高架：深色描邊＋珊瑚紅，畫在地面道路上面
+    const ds = this.net.deckGrid.query(x, z, RANGE * 1.42, this.tmp2);
+    const line = (e: 1 | 2) => { g.beginPath(); for (const s of ds) if (s.way.e === e) { g.moveTo(s.x1, s.z1); g.lineTo(s.x2, s.z2); } g.stroke(); };
+    const u = (n: number) => (n / k) * (W / 300);
+    g.setLineDash([u(5), u(4)]);
+    g.strokeStyle = '#8fa3c0'; g.lineWidth = u(2.6); line(2);
+    g.setLineDash([]);
+    g.strokeStyle = '#1a1c24'; g.lineWidth = u(5.4); line(1);
+    g.strokeStyle = '#ef7a62'; g.lineWidth = u(3.4); line(1);
     const px = (n: number) => (n / k) * (W / 300);
     if (extra?.route) {
       g.strokeStyle = '#ff9a1a';

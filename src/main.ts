@@ -660,7 +660,7 @@ const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
 // ---------------------------------------------------------------- 大地圖與導航
 // 🗺（電腦 M）開全螢幕地圖，點一下或選地標＝目的地；路上一排箭頭指路，偏離太多自動重新規劃
 const navArrows = new NavArrows(scene);
-let nav: { x: number; z: number; nm: string; path: [number, number][] | null; t: number } | null = null;
+let nav: { x: number; z: number; nm: string; path: [number, number][] | null; ys: number[] | null; t: number } | null = null;
 let mapOpen = false;
 function setNav(x: number, z: number, nm?: string) {
   if (!nm) {
@@ -668,7 +668,7 @@ function setNav(x: number, z: number, nm?: string) {
     for (const l of landmarks) { const d = Math.hypot(l.x - x, l.z - z); if (d < bd) { bd = d; best = l.nm; } }
     nm = best;
   }
-  nav = { x, z, nm, path: null, t: 99 };
+  nav = { x, z, nm, path: null, ys: null, t: 99 };
   closeMap();
   toast(`🧭 導航到 ${nm}`, '');
 }
@@ -679,9 +679,9 @@ function updateNav(dt: number) {
   // 偏離路線 25 m 以上、或每 6 秒，重新規劃
   let off = 0;
   if (nav.path) { off = Infinity; for (const [x, z] of nav.path) off = Math.min(off, Math.hypot(x - fcar.x, z - fcar.z)); }
-  if (nav.t > 6 || off > 25) { nav.t = 0; nav.path = router.route(fcar.x, fcar.z, nav.x, nav.z)?.path ?? null; }
+  if (nav.t > 6 || off > 25) { nav.t = 0; const r = router.route(fcar.x, fcar.z, nav.x, nav.z, fcar.y); nav.path = r?.path ?? null; nav.ys = r?.ys ?? null; } // 從現在這層（橋上／地面）出發
   if (d < 25) { toast(`🏁 抵達 ${nav.nm}`, 'purple'); nav = null; navArrows.update(null, 0, 0, 0); $('nav-hud').style.display = 'none'; return; }
-  navArrows.update(nav.path, fcar.x, fcar.z, performance.now() / 1000);
+  navArrows.update(nav.path, fcar.x, fcar.z, performance.now() / 1000, nav.ys);
   let len = 0;
   if (nav.path) for (let i = 1; i < nav.path.length; i++) len += Math.hypot(nav.path[i][0] - nav.path[i - 1][0], nav.path[i][1] - nav.path[i - 1][1]);
   const el = $('nav-hud');
@@ -2094,7 +2094,7 @@ function freeStep(dt: number) {
       const a = traffic.agents.find((b) => b.alive && b.v > 6 && b.kind !== 3 && b.kind !== 2);
       if (a) { honkPlaced = true; fcar.place(a.x + Math.sin(a.h) * 15, a.z + Math.cos(a.h) * 15, a.h); honkT = 0; }
     }
-    if (honkPlaced && honkT > 2) { honkT = 0; honkYield += traffic.honk(fcar.x, fcar.z, fcar.h); }
+    if (honkPlaced && honkT > 2) { honkT = 0; honkYield += traffic.honk(fcar.x, fcar.z, fcar.h, fcar.y); }
     honkBack += traffic.honks.splice(0).length;
   }
   let inp = FREE_SIM ? (DECK_TEST != null ? deckBot() : TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
@@ -2121,9 +2121,9 @@ function freeStep(dt: number) {
   let trafficHit = 0, pedHit = false;
   if (traffic && !NO_TRAFFIC && heavy) {
     traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? []), ...(police?.units.map((u) => u.car) ?? []), ...(police?.suspect ? [police.suspect.car] : [])]); // 車流會讓對手、過馬路的行人、警車、嫌犯車
-    if (grounded) trafficHit = traffic.collidePlayer(fcar);
+    trafficHit = traffic.collidePlayer(fcar); // 只撞同一層的車（traffic.ts 比高度）
   }
-  if (traffic && !NO_TRAFFIC && !heavy && grounded) trafficHit = traffic.collidePlayer(fcar);
+  if (traffic && !NO_TRAFFIC && !heavy) trafficHit = traffic.collidePlayer(fcar);
   impact = Math.max(impact, trafficHit);
   if (peds && heavy && peds.update(heavyAcc, grounded ? fcar : { x: fcar.x, z: fcar.z, h: fcar.h, v: 0 }, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
@@ -2528,4 +2528,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; }, get traffic() { return traffic; }, get police() { return police; } };

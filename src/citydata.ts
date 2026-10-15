@@ -147,9 +147,18 @@ export class RoadNet {
   nodes: number[];
   ways: NetWay[];
   segGrid = new Grid<Seg>(25);
+  /** 高架（e: 1）與隧道（e: 2）：地圖另外畫在最上層 */
+  decks: NetWay[];
+  deckGrid = new Grid<Seg>(25);
   constructor(d: CityData) {
     this.nodes = d.net.nodes;
     this.ways = d.net.ways;
+    this.decks = d.net.decks ?? [];
+    for (const w of this.decks) for (let k = 0; k + 1 < w.n.length; k++) {
+      const a = w.n[k], b = w.n[k + 1];
+      const s: Seg = { x1: this.nodes[a * 2], z1: this.nodes[a * 2 + 1], x2: this.nodes[b * 2], z2: this.nodes[b * 2 + 1], way: w };
+      this.deckGrid.addBox(s.x1, s.z1, s.x2, s.z2, s);
+    }
     for (const w of this.ways) {
       for (let k = 0; k + 1 < w.n.length; k++) {
         const a = w.n[k], b = w.n[k + 1];

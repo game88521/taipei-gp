@@ -64,7 +64,7 @@ function makeHeli(): { g: THREE.Group; rotor: THREE.Object3D; tail: THREE.Object
 
 /** 兩台 FreeCar 互撞：照質量交換動量（a 是主動算的那台，b 吃反作用）；回傳撞擊力道 */
 export function bumpCars(a: FreeCar, b: FreeCar): number {
-  if (Math.abs(a.x - b.x) > 8 || Math.abs(a.z - b.z) > 8) return 0;
+  if (Math.abs(a.x - b.x) > 8 || Math.abs(a.z - b.z) > 8 || Math.abs(a.y - b.y) > 2) return 0; // 橋上、橋下不會撞
   const R = FreeCar.RADIUS, inv = a.spec.mass / b.spec.mass, share = inv / (1 + inv);
   let impact = 0;
   for (const [ax, az] of a.circles()) for (const [bx, bz] of b.circles()) {
@@ -236,12 +236,12 @@ export class Police {
   }
 
   /** 開車：沿路線（或近距離直接衝向目標）；回傳要不要開、方向盤 */
-  private drive(u: Unit, tx: number, tz: number, vmax: number, dt: number, col: Collider | null, direct: boolean, closeV = Infinity, traffic: Traffic | null = null): number {
+  private drive(u: Unit, tx: number, tz: number, vmax: number, dt: number, col: Collider | null, direct: boolean, closeV = Infinity, traffic: Traffic | null = null, ty?: number): number {
     const c = u.car;
     u.repath -= dt;
     if (!direct && u.repath <= 0) {
       u.repath = 1.5;
-      u.path = this.router.route(c.x, c.z, tx, tz)?.path ?? null;
+      u.path = this.router.route(c.x, c.z, tx, tz, c.y, ty)?.path ?? null;
     }
     let ax = tx, az = tz;
     if (!direct && u.path && u.path.length > 1) {
@@ -257,6 +257,7 @@ export class Police {
     if (traffic && !direct) {
       const fx = Math.sin(c.h), fz = Math.cos(c.h);
       for (const a of traffic.near(c.x, c.z, 40)) {
+        if (Math.abs(a.y - c.y) > 2.5) continue; // 別層的車不用閃
         const dx = a.x + a.kx - c.x, dz = a.z + a.kz - c.z, ahead = dx * fx + dz * fz, lat = -dx * fz + dz * fx; // lat > 0：在右邊
         if (ahead < 2 || ahead > 35 || Math.abs(lat) > 3) continue;
         avoid += (lat >= 0 ? -1 : 1) * (1 - ahead / 35) * 1.4; // 方向盤負＝往左
@@ -311,11 +312,11 @@ export class Police {
       let nearest = Infinity;
       for (const u of this.units) {
         const d = Math.hypot(u.car.x - p.x, u.car.z - p.z);
-        nearest = Math.min(nearest, d);
+        nearest = Math.min(nearest, d + Math.abs(u.car.y - p.y) * 4); // 橋下的警車抓不到橋上的人
         // 近了直接衝撞（往玩家前面一點的位置）
         const lead = Math.min(0.6, d / 40);
         // 遠的時候全速追、35 m 內直接衝過來、12 m 內放慢貼著你（逼停，不要一直把人撞飛）
-        this.drive(u, p.x + p.vx * lead, p.z + p.vz * lead, vmax, dt, col, d < 35, d < 12 ? Math.abs(p.v) + 3 : Infinity, traffic);
+        this.drive(u, p.x + p.vx * lead, p.z + p.vz * lead, vmax, dt, col, d < 35, d < 12 ? Math.abs(p.v) + 3 : Infinity, traffic, p.y); // 玩家在高架上：路線從匝道追上去
         if (traffic) traffic.collidePlayer(u.car); // 警車也會把車流撞開
         // 撞警車：只算玩家主動撞過去（朝著警車、而且比它快）
         const tx = u.car.x - p.x, tz = u.car.z - p.z, tl = Math.hypot(tx, tz) || 1;
