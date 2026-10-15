@@ -232,9 +232,10 @@ export class Collider {
   /** 圓碰到的每一個接觸：法向量（從牆指向圓心）與重疊深度；給剛體逐一施加衝量用 */
   contacts(x: number, z: number, r: number, out: { nx: number; nz: number; depth: number }[], y = -0.25) {
     out.length = 0;
-    // 高度：車身約 0.2~1.6 m；地面帶 = 地面以上 3 m 內
-    const gTop = this.groundAt(x, z) + 3;
-    const reach = (b: { y1?: number; y2?: number }) => (b.y1 === undefined ? y < gTop : y + 1.6 >= b.y1 && y + 0.2 <= b.y2!);
+    // 高度：車身約 0.2~1.6 m；地面帶 = 地面下 2 m ~ 地面上 3 m（隧道裡的車不會撞到頭頂上的建築、山坡）
+    const g0 = this.groundAt(x, z), gTop = g0 + 3, gBot = g0 - 1.1; // 路塹、隧道口比地面低 1 m 以上就不算地面帶（不吃頭頂山坡的坡度牆）
+    const onGroundBand = y < gTop && y > gBot;
+    const reach = (b: { y1?: number; y2?: number }) => (b.y1 === undefined ? onGroundBand : y + 1.6 >= b.y1 && y + 0.2 <= b.y2!);
     for (const e of this.edges.query(x, z, r, this.te)) {
       if (!reach(e)) continue;
       const dx = e.x2 - e.x1, dz = e.z2 - e.z1, l2 = dx * dx + dz * dz || 1;
@@ -248,7 +249,7 @@ export class Collider {
       if (d < rr && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: rr - d });
     }
     // 山坡：坡度超過 45% 就當成牆（道路都挖填到 18% 以內，開得上去；陡坡、山壁上不去），從往下坡的方向推回來
-    if (this.terrain && y < gTop) {
+    if (this.terrain && onGroundBand) {
       const gx = terrainHeight(this.terrain, x + 2, z) - terrainHeight(this.terrain, x - 2, z);
       const gz = terrainHeight(this.terrain, x, z + 2) - terrainHeight(this.terrain, x, z - 2);
       const slope = Math.hypot(gx, gz) / 4;

@@ -73,12 +73,16 @@ export class Surface {
    */
   at(x: number, z: number, prevY: number, out: SurfaceHit = { y: 0, seg: null }): SurfaceHit {
     const lim = prevY + 0.6, gy = this.groundY(x, z);
-    let best = gy <= lim ? gy : -Infinity, seg: DeckSeg | null = null;
+    let best = gy <= lim ? gy : -Infinity, seg: DeckSeg | null = null, tun: DeckSeg | null = null, ty = 0;
     for (const s of this.grid.query(x, z, 1, this.tmp)) {
       if (!this.usable(s)) continue;
       const y = this.onSeg(s, x, z, 0.3);
-      if (y != null && y <= lim && y > best) { best = y; seg = s; }
+      if (y == null) continue;
+      if (y <= lim && y > best) { best = y; seg = s; }
+      // 隧道：洞口那段路面往下沉、頭頂的山坡沒挖掉；車子已經在隧道路面的高度上 → 跟著隧道走，不爬上山坡
+      if (s.way.e === 2 && Math.abs(y - prevY) < 0.8 && (!tun || Math.abs(y - prevY) < Math.abs(ty - prevY))) { tun = s; ty = y; }
     }
+    if (tun && ty < best) { best = ty; seg = tun; }
     out.y = best > -Infinity ? best : gy; // 比所有路面都低（剛放下來）→ 地面
     out.seg = best > -Infinity ? seg : null;
     return out;

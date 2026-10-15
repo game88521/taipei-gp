@@ -6,6 +6,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
 import { buildTrack, VMAX, setRealPerf, heightAt, locate, surfaceY, bankRoll, type Locate } from './track';
 import { buildWorld } from './world';
+import { CEIL, holeAware } from './tunnel';
 import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
 import { driverStandings, teamStandings, standingsHtml, roundName, POINTS } from './season';
@@ -154,6 +155,7 @@ let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西�
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 let cityStream: import('./city').CityStream | null = null;
 let surface: import('./surface').Surface | null = null; // 立體路面（地面＋高架；surface.ts）
+let tunDim = 0, tunWas = false; // 隧道調暗的程度（0~1）
 let cityDataRef: import('./citydata').CityData | null = null;
 let lastImpact = 0; // 這一步撞牆的力道（測試用）
 const hitLog: string[] = []; // 測試：自由駕駛模擬的重撞紀錄
@@ -206,6 +208,8 @@ const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all:
   collider.groundAt = (x, z) => c.surface.groundAt(x, z);
   for (const [x, z, r, top] of c.elev.posts) collider.addPost(x, z, r, top != null ? -10 : undefined, top); // 橋墩：只擋橋下的車
   for (const [x1, z1, x2, z2, y1, y2] of c.elev.walls) collider.addWall(x1, z1, x2, z2, y1, y2); // 橋面護欄：只擋橋上的車
+  for (const [x1, z1, x2, z2, y1, y2] of c.tunnels.walls) collider.addWall(x1, z1, x2, z2, y1, y2); // 隧道側牆、路塹矮牆
+  holeAware(world.ground.material as THREE.Material); // 隧道路塹的開口不畫地面
   for (const [x, z] of c.marketSpots) collider.addPost(x, z, 1.1); // 夜市攤位
   roadNet = new RoadNet(c.data);
   cityDataRef = c.data;
@@ -2072,7 +2076,7 @@ function streetRacing() {
 let posSaveAcc = 0;
 /** 記下自由駕駛的位置（下次從這裡出發） */
 /** 車子在地面（不在高架上） */
-function onGround() { return !surface || fcar.y - surface.groundY(fcar.x, fcar.z) < 1.5; }
+function onGround() { return !surface || Math.abs(fcar.y - surface.groundY(fcar.x, fcar.z)) < 1.5; } // 高架上、隧道裡都不算
 function saveFreePos() {
   if (BOT || CIRCUIT || mode !== 'free' || !Number.isFinite(fcar.x)) return;
   save.freePos = { x: Math.round(fcar.x * 10) / 10, z: Math.round(fcar.z * 10) / 10, h: Math.round(fcar.h * 1000) / 1000, y: Math.round(fcar.y * 10) / 10 };
@@ -2341,15 +2345,16 @@ const SR_TEST = new URLSearchParams(location.search).get('sr');
 const TAXI_TEST = new URLSearchParams(location.search).has('taxi'); // ?free&bot&taxi&sim=N：自動跑計程車任務
 // ?free&bot&deck[=名稱]&sim=N：測立體路面——從一條「地面接上高架」的上匝道腳出發，沿著橋面一路開；title 回報最高高度、撞擊、卡住
 const DECK_TEST = new URLSearchParams(location.search).get('deck');
-let deckPath: [number, number][] = [], deckMaxY = -9, deckHits = 0, deckStuck = 0, deckIdx = 0, deckName = '';
+let deckMinY = 999, deckPath: [number, number][] = [], deckMaxY = -9, deckHits = 0, deckStuck = 0, deckIdx = 0, deckName = '';
 function setupDeckTest(d: import('./citydata').CityData) {
-  const N = d.net.nodes, Y = d.net.y ?? [], decks = (d.net.decks ?? []).filter((w) => w.e === 1);
+  const N = d.net.nodes, Y = d.net.y ?? [], decks = d.net.decks ?? []; // 高架與隧道都算
   const g = (i: number) => surface?.groundY(N[i * 2], N[i * 2 + 1]) ?? -0.25;
   const fromNode = new Map<number, typeof decks>();
   for (const w of decks) { const a = w.o === -1 ? w.n[w.n.length - 1] : w.n[0]; if (!fromNode.has(a)) fromNode.set(a, []); fromNode.get(a)!.push(w); }
   const nodesOf = (w: (typeof decks)[number]) => (w.o === -1 ? [...w.n].reverse() : w.n);
   // 上匝道：起點貼地、終點離地 6 m 以上；名字符合（有指定的話）
-  const ramp = decks.find((w) => { const n = nodesOf(w); return Y[n[0]] - g(n[0]) < 0.5 && Y[n[n.length - 1]] - g(n[n.length - 1]) > 6 && (!DECK_TEST || (w.nm ?? '').includes(DECK_TEST)); });
+  // 上匝道（終點離地 6 m 以上）或往下進隧道（終點比地面低 3 m 以上）
+  const ramp = decks.find((w) => { const n = nodesOf(w), e = Y[n[n.length - 1]] - g(n[n.length - 1]); return Math.abs(Y[n[0]] - g(n[0])) < 0.5 && (e > 6 || e < -3) && (!DECK_TEST || (w.nm ?? '').includes(DECK_TEST)); });
   if (!ramp) return;
   let w: (typeof decks)[number] | undefined = ramp, len = 0;
   const seen = new Set<(typeof decks)[number]>();
@@ -2374,6 +2379,7 @@ function deckBot() {
   e = Math.atan2(Math.sin(e), Math.cos(e));
   const want = j >= deckPath.length - 1 ? 0 : Math.abs(e) > 0.4 ? 12 : 24;
   deckMaxY = Math.max(deckMaxY, fcar.y);
+  deckMinY = Math.min(deckMinY, fcar.y);
   deckStuck = Math.abs(fcar.v) < 1 && want > 0 ? deckStuck + STEP : 0;
   return { steer: Math.max(-1, Math.min(1, -e * 2.2)), brake: fcar.v > want + 1, throttle: fcar.v < want };
 }
@@ -2418,7 +2424,7 @@ if (FREE) void cityLoad.then(() => {
       setupDeckTest(cityDataRef);
       for (let n = 0; n < SIM / STEP; n++) { freeStep(STEP); if (lastImpact > 2) deckHits++; }
       const lastOn = !onGround() && fcar.deck ? fcar.deck.way.nm ?? '(無名)' : '地面';
-      document.title = `DECK ${deckName} 路線${deckPath.length}點 走到${deckIdx} 最高y=${deckMaxY.toFixed(1)} 現在y=${fcar.y.toFixed(1)} 在：${lastOn} 撞${deckHits} 卡住${deckStuck.toFixed(1)}s 速${(fcar.v * 3.6).toFixed(0)}`;
+      document.title = `DECK ${deckName} 路線${deckPath.length}點 走到${deckIdx} 最高y=${deckMaxY.toFixed(1)} 最低y=${deckMinY.toFixed(1)} 現在y=${fcar.y.toFixed(1)} 在：${lastOn} 撞${deckHits} 卡住${deckStuck.toFixed(1)}s 速${(fcar.v * 3.6).toFixed(0)}`;
       return;
     }
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
@@ -2498,6 +2504,18 @@ renderer.setAnimationLoop(() => {
   if (state === 'race' || state === 'countdown') updateDrsButton();
   weather.update(dt, camera.position);
   if (cityReady) tickCycle(dt);
+  // 在隧道裡（頭頂有天花板）：太陽、天空光漸漸調暗，只剩隧道燈
+  {
+    const inTun = mode === 'free' && !!surface && fcar.deck?.way.e === 2 && surface.groundY(fcar.x, fcar.z) - fcar.y > CEIL;
+    tunDim += ((inTun ? 1 : 0) - tunDim) * Math.min(1, dt * 3);
+    // 隧道西段比全圖那片平的地面還低：在隧道裡就把它收起來（不然從上面蓋住隧道路面）
+    world.ground.visible = !(mode === 'free' && fcar.deck?.way.e === 2 && fcar.y < world.ground.position.y + 1);
+    if (tunDim > 0.002 || tunWas) {
+      world.sun.intensity = weather.sunI * (1 - 0.85 * tunDim);
+      world.hemi.intensity = weather.hemiI * (1 - 0.7 * tunDim);
+      tunWas = tunDim > 0.002;
+    }
+  }
   tickStats(dt);
   if (holdRender) return;
   if (composer) composer.render(); else renderer.render(scene, camera);
@@ -2510,4 +2528,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; } };

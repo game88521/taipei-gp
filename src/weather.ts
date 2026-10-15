@@ -211,6 +211,9 @@ export class Weather {
     return true;
   }
 
+  /** 目前時段的太陽、天空光強度（隧道裡調暗用） */
+  get sunI() { return this.cur.sunI; }
+  get hemiI() { return this.cur.hemi; }
   get night() { return this.cur.night; }
   get raining() { return this.cur.rain; }
   /** 環境反射用：太陽（月亮）的亮度顏色 */

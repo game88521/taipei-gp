@@ -191,7 +191,7 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
     scene.add(im);
   }
   // 地下道入口：路往下進隧道的地方立一個混凝土門框，裡面是黑的（物理上車子開不進去，門框不擋路，只是外型）
-  const pt = d.portals ?? [];
+  const pt = surf ? [] : d.portals ?? []; // 隧道可以開進去之後（tunnel.ts）就不畫這個假的洞口
   if (pt.length) {
     const frame: number[] = [], hole: number[] = [];
     for (let k = 0; k + 3 < pt.length; k += 4) {
