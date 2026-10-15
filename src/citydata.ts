@@ -172,8 +172,9 @@ export function distSeg(x: number, z: number, x1: number, z1: number, x2: number
   return Math.hypot(x - x1 - dx * t, z - z1 - dz * t);
 }
 
-interface Edge { x1: number; z1: number; x2: number; z2: number; tag?: number /* 屬於哪個區塊（卸載時一起拿掉） */ }
-interface Post { x: number; z: number; r: number }
+// y1~y2：擋車的高度範圍（沒填 = 地面：地面以上 3 m 內的車才會撞到；橋面護欄、橋墩、隧道牆才有填）
+interface Edge { x1: number; z1: number; x2: number; z2: number; tag?: number /* 屬於哪個區塊（卸載時一起拿掉） */; y1?: number; y2?: number }
+interface Post { x: number; z: number; r: number; y1?: number; y2?: number }
 
 /** 靜態碰撞：建築外牆（落地的）＋ 樹幹 */
 export class Collider {
@@ -182,6 +183,8 @@ export class Collider {
   private te: Edge[] = [];
   private tp: Post[] = [];
   private terrain: Terrain | null;
+  /** 地面高度（立體路面 surface.ts 設定）；地面帶的障礙物只擋「地面以上 3 m 內」的車 */
+  groundAt: (x: number, z: number) => number = () => 0;
   constructor(d: CityData) {
     this.terrain = d.terrain ?? null;
     this.addBuildings(d.buildings);
@@ -212,9 +215,9 @@ export class Collider {
   removeTag(tag: number, bb: [number, number, number, number]) {
     if (bb[0] <= bb[2]) this.edges.removeIf(bb[0], bb[1], bb[2], bb[3], (e) => e.tag === tag);
   }
-  addPost(x: number, z: number, r: number) { this.posts.addBox(x, z, x, z, { x, z, r }); }
-  /** 一面牆（高架匝道貼地那段的側邊） */
-  addWall(x1: number, z1: number, x2: number, z2: number) { this.edges.addBox(x1, z1, x2, z2, { x1, z1, x2, z2 }); }
+  addPost(x: number, z: number, r: number, y1?: number, y2?: number) { this.posts.addBox(x, z, x, z, { x, z, r, y1, y2 }); }
+  /** 一面牆；y1~y2 = 擋車的高度範圍（橋面護欄、隧道牆），沒填是地面的牆 */
+  addWall(x1: number, z1: number, x2: number, z2: number, y1?: number, y2?: number) { this.edges.addBox(x1, z1, x2, z2, { x1, z1, x2, z2, y1, y2 }); }
   /** 軸對齊的方塊建築（地圖外圍的遠景城市） */
   addRect(cx: number, cz: number, w: number, d: number) {
     const a = cx - w / 2, b = cz - d / 2, c = cx + w / 2, e = cz + d / 2;
@@ -222,20 +225,25 @@ export class Collider {
   }
 
   /** 圓碰到的每一個接觸：法向量（從牆指向圓心）與重疊深度；給剛體逐一施加衝量用 */
-  contacts(x: number, z: number, r: number, out: { nx: number; nz: number; depth: number }[]) {
+  contacts(x: number, z: number, r: number, out: { nx: number; nz: number; depth: number }[], y = -0.25) {
     out.length = 0;
+    // 高度：車身約 0.2~1.6 m；地面帶 = 地面以上 3 m 內
+    const gTop = this.groundAt(x, z) + 3;
+    const reach = (b: { y1?: number; y2?: number }) => (b.y1 === undefined ? y < gTop : y + 1.6 >= b.y1 && y + 0.2 <= b.y2!);
     for (const e of this.edges.query(x, z, r, this.te)) {
+      if (!reach(e)) continue;
       const dx = e.x2 - e.x1, dz = e.z2 - e.z1, l2 = dx * dx + dz * dz || 1;
       const t = Math.max(0, Math.min(1, ((x - e.x1) * dx + (z - e.z1) * dz) / l2));
       const ox = x - e.x1 - dx * t, oz = z - e.z1 - dz * t, d = Math.hypot(ox, oz);
       if (d < r && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: r - d });
     }
     for (const p of this.posts.query(x, z, r + 0.5, this.tp)) {
+      if (!reach(p)) continue;
       const ox = x - p.x, oz = z - p.z, d = Math.hypot(ox, oz), rr = r + p.r;
       if (d < rr && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: rr - d });
     }
     // 山坡：太陡（離地超過 1.2 m）就當成牆，從往下坡的方向推回來
-    if (this.terrain) {
+    if (this.terrain && y < gTop) {
       const h0 = terrainHeight(this.terrain, x, z);
       if (h0 > 1.2) {
         const gx = terrainHeight(this.terrain, x + 2, z) - terrainHeight(this.terrain, x - 2, z);
@@ -260,6 +268,7 @@ export class Collider {
     out[0] = 0; out[1] = 0;
     let hit = false;
     for (const e of this.edges.query(x, z, r, this.te)) {
+      if (e.y1 !== undefined && e.y1 > 2) continue; // 車流在地面：橋上的護欄擋不到
       const dx = e.x2 - e.x1, dz = e.z2 - e.z1, l2 = dx * dx + dz * dz || 1;
       const t = Math.max(0, Math.min(1, ((x - e.x1) * dx + (z - e.z1) * dz) / l2));
       const px = e.x1 + dx * t, pz = e.z1 + dz * t;

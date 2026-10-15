@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeFiller, buildFiller, fillerMaterial, WALLS, type Filler } from './filler';
 import { buildSpecial, buildTrails } from './landmarks3d';
 import { buildElevated, type ElevatedHits } from './elevated';
+import { Surface } from './surface';
 import { Trains } from './trains';
 import { buildWater, buildMarket, buildLevee } from './riverside';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
@@ -243,7 +244,7 @@ export interface CityStream {
 }
 
 /** opts.all：一次載入全部區塊、不卸載（自動測試是同步模擬，等不到背景載入）；cx, cz：開場先載入哪一帶 */
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: { all?: boolean; cx: number; cz: number }): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][]; collider: Collider; stream: CityStream }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: { all?: boolean; cx: number; cz: number }): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][]; collider: Collider; stream: CityStream; surface: Surface }> {
   // 依距離顯示：每個區塊記住中心點，離鏡頭太遠就整塊不畫（地圖變大後很重要）
   // 分四層：far = 整個可視距離（建築、屋頂）；mid = 一半多（樹冠）；near = 550 m 內（店面、招牌、地上影子、機車、樹幹）；
   // close = 300 m 內（路名牌：一支一個物件，離遠了也看不清字）。遠處的小東西在手機螢幕上只有幾個像素，卻一個就多一次繪製
@@ -343,7 +344,8 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
 
   scene.add(build101());
   if (data.terrain && data.trails) scene.add(buildTrails(data.trails, data.terrain, data.rocks ?? []));
-  const elev = buildElevated(scene, data); // 高架道路、人行空橋、文湖線、地下道入口
+  const surface = new Surface(data); // 立體路面：地面＋高架橋面（surface.ts）
+  const elev = buildElevated(scene, data, surface); // 高架道路、人行空橋、文湖線、地下道入口
   const trains = new Trains(scene, data); // 文湖線列車
   buildWater(scene, data); // 基隆河、池塘
   const marketSpots = buildMarket(scene, data); // 饒河夜市
@@ -682,7 +684,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     for (let i = 0; i < TI.list.length; i++) lodShow(i, !(loaded.has(i) && d2(i, x, z) < (r + S * 0.71) ** 2));
     if (lodDirty && lodMesh) { lodMesh.instanceMatrix.needsUpdate = true; lodDirty = false; }
   };
-  return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots, collider, stream };
+  return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots, collider, stream, surface };
 }
 
 function build101(): THREE.Group {

@@ -153,6 +153,10 @@ const taxiOn = () => !!taxi && taxi.phase !== 'off';
 let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西（賽道旁的路名牌）
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 let cityStream: import('./city').CityStream | null = null;
+let surface: import('./surface').Surface | null = null; // 立體路面（地面＋高架；surface.ts）
+let cityDataRef: import('./citydata').CityData | null = null;
+let lastImpact = 0; // 這一步撞牆的力道（測試用）
+const hitLog: string[] = []; // 測試：自由駕駛模擬的重撞紀錄
 // 載入進度：選單的按鈕上顯示目前在做什麼＋進度條
 // 開始建城市之後先不重畫背景：每加進一批新東西，畫面第一次畫到它就要同步編譯著色器，載入會一直卡
 let holdRender = true; // 一開始就先不畫：開場就建好的車、警車、雨…第一次畫到也要同步編譯，等最後 compileAsync 一次編
@@ -196,10 +200,15 @@ const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all:
   c.stream.onAdd = (g) => applyShadowFlagsIn(g, Q.shadows); // 串流進來的區塊：跟載入時一樣只接受陰影
   c.stream.onRemove = () => renderer.renderLists.dispose(); // 繪製清單會留著卸掉區塊的物件，下一格重建一份新的
   for (const b of c.filler.boxes) collider.addRect(b.x, b.z, b.w, b.d);
-  for (const [x, z, r] of c.elev.posts) collider.addPost(x, z, r); // 高架橋墩
-  for (const [x1, z1, x2, z2] of c.elev.walls) collider.addWall(x1, z1, x2, z2); // 匝道貼地那段
+  // 立體路面：車子照它決定在哪一層；碰撞的「地面帶」照地面高度
+  surface = c.surface;
+  FreeCar.surface = (x, z, y, o) => c.surface.at(x, z, y, o);
+  collider.groundAt = (x, z) => c.surface.groundAt(x, z);
+  for (const [x, z, r, top] of c.elev.posts) collider.addPost(x, z, r, top != null ? -10 : undefined, top); // 橋墩：只擋橋下的車
+  for (const [x1, z1, x2, z2, y1, y2] of c.elev.walls) collider.addWall(x1, z1, x2, z2, y1, y2); // 橋面護欄：只擋橋上的車
   for (const [x, z] of c.marketSpots) collider.addPost(x, z, 1.1); // 夜市攤位
   roadNet = new RoadNet(c.data);
+  cityDataRef = c.data;
   // 水邊：擋住不讓車開進河裡；附近 8 m 內有車道的那段不擋（跨河、跨溝的橋）
   for (const w of c.data.water ?? []) {
     const P = w.p, n = P.length / 2;
@@ -850,9 +859,11 @@ function updateVisuals(dt: number) {
     peds.visible = mode === 'free';
     if (mode === 'free') peds.render();
   }
-  const ry = mode === 'race' ? surfaceY(track, car.pos.i, car.pos.lat) : 0; // 各國賽道的高低起伏（傾斜彎跟著路面）
-  model.root.position.set(vc.x, mode === 'free' ? -0.25 : ry, vc.z); // 城市道路比賽道路面低 0.25 m
-  model.root.rotation.set(mode === 'race' ? -Math.atan(track.grade[car.pos.i]) : 0, vc.h, mode === 'race' ? bankRoll(track, car.pos.i, car.pos.lat) : 0, 'YXZ'); // 上坡車頭抬起來、傾斜彎車身跟著斜
+  // 高度：比賽照賽道（各國賽道的高低起伏、傾斜彎）；自由駕駛照立體路面（高架、坡道；城市路面比賽道低 0.25 m）
+  const ry = mode === 'race' ? surfaceY(track, car.pos.i, car.pos.lat) : fcar.y + 0.25;
+  model.root.position.set(vc.x, mode === 'free' ? fcar.y : ry, vc.z);
+  if (mode === 'race') model.root.rotation.set(-Math.atan(track.grade[car.pos.i]), vc.h, bankRoll(track, car.pos.i, car.pos.lat), 'YXZ'); // 上坡車頭抬起來、傾斜彎車身跟著斜
+  else model.root.rotation.set(-fcar.pitch, vc.h, fcar.roll, 'YXZ');
   model.body.rotation.z = vc.steer * Math.min(1, Math.abs(vc.v) / 40) * (mode === 'race' ? 0.04 : 0.06);
   for (const w of model.steer) w.rotation.y = -vc.steer * 0.45;
   for (const w of model.spin) w.rotation.x += (vc.v / 0.35) * dt;
@@ -893,11 +904,11 @@ function updateVisuals(dt: number) {
   model.body.visible = !inCar;
   for (const w of [...model.steer, ...model.spin]) w.visible = !inCar;
   model.root.traverse((o) => { if (o.userData.lens) o.visible = !inCar; });
-  if (mode === 'free' && state === 'free') damage.update(dt, model, f1Look ? '#d40000' : save.paint?.[chosen.id] ?? pv.baseColor, vc.x, -0.25, vc.z, vc.h);
+  if (mode === 'free' && state === 'free') damage.update(dt, model, f1Look ? '#d40000' : save.paint?.[chosen.id] ?? pv.baseColor, vc.x, fcar.y, vc.z, vc.h);
   if (inCar) {
     const [ex, ey, ez] = EYE[f1Look ? 'f1' : chosen.id] ?? EYE.sedan;
     const hx = Math.sin(vc.h), hz = Math.cos(vc.h), lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 前、左
-    const base = mode === 'free' ? -0.25 : ry;
+    const base = mode === 'free' ? fcar.y : ry;
     camera.position.set(vc.x + lx * ex + hx * ez, base + ey, vc.z + lz * ex + hz * ez);
     camera.lookAt(vc.x + lx * ex + hx * 30, base + ey - 0.8, vc.z + lz * ex + hz * 30);
     if (Math.abs(camera.fov - 72) > 0.05) { camera.fov = 72; camera.updateProjectionMatrix(); }
@@ -2006,8 +2017,8 @@ let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
 function beginFree() {
   // 從上次停的地方出發（沒有就從 101 前的信義路）；測試一律從起點，結果才可重現
   const p = !BOT && validFreePos(save.freePos) ? save.freePos! : null;
-  if (p) fcar.place(p.x, p.z, p.h); else fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
-  unstick(); // 對齊到真實車道中心
+  if (p) fcar.place(p.x, p.z, p.h, p.y); else fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
+  unstick(); // 對齊到真實車道中心（在高架上就對齊橋面）
   if (p && roadNet) { const w = roadNet.nearestNamed(fcar.x, fcar.z, 60); toast(`📍 從上次的位置出發${w?.nm ? `：${w.nm}` : ''}`, ''); }
   camSnap = true;
   state = 'free';
@@ -2017,6 +2028,17 @@ function beginFree() {
 /** 卡住時：移到最近道路的中心，車頭順著道路 */
 function unstick() {
   if (!roadNet) return;
+  // 在高架上：放回最近的橋面中央（同一層）
+  if (surface && !onGround()) {
+    const s = surface.nearestDeck(fcar.x, fcar.z, fcar.y);
+    if (s) {
+      const t = Math.max(0, Math.min(1, ((fcar.x - s.ax) * s.ux + (fcar.z - s.az) * s.uz) / s.len));
+      let h = Math.atan2(s.ux, s.uz);
+      if (s.way.o === -1) h += Math.PI; else if (!s.way.o && Math.cos(h - fcar.h) < 0) h += Math.PI;
+      fcar.place(s.ax + (s.bx - s.ax) * t, s.az + (s.bz - s.az) * t, h, s.ya + (s.yb - s.ya) * t);
+      return;
+    }
+  }
   let best: { x: number; z: number; h: number } | null = null, bd = Infinity;
   for (const s of roadNet.segGrid.query(fcar.x, fcar.z, 60)) {
     if (s.way.c > 3) continue;
@@ -2049,9 +2071,11 @@ function streetRacing() {
 }
 let posSaveAcc = 0;
 /** 記下自由駕駛的位置（下次從這裡出發） */
+/** 車子在地面（不在高架上） */
+function onGround() { return !surface || fcar.y - surface.groundY(fcar.x, fcar.z) < 1.5; }
 function saveFreePos() {
   if (BOT || CIRCUIT || mode !== 'free' || !Number.isFinite(fcar.x)) return;
-  save.freePos = { x: Math.round(fcar.x * 10) / 10, z: Math.round(fcar.z * 10) / 10, h: Math.round(fcar.h * 1000) / 1000 };
+  save.freePos = { x: Math.round(fcar.x * 10) / 10, z: Math.round(fcar.z * 10) / 10, h: Math.round(fcar.h * 1000) / 1000, y: Math.round(fcar.y * 10) / 10 };
   writeSave();
 }
 function freeStep(dt: number) {
@@ -2069,13 +2093,16 @@ function freeStep(dt: number) {
     if (honkPlaced && honkT > 2) { honkT = 0; honkYield += traffic.honk(fcar.x, fcar.z, fcar.h); }
     honkBack += traffic.honks.splice(0).length;
   }
-  let inp = FREE_SIM ? (TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
+  let inp = FREE_SIM ? (DECK_TEST != null ? deckBot() : TAXI_TEST ? taxiBot() : SR_TEST ? srBot() : PURSUIT_TEST ? chaseBot() : { steer: 0, brake: false, throttle: !IDLE }) : input.read();
   if (sr?.phase === 'count') { inp = { steer: 0, brake: false, throttle: false }; fcar.vx = fcar.vz = fcar.w = 0; } // 倒數時原地不動（按煞車會變倒車）
   const hb = !!(inp as { handbrake?: boolean }).handbrake;
   fcar.drift = hb && Math.abs(fcar.v) > 8; // 按住甩尾鍵：車尾甩出去
   if (hb && !inp.brake) inp = { ...inp, throttle: true }; // 甩尾時自動給油（手機右手大拇指只要按住 🌀）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
-  const knockHit = breakables ? breakables.hit(fcar) : 0; // 樹、路燈：撞倒過去
+  lastImpact = impact;
+  if (FREE_SIM && impact > 6 && hitLog.length < 6) hitLog.push(`${fcar.x.toFixed(0)},${fcar.z.toFixed(0)} y${fcar.y.toFixed(1)} 撞${impact.toFixed(0)}${fcar.landed > 4 ? "（落地）" : ""}${fcar.deck ? "（橋上）" : ""}`);
+  const grounded = onGround(); // 在高架上：不會撞到地面的樹、路燈、車流、行人
+  const knockHit = breakables && grounded ? breakables.hit(fcar) : 0; // 樹、路燈：撞倒過去
   const hardHit = impact;
   impact = Math.max(impact, knockHit);
   if (sr) {
@@ -2090,11 +2117,11 @@ function freeStep(dt: number) {
   let trafficHit = 0, pedHit = false;
   if (traffic && !NO_TRAFFIC && heavy) {
     traffic.update(heavyAcc, fcar, [...(sr?.obstacle() ?? []), ...(peds?.crossers() ?? []), ...(police?.units.map((u) => u.car) ?? []), ...(police?.suspect ? [police.suspect.car] : [])]); // 車流會讓對手、過馬路的行人、警車、嫌犯車
-    trafficHit = traffic.collidePlayer(fcar);
+    if (grounded) trafficHit = traffic.collidePlayer(fcar);
   }
-  if (traffic && !NO_TRAFFIC && !heavy) trafficHit = traffic.collidePlayer(fcar);
+  if (traffic && !NO_TRAFFIC && !heavy && grounded) trafficHit = traffic.collidePlayer(fcar);
   impact = Math.max(impact, trafficHit);
-  if (peds && heavy && peds.update(heavyAcc, fcar, traffic)) {
+  if (peds && heavy && peds.update(heavyAcc, grounded ? fcar : { x: fcar.x, z: fcar.z, h: fcar.h, v: 0 }, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
     sound.hit(6);
     pedHit = true;
@@ -2180,7 +2207,7 @@ function updateFreeHud(dt: number) {
   roadAcc += dt;
   if (roadAcc > 0.25 && roadNet) {
     roadAcc = 0;
-    const w = roadNet.nearestNamed(fcar.x, fcar.z);
+    const w = !onGround() && fcar.deck?.way.nm ? fcar.deck.way : roadNet.nearestNamed(fcar.x, fcar.z); // 在高架上顯示高架的名字
     const key = w ? w.nm + '|' + (w.en || '') : '';
     if (key !== roadShown) {
       roadShown = key;
@@ -2312,6 +2339,44 @@ const IDLE = new URLSearchParams(location.search).has('idle'); // 測車流：�
 const NO_TRAFFIC = new URLSearchParams(location.search).has('notraffic'); // 測路線用：關掉車流
 const SR_TEST = new URLSearchParams(location.search).get('sr');
 const TAXI_TEST = new URLSearchParams(location.search).has('taxi'); // ?free&bot&taxi&sim=N：自動跑計程車任務
+// ?free&bot&deck[=名稱]&sim=N：測立體路面——從一條「地面接上高架」的上匝道腳出發，沿著橋面一路開；title 回報最高高度、撞擊、卡住
+const DECK_TEST = new URLSearchParams(location.search).get('deck');
+let deckPath: [number, number][] = [], deckMaxY = -9, deckHits = 0, deckStuck = 0, deckIdx = 0, deckName = '';
+function setupDeckTest(d: import('./citydata').CityData) {
+  const N = d.net.nodes, Y = d.net.y ?? [], decks = (d.net.decks ?? []).filter((w) => w.e === 1);
+  const g = (i: number) => surface?.groundY(N[i * 2], N[i * 2 + 1]) ?? -0.25;
+  const fromNode = new Map<number, typeof decks>();
+  for (const w of decks) { const a = w.o === -1 ? w.n[w.n.length - 1] : w.n[0]; if (!fromNode.has(a)) fromNode.set(a, []); fromNode.get(a)!.push(w); }
+  const nodesOf = (w: (typeof decks)[number]) => (w.o === -1 ? [...w.n].reverse() : w.n);
+  // 上匝道：起點貼地、終點離地 6 m 以上；名字符合（有指定的話）
+  const ramp = decks.find((w) => { const n = nodesOf(w); return Y[n[0]] - g(n[0]) < 0.5 && Y[n[n.length - 1]] - g(n[n.length - 1]) > 6 && (!DECK_TEST || (w.nm ?? '').includes(DECK_TEST)); });
+  if (!ramp) return;
+  let w: (typeof decks)[number] | undefined = ramp, len = 0;
+  const seen = new Set<(typeof decks)[number]>();
+  while (w && len < 3500 && !seen.has(w)) {
+    seen.add(w);
+    const n = nodesOf(w);
+    for (const i of n) { const p: [number, number] = [N[i * 2], N[i * 2 + 1]]; if (deckPath.length) len += Math.hypot(p[0] - deckPath[deckPath.length - 1][0], p[1] - deckPath[deckPath.length - 1][1]); deckPath.push(p); }
+    const nexts: typeof decks = (fromNode.get(n[n.length - 1]) ?? []).filter((o) => !seen.has(o));
+    w = nexts.sort((p, q) => (q.nm === w!.nm ? 1 : 0) - (p.nm === w!.nm ? 1 : 0))[0];
+  }
+  deckName = ramp.nm ?? '';
+  const [x0, z0] = deckPath[0], [x1, z1] = deckPath[1];
+  fcar.place(x0, z0, Math.atan2(x1 - x0, z1 - z0));
+}
+function deckBot() {
+  if (deckPath.length < 2) return { steer: 0, brake: true, throttle: false };
+  // 沿路線往前找最近點（只往前走），看前面 12 m
+  for (let k = deckIdx; k < Math.min(deckPath.length, deckIdx + 40); k++) if ((deckPath[k][0] - fcar.x) ** 2 + (deckPath[k][1] - fcar.z) ** 2 < (deckPath[deckIdx][0] - fcar.x) ** 2 + (deckPath[deckIdx][1] - fcar.z) ** 2) deckIdx = k;
+  let j = deckIdx, acc = 0;
+  while (j < deckPath.length - 1 && acc < 12) { acc += Math.hypot(deckPath[j + 1][0] - deckPath[j][0], deckPath[j + 1][1] - deckPath[j][1]); j++; }
+  let e = Math.atan2(deckPath[j][0] - fcar.x, deckPath[j][1] - fcar.z) - fcar.h;
+  e = Math.atan2(Math.sin(e), Math.cos(e));
+  const want = j >= deckPath.length - 1 ? 0 : Math.abs(e) > 0.4 ? 12 : 24;
+  deckMaxY = Math.max(deckMaxY, fcar.y);
+  deckStuck = Math.abs(fcar.v) < 1 && want > 0 ? deckStuck + STEP : 0;
+  return { steer: Math.max(-1, Math.min(1, -e * 2.2)), brake: fcar.v > want + 1, throttle: fcar.v < want };
+}
 /** 測試用：照計程車導航路線開，快到目標就減速停下 */
 /** 測試用：開巡邏車直接衝向嫌犯 */
 function chaseBot() {
@@ -2349,6 +2414,13 @@ if (FREE) void cityLoad.then(() => {
   beginFree();
   if (FREE_SIM) {
     if (TAXI_TEST) taxi?.start(fcar.x, fcar.z);
+    if (DECK_TEST != null && cityDataRef) {
+      setupDeckTest(cityDataRef);
+      for (let n = 0; n < SIM / STEP; n++) { freeStep(STEP); if (lastImpact > 2) deckHits++; }
+      const lastOn = !onGround() && fcar.deck ? fcar.deck.way.nm ?? '(無名)' : '地面';
+      document.title = `DECK ${deckName} 路線${deckPath.length}點 走到${deckIdx} 最高y=${deckMaxY.toFixed(1)} 現在y=${fcar.y.toFixed(1)} 在：${lastOn} 撞${deckHits} 卡住${deckStuck.toFixed(1)}s 速${(fcar.v * 3.6).toFixed(0)}`;
+      return;
+    }
     if (SR_TEST != null && sr?.challenges[+SR_TEST]) acceptChallenge(sr.challenges[+SR_TEST], new URLSearchParams(location.search).has('duel'));
     for (let n = 0; n < SIM / STEP; n++) freeStep(STEP);
     if (TAXI_TEST && taxi) { roadAcc = lmAcc = 1; updateFreeHud(0); document.title = `TAXI 趟數${taxi.trips} 收入${taxi.money} 狀態${taxi.phase} 目標${taxi.target?.nm} 剩${Math.round(taxi.timeLeft)}s 地點數${(taxi as unknown as { places: unknown[] }).places.length} 車${fcar.x.toFixed(0)},${fcar.z.toFixed(0)} 速${(fcar.v * 3.6).toFixed(0)} 路線${taxi.route?.length ?? 0}點 距目標${taxi.target ? Math.hypot(taxi.target.x - fcar.x, taxi.target.z - fcar.z).toFixed(0) : "-"}m`; return; }
@@ -2358,7 +2430,7 @@ if (FREE) void cityLoad.then(() => {
     updateFreeHud(0);
     if (HONK_TEST) { document.title = `HONK 讓路${honkYield}台 按喇叭${honkBack}次 被擋${traffic?.agents.filter((a) => a.blockT > 0).length} 玩家前後40m同向${traffic?.agents.filter((a) => a.alive && Math.hypot(a.x - fcar.x, a.z - fcar.z) < 40 && Math.cos(a.h - fcar.h) > 0.6).length} 車頭${fcar.h.toFixed(2)}`; return; }
     if (WANTED_TEST || PURSUIT_TEST) { document.title = `POLICE 星${police?.stars} 警車${police?.units.length} 路障${police?.blocks.length} 直升機${police?.heli.on ? "有" : "無"} 嫌犯${police?.suspect ? Math.round(police.suspectHp) + '%' : '-'} 嫌犯撞車${police?.suspectBumps} 疊住${police?.suspectOverlap} 錢${money()} ｜ ${policeLog.join(' / ')}`; return; }
-    document.title = `FREE 積水${rainfx?.count}灘 水花${rainfx?.splashes} 尖叫${peds?.screamCount} 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
+    document.title = `FREE 重撞[${hitLog.join(" / ")}] 積水${rainfx?.count}灘 水花${rainfx?.splashes} 尖叫${peds?.screamCount} 列車${trains?.count} 車損${Math.round(damage.value * 100)}% x=${fcar.x.toFixed(0)} z=${fcar.z.toFixed(0)} v=${(fcar.v * 3.6).toFixed(0)}km/h traffic=${traffic?.stats()} 行人${peds?.count}（人行道${peds?.sidewalks}段 斑馬線${peds?.crossingCount} 正在過${peds?.crossingNow} 等紅燈${peds?.waitingNow}）`;
   }
 });
 // ?bot&sim=N：不等畫面，直接同步模擬 N 秒（無頭瀏覽器測一圈用），結果寫在 document.title
@@ -2438,4 +2510,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; } };

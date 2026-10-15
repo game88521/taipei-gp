@@ -1,6 +1,7 @@
 import type { Collider } from './citydata';
+import type { SurfaceHit } from './surface';
 
-// 自由駕駛／街頭比賽的汽車：2D 剛體
+// 自由駕駛／街頭比賽的汽車：平面的 2D 剛體＋路面高度（立體路面 surface.ts：開上高架、從匝道下來、離開橋面會掉下去）
 // - 速度是向量（可以甩尾、被撞歪），另外有角速度
 // - 輪胎：把側向速度拉回 0（上限＝抓地力），把角速度拉向方向盤要的轉向率
 // - 碰撞：在接觸點施加衝量（反彈係數＋摩擦），車會彈開、被撞得轉向，不會黏在牆上
@@ -32,6 +33,16 @@ export class FreeCar {
   spec: CarSpec = DEFAULT_SPEC;
   /** 甩尾中（按住甩尾鍵）：側向抓地力降到約一半、轉向率上限放寬，車尾就甩得出去（打滿方向盤約 40°，不會原地打轉） */
   drift = false;
+  /** 路面高度與垂直速度、車身俯仰（車頭抬起為正）與側傾（左邊抬起為正） */
+  y = -0.25;
+  vy = 0;
+  pitch = 0;
+  roll = 0;
+  /** 這次落地的力道（從橋上掉下來）；update 回傳的撞擊力道也會算進去 */
+  landed = 0;
+  /** 立體路面（main 設定）：(x, z, 上一刻高度) → 路面高度；沒設定 = 平地 */
+  static surface: ((x: number, z: number, prevY: number, out?: SurfaceHit) => SurfaceHit) | null = null;
+  private sh: SurfaceHit = { y: 0, seg: null };
   private hitCool = 0;
   private contacts: Contact[] = [];
 
@@ -50,9 +61,14 @@ export class FreeCar {
     if (Math.abs(cur) > 0.05) { const k = n / cur; this.vx *= k; this.vz *= k; } else { this.vx = Math.sin(this.h) * n; this.vz = Math.cos(this.h) * n; }
   }
 
-  place(x: number, z: number, h: number) {
-    this.x = x; this.z = z; this.h = h; this.vx = this.vz = this.w = 0; this.steer = 0;
+  /** y：放在哪一層（沒給 = 地面） */
+  place(x: number, z: number, h: number, y?: number) {
+    this.x = x; this.z = z; this.h = h; this.vx = this.vz = this.w = 0; this.steer = 0; this.vy = 0;
+    this.y = FreeCar.surface ? FreeCar.surface(x, z, y ?? -1e3, this.sh).y : -0.25;
+    if (y != null && FreeCar.surface) this.y = FreeCar.surface(x, z, y, this.sh).y;
   }
+  /** 目前所在的橋面（地面 = null） */
+  get deck() { return this.sh.seg; }
 
   /**
    * 與另一個物體接觸：n 從對方指向自己、depth 為重疊深度、(cx, cz) 接觸點、(ovx, ovz) 對方速度（當作質量無限大）。
@@ -135,17 +151,36 @@ export class FreeCar {
     this.z += this.vz * dt;
 
     this.hitCool = Math.max(0, this.hitCool - dt);
-    if (!col) return 0;
+    // ---- 高度：貼著路面；路面比現在低很多（開出橋面）就照重力掉下去
+    this.landed = 0;
+    const surf = FreeCar.surface;
+    if (surf) {
+      const sy = surf(this.x, this.z, this.y, this.sh).y;
+      if (sy >= this.y - 0.35) { this.y = sy; this.vy = 0; }
+      else {
+        this.vy -= 9.81 * dt;
+        this.y += this.vy * dt;
+        if (this.y <= sy) { this.landed = -this.vy; this.y = sy; this.vy = 0; }
+      }
+      // 俯仰：車頭、車尾的路面高度差；側傾：左右；慢慢跟上，避免路面接縫抖動
+      const ffx = Math.sin(this.h), ffz = Math.cos(this.h), q: SurfaceHit = { y: 0, seg: null };
+      const yf = surf(this.x + ffx * 1.45, this.z + ffz * 1.45, this.y, q).y, yb = surf(this.x - ffx * 1.45, this.z - ffz * 1.45, this.y, q).y;
+      const yl = surf(this.x + ffz * 0.8, this.z - ffx * 0.8, this.y, q).y, yr = surf(this.x - ffz * 0.8, this.z + ffx * 0.8, this.y, q).y;
+      const k = Math.min(1, dt * 12);
+      this.pitch += (Math.atan2(Math.max(-1.2, Math.min(1.2, yf - yb)), 2.9) - this.pitch) * k;
+      this.roll += (Math.atan2(Math.max(-0.6, Math.min(0.6, yl - yr)), 1.6) - this.roll) * k;
+    }
+    if (!col) return this.landed > 4 ? this.landed : 0;
     // ---- 與建築、樹幹碰撞：三個圓各自找接觸，逐一施加衝量
     let impact = 0;
     const nfx = Math.sin(this.h), nfz = Math.cos(this.h);
     for (const off of OFFS) {
       const cx = this.x + nfx * off, cz = this.z + nfz * off;
-      for (const c of col.contacts(cx, cz, R, this.contacts)) {
+      for (const c of col.contacts(cx, cz, R, this.contacts, this.y)) {
         impact = Math.max(impact, this.contact(c.nx, c.nz, c.depth, cx - c.nx * R, cz - c.nz * R));
       }
     }
-    return impact;
+    return Math.max(impact, this.landed > 4 ? this.landed : 0);
   }
 
   /** 車身三個圓的位置（給車流、對手做碰撞） */

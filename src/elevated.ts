@@ -1,17 +1,20 @@
 import * as THREE from 'three';
 import { Grid, type CityData } from './citydata';
 import { bakedShadowMaterial, SHADOW_PER_M } from './world';
+import { ROAD_Y, type Surface } from './surface';
 
 // 高架道路（建國高架、市民大道高架…）、信義區人行空橋、捷運文湖線高架與月台、地下道入口。
-// 物理是平面的，車子開不上去：只畫外型，從底下過；橋墩與匝道貼地那段算障礙物（回傳給 Collider）
+// 車道的高架照路網（net.decks）畫：橋面就是能開的路面（surface.ts），護欄跟物理用同一份（分岔、匯入處有開口）；
+// 人行空橋、文湖線照 elevated 畫，只是外型。橋墩只擋橋下的車（回傳給 Collider，帶高度範圍）
 
 const GROUND = -0.6;
-export interface ElevatedHits { posts: [number, number, number][]; walls: [number, number, number, number][] }
+/** posts：[x, z, 半徑, 擋車的最高高度（橋下）]；walls：護欄 [x1, z1, x2, z2, 擋車的最低, 最高] */
+export interface ElevatedHits { posts: [number, number, number, number?][]; walls: [number, number, number, number, number, number][] }
 
 /** 一條四邊形加進頂點陣列（a b c d 逆時針） */
 function quad(pos: number[], a: number[], b: number[], c: number[], d: number[]) { pos.push(...a, ...b, ...c, ...a, ...c, ...d); }
 
-export function buildElevated(scene: THREE.Scene, d: CityData): ElevatedHits {
+export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): ElevatedHits {
   const hits: ElevatedHits = { posts: [], walls: [] };
   const els = d.elevated ?? [];
   const deck: number[] = [], concrete: number[] = [], rail: number[] = [], walk: number[] = [], glass: number[] = [], roof: number[] = [], shadow: number[] = [];
@@ -38,7 +41,57 @@ export function buildElevated(scene: THREE.Scene, d: CityData): ElevatedHits {
     if (best[5]) return null;
     return [best[0] + (best[2] - best[0]) * bt, best[1] + (best[3] - best[1]) * bt];
   };
+  // ---- 車道的高架：照路網畫（橋面 = 路面高度，含 −0.25）
+  if (surf) {
+    const NN = d.net.nodes, NY = d.net.y ?? [];
+    for (const w of d.net.decks ?? []) {
+      if (w.e !== 1) continue;
+      const hw = w.w / 2, thick = 1.4, spacing = 28;
+      let carry = spacing / 2;
+      for (let i = 0; i + 1 < w.n.length; i++) {
+        const a = w.n[i], b = w.n[i + 1];
+        const ax = NN[a * 2], az = NN[a * 2 + 1], bx = NN[b * 2], bz = NN[b * 2 + 1], ya = (NY[a] ?? 0) + ROAD_Y, yb = (NY[b] ?? 0) + ROAD_Y;
+        const l = Math.hypot(bx - ax, bz - az);
+        if (l < 0.2) continue;
+        const ux = (bx - ax) / l, uz = (bz - az) / l, nx = -uz * hw, nz = ux * hw;
+        const ex0 = i === 0 ? 0 : Math.min(1.5, hw * 0.4), ex1 = i + 2 === w.n.length ? 0 : Math.min(1.5, hw * 0.4);
+        const x0 = ax - ux * ex0, z0 = az - uz * ex0, x1 = bx + ux * ex1, z1 = bz + uz * ex1;
+        const L0 = [x0 - nx, ya, z0 - nz], R0 = [x0 + nx, ya, z0 + nz], L1 = [x1 - nx, yb, z1 - nz], R1 = [x1 + nx, yb, z1 + nz];
+        const lo = (p: number[]) => [p[0], p[1] - thick, p[2]];
+        quad(deck, L0, R0, R1, L1);
+        quad(concrete, lo(L0), lo(L1), lo(R1), lo(R0));
+        quad(concrete, lo(R0), lo(R1), R1, R0);
+        quad(concrete, lo(L1), lo(L0), L0, L1);
+        const gA = surf.groundY(ax, az), gB = surf.groundY(bx, bz);
+        const sh = (x: number, z: number, y: number) => [x + SHADOW_PER_M.x * Math.min(y, 30), 0.03, z + SHADOW_PER_M.z * Math.min(y, 30)];
+        if (ya - gA > 2 || yb - gB > 2) quad(shadow, sh(L0[0], L0[2], ya - gA), sh(L1[0], L1[2], yb - gB), sh(R1[0], R1[2], yb - gB), sh(R0[0], R0[2], ya - gA));
+        // 橋墩：每 28 m 一支（離地 4.5 m 以上才有）；只擋橋下的車（擋到橋底為止）
+        let t = carry;
+        for (; t < l; t += spacing) {
+          const f = t / l, y = ya + (yb - ya) * f, gy = surf.groundY(ax + ux * t, az + uz * t);
+          if (y - gy < 4.5) continue;
+          const at = placePillar(ax + ux * t, az + uz * t);
+          if (!at) continue;
+          const [px, pz] = at;
+          q.setFromAxisAngle(up, Math.atan2(ux, uz));
+          const top = y - thick, foot = gy + ROAD_Y - 0.35;
+          pillars.push(new THREE.Matrix4().compose(v.set(px, foot, pz), q, s.set(1.8, top - foot, 1.6)));
+          hits.posts.push([px, pz, 1.0, top]);
+        }
+        carry = t - l;
+      }
+    }
+    // 護欄（外觀與碰撞同一份，surface.ts 算好開口）
+    const H = 1.0;
+    for (const r of surf.rails) {
+      if (r.e !== 1) continue;
+      const a0 = [r.x1, r.ya, r.z1], a1 = [r.x2, r.yb, r.z2], b1 = [r.x2, r.yb + H, r.z2], b0 = [r.x1, r.ya + H, r.z1];
+      quad(concrete, a0, a1, b1, b0);
+      hits.walls.push([r.x1, r.z1, r.x2, r.z2, r.y1, r.y2]);
+    }
+  }
   for (const e of els) {
+    if (surf && e.k === 0) continue; // 車道的高架上面已經照路網畫了
     const P = e.p, Y = e.y, n = P.length / 2, hw = e.w / 2;
     const thick = e.k === 1 ? 0.5 : e.k === 0 ? 1.4 : 1.1;
     const spacing = e.k === 0 ? 28 : e.k === 1 ? 18 : 24;
@@ -105,7 +158,7 @@ export function buildElevated(scene: THREE.Scene, d: CityData): ElevatedHits {
         hits.posts.push([px, pz, e.k === 0 ? 1.0 : e.k === 1 ? 0.5 : 0.9]);
       }
       carry = t - l;
-      if (e.k === 0 && Math.max(ya, yb) < 4.5 && Math.min(ya, yb) > 0.4) for (const sd of [-1, 1]) hits.walls.push([ax + nx * sd, az + nz * sd, bx + nx * sd, bz + nz * sd]);
+      if (e.k === 0 && Math.max(ya, yb) < 4.5 && Math.min(ya, yb) > 0.4) for (const sd of [-1, 1]) hits.walls.push([ax + nx * sd, az + nz * sd, bx + nx * sd, bz + nz * sd, -10, 4.5]);
     }
   }
   const mesh = (pos: number[], mat: THREE.Material) => {
