@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Grid, type CityData } from './citydata';
+import { Grid, groundH, type CityData } from './citydata';
 
 // 雨天的路面：主要道路上一灘灘會反光的積水（下雨才出現）；車子開過積水噴水花，開得快輪胎後面一直揚起水霧
 
@@ -41,7 +41,7 @@ export class RainFx {
           const ux = (bx - ax) / l, uz = (bz - az) / l, off = (rnd() < 0.5 ? -1 : 1) * (w.w / 2 - 1.2 - rnd() * 2);
           const x = ax + ux * t - uz * off, z = az + uz * t + ux * off, r = 1 + rnd() * 1.6;
           q.setFromAxisAngle(up, Math.atan2(ux, uz) + (rnd() - 0.5) * 0.6);
-          list.push(new THREE.Matrix4().compose(p.set(x, -0.235, z), q, s.set(r * (0.6 + rnd() * 0.5), 1, r * (1.4 + rnd()))));
+          list.push(new THREE.Matrix4().compose(p.set(x, groundH(x, z) - 0.235, z), q, s.set(r * (0.6 + rnd() * 0.5), 1, r * (1.4 + rnd()))));
           this.grid.addBox(x - r * 2, z - r * 2, x + r * 2, z + r * 2, [x, z, r * 1.6]);
         }
       }

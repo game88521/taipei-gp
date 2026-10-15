@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Grid, type CityData, type Collider } from './citydata';
+import { Grid, groundH, type CityData, type Collider } from './citydata';
 import type { Traffic } from './traffic';
 import { pedParts } from './models';
 import { bakedShadowMaterial, blobTexture } from './world';
@@ -385,7 +385,7 @@ export class Pedestrians {
       q.setFromAxisAngle(up, p.h);
       const sitting = p.sit > 0;
       const bob = sitting ? 0 : Math.abs(Math.sin(p.phase)) * 0.03;
-      m.compose(pos.set(p.x, -0.25 + bob - (sitting ? 0.5 : 0), p.z), q, sc.setScalar(p.scale));
+      m.compose(pos.set(p.x, groundH(p.x, p.z) - 0.25 + bob - (sitting ? 0.5 : 0), p.z), q, sc.setScalar(p.scale));
       for (const k of ['torso', 'pelvis', 'neck', 'head'] as const) put(k, m, k === 'torso' ? p.shirt : k === 'pelvis' ? p.pants : p.skin);
       put('hair', m, p.hair);
       put('blob', m, p.hair);

@@ -27,12 +27,12 @@ export class Surface {
   segs: DeckSeg[] = [];
   rails: Rail[] = [];
   /** 地面道路是否照地形起伏（M4 打開前，地面路面維持平的） */
-  followGround = false;
+  followGround = true;
   /** 隧道能不能開進去（M5 打開前只開放高架） */
   tunnels = false;
 
   constructor(d: CityData) {
-    this.ground = d.ground ?? null;
+    this.ground = d.terrain ?? null; // 統一地面（真實地形＋道路挖填）
     const N = d.net.nodes, Y = d.net.y ?? [];
     for (const w of d.net.decks ?? []) {
       for (let k = 0; k + 1 < w.n.length; k++) {

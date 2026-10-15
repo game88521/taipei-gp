@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { canvasTex } from './world';
-import type { CityData, NetWay } from './citydata';
+import { groundH, type CityData, type NetWay } from './citydata';
 import type { Breakables } from './breakables';
 
 // 街道細節：有標線的路面、斑馬線、路口的綠色路名牌、地標屋頂招牌
@@ -48,7 +48,7 @@ function roadTexture(twoWay: boolean, lanes: number, marked: boolean) {
 }
 
 export function buildRoads(scene: THREE.Scene, d: CityData) {
-  const N = d.net.nodes;
+  const N = d.net.nodes, Y = d.net.y ?? []; // Y：節點高度（地面道路照地形起伏）
   const groups = new Map<string, { pos: number[]; uv: number[]; tex: () => THREE.Texture }>();
   for (const w of d.net.ways) {
     const marked = w.c <= 2;
@@ -68,7 +68,8 @@ export function buildRoads(scene: THREE.Scene, d: CityData) {
       const x0 = ax - ux * e0, z0 = az - uz * e0, x1 = bx + ux * e1, z1 = bz + uz * e1;
       const v0 = (along - e0) / 12, v1 = (along + l + e1) / 12;
       // 右 = (-uz, ux)：u=0 在左、u=1 在右
-      const L0 = [x0 - nx, ROAD_Y, z0 - nz], R0 = [x0 + nx, ROAD_Y, z0 + nz], L1 = [x1 - nx, ROAD_Y, z1 - nz], R1 = [x1 + nx, ROAD_Y, z1 + nz];
+      const ya = (Y[w.n[k]] ?? 0) + ROAD_Y, yb = (Y[w.n[k + 1]] ?? 0) + ROAD_Y;
+      const L0 = [x0 - nx, ya, z0 - nz], R0 = [x0 + nx, ya, z0 + nz], L1 = [x1 - nx, yb, z1 - nz], R1 = [x1 + nx, yb, z1 + nz];
       g.pos.push(...L0, ...R0, ...R1, ...L0, ...R1, ...L1);
       g.uv.push(0, v0, 1, v0, 1, v1, 0, v0, 1, v1, 0, v1);
       along += l;
@@ -106,7 +107,8 @@ export function buildCrossings(scene: THREE.Scene, d: CityData) {
     ux /= l; uz /= l;
     const x = N[ni * 2], z = N[ni * 2 + 1], hw = w.w / 2 - 0.3, hd = 2;
     const nx = -uz, nz = ux;
-    const p = (s: number, t: number) => [x + nx * s + ux * t, ROAD_Y + 0.01, z + nz * s + uz * t];
+    const cy = (d.net.y?.[ni] ?? 0) + ROAD_Y + 0.01;
+    const p = (s: number, t: number) => [x + nx * s + ux * t, cy, z + nz * s + uz * t];
     const rep = (w.w - 0.6) / 1.0; // 每 1 m 一條（0.5 m 白、0.5 m 空）
     const A = p(-hw, -hd), B = p(hw, -hd), C = p(hw, hd), D = p(-hw, hd);
     pos.push(...A, ...B, ...C, ...A, ...C, ...D);
@@ -193,13 +195,14 @@ export function buildStreetSigns(scene: THREE.Scene, d: CityData, breakables?: B
   for (const s of d.signs) {
     const g = new THREE.Group();
     const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.set(s.x, 0, s.z);
+    const gy = groundH(s.x, s.z);
+    pole.position.set(s.x, gy, s.z);
     g.add(pole);
     const buckets = mats.map(() => ({ pos: [] as number[], uv: [] as number[] }));
     s.b.forEach((b, k) => {
       const dx = Math.sin(b.a), dz = Math.cos(b.a);
       // 招牌面朝向與道路垂直；從柱子往道路方向伸出 1.35 m
-      addBoard(buckets, slots[index.get(b.nm + '|' + b.en)!], s.x + dx * 1.35, 4.4 - k * 0.75, s.z + dz * 1.35, b.a + Math.PI / 2, 2.6, 0.65);
+      addBoard(buckets, slots[index.get(b.nm + '|' + b.en)!], s.x + dx * 1.35, gy + 4.4 - k * 0.75, s.z + dz * 1.35, b.a + Math.PI / 2, 2.6, 0.65);
     });
     flush(g, mats, buckets);
     scene.add(g);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Landmark } from './decor';
 import type { Router } from './router';
+import { groundH } from './citydata';
 import { pedParts } from './models';
 
 // 計程車任務：去地標前載乘客 → 限時送到另一個地標 → 照台北跳表收車資（提早到有小費、撞車扣小費）
@@ -158,10 +159,10 @@ export class TaxiJob {
     this.person.visible = on && this.phase === 'seek';
     if (!on) return;
     const { x, z } = this.target!;
-    this.beam.position.set(x, -0.25, z);
+    this.beam.position.set(x, groundH(x, z) - 0.25, z);
     (this.beam.material as THREE.MeshBasicMaterial).color.set(this.phase === 'seek' ? '#3fff8a' : '#ffd400');
     (this.beam.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.1 * Math.sin(t * 3);
-    this.person.position.set(x + 3, -0.25, z);
+    this.person.position.set(x + 3, groundH(x + 3, z) - 0.25, z);
     this.arm.rotation.z = Math.PI * 0.85 + Math.sin(t * 8) * 0.35; // 舉手招車
   }
 

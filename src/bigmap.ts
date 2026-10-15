@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { RoadNet } from './citydata';
+import { groundH, type RoadNet } from './citydata';
 import type { Landmark } from './decor';
 
 // 全螢幕大地圖：整個路網、地標、玩家位置；拖曳平移、滾輪／雙指縮放，點一下設成目的地
@@ -166,7 +166,7 @@ export class NavArrows {
       let s = carry;
       for (; s < l && n < 40; s += 9) {
         q.setFromAxisAngle(up, h);
-        m.compose(p.set(ax + ((bx - ax) * s) / l, -0.18, az + ((bz - az) * s) / l), q, sc);
+        { const xx = ax + ((bx - ax) * s) / l, zz = az + ((bz - az) * s) / l; m.compose(p.set(xx, groundH(xx, zz) - 0.18, zz), q, sc); }
         this.mesh.setMatrixAt(n++, m);
       }
       carry = s - l;

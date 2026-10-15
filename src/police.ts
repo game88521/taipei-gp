@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FreeCar, type CarSpec } from './freecar';
-import type { Collider, RoadNet } from './citydata';
+import { groundH, type Collider, type RoadNet } from './citydata';
 import type { Router } from './router';
 import type { Traffic } from './traffic';
 import { buildPlayerVehicle, vehicleById, type PlayerVehicle } from './vehicles';
@@ -187,7 +187,7 @@ export class Police {
       const off = (i - 1.5) * 2.4;
       m.visible = true;
       m.rotation.set(0, h + Math.PI / 2, 0);
-      return { m, x: x + sx * off, z: z + sz * off, vx: 0, vy: 0, vz: 0, y: -0.25, spin: 0, hit: false };
+      return { m, x: x + sx * off, z: z + sz * off, vx: 0, vy: 0, vz: 0, y: groundH(x + sx * off, z + sz * off) - 0.25, spin: 0, hit: false };
     });
     this.blocks.push({ cops, bars: bs, x, z, age: 0 });
   }
@@ -343,11 +343,12 @@ export class Police {
               r.vx = p.vx * 0.9 + (r.x - p.x) * 2; r.vz = p.vz * 0.9 + (r.z - p.z) * 2; r.vy = 4 + Math.abs(p.v) * 0.25; r.spin = (Math.random() - 0.5) * 12;
               p.vx *= 0.82; p.vz *= 0.82;
             }
-          } else if (r.y > -0.25 || r.vy > 0) {
+          } else if (r.y > groundH(r.x, r.z) - 0.25 || r.vy > 0) {
+            const fy = groundH(r.x, r.z) - 0.25; // 地面（坡地）
             r.vy -= 18 * dt;
-            r.x += r.vx * dt; r.z += r.vz * dt; r.y = Math.max(-0.25, r.y + r.vy * dt);
+            r.x += r.vx * dt; r.z += r.vz * dt; r.y = Math.max(fy, r.y + r.vy * dt);
             r.m.rotation.x += r.spin * dt;
-            if (r.y <= -0.25) { r.vx *= 0.4; r.vz *= 0.4; r.vy = r.vy < -3 ? -r.vy * 0.3 : 0; }
+            if (r.y <= fy) { r.vx *= 0.4; r.vz *= 0.4; r.vy = r.vy < -3 ? -r.vy * 0.3 : 0; }
           }
           r.m.position.set(r.x, r.y, r.z);
         }
@@ -425,7 +426,7 @@ export class Police {
     const draw = (u: Unit) => {
       const m = u.pv.model;
       m.root.visible = true;
-      m.root.position.set(u.car.x, -0.25, u.car.z);
+      m.root.position.set(u.car.x, u.car.y, u.car.z); // 警車也照立體路面（追上高架、坡道）
       m.root.rotation.y = u.car.h;
       m.body.rotation.z = u.car.steer * Math.min(1, Math.abs(u.car.v) / 40) * 0.06;
       for (const w of m.steer) w.rotation.y = -u.car.steer * 0.45;

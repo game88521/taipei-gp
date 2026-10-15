@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Grid } from './citydata';
+import { Grid, groundH } from './citydata';
 import type { FreeCar } from './freecar';
 
 // 可以撞倒的東西（行道樹、路燈）：撞到時順著車子行進方向倒下，車子只稍微減速、不會被卡住；
@@ -8,6 +8,7 @@ import type { FreeCar } from './freecar';
 interface Item {
   x: number;
   z: number;
+  y: number; // 底部（地面）高度：倒下時繞這一點轉
   r: number; // 碰撞半徑
   slow: number; // 撞倒時車速保留比例
   // 各部位（hide：倒下就消失，例如地上的影子）。base＝原本的矩陣：第一次被撞倒時才從 InstancedMesh 讀出來存
@@ -45,14 +46,14 @@ export class Breakables {
   addObject(x: number, z: number, r: number, slow: number, obj: THREE.Object3D) {
     obj.matrixAutoUpdate = false;
     obj.updateMatrix();
-    const it: Item = { x, z, r, slow, parts: [], obj, state: 0, t: 0, down: 0, ax: 1, az: 0 };
+    const it: Item = { x, z, y: groundH(x, z), r, slow, parts: [], obj, state: 0, t: 0, down: 0, ax: 1, az: 0 };
     this.items.push(it);
     this.grid.addBox(x, z, x, z, it);
   }
   /** 各部位各自的 index 與矩陣（紅綠燈：桿、橫桿、燈箱、三顆燈） */
   addParts(x: number, z: number, r: number, slow: number, parts: { mesh: THREE.InstancedMesh; idx: number; base?: THREE.Matrix4; hide?: boolean }[], tag?: number) {
     // 呼叫前 InstancedMesh 的矩陣都已經設好了，所以不存 base（撞倒時再讀）
-    const it: Item = { x, z, r, slow, parts: parts.map((p) => ({ mesh: p.mesh, idx: p.idx, hide: p.hide })), state: 0, t: 0, down: 0, ax: 1, az: 0, tag };
+    const it: Item = { x, z, y: groundH(x, z), r, slow, parts: parts.map((p) => ({ mesh: p.mesh, idx: p.idx, hide: p.hide })), state: 0, t: 0, down: 0, ax: 1, az: 0, tag };
     this.items.push(it);
     this.grid.addBox(x, z, x, z, it);
   }
@@ -114,7 +115,7 @@ export class Breakables {
     this.axis.set(it.ax, 0, it.az);
     this.rot.makeRotationAxis(this.axis, ang);
     // M = T(底部) · R · T(−底部) · 原本的矩陣
-    const pivot = this.tr.makeTranslation(it.x, 0, it.z).multiply(this.rot).multiply(new THREE.Matrix4().makeTranslation(-it.x, 0, -it.z));
+    const pivot = this.tr.makeTranslation(it.x, it.y, it.z).multiply(this.rot).multiply(new THREE.Matrix4().makeTranslation(-it.x, -it.y, -it.z));
     for (const p of it.parts) {
       if (!p.base) continue;
       if (p.hide) { p.mesh.setMatrixAt(p.idx, ang > 0 ? ZERO : p.base); p.mesh.instanceMatrix.needsUpdate = true; continue; }

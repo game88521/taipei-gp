@@ -12,7 +12,7 @@ import { stage, fetchJson } from './loading';
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
 
-import { terrainHeight, decodeCity, Collider, type CityData, type Building } from './citydata';
+import { terrainHeight, groundH, decodeCity, Collider, type CityData, type Building } from './citydata';
 import { TilePool } from './tilepool';
 import type { GenOut } from './tilegen';
 import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Landmark } from './decor';
@@ -331,7 +331,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     for (let i = 0; i < n; i++) {
       qq.setFromAxisAngle(up, L[i * 3 + 2]);
-      m4.compose(new THREE.Vector3(L[i * 3], 0, L[i * 3 + 1]), qq, one);
+      m4.compose(new THREE.Vector3(L[i * 3], groundH(L[i * 3], L[i * 3 + 1]), L[i * 3 + 1]), qq, one); // 照地面高度（坡地上的路燈）
       pole.setMatrixAt(i, m4);
       arm.setMatrixAt(i, m4);
       head.setMatrixAt(i, m4);
@@ -440,7 +440,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     // 有專屬造型的地標（國父紀念館、中正紀念堂、總統府…）
     for (const s of out.specials) {
       const m = buildSpecial(s.b);
-      if (m) { m.userData.ownMats = true; add(m, s.x, s.z, 'far', 200); }
+      if (m) { m.position.y += s.b.y ?? 0; m.userData.ownMats = true; add(m, s.x, s.z, 'far', 200); } // 坡地上的地標墊高基座
     }
     await slice();
 
@@ -488,7 +488,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
         const body = new THREE.InstancedMesh(parkedGeo, parkedMat, ids.length);
         ids.forEach((i, n) => {
           qq.setFromAxisAngle(up, P[i * 4 + 2]);
-          m4.compose(new THREE.Vector3(P[i * 4], -0.25, P[i * 4 + 1]), qq, one);
+          m4.compose(new THREE.Vector3(P[i * 4], groundH(P[i * 4], P[i * 4 + 1]) - 0.25, P[i * 4 + 1]), qq, one);
           body.setMatrixAt(n, m4);
           body.setColorAt(n, parkedCol[P[i * 4 + 3] % parkedCol.length]);
         });
@@ -753,8 +753,9 @@ function build101(): THREE.Group {
 
 /** 凸包（Andrew 單調鏈）：預先算地面影子的形狀用 */
 /** 山的網格：高度大於 0 的格子才畫；顏色依高度與坡度（低處深綠、陡坡露出岩石） */
-function terrainMesh(t: { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }): THREE.Mesh {
+function terrainMesh(t: { x0: number; z0: number; step: number; nx: number; nz: number; h: number[]; c?: string }): THREE.Mesh {
   const { x0, z0, step, nx, nz, h } = t;
+  const pave = new THREE.Color('#77746e'); // 市區的坡地：跟平地的地面同色（c = 0）
   const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3), idx: number[] = [];
   const lo = new THREE.Color('#2f5a2c'), hi = new THREE.Color('#4f7a3a'), rock = new THREE.Color('#7a7466'), c = new THREE.Color();
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
@@ -763,7 +764,8 @@ function terrainMesh(t: { x0: number; z0: number; step: number; nx: number; nz: 
     const gx = (h[j * nx + Math.min(nx - 1, i + 1)] - h[j * nx + Math.max(0, i - 1)]) / (2 * step);
     const gz = (h[Math.min(nz - 1, j + 1) * nx + i] - h[Math.max(0, j - 1) * nx + i]) / (2 * step);
     const slope = Math.hypot(gx, gz);
-    c.copy(lo).lerp(hi, Math.min(1, y / 160)).lerp(rock, Math.max(0, Math.min(1, (slope - 0.7) * 1.5)));
+    if (t.c && t.c[k] === '0') c.copy(pave);
+    else c.copy(lo).lerp(hi, Math.min(1, y / 160)).lerp(rock, Math.max(0, Math.min(1, (slope - 0.7) * 1.5)));
     const n = (Math.sin(i * 1.7) * Math.cos(j * 2.3)) * 0.04; // 一點色差，不會整片同一個綠
     col.set([c.r + n, c.g + n, c.b + n], k * 3);
   }

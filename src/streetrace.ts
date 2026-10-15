@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CityData } from './citydata';
+import { groundH, type CityData } from './citydata';
 import type { Landmark } from './decor';
 import type { CarModel } from './carModel';
 import { makeF1, TEAMS } from './f1model';
@@ -185,7 +185,7 @@ export class StreetRace {
     const beam = new THREE.CylinderGeometry(2.2, 2.2, 60, 20, 1, true).translate(0, 30, 0);
     for (const c of this.challenges) {
       const m = new THREE.Mesh(beam, new THREE.MeshBasicMaterial({ color: '#ff8a1a', transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
-      m.position.set(c.start.x, -0.25, c.start.z);
+      m.position.set(c.start.x, groundH(c.start.x, c.start.z) - 0.25, c.start.z);
       scene.add(m);
       this.markers.push(m);
     }
@@ -448,7 +448,7 @@ export class StreetRace {
     for (const r of this.rivals) {
       const m = r.model;
       m.root.visible = show && (r.done == null || this.duel);
-      m.root.position.set(r.pos.x, -0.25, r.pos.z);
+      m.root.position.set(r.pos.x, groundH(r.pos.x, r.pos.z) - 0.25, r.pos.z);
       m.root.rotation.y = r.pos.h;
       for (const w of m.spin) w.rotation.x += (r.v / 0.33) * dt;
     }

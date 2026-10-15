@@ -203,6 +203,15 @@ export function genTile(td: TileData, tag: number, ctx: GenCtx): GenOut {
     const geo = tileGeo(`f${style}${variant}`, ring[0][0], ring[0][1]);
     const roofs = tileGeo('roof', ring[0][0], ring[0][1]);
     const shopsGeo = tileGeo('shop', ring[0][0], ring[0][1]), signsGeo = tileGeo('sign', ring[0][0], ring[0][1]);
+    // 坡地上的樓：整棟（牆、屋頂、店面、招牌、影子、屋頂水塔與加蓋）照基座高度 b.y 往上移；先記下各緩衝區這棟從哪裡開始
+    const dy = b.y ?? 0, sgGeo = tileGeo('shadow', ring[0][0], ring[0][1]);
+    const marks = [geo, roofs, shopsGeo, signsGeo, sgGeo].map((g) => g.pos.length), tk0 = tanks.length, sd0 = sheds.length;
+    const lift = () => {
+      if (!dy) return;
+      [geo, roofs, shopsGeo, signsGeo, sgGeo].forEach((g, k) => { for (let i = marks[k] + 1; i < g.pos.length; i += 3) g.pos[i] += dy; });
+      for (let i = tk0 + 1; i < tanks.length; i += 4) tanks[i] += dy;
+      for (let i = sd0 + 1; i < sheds.length; i += 7) sheds[i] += dy;
+    };
     if (q.rooftops && style === 0 && y0 < 0 && y1 < 45 && !b.k) roofDetails(ring, y1);
     const aoTint = tint.clone().multiplyScalar(0.5);
     // 預先算好的地面影子：腳印＋沿太陽反方向推出去的腳印，取凸包（高度最多算 80 m，免得 101 的影子拖到 1.5 km 外）
@@ -218,7 +227,7 @@ export function genTile(td: TileData, tag: number, ctx: GenCtx): GenOut {
       }
     }
     // 有專屬造型的地標：影子照外框算（上面），模型由主執行緒蓋
-    if (b.k) { specials.push({ b, x: ring[0][0], z: ring[0][1] }); continue; }
+    if (b.k) { lift(); specials.push({ b, x: ring[0][0], z: ring[0][1] }); continue; }
     let u = 0;
     const streetLevel = y0 < 0 && (b.s === 0 || b.s === 2) && y1 < 70;
     for (let i = 0; i < ring.length; i++) {
@@ -267,6 +276,7 @@ export function genTile(td: TileData, tag: number, ctx: GenCtx): GenOut {
       flatPoly(roofs, ring, y1, true, roofCol[Math.floor(r() * roofCol.length)]);
       if (y0 > 3) flatPoly(roofs, ring, y0, false, roofCol[0]); // 懸空的部件（101 的竹節）要有底面
     } catch { /* 畸形多邊形就不加屋頂 */ }
+    lift();
   }
   const geos: GenGeo[] = [];
   for (const [key, g] of tiles) {

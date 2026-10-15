@@ -1,6 +1,6 @@
 // city.json 的型別與共用查詢（路網、最近道路、碰撞）
 
-export interface Building { p: number[]; h: number; m?: number; s: number; c?: string; n?: string; k?: string /* 特殊地標造型（landmarks3d.ts） */ }
+export interface Building { p: number[]; h: number; m?: number; s: number; c?: string; n?: string; k?: string /* 特殊地標造型（landmarks3d.ts） */; y?: number /* 坡地上的基座高度 */ }
 export interface NetWay {
   n: number[]; // 節點編號
   w: number; // 路寬 (m)
@@ -53,7 +53,11 @@ export function decodeTile(d: TileData & { enc?: number }): TileData {
   }
   return d;
 }
-export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] }
+export interface Terrain { x0: number; z0: number; step: number; nx: number; nz: number; h: number[]; c?: string /* 每格 1 = 綠色山坡、0 = 市區坡地 */ }
+
+// 全圖的地面高度（統一地面：真實地形＋道路挖填；decodeCity 設定）。地面上的東西（路面、建築、樹、路燈、車流、行人）都照這個擺
+let worldGround: Terrain | null = null;
+export function groundH(x: number, z: number): number { return terrainHeight(worldGround, x, z); }
 
 /** 解碼 city.json 的瘦身格式（tools/build-city.mjs 的 enc）：每 stride 個一組累加差值，再除回倍數 */
 function dec(a: number[], stride: number, scale: number): number[] {
@@ -71,6 +75,7 @@ export function decodeCity(d: CityData & { enc?: number }): CityData {
   for (const w of d.net.ways) w.n = dec(w.n, 1, 1);
   if (d.net.y) d.net.y = dec(d.net.y, 1, 10);
   if (d.ground) d.ground.h = dec(d.ground.h, 1, 2);
+  worldGround = d.terrain ?? null;
   d.net.decks = d.net.ways.filter((w) => w.e);
   d.net.ways = d.net.ways.filter((w) => !w.e);
   if (d.lamps) d.lamps = dec(d.lamps, 3, 100);
@@ -242,14 +247,14 @@ export class Collider {
       const ox = x - p.x, oz = z - p.z, d = Math.hypot(ox, oz), rr = r + p.r;
       if (d < rr && d > 1e-4) out.push({ nx: ox / d, nz: oz / d, depth: rr - d });
     }
-    // 山坡：太陡（離地超過 1.2 m）就當成牆，從往下坡的方向推回來
+    // 山坡：坡度超過 45% 就當成牆（道路都挖填到 18% 以內，開得上去；陡坡、山壁上不去），從往下坡的方向推回來
     if (this.terrain && y < gTop) {
-      const h0 = terrainHeight(this.terrain, x, z);
-      if (h0 > 1.2) {
-        const gx = terrainHeight(this.terrain, x + 2, z) - terrainHeight(this.terrain, x - 2, z);
-        const gz = terrainHeight(this.terrain, x, z + 2) - terrainHeight(this.terrain, x, z - 2);
+      const gx = terrainHeight(this.terrain, x + 2, z) - terrainHeight(this.terrain, x - 2, z);
+      const gz = terrainHeight(this.terrain, x, z + 2) - terrainHeight(this.terrain, x, z - 2);
+      const slope = Math.hypot(gx, gz) / 4;
+      if (slope > 0.45) {
         const gl = Math.hypot(gx, gz) || 1;
-        out.push({ nx: -gx / gl, nz: -gz / gl, depth: Math.min(0.5, (h0 - 1.2) * 0.2) });
+        out.push({ nx: -gx / gl, nz: -gz / gl, depth: Math.min(0.5, (slope - 0.45) * 1.5) });
       }
     }
     // 同一面牆被兩條相鄰的邊各算一次時，只留最深的那個（避免推兩倍）

@@ -561,6 +561,7 @@ let ground = null;
 const groundAt = (x, z) => {
   if (!ground) return 0;
   const G = ground, fx = (x - G.x0) / G.step, fz = (z - G.z0) / G.step;
+  if (fx < 0 || fz < 0 || fx > G.nx - 1 || fz > G.nz - 1) return 0; // 範圍外當平地（跟執行時的 terrainHeight 一樣；以前夾到邊界值，出界的路被墊到山的高度）
   const i = Math.max(0, Math.min(G.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(G.nz - 2, Math.floor(fz)));
   const a = Math.max(0, Math.min(1, fx - i)), b = Math.max(0, Math.min(1, fz - j)), H = G.h, n = G.nx;
   return (H[j * n + i] * (1 - a) + H[j * n + i + 1] * a) * (1 - b) + (H[(j + 1) * n + i] * (1 - a) + H[(j + 1) * n + i + 1] * a) * b;
@@ -690,7 +691,7 @@ const portals = [];
     }
   }
   // 車行隧道、地下道也進路網（e: 2）：隧道段連成一張圖，從洞口（接地面的節點）往裡面算距離，
-  // 高度 = 洞口的地面高度 − min(7 m, 距離 × 6.5%)；山裡的隧道維持在洞口高度附近，不會跟著山頂起伏
+  // 高度 = 洞口道路的高度 − min(7 m, 距離 × 6.5%)；山裡的隧道維持在洞口高度附近，不會跟著山頂起伏
   {
     const tunnels = roadWays.filter((e) => {
       const t = e.tags;
@@ -705,14 +706,14 @@ const portals = [];
       }
     }
     // 多起點最短距離（洞口 = 也在地面路網的節點）
-    const dist = new Map(), portalY = new Map(), todo = [];
-    for (const id of adj.keys()) if (groundNodeIds.has(id)) { const [x, z] = pos.get(id); dist.set(id, 0); portalY.set(id, groundAt(x, z)); todo.push(id); }
+    const dist = new Map(), portalOf = new Map(), todo = [];
+    for (const id of adj.keys()) if (groundNodeIds.has(id)) { dist.set(id, 0); portalOf.set(id, id); todo.push(id); }
     while (todo.length) {
       todo.sort((a, b) => dist.get(b) - dist.get(a));
       const u = todo.pop();
       for (const [v, l] of adj.get(u)) {
         const d = dist.get(u) + l;
-        if (d < (dist.get(v) ?? Infinity)) { dist.set(v, d); portalY.set(v, portalY.get(u)); todo.push(v); }
+        if (d < (dist.get(v) ?? Infinity)) { dist.set(v, d); portalOf.set(v, portalOf.get(u)); todo.push(v); }
       }
     }
     let added = 0;
@@ -727,7 +728,7 @@ const portals = [];
       if (t.name) way.nm = t.name;
       if (t['name:en']) way.en = t['name:en'];
       if (maxspeed(t)) way.ms = maxspeed(t);
-      way.n.forEach((ni, i) => { const id = e.nodes[i]; if (!groundNodeIds.has(id)) deckY.set(ni, { abs: portalY.get(id) - Math.min(7, dist.get(id) * 0.065) }); });
+      way.n.forEach((ni, i) => { const id = e.nodes[i]; if (!groundNodeIds.has(id)) deckY.set(ni, { portal: netIndex.get(portalOf.get(id)), dip: Math.min(7, dist.get(id) * 0.065) }); }); // 高度 = 洞口道路的最終高度 − dip（道路高度平滑完再算）
       deckWays.push(way);
       added++;
     }
@@ -1121,12 +1122,106 @@ for (const e of roadWays) {
 console.log(`行人徒步區 ${pedzones.length} 段（面 ${pedzones.filter((z) => !z.w).length}）`);
 
 // 路網：地面道路接著高架、隧道；每個節點的高度（地面 = 地面高度場；高架 = 地面＋橋面離地高度；隧道 = 洞口往裡下沉）
+// ---------------------------------------------------------------- 路網高度（地面道路照地形起伏）
+// 地面道路：先取地面高度場，沿路網平滑、坡度上限 18%（SRTM 30 m 在山坡邊緣很粗，直接用會有 39% 的坡）；
+// 高架：地面＋橋面離地高度；隧道：洞口道路的高度往下沉
 const allWays = [...netWays, ...deckWays];
-const netY = [];
-for (let i = 0; i < netNodes.length / 2; i++) {
-  const d = deckY.get(i), g = groundAt(netNodes[i * 2], netNodes[i * 2 + 1]);
-  netY.push(r1(d ? d.abs ?? g + d.rel : g));
+const NN = netNodes.length / 2;
+const roadY = new Float32Array(NN);
+for (let i = 0; i < NN; i++) roadY[i] = groundAt(netNodes[i * 2], netNodes[i * 2 + 1]);
+{
+  const edges = [];
+  for (const w of netWays) for (let k = 1; k < w.n.length; k++) {
+    const a = w.n[k - 1], b = w.n[k];
+    edges.push([a, b, Math.max(1, Math.hypot(netNodes[a * 2] - netNodes[b * 2], netNodes[a * 2 + 1] - netNodes[b * 2 + 1]))]);
+  }
+  // 平滑：每個節點往鄰居的平均拉一半（8 次）
+  for (let pass = 0; pass < 8; pass++) {
+    const sum = new Float32Array(NN), cnt = new Float32Array(NN);
+    for (const [a, b] of edges) { sum[a] += roadY[b]; cnt[a]++; sum[b] += roadY[a]; cnt[b]++; }
+    for (let i = 0; i < NN; i++) if (cnt[i]) roadY[i] = 0.5 * roadY[i] + 0.5 * (sum[i] / cnt[i]);
+  }
+  // 坡度上限：太陡的路段兩端各往中間拉一半（反覆幾次）
+  let worst = 0;
+  for (let pass = 0; pass < 400; pass++) {
+    worst = 0;
+    for (const [a, b, L] of edges) {
+      const d = roadY[b] - roadY[a], ex = Math.abs(d) - 0.18 * L;
+      if (ex <= 0) continue;
+      worst = Math.max(worst, Math.abs(d) / L);
+      roadY[a] += (Math.sign(d) * ex) / 2;
+      roadY[b] -= (Math.sign(d) * ex) / 2;
+    }
+  }
+  let maxG = 0, over = 0;
+  for (const [a, b, L] of edges) { const g = Math.abs(roadY[b] - roadY[a]) / L; maxG = Math.max(maxG, g); if (g > 0.2) over++; }
+  console.log(`地面道路高度：平滑＋坡度上限 18%（實際最陡 ${(maxG * 100).toFixed(0)}%，超過 20% 的路段 ${over}）`);
 }
+const netY = [];
+for (let i = 0; i < NN; i++) {
+  const d = deckY.get(i);
+  if (!d) netY.push(r1(roadY[i]));
+  else if (d.rel != null) netY.push(r1(groundAt(netNodes[i * 2], netNodes[i * 2 + 1]) + d.rel));
+  else netY.push(r1(roadY[d.portal] - d.dip));
+}
+
+// ---------------------------------------------------------------- 統一的地面（全圖每 15 m）：取代原本合成的象山地形
+// 地面高度場；道路經過的地方挖／填到路面高度，路緣外 8 m 內維持跟路面一樣高（像真的路塹、路堤），再 10 m 漸變回原本的坡。
+// 執行時地形網格、路面、建築、樹、路燈、車子都照這一張（不會穿來穿去）
+if (ground) {
+  const S = 15, x0 = ground.x0, z0 = ground.z0;
+  const nx = Math.ceil((ground.step * (ground.nx - 1)) / S) + 1, nz = Math.ceil((ground.step * (ground.nz - 1)) / S) + 1;
+  const H = new Float32Array(nx * nz), W = new Float32Array(nx * nz), Tg = new Float32Array(nx * nz), Dd = new Float32Array(nx * nz).fill(1e9);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) H[j * nx + i] = groundAt(x0 + i * S, z0 + j * S);
+  for (const w of netWays) {
+    const half = w.w / 2, flat = half + 8, R = flat + 10;
+    for (let k = 1; k < w.n.length; k++) {
+      const a = w.n[k - 1], b = w.n[k], ax = netNodes[a * 2], az = netNodes[a * 2 + 1], bx = netNodes[b * 2], bz = netNodes[b * 2 + 1];
+      const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 4));
+      for (let q = 0; q <= n; q++) {
+        const f = q / n, px = ax + (bx - ax) * f, pz = az + (bz - az) * f, ry = roadY[a] + (roadY[b] - roadY[a]) * f;
+        // 平地上路面 = 地面（都是 0），不用挖
+        if (Math.abs(ry) < 0.05 && Math.abs(groundAt(px, pz)) < 0.05) continue;
+        for (let j = Math.max(0, Math.floor((pz - R - z0) / S)); j <= Math.min(nz - 1, Math.ceil((pz + R - z0) / S)); j++)
+          for (let i = Math.max(0, Math.floor((px - R - x0) / S)); i <= Math.min(nx - 1, Math.ceil((px + R - x0) / S)); i++) {
+            const c = j * nx + i, d = Math.hypot(x0 + i * S - px, z0 + j * S - pz);
+            const wt = d <= flat ? 1 : Math.max(0, 1 - (d - flat) / 10);
+            if (wt <= 0) continue;
+            // 權重一樣時取比較近的那條路
+            if (wt > W[c] || (wt === W[c] && d < Dd[c])) { W[c] = wt; Tg[c] = ry; Dd[c] = d; }
+          }
+      }
+    }
+  }
+  for (let c = 0; c < H.length; c++) if (W[c] > 0) H[c] = H[c] * (1 - W[c]) + Tg[c] * W[c];
+  terrain = { x0: r1(x0), z0: r1(z0), step: S, nx, nz, h: [...H].map((v) => Math.round(Math.max(-2, v) * 2) / 2) };
+  // 顏色：森林、公園裡，或離道路、建築都遠的山坡畫綠色；其他（市區的坡地）畫成人行道的灰（c 字串，1 = 綠）
+  const greenRings = greens.filter((g) => g.k === 1 || g.k === 3).map((g) => { const r = []; for (let k = 0; k < g.p.length; k += 2) r.push([g.p[k], g.p[k + 1]]); return r; });
+  const GB = 120, ggrid = new Map();
+  greenRings.forEach((r, gi) => { const xs = r.map((p) => p[0]), zs = r.map((p) => p[1]); for (let a = Math.floor(Math.min(...xs) / GB); a <= Math.floor(Math.max(...xs) / GB); a++) for (let b = Math.floor(Math.min(...zs) / GB); b <= Math.floor(Math.max(...zs) / GB); b++) { const k = a + ',' + b; if (!ggrid.has(k)) ggrid.set(k, []); ggrid.get(k).push(gi); } });
+  let cs = '';
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const c = j * nx + i, x = x0 + i * S, z = z0 + j * S;
+    if (terrain.h[c] <= 0.05) { cs += '0'; continue; }
+    const inGreen = (ggrid.get(Math.floor(x / GB) + ',' + Math.floor(z / GB)) || []).some((gi) => inside([x, z], greenRings[gi]));
+    cs += inGreen || (W[c] === 0 && !inBuilding(x, z)) ? '1' : '0';
+  }
+  terrain.c = cs;
+  // 建築的基座：外框各點的地面高度取最低的
+  const hAt = (x, z) => {
+    const fx = (x - x0) / S, fz = (z - z0) / S, i = Math.max(0, Math.min(nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(nz - 2, Math.floor(fz)));
+    const u = Math.max(0, Math.min(1, fx - i)), v = Math.max(0, Math.min(1, fz - j)), h = terrain.h;
+    return (h[j * nx + i] * (1 - u) + h[j * nx + i + 1] * u) * (1 - v) + (h[(j + 1) * nx + i] * (1 - u) + h[(j + 1) * nx + i + 1] * u) * v;
+  };
+  let raisedB = 0;
+  for (const b of buildings) {
+    let lo = Infinity;
+    for (let k = 0; k < b.p.length; k += 2) lo = Math.min(lo, hAt(b.p[k], b.p[k + 1]));
+    if (lo > 0.15) { b.y = r1(lo); raisedB++; }
+  }
+  console.log(`統一地面：${nx}×${nz} 格（每 ${S} m），道路挖填完成；建築墊高基座 ${raisedB} 棟`);
+}
+
 const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: allWays, y: netY }, ground, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market, pedzones };
 mkdirSync(here('../public/data/'), { recursive: true });
 // 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；
@@ -1142,8 +1237,7 @@ packed.buildings = buildings.map((b) => ({ ...b, p: enc(b.p, 2, 10) }));
 packed.greens = greens.map((g) => ({ ...g, p: enc(g.p, 2, 10) }));
 packed.trees = enc(trees, 2, 10);
 packed.net = { nodes: enc(netNodes, 2, 10), ways: allWays.map((w) => ({ ...w, n: enc(w.n, 1, 1) })), y: enc(netY, 1, 10) };
-if (ground) packed.ground = { ...ground, h: enc(ground.h, 1, 2) };
-else delete packed.ground;
+delete packed.ground; // 已經併進 terrain（統一地面）
 packed.lamps = enc(lamps, 3, 100);
 packed.parked = enc(parked, 4, 100);
 if (terrain) packed.terrain = { ...terrain, h: enc(terrain.h, 1, 2) };

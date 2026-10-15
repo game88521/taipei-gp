@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CityData, NetWay, Collider } from './citydata';
+import { groundH, type CityData, type NetWay, type Collider } from './citydata';
 import { lanesOf } from './decor';
 import { sedanGeo, busGeo, scooterGeo } from './models';
 import { FreeCar } from './freecar';
@@ -202,15 +202,16 @@ export class Traffic {
       const px = bx + rx * side - e.ux * 2, pz = bz + rz * side - e.uz * 2;
       const ang = Math.atan2(e.ux, e.uz);
       q.setFromAxisAngle(up, ang);
-      poles.push(new THREE.Matrix4().compose(new THREE.Vector3(px, 0, pz), q, one));
+      const gy = groundH(px, pz); // 坡地上的紅綠燈
+      poles.push(new THREE.Matrix4().compose(new THREE.Vector3(px, gy, pz), q, one));
       const armLen = Math.min(7, e.laneW * e.lanes);
-      arms.push(new THREE.Matrix4().compose(new THREE.Vector3(px - rx * armLen / 2, 5.6, pz - rz * armLen / 2), q, new THREE.Vector3(armLen, 1, 1)));
+      arms.push(new THREE.Matrix4().compose(new THREE.Vector3(px - rx * armLen / 2, gy + 5.6, pz - rz * armLen / 2), q, new THREE.Vector3(armLen, 1, 1)));
       const hx = px - rx * armLen, hz = pz - rz * armLen;
       const g = groupOf(c, e.ux, e.uz);
       for (let k = 0; k < 3; k++) {
         // 面向來車：燈在橫桿下、左到右 紅 黃 綠
         const lx = hx + rx * (k - 1) * 0.42 - e.ux * 0.2, lz = hz + rz * (k - 1) * 0.42 - e.uz * 0.2;
-        lampM.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, 5.25, lz), q, one));
+        lampM.push(new THREE.Matrix4().compose(new THREE.Vector3(lx, gy + 5.25, lz), q, one));
         this.heads.push({ c, g, idx: lampM.length - 1 });
       }
     }
@@ -590,7 +591,7 @@ export class Traffic {
       const i = counts[a.kind]++;
       q.setFromAxisAngle(up, a.vh + a.kh);
       if (a.fall > 0.01) q.multiply(roll.setFromAxisAngle(fwd, a.fall * 1.4)); // 機車倒地：沿車身方向側躺
-      m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
+      m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.25, a.z + a.kz), q, one);
       const mm = this.meshes[a.kind];
       mm.paint.setMatrixAt(i, m);
       mm.fixed.setMatrixAt(i, m);
@@ -602,7 +603,7 @@ export class Traffic {
       if (!a.alive) continue;
       const wide = a.kind === 3 ? 0.9 : a.kind === 2 ? 3.2 : 2.4;
       q.setFromAxisAngle(up, a.vh + a.kh);
-      m.compose(pos.set(a.x + a.kx, -0.21, a.z + a.kz), q, bs.set(wide, 1, KIND_LEN[a.kind] + 1));
+      m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.21, a.z + a.kz), q, bs.set(wide, 1, KIND_LEN[a.kind] + 1));
       this.blob.setMatrixAt(nb++, m);
     }
     this.blob.count = nb;
@@ -619,7 +620,7 @@ export class Traffic {
         if (!this.lightsOn && !(side && blinkOn)) continue;
         if (nl + 6 > cap) break;
         q.setFromAxisAngle(up, a.vh + a.kh);
-        m.compose(pos.set(a.x + a.kx, -0.25, a.z + a.kz), q, one);
+        m.compose(pos.set(a.x + a.kx, groundH(a.x, a.z) - 0.25, a.z + a.kz), q, one);
         const L = KIND_LEN[a.kind] / 2 + 0.03, sides = a.kind === 3 ? [0] : a.kind === 2 ? [-0.9, 0.9] : [-0.6, 0.6], y = a.kind === 2 ? 0.85 : a.kind === 3 ? 0.95 : 0.75;
         if (this.lightsOn) for (const s of sides) {
           lm.multiplyMatrices(m, off.makeTranslation(s, y, L)); this.carLights.setMatrixAt(nl, lm); this.carLights.setColorAt(nl++, head);
