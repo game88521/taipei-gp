@@ -11,6 +11,7 @@ import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
 import { driverStandings, teamStandings, standingsHtml, roundName, POINTS } from './season';
 import { buildCircuitEnv } from './circuitenv';
+import { PitLane } from './pitlane';
 import { setupInstall } from './install';
 import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
@@ -155,7 +156,7 @@ let raceHide: THREE.Object3D[] = []; // 街道賽封路時要藏起來的東西�
 let cityCull: ((x: number, z: number, r: number) => void) | null = null;
 let cityStream: import('./city').CityStream | null = null;
 let surface: import('./surface').Surface | null = null; // 立體路面（地面＋高架；surface.ts）
-let tunDim = 0, tunWas = false; // 隧道調暗的程度（0~1）
+let tunDim = 0, tunWas = false, groundHid = false; // 隧道調暗的程度（0~1）、全圖平面地面是不是因為隧道收起來了
 let cityDataRef: import('./citydata').CityData | null = null;
 let lastImpact = 0; // 這一步撞牆的力道（測試用）
 const hitLog: string[] = []; // 測試：自由駕駛模擬的重撞紀錄
@@ -341,6 +342,7 @@ applyWeather(); // 載入中的天空就先換好（城市載入完會再套一�
 
 const car = new Car(); // 街道賽的 F1
 const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
+field.pitlane = new PitLane(world.race, track, !CIRCUIT, CIRCUIT?.id); // 維修區：起跑線右側（台北搭臨時車庫，各國賽道用 circuitenv 的車庫）
 let raceKind: 'gp' | 'tt' = 'tt'; // 正賽 or 計時賽
 const fcar = new FreeCar(); // 自由駕駛的汽車
 type Mode = 'free' | 'race';
@@ -581,16 +583,22 @@ function step(dt: number) {
   const zone = field.drsZoneAt(car.pos.s);
   if (zone < 0) { car.drs = false; car.ovt = false; }
   car.aeroZone = zone >= 0; // 2026：直線模式區段
-  if (BOT) { drsPress = true; if (raceKind === 'gp' && (field.me.wear > 0.7 || (field.wet > 0.35 && field.me.compound !== RAIN)) && !field.me.pitReq && field.me.pitTimer <= 0 && field.laps - field.me.laps >= 1) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
+  if (BOT) { drsPress = true; if (raceKind === 'gp' && (field.me.wear > 0.7 || (field.wet > 0.35 && field.me.compound !== RAIN)) && !field.me.pitReq && !field.me.pit && field.laps - field.me.laps >= 1) pitPress = true; if (raceKind === 'gp' && new URLSearchParams(location.search).has('pittest') && field.me.laps === 1 && !field.me.pits && !field.me.pit && !field.me.pitReq) pitPress = true; } // 測試用的駕駛：能開就開 DRS、胎磨太多就進站
   if (drsPress) {
     drsPress = false;
     if (raceKind === 'tt' && zone >= 0) { if (car.r26) { if (car.energy > 0.1) car.ovt = true; } else car.drs = true; }
     else if (raceKind === 'gp') field.playerDrs();
   }
-  if (pitPress) { pitPress = false; if (raceKind === 'gp') toast(field.playerPit() ? '🔧 這圈結束進站' : '取消進站', ''); }
-  const inPit = raceKind === 'gp' && field.me.pitTimer > 0;
+  if (pitPress) {
+    pitPress = false;
+    if (raceKind === 'gp' && !field.me.pit) {
+      if (field.playerPit()) { toast('🔧 Box, box！經過進站口就進維修區', ''); radio.say('box', 'Box, box！這圈進站，選好要換的胎', 8); }
+      else toast('取消進站', '');
+    }
+  }
+  // 在維修區裡：自動駕駛（限速、停進停車格、換胎、放行），位置由 field.update 推進
+  const inPit = raceKind === 'gp' && !!field.me.pit;
   let impact = inPit ? 0 : car.update(dt, track, inp.steer, inp.brake);
-  if (inPit) car.v = 0;
   if (raceKind === 'gp') {
     impact = Math.max(impact, field.update(dt, true));
     if (impact > 22 && car.v < 3) field.incident(); // 玩家重撞、車停住了也可能出安全車
@@ -864,7 +872,7 @@ function updateVisuals(dt: number) {
     if (mode === 'free') peds.render();
   }
   // 高度：比賽照賽道（各國賽道的高低起伏、傾斜彎）；自由駕駛照立體路面（高架、坡道；城市路面比賽道低 0.25 m）
-  const ry = mode === 'race' ? surfaceY(track, car.pos.i, car.pos.lat) : fcar.y + 0.25;
+  const ry = mode === 'race' ? surfaceY(track, car.pos.i, car.pos.lat) + (raceKind === 'gp' ? field.me.lift : 0) : fcar.y + 0.25; // 換胎時千斤頂抬車
   model.root.position.set(vc.x, mode === 'free' ? fcar.y : ry, vc.z);
   if (mode === 'race') model.root.rotation.set(-Math.atan(track.grade[car.pos.i]), vc.h, bankRoll(track, car.pos.i, car.pos.lat), 'YXZ'); // 上坡車頭抬起來、傾斜彎車身跟著斜
   else model.root.rotation.set(-fcar.pitch, vc.h, fcar.roll, 'YXZ');
@@ -1450,6 +1458,14 @@ function scBanner(text: string, green = false) {
   el.className = text ? (green ? 'show green' : 'show') : '';
 }
 function gpEvent(ev: string) {
+  if (ev === 'pit-in') { toast(`🚧 進維修區 · 限速 ${Math.round((field.pitlane?.speed ?? 22.2) * 3.6)} km/h（自動駕駛）`, ''); return; }
+  if (ev.startsWith('stop:')) {
+    const [, sec, nx, slow] = ev.split(':');
+    toast(`🔧 停站 ${sec} 秒 · 換上${TYRES[+nx].name}`, +slow >= 0 ? 'bad' : 'purple');
+    if (+slow >= 0) radio.say('slowstop', `${['左前', '右前', '左後', '右後'][+slow]}輪卡住了，抱歉！損失了幾秒`, Infinity);
+    else if (+sec < 2.3) radio.say('faststop', `漂亮的停站，${sec} 秒！`, 20);
+    return;
+  }
   if (ev === 'sc-out') { scBanner('🟡 安全車'); radio.say('sc', '安全車出動！保持車距、不要超車，DRS 關閉', Infinity); sound.beep(660, 0.3); }
   else if (ev === 'sc-in') { scBanner('🟡 安全車本圈進站'); radio.say('sc-in', '安全車這圈進站，準備重新起跑', Infinity); }
   else if (ev === 'green') { scBanner('🟢 綠旗！', true); setTimeout(() => scBanner(''), 3000); radio.say('green', '綠旗！衝！', Infinity); }
@@ -1464,7 +1480,7 @@ function radioTick(dt: number) {
   if (me.finish != null) return;
   if (field.raceTime < 4) radio.say('start', '燈號熄滅！第一個彎小心，別跟人擠', Infinity);
   if (me.laps === field.laps && field.laps > 1) radio.say('last', '最後一圈！全力推！', Infinity);
-  if (me.pitTimer <= 0 && me.wear > 0.62 && !me.pitReq && field.laps - me.laps >= 1) radio.say('tyre', `輪胎剩 ${Math.round((1 - me.wear) * 100)}%，考慮這圈進站（按「進站」）`, Infinity);
+  if (!me.pit && me.wear > 0.62 && !me.pitReq && field.laps - me.laps >= 1) radio.say('tyre', `輪胎剩 ${Math.round((1 - me.wear) * 100)}%，考慮這圈進站（按「進站」）`, Infinity);
   if (me.wear < 0.1) radio.rearm('tyre');
   const ahead = st[k - 1], behind = st[k + 1];
   if (ahead && ahead.wear > 0.7 && field.progress(ahead) - field.progress(me) < 80) radio.say('ahead-tyre', `前車 ${ahead.name} 的輪胎快不行了，準備攻擊！`, 40);
@@ -1477,7 +1493,7 @@ function radioTick(dt: number) {
   }
   if (car.r26 && car.energy < 0.2) radio.say('batt', '電量剩 20%，先別開超車，煞車多回收一點', Infinity);
   if (car.energy > 0.5) radio.rearm('batt');
-  if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && me.pitTimer <= 0 && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
+  if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && !me.pit && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
   // 名次創新高才報（在兩個名次之間跳來跳去不要一直說）；掉了兩名以上之後重新算
   if (lastPos < 0) lastPos = k;
   if (k < lastPos && field.raceTime > 5) { radio.say('gain', `漂亮！上到第 ${k + 1} 名`, 12); lastPos = k; circuitEnv?.crowd.cheer(0.8); }
@@ -1540,7 +1556,9 @@ function updateGpHud() {
   $('lap').textContent = `${Math.min(field.laps, Math.max(1, mine.laps))}/${field.laps}`;
   // 胎況：胎種＋剩幾成
   const ty = TYRES[mine.compound], tyEl = $('tyre');
-  tyEl.textContent = mine.pitTimer > 0 ? `🔧 換胎中 ${mine.pitTimer.toFixed(1)}` : `${ty.short}胎 ${Math.round((1 - mine.wear) * 100)}%`;
+  const pp = mine.pit;
+  tyEl.textContent = pp?.ph === 'box' ? `🔧 停站 ${pp.t.toFixed(1)} s` : pp?.ph === 'out' && pp.sd > 150 ? '🚀 出站' : pp ? `🚧 維修區 ${Math.round((field.pitlane?.speed ?? 22.2) * 3.6)} km/h` : `${ty.short}胎 ${Math.round((1 - mine.wear) * 100)}%`;
+  updatePitTyre(mine);
   tyEl.style.borderColor = ty.color;
   tyEl.classList.toggle('worn', mine.wear > 0.6);
   $('pit').classList.toggle('on', mine.pitReq);
@@ -1592,7 +1610,7 @@ function showResults() {
   }
   recordSeason(st);
   $('results').classList.remove('hidden');
-  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits})` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? `有（第 ${field.scAt.toFixed(0)} 秒）` : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}${save.season ? ` 賽季已比${save.season.round}站 你${driverStandings(save.season, teamOf).find((r) => r.name === '你')?.pts ?? 0}分 領先${driverStandings(save.season, teamOf)[0]?.name}${driverStandings(save.season, teamOf)[0]?.pts}分` : ''}`;
+  if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits} ${r.lastStop.toFixed(1)}s)` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? `有（第 ${field.scAt.toFixed(0)} 秒）` : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}${save.season ? ` 賽季已比${save.season.round}站 你${driverStandings(save.season, teamOf).find((r) => r.name === '你')?.pts ?? 0}分 領先${driverStandings(save.season, teamOf)[0]?.name}${driverStandings(save.season, teamOf)[0]?.pts}分` : ''}`;
 }
 // ---------------------------------------------------------------- 回放：轉播機位（賽道外側每 220 m 一台）與追車鏡頭輪流
 let replayT = 0, replaySpeed = 1, camCut = 0, camMode: 'tv' | 'chase' | 'heli' = 'tv';
@@ -1676,6 +1694,26 @@ $('replay-speed').addEventListener('click', () => {
 });
 // DRS、進站按鈕（電腦：Ctrl 或 E 開 DRS、B 進站）
 let drsPress = false, pitPress = false;
+/** 進站要換的胎：進站按鈕旁邊的四顆（要求進站之後才出現；亮的是車隊建議或你選的） */
+const pitTyreEl = $('pit-tyre');
+TYRES.forEach((ty, k) => {
+  const b = document.createElement('button');
+  b.textContent = ty.short;
+  b.style.setProperty('--c', ty.color);
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); field.me.pitTyre = k; });
+  pitTyreEl.appendChild(b);
+});
+function updatePitTyre(me: typeof field.me) {
+  const show = me.pitReq && !me.pit;
+  pitTyreEl.classList.toggle('on', show);
+  if (!show) return;
+  // 擺在進站按鈕正上方（按鈕位置會隨觸控設定縮放、左右對調，照它實際的位置放）
+  const pr = $('pit').getBoundingClientRect();
+  pitTyreEl.style.left = `${pr.left + pr.width / 2}px`;
+  pitTyreEl.style.top = `${pr.top - 44}px`;
+  const pick = me.pitTyre >= 0 ? me.pitTyre : field.suggestTyre(me);
+  [...pitTyreEl.children].forEach((b, k) => b.classList.toggle('sel', k === pick));
+}
 $('drs').addEventListener('pointerdown', (e) => { e.preventDefault(); drsPress = true; });
 $('pit').addEventListener('pointerdown', (e) => { e.preventDefault(); pitPress = true; });
 addEventListener('keydown', (e) => {
@@ -1685,6 +1723,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return; // 按住不放不會一直重複觸發
   if (e.code === 'KeyE' || e.code === 'ControlLeft' || e.code === 'ControlRight') drsPress = true;
   if (e.code === 'KeyB') pitPress = true;
+  if (/^Digit[1-4]$/.test(e.code) && field.me.pitReq && !field.me.pit) field.me.pitTyre = +e.code.slice(5) - 1; // 選要換的胎
 });
 let drsWasOn = false;
 function updateDrsButton() {
@@ -2509,7 +2548,9 @@ renderer.setAnimationLoop(() => {
     const inTun = mode === 'free' && !!surface && fcar.deck?.way.e === 2 && surface.groundY(fcar.x, fcar.z) - fcar.y > CEIL;
     tunDim += ((inTun ? 1 : 0) - tunDim) * Math.min(1, dt * 3);
     // 隧道西段比全圖那片平的地面還低：在隧道裡就把它收起來（不然從上面蓋住隧道路面）
-    world.ground.visible = !(mode === 'free' && fcar.deck?.way.e === 2 && fcar.y < world.ground.position.y + 1);
+    // 只在狀態改變時才動（各國賽道 circuitenv 已經把它關掉，不能每格又打開）
+    const hideG = mode === 'free' && fcar.deck?.way.e === 2 && fcar.y < world.ground.position.y + 1;
+    if (hideG !== groundHid) { groundHid = hideG; world.ground.visible = !hideG && !CIRCUIT; }
     if (tunDim > 0.002 || tunWas) {
       world.sun.intensity = weather.sunI * (1 - 0.85 * tunDim);
       world.hemi.intensity = weather.hemiI * (1 - 0.7 * tunDim);

@@ -33,7 +33,8 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     grid.get(k)!.push(i);
   }
   // 地形高度：附近賽道點的高度做距離加權平均（離賽道越遠越接近整條的平均高度）；
-  // 賽道 40 m 內一律壓在路面下 1 m（地形的三角形才不會穿出路面）
+  // 賽道 90 m 內一律壓在路面下 1 m：地形網格每格約 40 m，包住維修道、看台的三角形三個頂點都要在路面下，內插才不會穿出來
+  // （起跑直線在低窪處的賽道，像蒙札，40 m 的話維修道會被外面比較高的頂點拉起來的地形蓋住）
   let mean = 0;
   for (let i = 0; i < t.N; i++) mean += t.py[i] / t.N;
   const hAt = (x: number, z: number) => {
@@ -45,7 +46,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       if (d2 < nd) { nd = d2; ny = t.py[i]; }
     }
     h /= w;
-    return Math.sqrt(nd) < WALL_OFF + 40 ? Math.min(h, ny - 1) : h;
+    return Math.sqrt(nd) < WALL_OFF + 90 ? Math.min(h, ny - 1) : h;
   };
   // ---- 地面：照環境畫紋理（草地有割草條紋、沙漠有沙紋、街道是石板），蓋住整條賽道再往外 3 km；有高低起伏
   const grassy = meta.biome === 'grass' || meta.biome === 'tropical';
@@ -381,13 +382,13 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   }
 
   // ---- 維修區：起跑線旁、右側（跟 AI 進站那側一樣）——維修道、11 隊車庫、二樓玻璃帷幕、屋頂廣告
+  // （維修道的路面、標線、停車格由 pitlane.ts 畫；車庫門的貼圖 11 隊排滿 260 m，對齊 pitlane.boxS 的停車格）
   sweep(-130, 130, 1, WALL_OFF + 3, [
-    { pts: [[0, -0.01], [10, -0.01], [10, BOT]], mats: [C_PITLANE, C_CONCRETE], unit: [true, false], rep: [12, 16] },
     {
       pts: [[10, BOT], [10, 0], [10, 5.2], [8.6, 5.2], [8.6, 9.4], [8.6, 10.2], [26, 10.2], [26, BOT], [10, BOT]],
       mats: [C_CONCRETE, C_GARAGE, C_CONCRETE, C_GLASS, C_BANNER, C_ROOF, C_CONCRETE, C_CONCRETE],
       unit: [false, true, false, true, true, false, false, false],
-      rep: [16, 132, 16, 24, 60, 16, 16, 16],
+      rep: [16, 260, 16, 24, 60, 16, 16, 16],
       cap: C_CONCRETE,
     },
     { pts: [[9.0, 5.12], [9.8, 5.12]], mats: [C_LAMP] }, // 雨遮下的燈條：晚上照亮車庫門口
@@ -406,6 +407,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     for (let s = 200, k = 0; s < t.length - 200; s += 280, k++) {
       const i = at(s), sg = k % 2 ? 1 : -1;
       if (gravelSide[i] === sg) continue;
+      if (sg > 0 && (s < 360 || s > t.length - 360)) continue; // 右側起跑線前後是進出維修區的車道
       const [x, z] = side(i, sg * (WALL_OFF + 4.5));
       if (!clear(x, z, WALL_OFF + 2)) continue;
       huts.push([x, t.py[i], z, Math.atan2(t.tx[i], t.tz[i])]);

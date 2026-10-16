@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HALF_WIDTH, WALL_OFF, VMAX, type Track } from './track';
+import { wallOpen } from './pitlane';
 import { racingLine } from './rivals';
 
 // 賽道本身（路面、路緣、護牆、門架、路燈）與天空光線；城市建築在 city.ts（真實 OpenStreetMap 資料）
@@ -420,12 +421,13 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, side: THREE.DoubleSide });
   for (const s of [-1, 1]) {
     // 右側牆要把文字翻過來，從賽道上看才是正的
-    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 0, yb: 1.2, along: s * -38, alongIsU: true }), wallMat));
+    // 右側護牆：進出維修區的車道穿過去的那兩段要開口（pitlane.ts）
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 0, yb: 1.2, along: s * -38, alongIsU: true, mask: s > 0 ? (i) => !wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N) : undefined }), wallMat));
   }
   // 牆頂的鐵絲網（半透明灰）
   const fenceMat = new THREE.MeshBasicMaterial({ color: '#9aa0a8', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
   for (const s of [-1, 1]) {
-    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10 }), fenceMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10, mask: s > 0 ? (i) => !wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N) : undefined }), fenceMat));
   }
 
   // ---- 起點門架

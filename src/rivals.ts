@@ -3,7 +3,8 @@ import { Car } from './car';
 import type { CarModel } from './carModel';
 import { makeF1, TEAMS } from './f1model';
 import { CIRCUIT } from './circuits';
-import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, type Track } from './track';
+import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, type Track } from './track';
+import { PIT, boxS, laneLat, signedS, type PitLane, type StopInfo } from './pitlane';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
 // 被慢車擋住就挑比較空的一側超車、尾流加速、車與車照動量交換互相撞開
@@ -20,7 +21,21 @@ export const TYRES = [
 export const RAIN = 3;
 export type GpWeather = 'dry' | 'maybe' | 'wet';
 const SC_SPEED = 40, SC_CATCHUP = 55; // 安全車期間：跟在車隊裡的限速、還沒追上車隊的限速（m/s）
-const PIT_TIME = 6; // 進站停多久（含進出維修區的時間損失）
+const PIT_TEST = new URLSearchParams(location.search).has('pittest');
+const smooth = (x: number) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+
+/** 進站中的狀態：in 進維修區（減速、轉進停車格）→ box 停在格子裡換胎 → out 出站、匯回賽道 */
+export interface PitState {
+  ph: 'in' | 'box' | 'out';
+  sd: number; // 離起跑線的帶號距離（沿賽道）
+  v: number;
+  entry: number; exit: number; // 進站前、出站後在賽道上的橫向位置
+  t: number; T: number; // 停好之後過了幾秒、這次停站要幾秒
+  slow: number; // 出包的輪子（-1 沒有）
+  next: number; // 換上的胎
+  box: number; // 停車格的位置
+  team: number;
+}
 
 /** DRS 區：長直線；偵測點在區間起點前 80 m */
 interface DrsZone { s0: number; s1: number; det: number }
@@ -28,8 +43,11 @@ interface DrsZone { s0: number; s1: number; det: number }
 export interface Racer {
   compound: number; // TYRES 的索引
   wear: number; // 0 新胎 … 1 磨光
-  pitReq: boolean; // 下次過線時進站
-  pitTimer: number; // 停在維修區的剩餘秒數
+  pitReq: boolean; // 下次經過進站口時進站
+  pit: PitState | null; // 進站中（null = 在賽道上）
+  pitTyre: number; // 玩家指定下一套胎（-1 = 照車隊建議）
+  lift: number; // 千斤頂把車抬高多少（m）
+  lastStop: number; // 上一次停站幾秒
   pits: number; // 進站次數
   drsOk: boolean; // 這個 DRS 區可以開（偵測點在前車 1 秒內）
   rec: number[]; // 回放紀錄：每 0.05 秒一筆 [x, z, h, steer, v]
@@ -112,6 +130,11 @@ export class RaceField {
   private base: [number, number, number][] = []; // 每位 AI 普通難度的 [抓地力, 煞車, 引擎力]
 
   aiHits = 0; // 測試用：AI 撞牆次數
+  /** 維修區（main 建好之後設定）：外觀與維修人員動畫；限速 */
+  pitlane: PitLane | null = null;
+  private pitSeed = 11;
+  private pitRnd() { this.pitSeed = (this.pitSeed * 16807) % 2147483647; return this.pitSeed / 2147483647; }
+  private stops = new Map<number, StopInfo>();
   difficulty: Difficulty = 'normal';
 
   constructor(private scene: THREE.Scene, private t: Track, player: Car) {
@@ -192,10 +215,11 @@ export class RaceField {
     this.wet = weather === 'wet' ? 1 : 0;
     this.rainAt = weather === 'wet' ? -1 : weather === 'maybe' && Math.random() < 0.4 ? laps * 55 * (0.3 + Math.random() * 0.3) : Infinity;
     // AI 的起跑胎：短比賽多用軟胎、長比賽多用中性胎
+    this.pitSeed = 11;
     let seed = 7;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (const r of this.racers) {
-      Object.assign(r, { wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] });
+      Object.assign(r, { wear: 0, pitReq: false, pit: null, pitTyre: -1, lift: 0, lastStop: 0, pits: 0, drsOk: false, rec: [] });
       r.compound = r.isPlayer ? playerCompound : laps <= 3 ? (rnd() < 0.7 ? 0 : 1) : rnd() < 0.5 ? 1 : rnd() < 0.5 ? 0 : 2;
       r.car.drs = false;
       r.car.gripMul = TYRES[r.compound].grip;
@@ -269,7 +293,7 @@ export class RaceField {
     for (const r of this.racers) {
       const c = r.car, ty = TYRES[r.compound];
       const onRain = r.compound === RAIN;
-      if (racing && r.pitTimer <= 0) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * r.persona.tyre * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
+      if (racing && !r.pit) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * r.persona.tyre * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
       // 濕地：乾地胎打滑（抓地力最多少 28%）；雨胎在濕地只少一點、在乾地反而差；雨戰型車手濕地少掉的抓地力少幾成
       const wetLoss = 1 - r.persona.wet;
       const wetK = (onRain ? (1 - 0.04 * this.wet * wetLoss) * (1 - 0.08 * (1 - this.wet)) : 1 - 0.28 * this.wet * wetLoss) * (1 + 0.06 * this.wet * r.persona.wet);
@@ -279,13 +303,7 @@ export class RaceField {
         c.speedCap = this.gapAhead(r) < 30 || r === this.leader() ? SC_SPEED : SC_CATCHUP;
         r.drsOk = false; c.drs = false; c.ovt = false;
       } else c.speedCap = Infinity;
-      if (r.pitTimer > 0) {
-        r.pitTimer -= dt;
-        c.v = 0;
-        c.drs = false;
-        if (r.pitTimer <= 0) { r.wear = 0; r.pits++; }
-        continue;
-      }
+      if (r.pit) { c.drs = false; c.ovt = false; continue; }
       const zi = this.drsZoneAt(c.pos.s);
       if (zi < 0) { c.drs = false; c.ovt = false; }
       c.aeroZone = zi >= 0;
@@ -296,15 +314,23 @@ export class RaceField {
       }
       if (zi < 0 && r.drsOk && !this.drsZones.some((z) => { const d = (c.pos.s - z.det + t.length) % t.length; return d < 80; })) r.drsOk = false;
     }
+    // 進站：要求進站的車經過進站口 → 接手自動駕駛；已經在維修區的車照維修區規則開
+    if (racing) for (const r of this.racers) {
+      if (r.pit) { const prevS = r.car.pos.s; this.pitStep(r, dt); if (!r.isPlayer) this.lapCheck(r, prevS); continue; }
+      if (!r.pitReq || r.finish != null || r.laps < 1 || r.laps >= this.laps) continue;
+      const sd = signedS(t, r.car.pos.s);
+      if (sd >= PIT.IN && sd < PIT.IN + 45) this.startPit(r);
+    }
     for (const r of this.racers) {
       if (r.isPlayer) continue;
       const c = r.car;
-      if (!racing || r.pitTimer > 0) { if (!racing) c.update(dt, t, 0, true); continue; } // 起跑前停在格位、進站中停住
+      if (!racing || r.pit) { if (!racing) c.update(dt, t, 0, true); continue; } // 起跑前停在格位；進站中的車上面處理過了
       const prevS = c.pos.s;
       const { steer, brake } = this.drive(r, r.finish != null);
       // AI：可以開 DRS 就開（2026：超車模式，電還夠才開）；輪胎磨太多、還有兩圈以上就準備進站
       if (r.drsOk && this.drsZoneAt(c.pos.s) >= 0 && !brake) { if (this.rules === '2026') { if (c.energy > 0.25) c.ovt = true; } else c.drs = true; }
       if (!r.pitReq && r.wear > 0.7 && this.laps - r.laps >= 1 && r.finish == null) r.pitReq = true;
+      if (PIT_TEST && r.laps === 1 && !r.pits && !r.pit && !r.pitReq) r.pitReq = true; // 測試（?pittest）：第 1 圈全部進站
       // 下雨了還穿乾地胎 → 這圈進站換雨胎
       if (!r.pitReq && r.finish == null && this.laps - r.laps >= 1 && this.wet > 0.35 && r.compound !== RAIN) r.pitReq = true;
       const hit = c.update(dt, t, steer, brake);
@@ -328,7 +354,7 @@ export class RaceField {
     let playerHit = 0;
     for (let a = 0; a < this.racers.length; a++) for (let b = a + 1; b < this.racers.length; b++) {
       const A = this.racers[a].car, B = this.racers[b].car;
-      if (this.racers[a].pitTimer > 0 || this.racers[b].pitTimer > 0) continue; // 停在維修區裡的車不會被撞
+      if (this.racers[a].pit || this.racers[b].pit) continue; // 在維修區裡的車不跟賽道上的車碰撞
       if (Math.abs(A.x - B.x) > 8 || Math.abs(A.z - B.z) > 8) continue;
       for (const oa of [1.6, -1.6]) for (const ob of [1.6, -1.6]) {
         const ax = A.x + Math.sin(A.h) * oa, az = A.z + Math.cos(A.h) * oa;
@@ -424,19 +450,106 @@ export class RaceField {
     r.laps++;
     r.lapStart = this.raceTime;
     if (r.laps > this.laps && r.finish == null) r.finish = this.raceTime;
-    // 進站：過線的時候停到賽道右側（維修區），換新胎；剩一兩圈換軟胎、不然換中性胎
-    if (r.pitReq && r.finish == null) {
-      r.pitReq = false;
-      r.pitTimer = PIT_TIME;
-      const left = this.laps - r.laps + 1;
-      r.compound = this.wet > 0.3 ? RAIN : left <= 2 ? 0 : r.compound === 1 ? 2 : 1; // 濕地換雨胎
-      const i = r.car.pos.i, t = this.t;
-      r.car.x = t.px[i] - t.tz[i] * 6;
-      r.car.z = t.pz[i] + t.tx[i] * 6;
-      r.car.h = Math.atan2(t.tx[i], t.tz[i]);
-      r.car.v = 0;
-      r.lat = 6 - this.line[i];
+  }
+
+  /** 車隊建議的下一套胎：濕地換雨胎、剩兩圈以內換軟胎、不然中性／硬胎輪著用 */
+  suggestTyre(r: Racer): number {
+    const left = this.laps - r.laps;
+    return this.wet > 0.3 ? RAIN : left <= 2 ? 0 : r.compound === 1 ? 2 : 1;
+  }
+
+  /** 經過進站口：開始進站（停站時間 2.0~2.9 秒；4% 機率某個輪子卡住，多 3~7 秒） */
+  private startPit(r: Racer) {
+    const c = r.car, k = Math.max(0, TEAMS.findIndex((tm) => tm.team === r.team));
+    let T = 2.0 + this.pitRnd() * 0.9, slow = -1;
+    if (this.pitRnd() < 0.04) { slow = Math.floor(this.pitRnd() * 4); T += 3 + this.pitRnd() * 4; }
+    const next = r.isPlayer && r.pitTyre >= 0 ? r.pitTyre : this.suggestTyre(r);
+    r.pit = { ph: 'in', sd: signedS(this.t, c.pos.s), v: c.v, entry: c.pos.lat, exit: 4.5, t: 0, T, slow, next, box: boxS(k), team: k };
+    r.pitReq = false;
+    c.drs = false; c.ovt = false;
+    if (r.isPlayer) this.events.push('pit-in');
+  }
+
+  /** 維修區裡的自動駕駛：限速線前減速、轉進停車格、換胎、放行、限速線後加速、匯回賽道 */
+  private pitStep(r: Racer, dt: number) {
+    const p = r.pit!, c = r.car, VP = this.pitlane?.speed ?? 80 / 3.6;
+    if (p.ph === 'box') {
+      p.t += dt;
+      c.v = 0;
+      r.lift = p.t < p.T - 0.3 ? Math.min(0.1, p.t * 0.6) : Math.max(0, r.lift - dt * 0.5);
+      // 放行：時間到、而且快車道後面 12 m 內沒有車正要開過來（不會放出去撞到人；同隊排隊等格子的不算）
+      const clear = !this.racers.some((o) => o !== r && o.pit && o.pit.ph === 'in' && o.pit.team !== p.team && o.pit.sd > p.box - 12 && o.pit.sd < p.box + 2 && o.pit.box - o.pit.sd > 18);
+      if (p.t >= p.T && clear) {
+        r.wear = 0; r.compound = p.next; r.pits++; r.lastStop = p.t; r.lift = 0;
+        p.ph = 'out';
+        if (r.isPlayer) this.events.push(`stop:${p.t.toFixed(1)}:${p.next}:${p.slow}`);
+      }
+      this.placePit(r);
+      return;
     }
+    // 目標速度：進場要在限速線前降到限速、再停進格子；出場在限速線後全力加速
+    let vt: number;
+    if (p.ph === 'in') {
+      vt = p.sd < PIT.LIM_IN ? Math.sqrt(VP * VP + 2 * 24 * (PIT.LIM_IN - p.sd)) : VP;
+      vt = Math.min(vt, Math.sqrt(2 * 6 * Math.max(0, p.box - p.sd)) + 0.6);
+    } else vt = p.sd < PIT.LIM_OUT ? VP : 95;
+    // 前面有車：快車道上的車、或同隊在格子裡（排隊等）→ 保持 9 m
+    for (const o of this.racers) {
+      if (o === r || !o.pit) continue;
+      const op = o.pit, gap = op.sd - p.sd;
+      if (gap <= 0 || gap > 35) continue;
+      const turningIn = op.ph === 'in' && op.box - op.sd < 18 && op.team !== p.team; // 已經轉進作業車道
+      const blocks = op.ph === 'box' ? op.team === p.team && p.ph === 'in' : !turningIn;
+      if (blocks) vt = Math.min(vt, Math.max(0, (gap - 9) * 1.6));
+    }
+    const acc = p.ph === 'out' && p.sd >= PIT.LIM_OUT ? 11 : 7;
+    p.v = p.v > vt ? Math.max(vt, p.v - 26 * dt) : Math.min(vt, p.v + acc * dt);
+    p.sd += p.v * dt;
+    if (p.ph === 'in' && p.sd >= p.box - 0.3) { p.sd = p.box; p.v = 0; p.ph = 'box'; p.t = 0; }
+    this.placePit(r);
+    if (p.ph === 'out' && p.sd >= PIT.OUT) {
+      // 匯回賽道：AI 從這個橫向位置慢慢回到賽車線
+      c.v = p.v;
+      if (!r.isPlayer) r.lat = p.exit - this.line[c.pos.i];
+      r.pit = null;
+    }
+  }
+
+  /** 照維修區路線（sd、橫向位置）擺車子：位置、車頭方向、賽道定位 */
+  private placePit(r: Racer) {
+    const p = r.pit!, c = r.car, t = this.t;
+    const latAt = (sd: number) => {
+      let lat = laneLat(sd, p.entry, p.exit);
+      if (p.ph === 'box') return PIT.WORK;
+      if (p.ph === 'in' && p.box - sd < 18) lat += (PIT.WORK - PIT.FAST) * smooth(1 - (p.box - sd) / 18);
+      if (p.ph === 'out' && sd - p.box < 16) lat += (PIT.WORK - PIT.FAST) * smooth(1 - (sd - p.box) / 16);
+      return lat;
+    };
+    const L = t.length, f = ((p.sd + L) % L) / t.ds, i = Math.floor(f) % t.N, j = (i + 1) % t.N, k = f - Math.floor(f);
+    const lat = latAt(p.sd), slope = p.ph === 'box' ? 0 : (latAt(p.sd + 1) - latAt(p.sd - 1)) / 2;
+    const tx = t.tx[i], tz = t.tz[i];
+    c.x = t.px[i] + (t.px[j] - t.px[i]) * k - tz * lat;
+    c.z = t.pz[i] + (t.pz[j] - t.pz[i]) * k + tx * lat;
+    c.h = Math.atan2(tx - tz * slope, tz + tx * slope);
+    c.v = p.v;
+    c.steer += (Math.max(-1, Math.min(1, -slope * 6)) - c.steer) * 0.2;
+    locate(t, c.x, c.z, c.pos);
+  }
+
+  /** 正在進站的隊伍 → 給維修人員動畫的停站狀態（同隊兩台都在維修區時，看停在格子裡、或比較接近格子的那台） */
+  private stopInfo(): Map<number, StopInfo> {
+    this.stops.clear();
+    for (const r of this.racers) {
+      const p = r.pit;
+      if (!p) continue;
+      const near = p.ph === 'box' || (p.ph === 'in' && p.box - p.sd < 140) || (p.ph === 'out' && p.sd - p.box < 6);
+      if (!near) continue;
+      const cur = this.stops.get(p.team);
+      if (cur && cur.phase === 'service') continue;
+      const phase: StopInfo['phase'] = p.ph === 'in' ? 'approach' : p.ph === 'box' && p.t < p.T ? 'service' : 'release';
+      this.stops.set(p.team, { phase, t: p.t, T: p.T, slow: p.slow, newColor: TYRES[p.next].color });
+    }
+    return this.stops;
   }
 
   /** 正前方最近一台車的距離（m） */
@@ -444,7 +557,7 @@ export class RaceField {
     if (this.solo) return Infinity;
     let best = Infinity;
     for (const o of this.racers) {
-      if (o === r) continue;
+      if (o === r || (o.pit && !r.pit)) continue; // 維修區裡的車不算前車
       let d = o.car.pos.s - r.car.pos.s;
       if (d < 0) d += this.t.length;
       if (d < best) best = d;
@@ -463,7 +576,9 @@ export class RaceField {
   }
   playerPit() {
     const me = this.racers.find((r) => r.isPlayer)!;
+    if (me.pit) return false; // 已經在維修區裡
     if (me.finish == null && me.laps < this.laps) me.pitReq = !me.pitReq;
+    if (!me.pitReq) me.pitTyre = -1;
     return me.pitReq;
   }
   get me() { return this.racers.find((r) => r.isPlayer)!; }
@@ -488,7 +603,7 @@ export class RaceField {
     const range = 18 + 14 * P.aggr;
     let blocker: Racer | null = null, gap = Infinity, attacker: Racer | null = null, agap = Infinity;
     for (const o of this.racers) {
-      if (o === r || this.solo) continue;
+      if (o === r || this.solo || o.pit) continue; // 維修區裡的車不會擋路
       let d = o.car.pos.s - c.pos.s;
       if (d < -t.length / 2) d += t.length;
       if (d > t.length / 2) d -= t.length;
@@ -541,18 +656,19 @@ export class RaceField {
     for (const r of this.racers) {
       if (!r.model) continue;
       const c = r.car, m = r.model;
-      m.root.position.set(c.x, surfaceY(this.t, c.pos.i, c.pos.lat), c.z);
+      m.root.position.set(c.x, surfaceY(this.t, c.pos.i, c.pos.lat) + r.lift, c.z); // 換胎時千斤頂把車抬起來
       m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, bankRoll(this.t, c.pos.i, c.pos.lat), 'YXZ');
       m.body.rotation.z = c.steer * Math.min(1, c.v / 40) * 0.04;
       for (const w of m.steer) w.rotation.y = -c.steer * 0.35;
       for (const w of m.spin) w.rotation.x += (c.v / 0.36) * dt;
     }
+    this.pitlane?.update(dt, this.stopInfo());
   }
 }
 
 /** 每台車比賽開始時的狀態 */
 function fresh() {
-  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, crashAt: -99, slowT: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pitTimer: 0, pits: 0, drsOk: false, rec: [] as number[] };
+  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, crashAt: -99, slowT: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pit: null as PitState | null, pitTyre: -1, lift: 0, lastStop: 0, pits: 0, drsOk: false, rec: [] as number[] };
 }
 
 /**

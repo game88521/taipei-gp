@@ -237,6 +237,25 @@ line.forEach((p, i) => {
   if (!tgrid.has(k)) tgrid.set(k, []);
   tgrid.get(k).push(i);
 });
+/**
+ * 街道賽的臨時維修區（執行時 src/pitlane.ts 畫）：起跑線右側、線前後 345 m、離中心線 7 ~ 32 m。
+ * 這個範圍裡的建築、行道樹、路燈、路邊機車都拿掉（真的街道賽也會清出空間搭維修區）
+ */
+function inPitZone(x, z) {
+  const r = 1, cx = Math.floor(x / TG), cz = Math.floor(z / TG);
+  let best = Infinity, lat = 0, sd = 0;
+  for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) {
+    for (const i of tgrid.get(`${cx + a},${cz + b}`) || []) {
+      const p = line[i], q = line[(i + 1) % line.length];
+      const dx = q[0] - p[0], dz = q[1] - p[1], l = Math.hypot(dx, dz) || 1;
+      const t = Math.max(0, Math.min(1, ((x - p[0]) * dx + (z - p[1]) * dz) / (l * l)));
+      const d = Math.hypot(x - p[0] - dx * t, z - p[1] - dz * t);
+      if (d < best) { best = d; lat = ((x - p[0]) * -dz + (z - p[1]) * dx) / l; sd = i * 4 + t * l; }
+    }
+  }
+  if (sd > length / 2) sd -= length;
+  return best < 40 && sd > -345 && sd < 345 && lat > 7 && lat < 32;
+}
 function distToTrack(x, z, maxR = 60) {
   let best = Infinity;
   const r = Math.ceil(maxR / TG), cx = Math.floor(x / TG), cz = Math.floor(z / TG);
@@ -359,7 +378,7 @@ const isSpecial = (t) => SPECIAL.some(([re]) => re.test(t.name || '')) || t.man_
 const OUTLINE_COLOUR = [[/^臺北市政府$/, '#b8a487']];
 const partCentroids = parts.map((p) => centroid(p.rings[0]));
 const keep = [], dropParts = new Set();
-let skippedOutline = 0, droppedTrack = 0;
+let skippedOutline = 0, droppedTrack = 0, droppedPit = 0;
 for (const o of outlines) {
   const r0 = o.rings[0];
   if (!r0 || o.under) continue;
@@ -386,6 +405,7 @@ for (const b of keep) {
     const c = centroid(r);
     if (farFromTrack(c[0], c[1])) continue;
     if (r.some((p) => distToTrack(p[0], p[1]) < TRACK_CLEAR) || inside(line[0], r)) { droppedTrack++; continue; }
+    if (inPitZone(c[0], c[1]) || r.some((p) => inPitZone(p[0], p[1]))) { droppedPit++; continue; }
     const [h, mh] = heightOf(b.t, b.id, !!b.t['building:part']);
     if (h <= mh + 0.5) continue;
     const o = { p: r.flatMap(([x, z]) => [r1(x), r1(z)]), h: r1(h), s: styleOf(b.t, h) };
@@ -1285,6 +1305,18 @@ if (ground) {
   console.log(`統一地面：${nx}×${nz} 格（每 ${S} m），道路挖填完成；建築墊高基座 ${raisedB} 棟`);
 }
 
+// 臨時維修區範圍裡的樹、路燈、路邊機車拿掉
+let pitProps = 0;
+for (const [arr, n] of [[trees, 2], [lamps, 3], [parked, 4]]) {
+  let w = 0;
+  for (let k = 0; k < arr.length; k += n) {
+    if (inPitZone(arr[k], arr[k + 1])) { pitProps++; continue; }
+    for (let q = 0; q < n; q++) arr[w + q] = arr[k + q];
+    w += n;
+  }
+  arr.length = w;
+}
+console.log(`臨時維修區：拿掉建築 ${droppedPit} 棟、樹／路燈／機車 ${pitProps} 個`);
 const city = { attribution: '© OpenStreetMap contributors (ODbL)', buildings, roads, greens, trees, net: { nodes: netNodes, ways: allWays, y: netY }, ground, signals, crossings, signs, places, lamps, parked, terrain, trails, rocks, elevated, portals, water, market, pedzones };
 mkdirSync(here('../public/data/'), { recursive: true });
 // 瘦身：座標乘上倍數變整數、每 stride 個一組存「跟上一組的差」（數字變小，brotli 壓得更好、解析更快）；

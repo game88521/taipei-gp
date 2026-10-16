@@ -750,6 +750,12 @@ html:not(.touch) #btn-horn { display: none; }
   touch-action: none;
 }
 #pit.on { background: rgba(255, 180, 0, 0.75); border-color: #ffd400; color: #111; }
+/* 進站要換的胎：進站按鈕上方一排（要求進站之後才出現） */
+#pit-tyre { position: fixed; display: none; gap: 6px; z-index: 6; transform: translateX(-50%); }
+#pit-tyre.on { display: flex; }
+#pit-tyre button { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--c); background: rgba(10, 12, 18, 0.78); color: #fff; font: 700 13px/1 inherit; opacity: 0.55; padding: 0; }
+#pit-tyre button.sel { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 12px var(--c); }
+#hud[data-mode='free'] #pit-tyre, #hud[data-kind='tt'] #pit-tyre { display: none !important; }
 #tyre {
   position: absolute;
   left: calc(max(10px, env(safe-area-inset-left)) + 180px);
