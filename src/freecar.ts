@@ -156,7 +156,8 @@ export class FreeCar {
     const surf = FreeCar.surface;
     if (surf) {
       const sy = surf(this.x, this.z, this.y, this.sh).y;
-      if (sy >= this.y - 0.35) { this.y = sy; this.vy = 0; }
+      // 往上的小台階（匝道併入主線那一下約 0.5 m）用幾格時間爬上去，不要瞬間跳一下
+      if (sy >= this.y - 0.35) { this.y = sy - this.y > 0.15 ? this.y + Math.min(sy - this.y, (4 + Math.abs(this.v) * 0.2) * dt) : sy; this.vy = 0; }
       else {
         this.vy -= 9.81 * dt;
         this.y += this.vy * dt;

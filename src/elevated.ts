@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { Grid, type CityData } from './citydata';
-import { bakedShadowMaterial, SHADOW_PER_M } from './world';
+import { bakedShadowMaterial, canvasTex, SHADOW_PER_M } from './world';
+import { lanesOf, roadTexture } from './decor';
 import { ROAD_Y, type Surface } from './surface';
 
 // 高架道路（建國高架、市民大道高架…）、信義區人行空橋、捷運文湖線高架與月台、地下道入口。
 // 車道的高架照路網（net.decks）畫：橋面就是能開的路面（surface.ts），護欄跟物理用同一份（分岔、匯入處有開口）；
-// 人行空橋、文湖線照 elevated 畫，只是外型。橋墩只擋橋下的車（回傳給 Collider，帶高度範圍）
+// 人行空橋、文湖線照 elevated 畫，只是外型。橋墩只擋橋下的車（回傳給 Collider，帶高度範圍）。
+// 橋面：跟地面道路同一套標線貼圖（decor.roadTexture）、每 28 m 一道伸縮縫；主線離地 6 m 以上裝透明隔音牆、
+// 每 36 m 一支路燈；橋墩頂掛一盞往下照的燈（晚上橋下才不會一片黑）
 
 const GROUND = -0.6;
 /** posts：[x, z, 半徑, 擋車的最高高度（橋下）]；walls：護欄 [x1, z1, x2, z2, 擋車的最低, 最高] */
@@ -19,6 +22,9 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
   const els = d.elevated ?? [];
   const deck: number[] = [], concrete: number[] = [], rail: number[] = [], walk: number[] = [], glass: number[] = [], roof: number[] = [], shadow: number[] = [];
   const pillars: THREE.Matrix4[] = [], columns: THREE.Matrix4[] = [];
+  const decks = new Map<string, { pos: number[]; uv: number[]; tex: () => THREE.Texture }>(); // 橋面依「單雙向-車道數」分組，各一張標線貼圖
+  const joint: number[] = [], barrier: number[] = [], frame: number[] = [];
+  const lampsAt: THREE.Matrix4[] = [], underAt: THREE.Matrix4[] = [];
   const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), s = new THREE.Vector3();
   // 橋墩不能立在車道中間：落在雙向道路上 → 移到道路中線（分隔島）；落在單行道上 → 不放
   const N = d.net.nodes, segs = new Grid<number[]>(30), tmp: number[][] = [];
@@ -48,6 +54,11 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
       if (w.e !== 1) continue;
       const hw = w.w / 2, thick = 1.4, spacing = 28;
       let carry = spacing / 2;
+      const lanes = Math.min(6, lanesOf(w)), key = `${w.o ? 1 : 2}-${lanes}`;
+      if (!decks.has(key)) decks.set(key, { pos: [], uv: [], tex: () => roadTexture(!w.o, lanes, true) });
+      const dg = decks.get(key)!;
+      const main = w.w >= 9 && w.c <= 1; // 主線（匝道窄，不裝路燈、隔音牆）
+      let along = 0, lampCarry = 18, lampSide = 1;
       for (let i = 0; i + 1 < w.n.length; i++) {
         const a = w.n[i], b = w.n[i + 1];
         const ax = NN[a * 2], az = NN[a * 2 + 1], bx = NN[b * 2], bz = NN[b * 2 + 1], ya = (NY[a] ?? 0) + ROAD_Y, yb = (NY[b] ?? 0) + ROAD_Y;
@@ -58,7 +69,11 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
         const x0 = ax - ux * ex0, z0 = az - uz * ex0, x1 = bx + ux * ex1, z1 = bz + uz * ex1;
         const L0 = [x0 - nx, ya, z0 - nz], R0 = [x0 + nx, ya, z0 + nz], L1 = [x1 - nx, yb, z1 - nz], R1 = [x1 + nx, yb, z1 + nz];
         const lo = (p: number[]) => [p[0], p[1] - thick, p[2]];
-        quad(deck, L0, R0, R1, L1);
+        // 橋面：u 橫跨路寬（0 左、1 右）、v 沿路每 12 m 一輪（跟地面道路一樣的標線）
+        const v0 = (along - ex0) / 12, v1 = (along + l + ex1) / 12;
+        dg.pos.push(...L0, ...R0, ...R1, ...L0, ...R1, ...L1);
+        dg.uv.push(0, v0, 1, v0, 1, v1, 0, v0, 1, v1, 0, v1);
+        along += l;
         quad(concrete, lo(L0), lo(L1), lo(R1), lo(R0));
         quad(concrete, lo(R0), lo(R1), R1, R0);
         quad(concrete, lo(L1), lo(L0), L0, L1);
@@ -70,15 +85,33 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
         for (; t < l; t += spacing) {
           const f = t / l, y = ya + (yb - ya) * f, gy = surf.groundY(ax + ux * t, az + uz * t);
           if (y - gy < 4.5) continue;
+          // 伸縮縫：橫跨橋面一條 30 cm 的鋼板（每跨一道，跟橋墩對齊）
+          const jx = ax + ux * t, jz = az + uz * t, jy = y + 0.012, ox = -uz * (hw - 0.1), oz = ux * (hw - 0.1);
+          quad(joint, [jx - ox - ux * 0.15, jy, jz - oz - uz * 0.15], [jx + ox - ux * 0.15, jy, jz + oz - uz * 0.15], [jx + ox + ux * 0.15, jy, jz + oz + uz * 0.15], [jx - ox + ux * 0.15, jy, jz - oz + uz * 0.15]);
           const at = placePillar(ax + ux * t, az + uz * t);
           if (!at) continue;
           const [px, pz] = at;
+          if (surf.deckBelow(px, pz, y - thick, 1.2)) continue; // 下面還有一層匝道：不能立在它的車道上
           q.setFromAxisAngle(up, Math.atan2(ux, uz));
           const top = y - thick, foot = gy + ROAD_Y - 0.35;
           pillars.push(new THREE.Matrix4().compose(v.set(px, foot, pz), q, s.set(1.8, top - foot, 1.6)));
           hits.posts.push([px, pz, 1.0, top]);
+          underAt.push(new THREE.Matrix4().compose(v.set(px, top, pz), q, s.set(1, (top - foot - 0.4) / 7, 1))); // 橋下的燈：y 縮放 = 橋底到地面路面的距離 ÷ 7（光圈落在路面上）
         }
         carry = t - l;
+        // 橋上路燈：主線每 36 m 一支，單行道裝右側、雙向道兩側輪流；燈臂伸向路中間
+        if (main) {
+          let tl = lampCarry;
+          for (; tl < l; tl += 36) {
+            const f = tl / l, y = ya + (yb - ya) * f, gy = surf.groundY(ax + ux * tl, az + uz * tl);
+            if (y - gy < 4.5) continue;
+            const sd = w.o ? 1 : (lampSide = -lampSide);
+            const px = ax + ux * tl - uz * sd * (hw - 0.15), pz = az + uz * tl + ux * sd * (hw - 0.15);
+            q.setFromAxisAngle(up, Math.atan2(-(-uz * sd), -(ux * sd))); // 燈臂（本地 +z）朝路中間
+            lampsAt.push(new THREE.Matrix4().compose(v.set(px, y + 1.0, pz), q, s.set(1, 1, 1)));
+          }
+          lampCarry = tl - l;
+        }
       }
     }
     // 護欄（外觀與碰撞同一份，surface.ts 算好開口）
@@ -88,6 +121,12 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
       const a0 = [r.x1, r.ya, r.z1], a1 = [r.x2, r.yb, r.z2], b1 = [r.x2, r.yb + H, r.z2], b0 = [r.x1, r.ya + H, r.z1];
       quad(concrete, a0, a1, b1, b0);
       hits.walls.push([r.x1, r.z1, r.x2, r.z2, r.y1, r.y2]);
+      // 隔音牆：主線離地 6 m 以上，護欄上面再 2.2 m 透明板＋頂框（台北的高架經過住宅區幾乎都有）
+      if (r.way.w >= 9 && r.way.c <= 1 && Math.min(r.ya - surf.groundY(r.x1, r.z1), r.yb - surf.groundY(r.x2, r.z2)) > 6) {
+        const B = 2.2, up0 = [r.x1, r.ya + H + B, r.z1], up1 = [r.x2, r.yb + H + B, r.z2];
+        quad(barrier, b0, b1, up1, up0);
+        quad(frame, [r.x1, r.ya + H + B - 0.14, r.z1], [r.x2, r.yb + H + B - 0.14, r.z2], up1, up0);
+      }
     }
   }
   for (const e of els) {
@@ -172,6 +211,50 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
   // 頂點是手算的，正反面不一定一致：一律雙面（three.js 會幫背面翻法線，打光一樣正確）
   const D = THREE.DoubleSide;
   mesh(deck, new THREE.MeshLambertMaterial({ color: '#46484e', side: D }));
+  for (const g of decks.values()) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(g.pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.uv, 2));
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+    const tex = g.tex();
+    tex.anisotropy = 8;
+    const mat = new THREE.MeshLambertMaterial({ map: tex, side: D });
+    mat.userData.road = true; // 下雨時一樣會濕（weather.ts）
+    scene.add(new THREE.Mesh(geo, mat));
+  }
+  mesh(joint, new THREE.MeshLambertMaterial({ color: '#2b2c30', side: D, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -20 }));
+  mesh(barrier, new THREE.MeshStandardMaterial({ color: '#b9e2da', metalness: 0.1, roughness: 0.15, transparent: true, opacity: 0.3, side: D, depthWrite: false }));
+  mesh(frame, new THREE.MeshLambertMaterial({ color: '#7d8389', side: D }));
+  // 橋上路燈、橋下的燈（燈頭白天熄、晚上亮；地上的光圈只有晚上才出現）
+  const glow = new THREE.MeshBasicMaterial({ color: '#ffe0a8', toneMapped: false });
+  glow.userData.lamp = true;
+  const poolTex = canvasTex(64, 64, (g) => {
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,214,150,0.5)');
+    grd.addColorStop(0.5, 'rgba(255,190,120,0.16)');
+    grd.addColorStop(1, 'rgba(255,170,100,0)');
+    g.clearRect(0, 0, 64, 64);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+  }, false);
+  const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 });
+  const inst = (geo: THREE.BufferGeometry, mat: THREE.Material, ms: THREE.Matrix4[], night = false) => {
+    if (!ms.length) return;
+    const im = new THREE.InstancedMesh(geo, mat, ms.length);
+    ms.forEach((m, i) => im.setMatrixAt(i, m));
+    im.computeBoundingSphere();
+    if (night) { im.userData.nightOnly = true; im.visible = false; }
+    scene.add(im);
+  };
+  const steel = new THREE.MeshLambertMaterial({ color: '#6b7076' });
+  inst(new THREE.CylinderGeometry(0.08, 0.11, 8, 6).translate(0, 4, 0), steel, lampsAt);
+  inst(new THREE.BoxGeometry(0.08, 0.08, 2.2).translate(0, 7.9, 1.1), steel, lampsAt);
+  inst(new THREE.BoxGeometry(0.4, 0.13, 0.75).translate(0, 7.82, 2.1), glow, lampsAt);
+  inst(new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2).translate(0, -0.97, 3), poolMat, lampsAt, true); // 光圈貼在橋面上（路燈底座是護欄頂＝橋面 +1 m）
+  // 橋下：橋墩頂下方一盞方燈，地上一圈光（矩陣的 y 縮放 = 燈到地面的距離 ÷ 7，光圈放在地面）
+  inst(new THREE.BoxGeometry(0.9, 0.12, 0.9).translate(0, -0.1, 1.2), glow, underAt);
+  inst(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2).translate(0, -7, 1.2), poolMat, underAt, true);
   mesh(concrete, new THREE.MeshLambertMaterial({ color: '#b3afa6', side: D }));
   mesh(rail, new THREE.MeshLambertMaterial({ color: '#3a3c40', side: D }));
   mesh(walk, new THREE.MeshLambertMaterial({ color: '#c9c1b2', side: D }));

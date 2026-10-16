@@ -20,8 +20,8 @@ export const lanesOf = (w: NetWay) => {
   return w.o ? Math.max(1, Math.round(w.w / 3.4)) : Math.max(2, Math.round(w.w / 3.4 / 2) * 2);
 };
 
-/** 路面貼圖：u 橫跨路寬、v 沿路每 12 m 重複 */
-function roadTexture(twoWay: boolean, lanes: number, marked: boolean) {
+/** 路面貼圖：u 橫跨路寬、v 沿路每 12 m 重複（高架橋面也用這張，elevated.ts） */
+export function roadTexture(twoWay: boolean, lanes: number, marked: boolean) {
   return canvasTex(128, 256, (g) => {
     g.fillStyle = '#3c3e43';
     g.fillRect(0, 0, 128, 256);

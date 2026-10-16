@@ -16,7 +16,7 @@ export interface DeckSeg {
   way: NetWay;
 }
 /** 護欄（隧道是側牆）：一段牆線＋擋車的高度範圍 */
-export interface Rail { x1: number; z1: number; x2: number; z2: number; ya: number; yb: number /* 兩端的路面高度 */; y1: number; y2: number; e: 1 | 2 }
+export interface Rail { x1: number; z1: number; x2: number; z2: number; ya: number; yb: number /* 兩端的路面高度 */; y1: number; y2: number; e: 1 | 2; way: NetWay }
 
 export interface SurfaceHit { y: number; seg: DeckSeg | null }
 
@@ -88,6 +88,15 @@ export class Surface {
     return out;
   }
 
+  /** (x, z) 是不是在某條「比 y 低 1 m 以上」的橋面／隧道路面上（pad = 往外多算）：上層的橋墩不能立在下層的車道上 */
+  deckBelow(x: number, z: number, y: number, pad = 0.8): boolean {
+    for (const s of this.grid.query(x, z, pad + 1, this.tmp)) {
+      const sy = this.onSeg(s, x, z, pad);
+      if (sy != null && sy < y - 1) return true;
+    }
+    return false;
+  }
+
   /** 離 (x, z) 最近、高度接近 y 的橋面（重新放回路上用）；找不到回傳 null */
   nearestDeck(x: number, z: number, y: number, r = 40): DeckSeg | null {
     let best: DeckSeg | null = null, bd = Infinity;
@@ -113,7 +122,7 @@ export class Surface {
         const flush = () => {
           if (run.length >= 2) {
             const a = run[0], b = run[run.length - 1];
-            this.rails.push({ x1: a.x, z1: a.z, x2: b.x, z2: b.z, ya: a.y, yb: b.y, y1: Math.min(a.y, b.y) - 0.3, y2: Math.max(a.y, b.y) + 1.2, e: s.way.e === 2 ? 2 : 1 });
+            this.rails.push({ x1: a.x, z1: a.z, x2: b.x, z2: b.z, ya: a.y, yb: b.y, y1: Math.min(a.y, b.y) - 0.3, y2: Math.max(a.y, b.y) + 1.2, e: s.way.e === 2 ? 2 : 1, way: s.way });
           }
           run = [];
         };
@@ -124,7 +133,8 @@ export class Surface {
           if (!open) for (const o of this.grid.query(x, z, 1, this.tmp)) {
             if (o.way === s.way) continue; // 同一條路的下一段（轉彎處）不算
             const oy = this.onSeg(o, x, z, -0.4);
-            if (oy != null && Math.abs(oy - y) < 1.5) { open = true; break; }
+            // 那條路面比護欄低 2.2 m 內（車頂會撞到這段護欄）或高 1.5 m 內（分岔、匯入）→ 留開口
+            if (oy != null && oy > y - 2.2 && oy < y + 1.5) { open = true; break; }
           }
           if (open) flush(); else run.push({ x, z, y });
           // 每 12 m 斷成一段（牆線短一點，高度範圍才貼得住坡）

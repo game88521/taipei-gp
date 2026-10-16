@@ -695,7 +695,8 @@ const portals = [];
   {
     const tunnels = roadWays.filter((e) => {
       const t = e.tags;
-      return e.geometry && RW[t.highway] && t.area !== 'yes' && (t.tunnel === 'yes' || Number(t.layer) < 0) && !e.geometry.every((g) => { const [x, z] = proj(g.lat, g.lon); return farFromTrack(x, z); });
+      // 只收一般道路（c ≤ 3）：服務道路的地下化多半是停車場出入口、得來速、穿過建築的通道，挖下去反而卡在建築裡
+      return e.geometry && RW[t.highway] && (CLS[t.highway] ?? 4) <= 3 && t.area !== 'yes' && (t.tunnel === 'yes' || Number(t.layer) < 0) && !e.geometry.every((g) => { const [x, z] = proj(g.lat, g.lon); return farFromTrack(x, z); });
     });
     const adj = new Map(), pos = new Map();
     for (const e of tunnels) {
@@ -1163,6 +1164,68 @@ for (let i = 0; i < NN; i++) {
   if (!d) netY.push(r1(roadY[i]));
   else if (d.rel != null) netY.push(r1(groundAt(netNodes[i * 2], netNodes[i * 2 + 1]) + d.rel));
   else netY.push(r1(roadY[d.portal] - d.dip));
+}
+// 高架的高度修整（照 OSM 層數內插出來的高度有兩種台階）：
+// (1) 匝道快併進主線時還沒爬到主線高度 → 節點落在別條高架的路面上、高度差 1.6 m 內，就跟那條路同高；
+// (2) 橋頭（中正橋、台北大橋…）中間節點直接是 6.5 m，第一段很短就是一面牆 → 坡度上限 9%，接地面的節點固定
+{
+  const DW = deckWays.filter((w) => w.e === 1);
+  const edges = [];
+  for (const w of DW) for (let k = 1; k < w.n.length; k++) {
+    const a = w.n[k - 1], b = w.n[k];
+    edges.push([a, b, Math.max(0.5, Math.hypot(netNodes[a * 2] - netNodes[b * 2], netNodes[a * 2 + 1] - netNodes[b * 2 + 1]))]);
+  }
+  const free = (i) => deckY.has(i) && deckY.get(i).rel != null; // 地面節點、隧道節點不動
+  const Y = netY.map(Number);
+  const segs = [];
+  for (const w of DW) for (let k = 1; k < w.n.length; k++) segs.push([w, w.n[k - 1], w.n[k]]);
+  const SG = new Map(), key = (x, z) => `${Math.floor(x / 40)},${Math.floor(z / 40)}`;
+  for (const sg of segs) {
+    const [, a, b] = sg, x0 = Math.min(netNodes[a * 2], netNodes[b * 2]), x1 = Math.max(netNodes[a * 2], netNodes[b * 2]), z0 = Math.min(netNodes[a * 2 + 1], netNodes[b * 2 + 1]), z1 = Math.max(netNodes[a * 2 + 1], netNodes[b * 2 + 1]);
+    for (let i = Math.floor((x0 - 20) / 40); i <= Math.floor((x1 + 20) / 40); i++) for (let j = Math.floor((z0 - 20) / 40); j <= Math.floor((z1 + 20) / 40); j++) { const k = `${i},${j}`; if (!SG.has(k)) SG.set(k, []); SG.get(k).push(sg); }
+  }
+  const blend = () => {
+    let n = 0;
+    for (const w of DW) for (const i of w.n) {
+      if (!free(i)) continue;
+      const x = netNodes[i * 2], z = netNodes[i * 2 + 1];
+      let best = null;
+      for (const [o, a, b] of SG.get(key(x, z)) ?? []) {
+        if (o === w || a === i || b === i) continue;
+        const ax = netNodes[a * 2], az = netNodes[a * 2 + 1], dx = netNodes[b * 2] - ax, dz = netNodes[b * 2 + 1] - az, l2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
+        if (Math.hypot(x - ax - dx * t, z - az - dz * t) > o.w / 2 + 0.3) continue;
+        const oy = Y[a] + (Y[b] - Y[a]) * t;
+        if (Math.abs(oy - Y[i]) < 1.6 && (best == null || Math.abs(oy - Y[i]) < Math.abs(best - Y[i]))) best = oy;
+      }
+      if (best != null && Math.abs(best - Y[i]) > 0.05) { Y[i] = best; n++; }
+    }
+    return n;
+  };
+  const cap = (g) => {
+    for (let pass = 0; pass < 400; pass++) {
+      let moved = 0;
+      for (const [a, b, L] of edges) {
+        const d = Y[b] - Y[a], ex = Math.abs(d) - g * L;
+        if (ex <= 1e-3) continue;
+        const fa = free(a), fb = free(b);
+        if (!fa && !fb) continue;
+        const sa = fa && fb ? 0.5 : fa ? 1 : 0, sb = 1 - sa;
+        Y[a] += Math.sign(d) * ex * sa;
+        Y[b] -= Math.sign(d) * ex * sb;
+        moved++;
+      }
+      if (!moved) break;
+    }
+  };
+  const b1 = blend();
+  cap(0.09);
+  const b2 = blend();
+  cap(0.09);
+  let maxG = 0;
+  for (const [a, b, L] of edges) maxG = Math.max(maxG, Math.abs(Y[b] - Y[a]) / L);
+  for (let i = 0; i < Y.length; i++) netY[i] = r1(Y[i]);
+  console.log(`高架高度修整：匯流同高 ${b1}+${b2} 個節點，坡度上限 9%（實際最陡 ${(maxG * 100).toFixed(1)}%）`);
 }
 
 // ---------------------------------------------------------------- 統一的地面（全圖每 15 m）：取代原本合成的象山地形
