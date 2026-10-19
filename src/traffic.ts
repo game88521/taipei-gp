@@ -391,7 +391,9 @@ export class Traffic {
   }
 
   /** 闖紅燈判斷用：(x, z) 在號誌路口中心 14 m 內時，回傳這個路口與「沿 (ux, uz) 方向走的這條路」是不是紅燈；不在路口回傳 null */
-  signalAt(x: number, z: number, ux: number, uz: number): { id: object; red: boolean } | null {
+  signalAt(x: number, z: number, ux: number, uz: number, y?: number): { id: object; red: boolean } | null {
+    // 號誌只管地面：在高架上（路面比地面高 2.5 m 以上）或隧道裡（比地面低）的車不受底下路口的燈號影響
+    if (y !== undefined && Math.abs(y - (groundH(x, z) + ROAD_Y)) > LAYER) return null;
     let best: Cluster | null = null, bd = 14;
     for (const c of this.clusters) {
       if (Math.abs(c.cx - x) > bd || Math.abs(c.cz - z) > bd) continue;

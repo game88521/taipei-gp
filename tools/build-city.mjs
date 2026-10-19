@@ -853,9 +853,35 @@ const onRoad = (x, z) => {
   }
   return false;
 };
+// 高架橋面下方的低矮區域：地面擺設（樹約 8 m、路燈 8.5 m）會穿出橋面，這些地方不放
+const dgrid = new Map();
+for (const w of deckWays) {
+  if (w.e !== 1) continue;
+  for (let k = 0; k + 1 < w.n.length; k++) {
+    const ra = deckY.get(w.n[k])?.rel, rb = deckY.get(w.n[k + 1])?.rel;
+    const rel = Math.min(ra ?? 0, rb ?? 0); // 沒有 rel（接地面的節點）= 貼地
+    if (rel >= 10.5) continue;
+    const s = [netNodes[w.n[k] * 2], netNodes[w.n[k] * 2 + 1], netNodes[w.n[k + 1] * 2], netNodes[w.n[k + 1] * 2 + 1], w.w / 2 + 2.5];
+    // 線段的外框再外擴 s[4]（橋面半寬＋緩衝）：樹在相鄰格子時才查得到
+    for (let gx = Math.floor((Math.min(s[0], s[2]) - s[4]) / RG); gx <= Math.floor((Math.max(s[0], s[2]) + s[4]) / RG); gx++)
+      for (let gz = Math.floor((Math.min(s[1], s[3]) - s[4]) / RG); gz <= Math.floor((Math.max(s[1], s[3]) + s[4]) / RG); gz++) {
+        const k2 = `${gx},${gz}`;
+        if (!dgrid.has(k2)) dgrid.set(k2, []);
+        dgrid.get(k2).push(s);
+      }
+  }
+}
+const underDeck = (x, z) => {
+  for (const s of dgrid.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) {
+    const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - s[0]) * dx + (z - s[1]) * dz) / l2));
+    if (Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t) < s[4]) return true;
+  }
+  return false;
+};
 const trees = [];
 const tryTree = (x, z) => {
-  if (farFromTrack(x, z) || distToTrack(x, z) < TRACK_CLEAR + 0.5 || inBuilding(x, z) || onRoad(x, z)) return;
+  if (farFromTrack(x, z) || distToTrack(x, z) < TRACK_CLEAR + 0.5 || inBuilding(x, z) || onRoad(x, z) || underDeck(x, z)) return;
   trees.push(r1(x), r1(z));
 };
 for (const e of E) if (e.type === 'node' && e.tags?.natural === 'tree') { const p = proj(e.lat, e.lon); tryTree(p[0], p[1]); }
@@ -913,7 +939,7 @@ const parked = [];
       for (const p of jgrid.get(`${Math.floor(x / JG) + a},${Math.floor(z / JG) + b}`) || []) if (Math.hypot(p[0] - x, p[1] - z) < r) return true;
     return false;
   };
-  const ok = (x, z) => !farFromTrack(x, z) && distToTrack(x, z) > TRACK_CLEAR && !inBuilding(x, z) && !onRoad(x, z);
+  const ok = (x, z) => !farFromTrack(x, z) && distToTrack(x, z) > TRACK_CLEAR && !inBuilding(x, z) && !onRoad(x, z) && !underDeck(x, z);
   let seed2 = 11;
   const rnd2 = () => (seed2 = (seed2 * 16807) % 2147483647) / 2147483647;
   for (const w of netWays) {
@@ -1305,6 +1331,49 @@ if (ground) {
   console.log(`統一地面：${nx}×${nz} 格（每 ${S} m），道路挖填完成；建築墊高基座 ${raisedB} 棟`);
 }
 
+// 高架橋面下方的樹、路燈、路邊機車：用最終的橋面離地高度判斷（OSM 層數推估的高度，後來經過匯流同高、坡度上限修整，兩者會差好幾公尺）
+// 樹約 8 m 高、路燈 8.5 m、機車 1.2 m：橋面離地不到這個高度的橋面範圍（半寬＋2.5 m）內不放
+{
+  const lowSegs = [];
+  for (const w of deckWays) {
+    if (w.e !== 1) continue;
+    for (let k = 0; k + 1 < w.n.length; k++) {
+      const a = w.n[k], b = w.n[k + 1];
+      const ha = netY[a] - groundAt(netNodes[a * 2], netNodes[a * 2 + 1]), hb = netY[b] - groundAt(netNodes[b * 2], netNodes[b * 2 + 1]);
+      lowSegs.push({ ax: netNodes[a * 2], az: netNodes[a * 2 + 1], bx: netNodes[b * 2], bz: netNodes[b * 2 + 1], ha, hb, r: w.w / 2 + 2.5 });
+    }
+  }
+  const LG = 25, lgrid = new Map();
+  for (const s of lowSegs) {
+    if (Math.min(s.ha, s.hb) >= 9.5) continue; // 夠高的橋，樹和路燈都在橋底下
+    for (let gx = Math.floor((Math.min(s.ax, s.bx) - s.r) / LG); gx <= Math.floor((Math.max(s.ax, s.bx) + s.r) / LG); gx++)
+      for (let gz = Math.floor((Math.min(s.az, s.bz) - s.r) / LG); gz <= Math.floor((Math.max(s.az, s.bz) + s.r) / LG); gz++) {
+        const k2 = `${gx},${gz}`;
+        if (!lgrid.has(k2)) lgrid.set(k2, []);
+        lgrid.get(k2).push(s);
+      }
+  }
+  /** (x, z) 是不是在橋面範圍內、而且那裡橋面離地低於 limit */
+  const underLow = (x, z, limit) => {
+    for (const s of lgrid.get(`${Math.floor(x / LG)},${Math.floor(z / LG)}`) || []) {
+      const dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / l2));
+      if (Math.hypot(x - s.ax - dx * t, z - s.az - dz * t) < s.r && s.ha + (s.hb - s.ha) * t < limit) return true;
+    }
+    return false;
+  };
+  let dropped = 0;
+  for (const [arr, n, limit] of [[trees, 2, 9.5], [lamps, 3, 9.5], [parked, 4, 2.5]]) {
+    let w = 0;
+    for (let k = 0; k < arr.length; k += n) {
+      if (underLow(arr[k], arr[k + 1], limit)) { dropped++; continue; }
+      for (let q = 0; q < n; q++) arr[w + q] = arr[k + q];
+      w += n;
+    }
+    arr.length = w;
+  }
+  console.log(`高架橋面下方（離地不到 9.5 m）拿掉樹／路燈／機車 ${dropped} 個`);
+}
 // 臨時維修區範圍裡的樹、路燈、路邊機車拿掉
 let pitProps = 0;
 for (const [arr, n] of [[trees, 2], [lamps, 3], [parked, 4]]) {

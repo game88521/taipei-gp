@@ -285,7 +285,7 @@ export class Police {
     // 闖紅燈：開進號誌路口那一刻是紅燈、速度夠快
     const copNear = this.units.some((u) => Math.hypot(u.car.x - p.x, u.car.z - p.z) < 15); // 被警車撞進路口不算闖紅燈
     if (crimesOn && traffic && !this.suspect) {
-      const s = traffic.signalAt(p.x, p.z, Math.sin(p.h), Math.cos(p.h));
+      const s = traffic.signalAt(p.x, p.z, Math.sin(p.h), Math.cos(p.h), p.y); // 在高架上不受底下路口的燈號管
       if (s && s.id !== this.lastSignal && s.red && p.v > 8 && !copNear) msg = this.crime(0.6, '闖紅燈') ?? msg;
       this.lastSignal = s ? s.id : null;
     }

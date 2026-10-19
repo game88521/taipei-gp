@@ -78,6 +78,25 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
         quad(concrete, lo(R0), lo(R1), R1, R0);
         quad(concrete, lo(L1), lo(L0), L0, L1);
         const gA = surf.groundY(ax, az), gB = surf.groundY(bx, bz);
+        // 隔音牆：主線（寬 ≥ 9 m、一級道路）離地 6 m 以上、這一段跟前後兩段的方向差都不到 8°（彎道、分岔、匝道銜接處不裝）
+        if (main && l > 10 && Math.min(ya - gA, yb - gB) > 6 && i > 0 && i + 2 < w.n.length) {
+          const turn = (p0: number, p1: number, p2: number) => {
+            const d1x = NN[p1 * 2] - NN[p0 * 2], d1z = NN[p1 * 2 + 1] - NN[p0 * 2 + 1], d2x = NN[p2 * 2] - NN[p1 * 2], d2z = NN[p2 * 2 + 1] - NN[p1 * 2 + 1];
+            return Math.abs(Math.atan2(d1x * d2z - d1z * d2x, d1x * d2x + d1z * d2z));
+          };
+          // 另一條路的橋面在這段旁邊（匯入、分岔）也不裝
+          const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+          const busy = surf.nearestDeck(mx + nx / hw * (hw + 4), mz + nz / hw * (hw + 4), (ya + yb) / 2, 8) !== null || surf.nearestDeck(mx - nx / hw * (hw + 4), mz - nz / hw * (hw + 4), (ya + yb) / 2, 8) !== null;
+          if (turn(w.n[i - 1], a, b) < 0.14 && turn(a, b, w.n[i + 2]) < 0.14 && !busy) {
+            const H0 = 1.0, B = 2.2;
+            for (const sd of [-1, 1]) {
+              const e0 = [ax + nx / hw * (hw - 0.15) * sd, ya + H0, az + nz / hw * (hw - 0.15) * sd], e1 = [bx + nx / hw * (hw - 0.15) * sd, yb + H0, bz + nz / hw * (hw - 0.15) * sd];
+              const t0 = [e0[0], e0[1] + B, e0[2]], t1 = [e1[0], e1[1] + B, e1[2]];
+              quad(barrier, e0, e1, t1, t0);
+              quad(frame, [t0[0], t0[1] - 0.14, t0[2]], [t1[0], t1[1] - 0.14, t1[2]], t1, t0);
+            }
+          }
+        }
         const sh = (x: number, z: number, y: number) => [x + SHADOW_PER_M.x * Math.min(y, 30), 0.03, z + SHADOW_PER_M.z * Math.min(y, 30)];
         if (ya - gA > 2 || yb - gB > 2) quad(shadow, sh(L0[0], L0[2], ya - gA), sh(L1[0], L1[2], yb - gB), sh(R1[0], R1[2], yb - gB), sh(R0[0], R0[2], ya - gA));
         // 橋墩：每 28 m 一支（離地 4.5 m 以上才有）；只擋橋下的車（擋到橋底為止）
@@ -121,12 +140,6 @@ export function buildElevated(scene: THREE.Scene, d: CityData, surf?: Surface): 
       const a0 = [r.x1, r.ya, r.z1], a1 = [r.x2, r.yb, r.z2], b1 = [r.x2, r.yb + H, r.z2], b0 = [r.x1, r.ya + H, r.z1];
       quad(concrete, a0, a1, b1, b0);
       hits.walls.push([r.x1, r.z1, r.x2, r.z2, r.y1, r.y2]);
-      // 隔音牆：主線離地 6 m 以上，護欄上面再 2.2 m 透明板＋頂框（台北的高架經過住宅區幾乎都有）
-      if (r.way.w >= 9 && r.way.c <= 1 && Math.min(r.ya - surf.groundY(r.x1, r.z1), r.yb - surf.groundY(r.x2, r.z2)) > 6) {
-        const B = 2.2, up0 = [r.x1, r.ya + H + B, r.z1], up1 = [r.x2, r.yb + H + B, r.z2];
-        quad(barrier, b0, b1, up1, up0);
-        quad(frame, [r.x1, r.ya + H + B - 0.14, r.z1], [r.x2, r.yb + H + B - 0.14, r.z2], up1, up0);
-      }
     }
   }
   for (const e of els) {
