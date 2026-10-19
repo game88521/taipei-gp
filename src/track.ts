@@ -42,7 +42,7 @@ export interface Track {
   grade: Float32Array; // 坡度（每公尺升高幾公尺，上坡正）
   bank: Float32Array; // 傾斜彎：路面橫向每公尺升高幾公尺（橫向正 = 右邊；外側比較高），0 = 平的
   bankGrip: Float32Array; // 傾斜彎的抓地力倍率（平的 = 1）
-  gap: Float32Array; // 到賽道上「別的路段」（前後 200 m 以外）中心線的最近距離（m）；折返、發夾彎旁邊的路肩、碎石區要收窄用
+  gap: Float32Array; // 到賽道上「別的路段」（前後 50 m 以外）中心線的最近距離（m）；折返、發夾彎旁邊的路肩、碎石區要收窄用
 }
 
 /** 傾斜彎：at = 彎心在一圈的幾成處（0~1）、deg = 傾斜角度、len = 傾斜的長度（公尺，前後各有 30 m 漸變） */
@@ -153,7 +153,7 @@ export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]
   // 別的路段有多近：格子索引（每 40 m 一格），只看前後 200 m 以外的點
   const gap = new Float32Array(N).fill(1e3);
   {
-    const G = 40, cells = new Map<string, number[]>(), skip = Math.round(200 / ds);
+    const G = 40, cells = new Map<string, number[]>(), skip = Math.round(50 / ds); // 50 m 以內是同一個彎的相鄰點（上海蝸牛彎這種彎自己繞回來，比 200 m 小）
     for (let i = 0; i < N; i++) { const k = `${Math.floor(px[i] / G)},${Math.floor(pz[i] / G)}`; (cells.get(k) ?? cells.set(k, []).get(k)!).push(i); }
     for (let i = 0; i < N; i++) {
       const cx = Math.floor(px[i] / G), cz = Math.floor(pz[i] / G);
