@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WALL_OFF, type Track } from './track';
+import { HALF_WIDTH, WALL_OFF, type Track } from './track';
+import { PIT } from './pitlane';
 import { fillerMaterial, WALLS } from './filler';
 import { canvasTex, type World } from './world';
 import type { CircuitMeta } from './circuits';
@@ -39,14 +40,18 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   for (let i = 0; i < t.N; i++) mean += t.py[i] / t.N;
   const hAt = (x: number, z: number) => {
     const cx = Math.floor(x / G), cz = Math.floor(z / G), R = 7;
-    let w = 0.0004, h = mean * 0.0004, nd = Infinity, ny = 0;
+    let w = 0.0004, h = mean * 0.0004, nd = Infinity, ny = 0, lo = Infinity;
     for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) for (const i of grid.get(`${cx + a},${cz + b}`) || []) {
       const d2 = (t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2, k = 1 / (d2 + 400);
       w += k; h += t.py[i] * k;
       if (d2 < nd) { nd = d2; ny = t.py[i]; }
+      // 路面（含路肩、維修道、看台）範圍內所有賽道點的最低高度：地形三角形有 40 m 長，內插時不能比任何一側的路面高
+      // 傾斜彎：路面兩側的高度差 ±HALF_WIDTH×bank，路肩、維修道維持路緣的高度；地形要在「最低的那一側」之下
+      const low = t.py[i] - HALF_WIDTH * Math.abs(t.bank[i]) * 2;
+      if (d2 < (WALL_OFF + 60) ** 2 && low < lo) lo = low;
     }
     h /= w;
-    return Math.sqrt(nd) < WALL_OFF + 90 ? Math.min(h, ny - 1) : h;
+    return Math.sqrt(nd) < WALL_OFF + 90 ? Math.min(h, Math.min(ny, lo) - 1) : h;
   };
   // ---- 地面：照環境畫紋理（草地有割草條紋、沙漠有沙紋、街道是石板），蓋住整條賽道再往外 3 km；有高低起伏
   const grassy = meta.biome === 'grass' || meta.biome === 'tropical';
@@ -314,7 +319,24 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
 
   // ---- 看台：斜坡座位區（前牆有廣告）＋懸臂屋頂（後排柱子撐著）
   const BOT = -4; // 底部埋進地面，地形低一點也不會懸空
+  /** 看台佔的範圍（賽道外側 base-2 ~ base+17 m）有沒有碰到賽道上「別的路段」（發夾彎、折返段）：跟自己同一段的賽道點（前後 150 m）不算 */
+  const standBlocked = (s0: number, s1: number, sg: number, base: number) => {
+    const skip = Math.round(150 / t.ds);
+    for (let s = s0; s <= s1; s += 6) {
+      const i0 = at(s);
+      for (const lat of [base - 2, base + 6, base + 17]) {
+        const [x, z] = side(i0, sg * lat);
+        const cx = Math.floor(x / G), cz = Math.floor(z / G);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const i of grid.get(`${cx + a},${cz + b}`) || []) {
+          const di = Math.abs(i - i0), far = Math.min(di, t.N - di) > skip;
+          if (far && (t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2 < (WALL_OFF + 6) ** 2) return true;
+        }
+      }
+    }
+    return false;
+  };
   const stand = (s0: number, s1: number, sg: number, base: number) => {
+    if (standBlocked(s0, s1, sg, base)) return false;
     const P = sweep(s0, s1, sg, base, [
       { pts: [[0, BOT], [0, 0.6], [0, 2.4], [0.7, 2.4], [14, 11], [14.8, 11], [14.8, BOT], [0, BOT]], mats: [C_CONCRETE, C_BANNER, C_CONCRETE, C_CROWD, C_CONCRETE, C_CONCRETE, C_CONCRETE], unit: [false, true, false, true, false, false, false], rep: [16, 60, 16, 32, 16, 16, 16], cap: C_CONCRETE },
       { pts: [[-1.5, 15.6], [15.2, 13.4]], mats: [C_ROOF] },
@@ -331,6 +353,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     }
     const mid = at((s0 + s1) / 2), [cx, , cz] = P(mid, 7, 0);
     standSpots.push([cx, cz]);
+    return true;
   };
   // 主看台：起跑線前後、維修區的對面（維修區在右側）
   stand(-160, 160, -1, WALL_OFF + 5);
@@ -341,7 +364,10 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
     if (corners.length >= 5) break;
     const s = i * t.ds;
     if (s < 260 || s > t.length - 260) continue; // 主看台附近不要
-    if (corners.every((c) => Math.abs(c - i) > 120 && Math.abs(c - i) < t.N - 120)) corners.push(i);
+    if (!corners.every((c) => Math.abs(c - i) > 120 && Math.abs(c - i) < t.N - 120)) continue;
+    const sgc = t.curv[i] > 0 ? -1 : 1, lenc = corners.length < 3 ? 50 : 32;
+    if (standBlocked(s - lenc, s + lenc, sgc, WALL_OFF + 28)) continue; // 旁邊就是賽道的另一段：這個彎不蓋看台
+    corners.push(i);
   }
   const screenGeo: THREE.BufferGeometry[] = [];
   corners.forEach((i, n) => {
@@ -383,19 +409,22 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
 
   // ---- 維修區：起跑線旁、右側（跟 AI 進站那側一樣）——維修道、11 隊車庫、二樓玻璃帷幕、屋頂廣告
   // （維修道的路面、標線、停車格由 pitlane.ts 畫；車庫門的貼圖 11 隊排滿 260 m，對齊 pitlane.boxS 的停車格）
-  sweep(-130, 130, 1, WALL_OFF + 3, [
+  // 車庫建築的範圍跟停車格同一份（pitlane.fitPit 依賽道的彎道決定，world 建立時已經算好）
+  const gs0 = PIT.G0, gs1 = PIT.G1;
+  const hasGarage = PIT.BUILD;
+  if (hasGarage) sweep(gs0, gs1, 1, WALL_OFF + 3, [
     {
       pts: [[10, BOT], [10, 0], [10, 5.2], [8.6, 5.2], [8.6, 9.4], [8.6, 10.2], [26, 10.2], [26, BOT], [10, BOT]],
       mats: [C_CONCRETE, C_GARAGE, C_CONCRETE, C_GLASS, C_BANNER, C_ROOF, C_CONCRETE, C_CONCRETE],
       unit: [false, true, false, true, true, false, false, false],
-      rep: [16, 260, 16, 24, 60, 16, 16, 16],
+      rep: [16, gs1 - gs0, 16, 24, 60, 16, 16, 16],
       cap: C_CONCRETE,
     },
     { pts: [[9.0, 5.12], [9.8, 5.12]], mats: [C_LAMP] }, // 雨遮下的燈條：晚上照亮車庫門口
   ]);
 
   // 維修區屋頂上的空調箱、轉播棚（從空中看才不會是一整片平的）
-  for (let s = -115; s <= 115; s += 23) {
+  if (hasGarage) for (let s = Math.ceil((gs0 + 15) / 23) * 23; s <= gs1 - 15; s += 23) {
     const i = at(s), ang = Math.atan2(t.tx[i], t.tz[i]);
     const [x, z] = side(i, WALL_OFF + 3 + 20 + (Math.abs(s) % 2) * 2);
     box(Math.abs(s) % 46 === 0 ? C_GLASS : C_CONCRETE, 5, 1.8, 6, x, t.py[i] + 11.1, z, ang);
@@ -410,9 +439,9 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       if (sg > 0 && (s < 360 || s > t.length - 360)) continue; // 右側起跑線前後是進出維修區的車道
       const [x, z] = side(i, sg * (WALL_OFF + 4.5));
       if (!clear(x, z, WALL_OFF + 2)) continue;
-      huts.push([x, t.py[i], z, Math.atan2(t.tx[i], t.tz[i])]);
+      huts.push([x, hAt(x, z) - 0.6, z, Math.atan2(t.tx[i], t.tz[i])]); // 腳貼地形（賽道旁的地形在路面下 1.6 m）
     }
-    const hut = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 2.6, 2.4).translate(0, 1.3 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#e6e8ea' }), Math.max(1, huts.length));
+    const hut = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 3.4, 2.4).translate(0, 1.7 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#e6e8ea' }), Math.max(1, huts.length));
     const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 0.3, 3).translate(0, 2.15, 0), new THREE.MeshLambertMaterial({ color: '#ff7a1a' }), Math.max(1, huts.length));
     huts.forEach(([x, y, z, a], k) => {
       Q.setFromAxisAngle(up, a);
@@ -452,7 +481,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   // ---- 夜賽、黃昏賽：照明燈柱（燈頭會亮）＋晚上照在路面上的光圈
   if (meta.time === 'night' || meta.time === 'dusk') {
     const nL = Math.floor(t.length / 60);
-    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.3, 18, 6).translate(0, 9 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), nL);
+    const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.3, 19.6, 6).translate(0, 9.8 - 0.6, 0), new THREE.MeshLambertMaterial({ color: '#5d6168' }), nL);
     const headMat = new THREE.MeshBasicMaterial({ color: '#fff4dc', toneMapped: false });
     headMat.userData.lamp = true; // 白天熄、晚上亮（weather.ts）
     const head = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 0.6, 1.2).translate(0, 17.6, 0), headMat, nL);
@@ -468,7 +497,7 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       const i = at(k * 60), sg = k % 2 ? 1 : -1;
       const [x, z] = side(i, sg * (WALL_OFF + 4));
       Q.setFromAxisAngle(up, Math.atan2(t.tx[i], t.tz[i]));
-      M.compose(V.set(x, t.py[i], z), Q, S.set(1, 1, 1));
+      M.compose(V.set(x, hAt(x, z) - 0.6, z), Q, S.set(1, 1, 1));
       pole.setMatrixAt(k, M); head.setMatrixAt(k, M);
       M.compose(V.set(t.px[i], t.py[i], t.pz[i]), Q, S.set(1, 1, 1));
       pool.setMatrixAt(k, M);

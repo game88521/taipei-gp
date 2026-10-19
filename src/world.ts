@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { HALF_WIDTH, WALL_OFF, VMAX, type Track } from './track';
-import { wallOpen } from './pitlane';
+import { fitPit, wallOpen } from './pitlane';
 import { racingLine } from './rivals';
 
 // 賽道本身（路面、路緣、護牆、門架、路燈）與天空光線；城市建築在 city.ts（真實 OpenStreetMap 資料）
@@ -166,6 +166,7 @@ export interface World {
 
 /** ads：護牆廣告看板的字（各國賽道換成當地的）；title：起點門架上的字 */
 export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title?: string): World {
+  fitPit(t); // 維修區的進出站車道長度依賽道的彎道調整（護牆開口、維修道共用這份）
   const rand = rng(20261001);
   const lampMeshes: THREE.Object3D[] = [], startLights: THREE.MeshBasicMaterial[] = [];
 
@@ -216,14 +217,19 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
     for (let k = 0; k < 140; k++) {
       const x = rr() * 1024, y = 40 + rr() * 170, rad = 20 + rr() * 70;
       const warm = Math.abs(x / 1024 - 0.62) < 0.2;
-      const grd = g.createRadialGradient(x, y, 0, x, y, rad);
-      const c = warm ? '255,190,140' : '230,160,190';
-      grd.addColorStop(0, `rgba(${c},${0.22 + rr() * 0.2})`);
-      grd.addColorStop(1, `rgba(${c},0)`);
-      g.fillStyle = grd;
-      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      const c = warm ? '255,190,140' : '230,160,190', a0 = 0.22 + rr() * 0.2;
+      // 跨過貼圖左右邊緣的雲要在另一頭也畫一份（貼圖是繞一圈的，不然球面上會有一道垂直的接縫）
+      for (const dx of [-1024, 0, 1024]) {
+        if (x + dx + rad < 0 || x + dx - rad > 1024) continue;
+        const grd = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad);
+        grd.addColorStop(0, `rgba(${c},${a0})`);
+        grd.addColorStop(1, `rgba(${c},0)`);
+        g.fillStyle = grd;
+        g.fillRect(x + dx - rad, y - rad, rad * 2, rad * 2);
+      }
     }
   });
+  cloudTex.wrapS = THREE.RepeatWrapping;
   cloudTex.wrapT = THREE.ClampToEdgeWrapping;
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(2400, 48, 12, 0, Math.PI * 2, Math.PI * 0.18, Math.PI * 0.3),
@@ -266,7 +272,9 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
   shoulder.userData.road = true;
   for (const s of [-1, 1]) {
-    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10 }), shoulder));
+    // 折返、發夾彎：另一段賽道很近的地方，路肩只鋪到兩段賽道的中間（不然路肩會蓋到另一段的路面上）
+    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10, mask: (i) => t.gap[i] >= 2 * (WALL_OFF + 3) + 2 }), shoulder));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 0.2), ya: -0.01, yb: -0.01, along: 10, mask: (i) => t.gap[i] < 2 * (WALL_OFF + 3) + 2 }), shoulder)); // 靠太近的路段只鋪到護牆
   }
   // 傾斜彎外側抬高了：路肩外緣補一道擋土牆，往下接到原本的地面（地形在原本路面下 1.6 m）
   {
@@ -310,7 +318,9 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
       g.clearRect(0, 0, 64, 256);
       for (let k = 0; k < n; k++) {
         g.fillStyle = `rgba(8,8,10,${a0 + Math.random() * (a1 - a0)})`;
-        g.fillRect(4 + Math.random() * 56, Math.random() * 256, 1 + Math.random() * 2.5, 10 + Math.random() * 60);
+        const x = 4 + Math.random() * 56, y = Math.random() * 256, w = 1 + Math.random() * 2.5, h = 10 + Math.random() * 60;
+        g.fillRect(x, y, w, h);
+        if (y + h > 256) g.fillRect(x, y - 256, w, h); // 超出下緣的接到上緣（貼圖是沿賽道重複的，不然每個重複單元的交界會有一道階梯）
       }
     });
     const darken = (map: THREE.Texture, opacity: number, u: number) => new THREE.MeshBasicMaterial({ map, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: u });

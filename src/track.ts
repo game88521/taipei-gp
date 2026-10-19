@@ -42,6 +42,7 @@ export interface Track {
   grade: Float32Array; // 坡度（每公尺升高幾公尺，上坡正）
   bank: Float32Array; // 傾斜彎：路面橫向每公尺升高幾公尺（橫向正 = 右邊；外側比較高），0 = 平的
   bankGrip: Float32Array; // 傾斜彎的抓地力倍率（平的 = 1）
+  gap: Float32Array; // 到賽道上「別的路段」（前後 200 m 以外）中心線的最近距離（m）；折返、發夾彎旁邊的路肩、碎石區要收窄用
 }
 
 /** 傾斜彎：at = 彎心在一圈的幾成處（0~1）、deg = 傾斜角度、len = 傾斜的長度（公尺，前後各有 30 m 漸變） */
@@ -149,7 +150,24 @@ export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]
   // 傾斜的軸在路面內側邊緣：中心線跟著抬高半個路寬，內側路緣維持原本高度（旁邊的地面才不會穿出路面）
   for (let i = 0; i < N; i++) py[i] += HALF_WIDTH * Math.abs(bank[i]);
   for (let i = 0; i < N; i++) grade[i] = (py[(i + 2) % N] - py[(i - 2 + N) % N]) / (4 * ds);
-  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget, py, grade, bank, bankGrip };
+  // 別的路段有多近：格子索引（每 40 m 一格），只看前後 200 m 以外的點
+  const gap = new Float32Array(N).fill(1e3);
+  {
+    const G = 40, cells = new Map<string, number[]>(), skip = Math.round(200 / ds);
+    for (let i = 0; i < N; i++) { const k = `${Math.floor(px[i] / G)},${Math.floor(pz[i] / G)}`; (cells.get(k) ?? cells.set(k, []).get(k)!).push(i); }
+    for (let i = 0; i < N; i++) {
+      const cx = Math.floor(px[i] / G), cz = Math.floor(pz[i] / G);
+      let best = 1e3;
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (const j of cells.get(`${cx + a},${cz + b}`) ?? []) {
+        const di = Math.abs(i - j);
+        if (Math.min(di, N - di) <= skip) continue;
+        const d = Math.hypot(px[i] - px[j], pz[i] - pz[j]);
+        if (d < best) best = d;
+      }
+      gap[i] = best;
+    }
+  }
+  return { N, length, ds, px, pz, tx, tz, dist, curv, vTarget, py, grade, bank, bankGrip, gap };
 }
 
 export interface Locate {

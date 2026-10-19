@@ -19,7 +19,39 @@ export const PIT = {
   FAST: 15, // 快車道中心（右正，護牆 9.5 m 外）
   WORK: 20, // 作業車道（停車格）中心
   HALF: 2.5, // 一條車道的半寬
-} as const;
+  G0: -130, // 車庫（11 隊停車格）的範圍：夠直的區間（fitPit 決定）；彎道裡的賽道會縮短
+  G1: 130,
+  BUILD: true, // 這條賽道能不能蓋車庫建築（車庫段整段都是急彎，像摩納哥、拉斯維加斯，就只畫停車格，沒有建築）
+};
+
+/**
+ * 依賽道調整進出站車道的長度：從車庫往前、往後各最多 330 m，遇到曲率半徑 < 170 m 的彎就在彎之前 50 m 收住
+ * （髮夾彎裡畫不出車道：偏移 15~24 m 比彎的半徑還大，車道會翻面、切進彎內側的草地）。
+ * 進站口至少要在限速線前 90 m（車子才有時間降速）；車庫段（±150 m）本身就彎的賽道（拉斯維加斯）不縮，由 pitlane 把車道貼得近一點
+ */
+export function fitPit(t: Track) {
+  const L = t.length;
+  // 車庫範圍：-130 ~ 130 m 裡曲率半徑 ≥ 130 m 的最長連續區間（車庫深 16 m、屋頂 26 m，彎的半徑比這小，建築會翻面）；太短（< 80 m）就不蓋車庫，停車格擺在中間 80 m
+  {
+    let best: [number, number] = [0, 0], cur = NaN;
+    const ok = (sd: number) => 1 / Math.max(1e-6, Math.abs(t.curv[Math.floor((((sd + L) % L) / t.ds)) % t.N])) >= 130;
+    for (let sd = -130; sd <= 134; sd += 4) {
+      if (sd <= 130 && ok(sd)) { if (Number.isNaN(cur)) cur = sd; }
+      else if (!Number.isNaN(cur)) { if (sd - 4 - cur > best[1] - best[0]) best = [cur, sd - 4]; cur = NaN; }
+    }
+    PIT.G0 = best[0]; PIT.G1 = best[1]; PIT.BUILD = true;
+    if (PIT.G1 - PIT.G0 < 120) { PIT.G0 = -110; PIT.G1 = 110; PIT.BUILD = false; } // 沒有夠長的直線：不蓋車庫建築，停車格照 ±110 m 排（維修道、人員照常）
+  }
+  const R = (sd: number) => 1 / Math.max(1e-6, Math.abs(t.curv[Math.floor((((sd + L) % L) / t.ds)) % t.N]));
+  const CUT = 170;
+  let inn = -330, out = 330;
+  for (let sd = -160; sd >= -330; sd -= 6) if (R(sd) < CUT) { inn = sd + 50 > -150 - 90 ? -150 - 90 : sd + 50; break; }
+  for (let sd = 160; sd <= 330; sd += 6) if (R(sd) < CUT) { out = sd - 50 < 150 + 90 ? 150 + 90 : sd - 50; break; }
+  PIT.IN = inn; PIT.OUT = out;
+  // 離開／回到賽道的過渡段：預設 130 m（-330 → -200），進出站口縮短時等比縮，但至少 60 m、且要在限速線前 40 m 完成
+  PIT.TAPER = Math.min(inn + Math.max(60, Math.round(130 * (-150 - inn) / 180)), PIT.LIM_IN - 40);
+  PIT.TAPER_OUT = Math.max(out - Math.max(60, Math.round(130 * (out - 150) / 180)), PIT.LIM_OUT + 40);
+}
 
 const smooth = (x: number) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
@@ -27,7 +59,7 @@ const smooth = (x: number) => { x = Math.max(0, Math.min(1, x)); return x * x * 
 export const pitSpeed = (circuitId?: string) => ((circuitId === 'monaco' ? 60 : 80) / 3.6);
 /** 第 k 隊停車格的位置（離起跑線的帶號距離）：11 隊平均排在車庫前（-130 ~ 130 m）；
  *  跟 circuitenv 車庫門的貼圖同一個順序（右側的貼圖從賽道上看由右往左排，第 0 隊在 +130 m 那頭） */
-export const boxS = (k: number) => 130 - ((k + 0.5) * 260) / TEAMS.length;
+export const boxS = (k: number) => PIT.G1 - ((k + 0.5) * (PIT.G1 - PIT.G0)) / TEAMS.length;
 /** 賽道位置 s（0 ~ 全長）→ 離起跑線的帶號距離 */
 export const signedS = (t: Track, s: number) => (s > t.length / 2 ? s - t.length : s);
 /** 快車道中心線的橫向位置；entry／exit = 進站前、出站後在賽道上的橫向位置 */
@@ -79,13 +111,17 @@ export class PitLane {
   private up = new THREE.Vector3(0, 1, 0);
 
   constructor(parent: THREE.Object3D, private t: Track, garages: boolean, circuitId?: string) {
+    fitPit(t);
     this.speed = pitSpeed(circuitId);
     const L = t.length, N = t.N;
     const iOf = (sd: number) => Math.round(((sd + L) % L) / t.ds) % N;
     /** (sd, lat) → 世界座標（取最近的取樣點；起跑直線上誤差很小） */
     const P = (sd: number, lat: number, y = 0): [number, number, number] => {
       const f = (((sd + L) % L) / t.ds), i = Math.floor(f) % N, j = (i + 1) % N, k = f - Math.floor(f);
-      const px = t.px[i] + (t.px[j] - t.px[i]) * k, pz = t.pz[i] + (t.pz[j] - t.pz[i]) * k, py = t.py[i] + (t.py[j] - t.py[i]) * k;
+      const px = t.px[i] + (t.px[j] - t.px[i]) * k, pz = t.pz[i] + (t.pz[j] - t.pz[i]) * k;
+      // 傾斜彎：路面外的路肩、維修道維持路緣的高度（跟 surfaceY 一樣夾在路面半寬內），不然傾斜彎旁邊的維修道會比路肩高 2 m 多
+      const edge = Math.max(-HALF_WIDTH, Math.min(HALF_WIDTH, lat));
+      const py = t.py[i] + edge * t.bank[i] + (t.py[j] + edge * t.bank[j] - t.py[i] - edge * t.bank[i]) * k;
       const tx = t.tx[i], tz = t.tz[i];
       return [px - tz * lat, py + y, pz + tx * lat];
     };
@@ -175,7 +211,7 @@ export class PitLane {
     });
 
     // 台北街道賽：沒有常設的維修區建築，搭一排臨時車庫（各國賽道 circuitenv.ts 已經蓋好了）
-    if (garages) this.buildGarages(parent, P);
+    if (garages && PIT.BUILD) this.buildGarages(parent, P);
 
     // ---- 維修人員、輪胎、放行牌（全部隊伍共用幾個 InstancedMesh）
     const n = TEAMS.length * CREW_N;
@@ -205,7 +241,7 @@ export class PitLane {
   private buildGarages(parent: THREE.Object3D, P: (sd: number, lat: number, y?: number) => [number, number, number]) {
     const geo: THREE.BufferGeometry[] = [], dark: THREE.BufferGeometry[] = [];
     const q = new THREE.Quaternion(), m = new THREE.Matrix4(), v = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
-    const span = 260 / TEAMS.length, b0 = PIT.WORK + PIT.HALF, depth = 8, H = 4.6;
+    const span = (PIT.G1 - PIT.G0) / TEAMS.length, b0 = PIT.WORK + PIT.HALF, depth = 8, H = 4.6;
     const header = canvasTex(1024, 64, (g) => {
       const w = 1024 / TEAMS.length;
       TEAMS.forEach((tm, k) => {
