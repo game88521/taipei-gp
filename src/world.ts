@@ -112,6 +112,8 @@ interface RibbonOpt {
   along: number; // 貼圖沿賽道方向每幾公尺重複一次；負數 = 左右翻轉
   alongIsU?: boolean; // 沿賽道方向放在 u（看板文字用）
   mask?: (i: number) => boolean;
+  /** 髮夾彎內側夾在曲率半徑內（護牆、路肩、鐵絲網用）；路面、路緣、標線不用 */
+  clampInner?: boolean;
   color?: (i: number) => THREE.Color;
   center?: ArrayLike<number>; // 每個點的橫向基準（賽車線上的胎痕用）；a、b 是相對它的偏移
 }
@@ -121,6 +123,12 @@ function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
   const pos: number[] = [], uv: number[] = [], col: number[] = [];
   const vert = (i: number, off: number, y: number, across: number, d: number) => {
     off += o.center ? o.center[i] : 0;
+    // 髮夾彎的內側：偏移量大於曲率半徑，這條帶子的內側邊會翻過彎心、跟自己交錯成一團（摩納哥 R = 8.9 m，護牆 9.5、路肩 12.5）。
+    // 內側（彎心那一側，曲率 > 0 是右彎 → 右邊）的偏移最多取 R − 0.4；路面本身（|off| ≤ 7）不夾，外側也不動
+    if (o.clampInner && Math.abs(off) > HALF_WIDTH) {
+      const R = 1 / Math.max(1e-6, Math.abs(t.curv[i])), inner = (t.curv[i] > 0 ? 1 : -1) * Math.sign(off) > 0;
+      if (inner && Math.abs(off) > R - 0.4) off = Math.sign(off) * Math.max(HALF_WIDTH + 0.3, R - 0.4);
+    }
     // 傾斜彎：只有路面傾斜，路面外（路肩、護牆）維持路緣的高度
     pos.push(t.px[i] - t.tz[i] * off, y + t.py[i] + Math.max(-HALF_WIDTH, Math.min(HALF_WIDTH, off)) * t.bank[i], t.pz[i] + t.tx[i] * off);
     const along = d / o.along;
@@ -163,6 +171,9 @@ export interface World {
   /** 門架起跑燈亮幾盞（0 = 全熄） */
   setStartLights: (n: number) => void;
 }
+
+/** 護牆底邊往下埋進地面的深度（m）：摩納哥等賽道的地形會低於路面，護牆底邊要一路垂到地形，不然懸空 */
+const WALL_SINK = 6;
 
 /** ads：護牆廣告看板的字（各國賽道換成當地的）；title：起點門架上的字 */
 export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title?: string): World {
@@ -273,8 +284,8 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   shoulder.userData.road = true;
   for (const s of [-1, 1]) {
     // 折返、發夾彎：另一段賽道很近的地方，路肩只鋪到兩段賽道的中間（不然路肩會蓋到另一段的路面上）
-    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10, mask: (i) => t.gap[i] >= 2 * (WALL_OFF + 3) + 2 }), shoulder));
-    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 0.2), ya: -0.01, yb: -0.01, along: 10, mask: (i) => t.gap[i] < 2 * (WALL_OFF + 3) + 2 }), shoulder)); // 靠太近的路段只鋪到護牆
+    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 3), ya: -0.01, yb: -0.01, along: 10, clampInner: true, mask: (i) => t.gap[i] >= 2 * (WALL_OFF + 3) + 2 }), shoulder));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * HALF_WIDTH, b: s * (WALL_OFF + 0.2), ya: -0.01, yb: -0.01, along: 10, clampInner: true, mask: (i) => t.gap[i] < 2 * (WALL_OFF + 3) + 2 }), shoulder)); // 靠太近的路段只鋪到護牆
   }
   // 傾斜彎外側抬高了：路肩外緣補一道擋土牆，往下接到原本的地面（地形在原本路面下 1.6 m）
   {
@@ -429,15 +440,17 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   });
   wallTex.wrapT = THREE.ClampToEdgeWrapping;
   const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, side: THREE.DoubleSide });
+  /** 這一格的 s 側（-1 左、1 右）護牆是不是在髮夾彎的彎心那一邊、而且彎心放不下：偏移 9.5 m 大於曲率半徑 − 1 */
+  const noRoom = (s: number, i: number) => (t.curv[i] > 0 ? 1 : -1) === s && WALL_OFF > 1 / Math.max(1e-6, Math.abs(t.curv[i])) - 1;
   for (const s of [-1, 1]) {
     // 右側牆要把文字翻過來，從賽道上看才是正的
     // 右側護牆：進出維修區的車道穿過去的那兩段要開口（pitlane.ts）
-    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 0, yb: 1.2, along: s * -38, alongIsU: true, mask: s > 0 ? (i) => !wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N) : undefined }), wallMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: -WALL_SINK, yb: 1.2, along: s * -38, alongIsU: true, mask: (i) => !noRoom(s, i) && !noRoom(s, (i + 1) % t.N) && (s < 0 || (!wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N))) }), wallMat));
   }
   // 牆頂的鐵絲網（半透明灰）
   const fenceMat = new THREE.MeshBasicMaterial({ color: '#9aa0a8', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
   for (const s of [-1, 1]) {
-    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10, mask: s > 0 ? (i) => !wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N) : undefined }), fenceMat));
+    race.add(new THREE.Mesh(ribbon(t, { a: s * WALL_OFF, b: s * WALL_OFF, ya: 1.2, yb: 3.6, along: 10, mask: (i) => !noRoom(s, i) && !noRoom(s, (i + 1) % t.N) && (s < 0 || (!wallOpen(t, i) && !wallOpen(t, (i + 1) % t.N))) }), fenceMat));
   }
 
   // ---- 起點門架

@@ -28,6 +28,12 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   for (let i = 0; i < t.N; i++) { x0 = Math.min(x0, t.px[i]); x1 = Math.max(x1, t.px[i]); z0 = Math.min(z0, t.pz[i]); z1 = Math.max(z1, t.pz[i]); }
   // 離賽道多遠：賽道點的格子
   const G = 40, grid = new Map<string, number[]>();
+  /**
+   * 地形網格頂點離路面多遠內要壓在路面之下。網格格距約 38 m（180 段），一個格子的半個對角線 ≈ 27 m：
+   * 路面可能剛好穿過格子正中央，離它最近的頂點最遠就是 27 m，那個頂點比路面高，整個三角形就會升到路面上面（摩納哥量到 27.2 m、高 3.6 m）。
+   * 取 32 m 留一點餘量。範圍再大會把遠處的高低點算進來，護牆外面的地形被拉偏。
+   */
+  const FLAT_R = 32;
   for (let i = 0; i < t.N; i += 2) {
     const k = `${Math.floor(t.px[i] / G)},${Math.floor(t.pz[i] / G)}`;
     if (!grid.has(k)) grid.set(k, []);
@@ -45,13 +51,14 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
       const d2 = (t.px[i] - x) ** 2 + (t.pz[i] - z) ** 2, k = 1 / (d2 + 400);
       w += k; h += t.py[i] * k;
       if (d2 < nd) { nd = d2; ny = t.py[i]; }
-      // 路面（含路肩、維修道、看台）範圍內所有賽道點的最低高度：地形三角形有 40 m 長，內插時不能比任何一側的路面高
-      // 傾斜彎：路面兩側的高度差 ±HALF_WIDTH×bank，路肩、維修道維持路緣的高度；地形要在「最低的那一側」之下
+      // 傾斜彎：路面兩側的高度差 ±HALF_WIDTH×bank，路面的「低側」才是地形該低於的高度
       const low = t.py[i] - HALF_WIDTH * Math.abs(t.bank[i]) * 2;
-      if (d2 < (WALL_OFF + 60) ** 2 && low < lo) lo = low;
+      if (d2 < FLAT_R * FLAT_R && low < lo) lo = low;
     }
     h /= w;
-    return Math.sqrt(nd) < WALL_OFF + 90 ? Math.min(h, Math.min(ny, lo) - 1) : h;
+    // 地形網格的頂點（每 ~38 m 一個）就是 hAt 的取樣點：頂點離路面 FLAT_R 之內，不能比它附近最低的路面高，所以壓在路面下 1 m。
+    // 只壓「高過路面」的頂點（Math.min）；FLAT_R 之外的地形照高度場走
+    return lo < Infinity ? Math.min(h, lo - 1) : h;
   };
   // ---- 地面：照環境畫紋理（草地有割草條紋、沙漠有沙紋、街道是石板），蓋住整條賽道再往外 3 km；有高低起伏
   const grassy = meta.biome === 'grass' || meta.biome === 'tropical';
