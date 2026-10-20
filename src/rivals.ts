@@ -130,6 +130,8 @@ export class RaceField {
   private base: [number, number, number][] = []; // 每位 AI 普通難度的 [抓地力, 煞車, 引擎力]
 
   aiHits = 0; // 測試用：AI 撞牆次數
+  /** 賽季的車手狀態（name → -1..+1）；空 = 沒有賽季，所有人倍率 1。改了之後要呼叫 applyDifficulty() 重算 */
+  form: Record<string, number> = {};
   /** 維修區（main 建好之後設定）：外觀與維修人員動畫；限速 */
   pitlane: PitLane | null = null;
   private pitSeed = 11;
@@ -189,11 +191,15 @@ export class RaceField {
   setDifficulty(d: Difficulty) {
     if (d === this.difficulty || !DIFFICULTY[d]) return;
     this.difficulty = d;
-    const D = DIFFICULTY[d];
+    this.applyDifficulty();
+  }
+  /** 依目前的難度與車手狀態（賽季）重算每位 AI 的速度曲線與引擎力；狀態 ±1 = 抓地力、煞車、引擎力 ±1.2%（formFactor） */
+  applyDifficulty() {
+    const D = DIFFICULTY[this.difficulty];
     this.base.forEach(([g, b, p], k) => {
-      const r = this.racers[k];
-      r.profile = speedProfile(this.t, this.line, g * D.grip, b * D.brake);
-      r.car.power = p * D.power;
+      const r = this.racers[k], f = 1 + (this.form[r.name] ?? 0) * 0.012;
+      r.profile = speedProfile(this.t, this.line, g * D.grip * f, b * D.brake * f);
+      r.car.power = p * D.power * f;
     });
   }
 

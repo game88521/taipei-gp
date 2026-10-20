@@ -17,8 +17,13 @@ export interface Stats {
   playTime: number; // 秒
   bestDrift: number; // 單次甩尾最高分
   totalDrift: number;
+  seasonsDone: number; // 完成幾個賽季
+  seasonTitles: number; // 年度車手冠軍
+  teamTitles: number; // 年度車隊冠軍
+  seasonWins: number; // 單季最多贏幾站
+  perfectSeason: number; // 全勝賽季（每一站都第一）
 }
-export const emptyStats = (): Stats => ({ dist: 0, nightDist: 0, topSpeed: 0, trips: 0, earned: 0, knocked: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, gpWins: 0, streetWins: 0, honks: 0, playTime: 0, bestDrift: 0, totalDrift: 0 });
+export const emptyStats = (): Stats => ({ dist: 0, nightDist: 0, topSpeed: 0, trips: 0, earned: 0, knocked: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, gpWins: 0, streetWins: 0, honks: 0, playTime: 0, bestDrift: 0, totalDrift: 0, seasonsDone: 0, seasonTitles: 0, teamTitles: 0, seasonWins: 0, perfectSeason: 0 });
 
 interface Ach { id: string; icon: string; name: string; desc: string; value: (s: Stats) => number; goal: number }
 export const ACHIEVEMENTS: Ach[] = [
@@ -38,6 +43,11 @@ export const ACHIEVEMENTS: Ach[] = [
   { id: 'honk', icon: '📯', name: '喇叭狂', desc: '按喇叭 100 次', value: (s) => s.honks, goal: 100 },
   { id: 'drift1', icon: '🌀', name: '甩尾新手', desc: '單次甩尾拿到 3,000 分', value: (s) => s.bestDrift, goal: 3000 },
   { id: 'drift2', icon: '🔥', name: '甩尾大師', desc: '單次甩尾拿到 20,000 分', value: (s) => s.bestDrift, goal: 20000 },
+  { id: 'season1', icon: '🗓️', name: '跑完一季', desc: '完成一個 23 站的賽季', value: (s) => s.seasonsDone, goal: 1 },
+  { id: 'title', icon: '👑', name: '年度車手冠軍', desc: '賽季結束時積分第一', value: (s) => s.seasonTitles, goal: 1 },
+  { id: 'teamtitle', icon: '🏁', name: '車隊冠軍', desc: '賽季結束時你的車隊積分第一', value: (s) => s.teamTitles, goal: 1 },
+  { id: 'win5', icon: '🥇', name: '一季五勝', desc: '單一賽季贏 5 站', value: (s) => s.seasonWins, goal: 5 },
+  { id: 'perfect', icon: '💎', name: '全勝賽季', desc: '一季 23 站全部奪冠', value: (s) => s.perfectSeason, goal: 1 },
 ];
 
 /** 新達成的成就（還沒在 got 裡的） */
@@ -52,7 +62,7 @@ export function renderAchPage(s: Stats, got: string[]): string {
     ['駕駛距離', `${(s.dist / 1000).toFixed(1)} km`], ['最高時速', `${Math.round(s.topSpeed)} km/h`], ['遊玩時間', `${t >= 60 ? `${Math.floor(t / 60)} 小時 ` : ''}${t % 60} 分`],
     ['載客趟數', `${s.trips}`], ['累積收入', `NT$ ${Math.round(s.earned).toLocaleString()}`], ['撞倒路邊物', `${s.knocked}`],
     ['甩掉警察', `${s.escapes} 次（最高 ${s.maxEscaped} 星）`], ['被逮捕', `${s.busted} 次`], ['逮捕嫌犯', `${s.arrests}`],
-    ['正賽冠軍', `${s.gpWins}`], ['街頭比賽獲勝', `${s.streetWins}`], ['按喇叭', `${s.honks}`],
+    ['正賽冠軍', `${s.gpWins}`], ['完成賽季', `${s.seasonsDone}（冠軍 ${s.seasonTitles}）`], ['街頭比賽獲勝', `${s.streetWins}`], ['按喇叭', `${s.honks}`],
     ['甩尾最高分', `${Math.round(s.bestDrift).toLocaleString()}`], ['甩尾累積', `${Math.round(s.totalDrift).toLocaleString()}`],
   ];
   const stat = rows.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('');

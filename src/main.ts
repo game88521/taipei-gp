@@ -9,7 +9,7 @@ import { buildWorld } from './world';
 import { CEIL, holeAware } from './tunnel';
 import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
-import { driverStandings, teamStandings, standingsHtml, roundName, POINTS } from './season';
+import { driverStandings, teamStandings, standingsHtml, roundName, roundPoints, pointsAfterEachRound, titleFight, nextForm, formTag, seasonPrize, defaultSeason, POINTS, FASTEST_LAP_POINT, type SeasonSave, type RoundResult } from './season';
 import { buildCircuitEnv } from './circuitenv';
 import { PitLane } from './pitlane';
 import { setupInstall } from './install';
@@ -752,14 +752,20 @@ function tickStats(dt: number) {
   statAcc += dt; statSave += dt;
   if (statAcc > 1) {
     statAcc = 0;
-    for (const a of newlyUnlocked(stats, save.ach!)) {
-      save.ach!.push(a.id);
-      toast(`🏆 成就解鎖：${a.icon} ${a.name}`, 'purple');
-      sound.beep(1180, 0.3);
-      statSave = 99;
-    }
+    if (checkAchievements()) statSave = 99;
   }
   if (statSave > 5) { statSave = 0; writeSave(); }
+}
+/** 有新達成的成就就解鎖、提示；回傳有沒有解鎖 */
+function checkAchievements(): boolean {
+  let any = false;
+  for (const a of newlyUnlocked(stats, save.ach!)) {
+    save.ach!.push(a.id);
+    toast(`🏆 成就解鎖：${a.icon} ${a.name}`, 'purple');
+    sound.beep(1180, 0.3);
+    any = true;
+  }
+  return any;
 }
 initLeaderboard(toast, fmt);
 $('btn-ach').addEventListener('click', () => {
@@ -1002,8 +1008,11 @@ function beginCountdown() {
   world.setStartLights(0); // 倒數到一半離開的話燈還亮著
   // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
   // AI 難度（設定頁；測試可用 ?diff=easy|normal|hard）
-  field.setDifficulty((new URLSearchParams(location.search).get('diff') ?? $<HTMLSelectElement>('opt-diff').value) as Difficulty);
-  field.rules = (new URLSearchParams(location.search).get('rules') ?? $<HTMLSelectElement>('opt-rules').value) === '2026' ? '2026' : 'classic';
+  const ssn = inSeasonRound() && raceKind === 'gp' ? save.season! : null; // 賽季這一站：圈數、難度、規則整季固定
+  field.form = ssn?.form ?? {};
+  field.setDifficulty(((ssn?.diff ?? new URLSearchParams(location.search).get('diff')) ?? $<HTMLSelectElement>('opt-diff').value) as Difficulty);
+  field.applyDifficulty(); // 狀態每站不同，難度沒變也要重算
+  field.rules = ((ssn?.rules ?? new URLSearchParams(location.search).get('rules')) ?? $<HTMLSelectElement>('opt-rules').value) === '2026' ? '2026' : 'classic';
   hud.dataset.rules = field.rules;
   $('drs').textContent = field.rules === '2026' ? '超車' : 'DRS';
   if (raceKind === 'gp') {
@@ -1012,7 +1021,8 @@ function beginCountdown() {
     lastGrid = grid;
     qualiGrid = null;
     const wx = (BOT ? new URLSearchParams(location.search).get('gpwx') ?? 'dry' : $<HTMLSelectElement>('opt-gpwx').value) as GpWeather;
-    field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, +$<HTMLSelectElement>('opt-laps').value, grid ?? undefined, wx);
+    field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, ssn?.laps ?? +$<HTMLSelectElement>('opt-laps').value, grid ?? undefined, wx);
+    if (ssn) { seasonGrid = (grid ?? field.racers).map((r) => r.name); ssn.pending = { id: CIRCUIT!.id, grid: seasonGrid, at: Date.now() }; writeSave(); } // 開跑了：中途離開就算棄賽
     // 安全車（設定 → 比賽）：正常＝有車撞停六成機率出、少見＝兩成五、關閉；測試 ?sc 一定出
     field.scChance = ({ normal: 0.6, rare: 0.25, off: 0 } as Record<string, number>)[$<HTMLSelectElement>('opt-sc').value] ?? 0.6;
     if (new URLSearchParams(location.search).has('sc')) field.scChance = 1;
@@ -1296,7 +1306,7 @@ async function startGp() {
   taxi?.stop();
   mode = 'race';
   lastGrid = null;
-  if (opts.quali) { startQuali(); return; }
+  if (opts.quali || inSeasonRound()) { startQuali(); return; } // 賽季那一站一定先排位
   raceKind = 'gp';
   hideMenu();
   beginCountdown();
@@ -1307,10 +1317,31 @@ $('btn-gp').addEventListener('click', () => openPicker('gp'));
 const SEASON = new URLSearchParams(location.search).has('season');
 const teamOf = (name: string) => field.racers.find((r) => r.name === name)?.team ?? '';
 const seasonDone = () => !!save.season && save.season.round >= CIRCUITS.length;
+let seasonGrid: string[] = []; // 這一站的發車順序（記進結果）
 /** 現在這個頁面是不是賽季目前要跑的那一站 */
 const inSeasonRound = () => SEASON && !!CIRCUIT && !!save.season && CIRCUITS[save.season.round]?.id === CIRCUIT.id;
-if (BOT && SEASON && CIRCUIT && !save.season) save.season = { round: CIRCUITS.indexOf(CIRCUIT), results: [] }; // 測試：直接從這一站開始賽季
+if (BOT && SEASON && CIRCUIT && !save.season) {
+  save.season = defaultSeason(+(new URLSearchParams(location.search).get('laps') ?? 3), 'normal', 'classic', 1);
+  save.season.round = CIRCUITS.indexOf(CIRCUIT); // 測試：直接從這一站開始賽季
+}
+// 舊存檔相容：沒有固定圈數／難度／規則／種子的賽季，補上預設值
+if (save.season) {
+  const ss0 = save.season;
+  ss0.laps ??= 3; ss0.diff ??= 'normal'; ss0.rules ??= 'classic'; ss0.form ??= {}; ss0.no ??= (save.seasonHistory?.length ?? 0) + 1;
+  ss0.seed ??= (ss0.results.length * 2654435761 + 12345) >>> 0;
+}
 const goSeasonRound = () => { location.search = `?circuit=${CIRCUITS[save.season!.round].id}&season=1`; };
+/** 賽季這一站：把設定頁裡「比賽」的幾個選項鎖起來，顯示賽季固定的值 */
+function lockSeasonOptions() {
+  const ss = save.season;
+  const on = inSeasonRound() && !!ss;
+  for (const [id, v] of [['opt-laps', String(ss?.laps ?? 3)], ['opt-diff', ss?.diff ?? 'normal'], ['opt-rules', ss?.rules ?? 'classic']] as const) {
+    const el = $<HTMLSelectElement>(id);
+    if (on) { el.value = v; el.disabled = true; el.title = '賽季中整季固定'; } else { el.disabled = false; el.title = ''; }
+  }
+  const q = $<HTMLInputElement>('opt-quali');
+  q.disabled = on; if (on) q.checked = true;
+}
 function updateSeasonUi() {
   const ss = save.season;
   $('season-sub').textContent = !ss ? '2026 賽曆 23 站 · 累積車手與車隊積分' : seasonDone() ? '賽季完成！再開新的一季' : `繼續：${roundName(ss.round)}`;
@@ -1320,41 +1351,187 @@ function updateSeasonUi() {
     const rows = driverStandings(ss!, teamOf), k = rows.findIndex((r) => r.name === '你');
     banner.innerHTML = '';
     const b = document.createElement('b');
-    b.textContent = `🏆 2026 賽季 第 ${ss!.round + 1} / ${CIRCUITS.length} 站`;
-    banner.append(b, document.createTextNode(k >= 0 ? `　你目前第 ${k + 1} 名、${rows[k].pts} 分（按「大獎賽」或「賽季模式」開始這一站）` : '　按「大獎賽」或「賽季模式」開始這一站'));
+    b.textContent = `🏆 2026 賽季 第 ${ss!.round + 1} / ${CIRCUITS.length} 站 · ${ss!.laps} 圈`;
+    banner.append(b, document.createTextNode(k >= 0 ? `　你目前第 ${k + 1} 名、${rows[k].pts} 分（按「大獎賽」或「賽季模式」開始這一站；離開算棄賽）` : '　按「大獎賽」或「賽季模式」開始這一站（離開算棄賽）'));
   }
+  lockSeasonOptions();
 }
+/** 開新賽季：先問圈數／難度／規則（整季固定） */
+function openNewSeason() {
+  $<HTMLSelectElement>('sn-laps').value = '3';
+  $<HTMLSelectElement>('sn-diff').value = $<HTMLSelectElement>('opt-diff').value;
+  $<HTMLSelectElement>('sn-rules').value = $<HTMLSelectElement>('opt-rules').value;
+  $('season-new').classList.remove('hidden');
+}
+$('sn-cancel').addEventListener('click', () => $('season-new').classList.add('hidden'));
+$('sn-go').addEventListener('click', () => {
+  $('season-new').classList.add('hidden');
+  const no = (save.seasonHistory?.length ?? 0) + 1;
+  save.season = defaultSeason(+$<HTMLSelectElement>('sn-laps').value, $<HTMLSelectElement>('sn-diff').value, $<HTMLSelectElement>('sn-rules').value, no);
+  writeSave();
+  goSeasonRound();
+});
 $('btn-season').addEventListener('click', () => {
-  if (!save.season || seasonDone()) { save.season = { round: 0, results: [] }; writeSave(); }
+  if (!save.season || seasonDone()) { openNewSeason(); return; }
   if (inSeasonRound()) void startGp(); else goSeasonRound();
 });
-function showSeasonPage() {
-  const ss = save.season ?? { round: 0, results: [] };
+// ---- 賽季總覽頁
+const LINE_COLORS = ['#ff4d4d', '#ffb02e', '#4dd2ff', '#9b7bff', '#4dff9a', '#ffffff'];
+function drawSeasonChart(ss: SeasonSave) {
+  const cv = $<HTMLCanvasElement>('season-chart'), g = cv.getContext('2d')!;
+  const W = cv.width, H = cv.height, L = 34, R = 10, T = 12, B = 22;
+  g.clearRect(0, 0, W, H);
+  const trend = pointsAfterEachRound(ss);
   const rows = driverStandings(ss, teamOf);
-  $('season-title').textContent = seasonDone() ? `🏆 2026 年度冠軍：${rows[0]?.name ?? ''}` : '2026 賽季';
-  $('season-page-sub').textContent = !save.season ? '還沒開始賽季：按「賽季模式」從澳洲站開始' : seasonDone() ? `23 站全部比完。你是第 ${rows.findIndex((r) => r.name === '你') + 1} 名` : `已比完 ${ss.round} 站，下一站：${roundName(ss.round)}`;
-  $('season-drivers').innerHTML = standingsHtml(rows, '你');
+  const pick = rows.slice(0, 5).map((r) => r.name);
+  if (!pick.includes('你') && trend.has('你')) pick.push('你');
+  const n = Math.max(ss.results.length, 2);
+  let mx = 10;
+  for (const name of pick) for (const v of trend.get(name) ?? []) mx = Math.max(mx, v);
+  mx = Math.ceil(mx / 25) * 25;
+  const X = (i: number) => L + ((W - L - R) * i) / (n - 1), Y = (v: number) => H - B - ((H - T - B) * v) / mx;
+  g.font = '11px sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'right';
+  g.strokeStyle = 'rgba(255,255,255,0.1)'; g.fillStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1;
+  for (let v = 0; v <= mx; v += mx / 4) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(String(Math.round(v)), L - 4, Y(v)); }
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let i = 0; i < n; i += Math.max(1, Math.round(n / 8))) g.fillText(String(i + 1), X(i), H - B + 5);
+  const legend = $('season-legend'); legend.innerHTML = '';
+  pick.forEach((name, k) => {
+    const col = name === '你' ? '#ff3b30' : LINE_COLORS[k % LINE_COLORS.length], a = trend.get(name) ?? [];
+    g.strokeStyle = col; g.lineWidth = name === '你' ? 3.2 : 1.8; g.beginPath();
+    a.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
+    g.stroke();
+    if (a.length) { g.fillStyle = col; g.beginPath(); g.arc(X(a.length - 1), Y(a[a.length - 1]), 3.5, 0, 7); g.fill(); }
+    const li = document.createElement('span'), dot = document.createElement('i');
+    dot.style.background = col; li.append(dot, document.createTextNode(`${name} ${a[a.length - 1] ?? 0}`));
+    legend.appendChild(li);
+  });
+}
+function renderSeasonFight(ss: SeasonSave, rows: ReturnType<typeof driverStandings>) {
+  const box = $('season-fight'), left = CIRCUITS.length - ss.round;
+  const tf = titleFight(rows, '你', left, ss.round);
+  box.innerHTML = '';
+  const add = (html: string) => { const d = document.createElement('div'); d.innerHTML = html; box.appendChild(d); };
+  if (!tf) { add('還沒有比賽結果。跑完第一站，這裡會顯示你的冠軍之路。'); return; }
+  if (left <= 0) { add(`<b>賽季結束</b>　你第 <b>${tf.rank}</b> 名，${tf.pts} 分`); return; }
+  add(`目前 <b>第 ${tf.rank} 名</b>　${tf.pts} 分　${tf.rank === 1 ? '（領先群）' : `落後 ${tf.leader} <b>${tf.gap}</b> 分`}`);
+  add(`還剩 <b>${left}</b> 站，每站最多 ${POINTS[0] + FASTEST_LAP_POINT} 分 → 你最多還能拿 <b>${tf.max}</b> 分`);
+  add(tf.clinched ? '<span class="ok">🏆 你已經確定拿下年度冠軍！</span>' : tf.canWin ? `<span class="ok">還有機會奪冠</span>　照目前的得分速度，還在爭冠的有 ${tf.contenders} 位` : '<span class="no">車手冠軍已經追不上了；車隊積分、單站勝利還是有意義</span>');
+}
+function renderSeasonRounds(ss: SeasonSave) {
+  const tb = $('season-rounds');
+  tb.innerHTML = '<tr><th>站</th><th>大獎賽</th><th>冠軍</th><th>發車→名次</th><th>得分</th></tr>';
+  ss.results.forEach((r, i) => {
+    const c = CIRCUITS.find((x) => x.id === r.id), pts = roundPoints(r).get('你') ?? 0, dnf = (r.dnf ?? []).includes('你');
+    const tr = document.createElement('tr');
+    if (dnf) tr.className = 'dnf';
+    const you = r.you ? `${r.you.grid} → ${dnf ? '棄賽' : r.you.finish}` : `→ ${dnf ? '棄賽' : r.order.indexOf('你') + 1}`;
+    for (const v of [String(i + 1), `${c?.flag ?? ''} ${c?.gp ?? r.id}`, r.order[0] + (r.fl ? '' : ''), you, `+${pts}`]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    tb.appendChild(tr);
+  });
+  if (!ss.results.length) tb.innerHTML = '<tr><td>還沒有比完的站</td></tr>';
+}
+function renderSeasonHistory() {
+  const tb = $('season-hist'), h = save.seasonHistory ?? [];
+  tb.innerHTML = '<tr><th>季</th><th>你的名次</th><th>積分</th><th>勝場</th><th>年度冠軍</th></tr>';
+  for (const r of [...h].reverse()) {
+    const tr = document.createElement('tr');
+    if (r.rank === 1) tr.className = 'me';
+    for (const v of [`第 ${r.no} 季${r.laps === 6 ? '（6 圈）' : ''}`, `第 ${r.rank} 名`, String(r.pts), String(r.wins), r.champion]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    tb.appendChild(tr);
+  }
+  if (!h.length) tb.innerHTML = '<tr><td>還沒有跑完的賽季</td></tr>';
+}
+function showSeasonPage() {
+  const ss = save.season ?? defaultSeason();
+  const rows = driverStandings(ss, teamOf);
+  $('season-title').textContent = seasonDone() ? `🏆 2026 年度冠軍：${rows[0]?.name ?? ''}` : `2026 賽季（第 ${ss.no ?? 1} 季）`;
+  $('season-page-sub').textContent = !save.season ? '還沒開始賽季：按「賽季模式」從澳洲站開始' : seasonDone() ? `23 站全部比完。你是第 ${rows.findIndex((r) => r.name === '你') + 1} 名` : `已比完 ${ss.round} 站，下一站：${roundName(ss.round)}　· 每站 ${ss.laps} 圈`;
+  $('season-drivers').innerHTML = standingsHtml(rows, '你', 99, ss.form);
   $('season-teams').innerHTML = '<tr><th>名次</th><th>車隊</th><th></th><th>積分</th></tr>' + teamStandings(rows).map((t, k) => `<tr><td>${k + 1}</td><td>${t.team}</td><td></td><td>${t.pts}</td></tr>`).join('');
+  renderSeasonFight(ss, rows);
+  drawSeasonChart(ss);
+  renderSeasonRounds(ss);
+  renderSeasonHistory();
   $('season-continue').style.display = save.season && !seasonDone() ? '' : 'none';
   $('season-page').classList.remove('hidden');
 }
+document.querySelectorAll<HTMLButtonElement>('#season-tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#season-tabs button').forEach((x) => x.classList.toggle('on', x === b));
+  document.querySelectorAll('#season-page .stab').forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.tab === b.dataset.tab));
+}));
 $('btn-season-table').addEventListener('click', showSeasonPage);
 $('season-close').addEventListener('click', () => $('season-page').classList.add('hidden'));
 $('season-continue').addEventListener('click', () => { $('season-page').classList.add('hidden'); if (inSeasonRound()) void startGp(); else goSeasonRound(); });
-$('season-reset').addEventListener('click', () => { if (!confirm('重新開始賽季？目前的積分會清掉')) return; save.season = { round: 0, results: [] }; writeSave(); goSeasonRound(); });
+$('season-reset').addEventListener('click', () => { if (!confirm('重新開始賽季？目前的積分會清掉')) return; $('season-page').classList.add('hidden'); openNewSeason(); });
 $('btn-next-round').addEventListener('click', () => { if (seasonDone()) location.search = '?showseason=1'; else goSeasonRound(); });
 if (new URLSearchParams(location.search).has('showseason')) setTimeout(showSeasonPage, 300);
+if (!BOT) settleAbandoned(); // 頁面載入時：上次賽季那一站開跑了沒比完 → 棄賽（測試用的 bot 會連跑多站，不處理）
+
+/**
+ * 賽季那一站「開跑了但沒有正常結束」就算棄賽：開跑時寫入 save.season.pending，正常結束時清掉。
+ * 所以任何離開的方式（回主選單、切到別的模式、關頁面、重新整理）下一次載入時都會留下 pending，在這裡一次處理。
+ * 例外：頁面剛載入、玩家還在同一站的選單等著按「開始」，pending 也是空的（沒開跑過就沒有標記）。
+ */
+function settleAbandoned() {
+  const ss = save.season;
+  if (!ss || !ss.pending || seasonDone()) return;
+  const pend = ss.pending, c = CIRCUITS[ss.round];
+  ss.pending = undefined;
+  if (!c || c.id !== pend.id) { writeSave(); return; } // 標記對不上目前的站：清掉就好
+  // 開跑不到 20 秒就離開／重整（誤觸、切 App 回來）不算棄賽
+  if (Date.now() - pend.at < 20000) { writeSave(); return; }
+  // 棄賽排在最後、其他車手照發車順序（沒有這一站的比賽進度可用）
+  const order = [...(pend.grid ?? []).filter((n) => n !== '你'), '你'];
+  finishRound(ss, { id: c.id, order, dnf: ['你'], grid: pend.grid, you: { grid: pend.grid ? pend.grid.indexOf('你') + 1 : 0, finish: order.length, pts: 0 } });
+  toast(`🏳️ 上次的「${c.gp}」沒有比完，算棄賽（0 分）`, 'bad');
+}
+/** 一站結束（正常完賽或棄賽）：寫入結果、更新車手狀態、跳到下一站；賽季跑完就發獎金、記歷屆 */
+function finishRound(ss: SeasonSave, r: RoundResult) {
+  ss.results.push(r);
+  ss.round++;
+  ss.pending = undefined;
+  // 下一站的車手狀態：所有 AI 隨機漫步一點（種子固定＝同一季重載頁面結果一致）
+  ss.form = nextForm(ss.form ?? {}, field.racers.filter((x) => !x.isPlayer).map((x) => x.name), ss.seed ?? 1, ss.round);
+  if (ss.round >= CIRCUITS.length) settleSeason(ss);
+  writeSave();
+}
+/** 賽季跑完：獎金、歷屆紀錄、成就統計（只會做一次） */
+function settleSeason(ss: SeasonSave) {
+  if (ss.paid) return;
+  ss.paid = true;
+  const rows = driverStandings(ss, teamOf), mi = rows.findIndex((r) => r.name === '你');
+  const teams = teamStandings(rows), myTeam = teamOf('你');
+  const rank = mi + 1, teamRank = teams.findIndex((t) => t.team === myTeam) + 1;
+  const wins = rows[mi]?.wins ?? 0;
+  const prize = seasonPrize(rank, teamRank);
+  (save.seasonHistory ??= []).push({ no: ss.no ?? 1, rank, pts: rows[mi]?.pts ?? 0, wins, champion: rows[0].name, team: rows[0].team, teamRank, laps: ss.laps ?? 3 });
+  stats.seasonsDone++;
+  if (rank === 1) stats.seasonTitles++;
+  if (teamRank === 1) stats.teamTitles++;
+  stats.seasonWins = Math.max(stats.seasonWins, wins);
+  if (wins >= CIRCUITS.length) stats.perfectSeason++;
+  earn(prize.cash, `賽季結算（${prize.parts.join('、')}）`);
+  seasonPrizeText = prize.parts.join('　');
+  checkAchievements(); // 結算發生在成績表（tickStats 只在開車時跑），要自己檢查成就
+}
+let seasonPrizeText = '';
 /** 正賽結束：記下這一站的名次、更新積分榜、成績表下面顯示積分與「下一站」 */
 function recordSeason(st: Racer[]) {
   const box = $('season-res'), next = $<HTMLButtonElement>('btn-next-round'), again = $('btn-again');
   if (!(inSeasonRound() && raceKind === 'gp')) { box.hidden = true; next.style.display = 'none'; again.style.display = ''; return; }
   const ss = save.season!;
-  ss.results.push({ id: CIRCUIT!.id, order: st.map((r) => r.name) });
-  ss.round++;
-  writeSave();
-  const rows = driverStandings(ss, teamOf), me = st.findIndex((r) => r.isPlayer);
-  $('season-res-title').textContent = seasonDone() ? `🏆 賽季結束！年度冠軍 ${rows[0].name}（${rows[0].team}）` : `這一站 +${POINTS[me] ?? 0} 分　車手積分榜（${ss.round} / ${CIRCUITS.length} 站）`;
-  $('season-res-table').innerHTML = standingsHtml(rows, '你', 10);
+  const me = st.findIndex((r) => r.isPlayer);
+  // 最快圈：所有車手裡最快的一圈（沒完賽的也算，F1 規則是名次前十才加分，roundPoints 會處理）
+  const fl = st.filter((r) => r.bestLap != null).sort((a, b) => a.bestLap! - b.bestLap!)[0];
+  const result: RoundResult = { id: CIRCUIT!.id, order: st.map((r) => r.name), fl: fl?.name, grid: seasonGrid.length ? seasonGrid : undefined, you: { grid: seasonGrid.indexOf('你') + 1, finish: me + 1, pts: 0 } };
+  result.you!.pts = roundPoints(result).get('你') ?? 0;
+  finishRound(ss, result);
+  const rows = driverStandings(ss, teamOf);
+  const flNote = fl ? `　⏱ 最快圈 ${fl.name} ${fmt(fl.bestLap)}${(result.order.indexOf(fl.name) < POINTS.length) ? ' +1' : '（名次不在前十，沒有加分）'}` : '';
+  $('season-res-title').textContent = seasonDone() ? `🏆 賽季結束！年度冠軍 ${rows[0].name}（${rows[0].team}）` : `這一站 +${result.you!.pts} 分　車手積分榜（${ss.round} / ${CIRCUITS.length} 站）${flNote}`;
+  $('season-res-table').innerHTML = standingsHtml(rows, '你', 10, ss.form);
+  if (seasonDone() && seasonPrizeText) { const p = document.createElement('p'); p.className = 'sub'; p.textContent = '🎁 ' + seasonPrizeText; $('season-res').appendChild(p); }
   box.hidden = false;
   again.style.display = 'none'; // 賽季中同一站不能重比
   next.style.display = '';
@@ -1398,6 +1575,8 @@ let podium: Podium | null = null, podiumT = 0;
 
 function startQuali() {
   qualiRun = true;
+  // 賽季：排位賽就吃本站的車手狀態（狀態好的排位快、發車位置也前面）
+  if (inSeasonRound() && save.season) { field.form = save.season.form ?? {}; field.setDifficulty(save.season.diff as Difficulty); field.applyDifficulty(); }
   raceKind = 'tt';
   hideMenu();
   beginCountdown();
@@ -1405,7 +1584,10 @@ function startQuali() {
   toast('🏁 排位賽：跑一圈，圈速決定發車位置', 'purple');
 }
 /** 車手名字後面加個性圖示（🔥 激進、🛡️ 防守…；均衡的不加） */
-const withPersona = (r: Racer) => (r.persona.icon ? `${r.name} ${r.persona.icon}` : r.name);
+const withPersona = (r: Racer) => {
+  const f = inSeasonRound() && raceKind !== 'tt' ? formTag(save.season?.form?.[r.name] ?? 0) : ''; // 賽季：狀態好 ↑、差 ↓
+  return `${r.name}${r.persona.icon ? ' ' + r.persona.icon : ''}${f ? ' ' + f : ''}`;
+};
 /** 排位賽跑完：AI 用同一套物理各跑一圈，大家照圈速排發車格 */
 function finishQuali(t: number) {
   qualiRun = false;

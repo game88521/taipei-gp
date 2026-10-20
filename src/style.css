@@ -1321,6 +1321,27 @@ html:not(.touch) #radio { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 
 .season-table td:nth-child(4) { font: 800 14px var(--mono); color: #f2c14e; }
 .season-table tr.me td { background: rgba(225, 6, 0, 0.35); }
 #season-res h3 { margin: 4px 0; font-size: 15px; color: #f2c14e; }
+#season-new { z-index: 7; }
+#season-new .card { max-width: 420px; }
+#season-new label.sn { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; }
+#season-new label.sn select { flex: 1; min-width: 0; max-width: 62%; }
+.stabs { display: flex; gap: 6px; margin: 6px 0 10px; }
+.stabs button { flex: 1; padding: 7px 4px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.05); color: var(--muted); font: 700 13px inherit; }
+.stabs button.on { color: #111; background: #f2c14e; border-color: #f2c14e; }
+.stab { display: none; }
+.stab.on { display: block; }
+.sfight { margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: rgba(242, 193, 78, 0.1); border: 1px solid rgba(242, 193, 78, 0.35); font-size: 13px; line-height: 1.6; }
+.sfight b { color: #f2c14e; }
+.sfight .ok { color: #4dff9a; }
+.sfight .no { color: #ff7a6b; }
+#season-chart { width: 100%; height: auto; background: rgba(0, 0, 0, 0.25); border-radius: 10px; }
+.slegend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 10px; font-size: 12px; }
+.slegend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.season-table small.form { font-weight: 800; }
+.season-table small.form.up { color: #4dff9a; }
+.season-table small.form.down { color: #ff7a6b; }
+#season-rounds td:nth-child(5), #season-hist td:nth-child(3), #season-hist td:nth-child(4) { font: 800 14px var(--mono); color: #f2c14e; }
+#season-rounds tr.dnf td { opacity: 0.55; }
 
 /* ---------------- 觸控按鈕自訂（設定 → 操作）：--tc-scale 大小、--tc-op 透明度、--tc-lift 抬高；html.tc-swap 左右對調
    每顆按鈕照自己貼邊的那個角縮放，按鈕之間的間距也乘上同一個倍數，放大時才不會疊在一起 */
