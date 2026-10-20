@@ -28,17 +28,44 @@ export function buildTunnels(scene: THREE.Scene, d: CityData, surf: Surface): Tu
   for (const w of d.net.decks ?? []) {
     if (w.e !== 2) continue;
     const hw = w.w / 2;
+    // 節點的角平分法線：前後兩條邊的法線平均（單位化），外側偏移 = hw / cos(θ/2)，這樣相鄰兩段在接頭的外側點重合
+    const bisect = (k: number): [number, number, number] => {
+      const cur = w.n[k];
+      const pre = k > 0 ? w.n[k - 1] : -1, nxt = k + 1 < w.n.length ? w.n[k + 1] : -1;
+      // 太短的邊（重複節點）不算方向：當成沒有那條邊，不然角平分會除以零
+      const dir = (p: number, q: number): [number, number] | null => { const dx = N[q * 2] - N[p * 2], dz = N[q * 2 + 1] - N[p * 2 + 1], l = Math.hypot(dx, dz); return l < 0.2 ? null : [dx / l, dz / l]; };
+      const d1 = pre >= 0 ? dir(pre, cur) : null, d2 = nxt >= 0 ? dir(cur, nxt) : null;
+      if (!d1 && !d2) return [0, 0, 1];
+      if (!d1 && d2) return [-d2[1], d2[0], 1];
+      if (d1 && !d2) return [-d1[1], d1[0], 1];
+      if (!d1 || !d2) return [0, 0, 1]; // 走不到（上面都處理了），保險
+      // 兩條邊的法線平均；θ 是轉角，cos(θ/2) = |法線平均|（平均前的長度），外側偏移要放大 1/|平均|
+      const n1 = [-d1[1], d1[0]], n2 = [-d2[1], d2[0]];
+      const mx = (n1[0] + n2[0]) / 2, mz = (n1[1] + n2[1]) / 2, m = Math.hypot(mx, mz) || 1;
+      return [mx / m, mz / m, 1 / Math.max(0.3, m)]; // 第三個 = 外側要放大的倍數（1 = 直線）
+    };
     for (let k = 0; k + 1 < w.n.length; k++) {
       const a = w.n[k], b = w.n[k + 1];
       const ax = N[a * 2], az = N[a * 2 + 1], bx = N[b * 2], bz = N[b * 2 + 1], l = Math.hypot(bx - ax, bz - az);
       if (l < 0.2) continue;
       const ya = (Y[a] ?? 0) + ROAD_Y, yb = (Y[b] ?? 0) + ROAD_Y;
-      const ux = (bx - ax) / l, uz = (bz - az) / l, nx = -uz, nz = ux;
+      const ux = (bx - ax) / l, uz = (bz - az) / l;
+      // 起點、終點各用各自節點的角平分法線（直線段中間不會變），段與段之間的接頭就共用同一個外側點
+      const [sxn, szn, skA] = bisect(k), [exn, ezn, skB] = bisect(k + 1);
+      const nxA = sxn, nzA = szn, nxB = exn, nzB = ezn; // 端點 A、B 各自的法向量與放大倍數
       // 每 4 m 一小段：頂上的地面多高決定是隧道還是路塹
       const n = Math.max(1, Math.ceil(l / 4));
       for (let q = 0; q < n; q++) {
         const f0 = q / n, f1 = (q + 1) / n;
-        const P = (f: number, s: number, dy = 0) => [ax + (bx - ax) * f + nx * s, ya + (yb - ya) * f + dy, az + (bz - az) * f + nz * s];
+        // 段內第 f 點、橫向 s（相對中心線，s 已經含 hw）：沿邊線性內插「法向量 × 偏移倍數」
+        // 單位法向量沿邊內插後單位化，再乘上該點的角平分放大倍數（kA、kB 內插）；s 是絕對橫向距離（已含 hw）
+        const P = (f: number, s: number, dy = 0) => {
+          let fx = (1 - f) * nxA + f * nxB, fz = (1 - f) * nzA + f * nzB;
+          const fm = Math.hypot(fx, fz) || 1; fx /= fm; fz /= fm;
+          const kk = (1 - f) * skA + f * skB; // 這個點的放大倍數（直線 = 1）
+          const sPt = s * kk / 1; // s 已含 hw；倍數只放大接頭處的偏移
+          return [ax + (bx - ax) * f + fx * sPt, ya + (yb - ya) * f + dy, az + (bz - az) * f + fz * sPt];
+        };
         const y0 = ya + (yb - ya) * f0, y1 = ya + (yb - ya) * f1;
         const mx = ax + (bx - ax) * (f0 + f1) / 2, mz = az + (bz - az) * (f0 + f1) / 2;
         const g = surf.groundY(mx, mz), depth = g - (y0 + y1) / 2; // 頂上的路面比隧道路面高多少
@@ -53,8 +80,10 @@ export function buildTunnels(scene: THREE.Scene, d: CityData, surf: Surface): Tu
             if (q % 2 === 0) quad(lamp, P(f0, sd * (hw - 0.6), CEIL - 0.05), P(f0, sd * (hw - 0.2), CEIL - 0.05), P(f1, sd * (hw - 0.2), CEIL - 0.05), P(f1, sd * (hw - 0.6), CEIL - 0.05));
           } else {
             // 路塹：側牆接到地面，牆頂再多 1 m 矮牆（地面的車撞到會被擋住）
-            const ga = surf.groundY(ax + (bx - ax) * f0 + nx * s, az + (bz - az) * f0 + nz * s) + 0.25, gb = surf.groundY(ax + (bx - ax) * f1 + nx * s, az + (bz - az) * f1 + nz * s) + 0.25;
-            const A0 = P(f0, s), A1 = P(f1, s), T0 = [A0[0], ga, A0[2]], T1 = [A1[0], gb, A1[2]];
+            // 牆腳的地面高度：用牆的實際橫向點查（接頭處角平分後的點，跟直線段的法向量不同）
+            const A0 = P(f0, s), A1 = P(f1, s);
+            const ga = surf.groundY(A0[0], A0[2]) + 0.25, gb = surf.groundY(A1[0], A1[2]) + 0.25;
+            const T0 = [A0[0], ga, A0[2]], T1 = [A1[0], gb, A1[2]];
             quad(wall, A0, A1, T1, T0);
             quad(parapet, T0, T1, [T1[0], gb + 1, T1[2]], [T0[0], ga + 1, T0[2]]);
             hits.walls.push([T0[0], T0[2], T1[0], T1[2], Math.min(ga, gb) - 0.9, Math.max(ga, gb) + 1.2]); // 擋地面的車
