@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quality';
-import { buildTrack, VMAX, setRealPerf, heightAt, locate, surfaceY, bankRoll, type Locate } from './track';
+import { buildTrack, spreadLegs, VMAX, setRealPerf, heightAt, locate, surfaceY, bankRoll, type Locate } from './track';
 import { buildWorld } from './world';
 import { CEIL, holeAware } from './tunnel';
 import { GaragePreview } from './garage3d';
@@ -104,7 +104,8 @@ const toOfficial = (p: [number, number][], km: number | null) => {
 const track = (() => {
   if (!circuitData) return buildTrack();
   // elev：高低起伏（tools/fetch-elevation.mjs）；bank：傾斜彎。建賽道時會再做曲線平滑、長度又短一點 → 建好量一次再縮放重建
-  const pts = toOfficial(smooth(smooth(circuitData.points)), circuitData.info.lengthKm);
+  // 折返（髮夾彎的兩條腿）中心線太近、路面（14 m 寬）會重疊：推開到至少 17.5 m（英國 Luffield 原始資料兩腿只隔 3.9 m）；高度差 > 1.5 m 的立體交叉不推
+  const pts = toOfficial(spreadLegs(smooth(smooth(circuitData.points)), circuitData.elev, 17.5), circuitData.info.lengthKm);
   const t0 = buildTrack(pts, circuitData.elev, CIRCUIT?.bank), km = circuitData.info.lengthKm;
   if (!km) return t0;
   const k = (km * 1000) / t0.length;

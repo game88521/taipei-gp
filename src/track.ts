@@ -63,6 +63,59 @@ export function heightAt(t: Track, s: number): number {
   return t.py[i] + (t.py[j] - t.py[i]) * (f - i);
 }
 
+/**
+ * 折返（髮夾彎的兩條腿）太近、路面會重疊時，把它們推開到至少 minD。
+ * 「折返」= 沿賽道的距離 s > 14 m 而且 s > 1.6 × 直線距離 d（同一個彎的弧線 s 跟 d 差不多）；
+ * 「同一個高度」= 高度差 < 1.5 m（Suzuka 的立體交叉、摩納哥上下疊的兩段不推）
+ */
+export function spreadLegs(points: [number, number][], elev: ArrayLike<number> | undefined, minD = 17.5, maxIter = 40): [number, number][] {
+  const n = points.length;
+  if (n < 20) return points;
+  const cum: number[] = [0];
+  for (let i = 1; i <= n; i++) { const a = points[i - 1], b = points[i % n]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+  const L = cum[n];
+  const X = points.map((p) => p[0]), Z = points.map((p) => p[1]);
+  const sAlong = (i: number, j: number) => { const d = Math.abs(cum[i] - cum[j]); return Math.min(d, L - d); };
+  for (let iters = 0; iters < maxIter; iters++) {
+    const G = minD, cells = new Map<string, number[]>();
+    for (let i = 0; i < n; i++) { const k = Math.floor(X[i] / G) + ',' + Math.floor(Z[i] / G); (cells.get(k) ?? cells.set(k, []).get(k)!).push(i); }
+    const dx = new Float64Array(n), dz = new Float64Array(n), cnt = new Float64Array(n);
+    let pairs = 0;
+    for (let i = 0; i < n; i++) {
+      const cx = Math.floor(X[i] / G), cz = Math.floor(Z[i] / G);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const j of cells.get((cx + a) + ',' + (cz + b)) ?? []) {
+        if (j <= i) continue;
+        const d = Math.hypot(X[i] - X[j], Z[i] - Z[j]);
+        if (d >= minD) continue;
+        const s = sAlong(i, j);
+        if (s < 14 || s <= 1.6 * d) continue;
+        if (elev && Math.abs(elev[i] - elev[j]) > 1.5) continue;
+        let ux: number, uz: number;
+        if (d < 0.05) { // 兩點重合：用 i 的行進方向的法線（j 反方向）
+          const a2 = (i + 1) % n, b2 = (i - 1 + n) % n, tx = X[a2] - X[b2], tz = Z[a2] - Z[b2], tl = Math.hypot(tx, tz) || 1;
+          ux = -tz / tl; uz = tx / tl;
+        } else { ux = (X[i] - X[j]) / d; uz = (Z[i] - Z[j]) / d; }
+        const push = (minD - d) * 0.5;
+        dx[i] += ux * push; dz[i] += uz * push; dx[j] -= ux * push; dz[j] -= uz * push; cnt[i]++; cnt[j]++;
+        pairs++;
+      }
+    }
+    if (!pairs) break;
+    for (let i = 0; i < n; i++) if (cnt[i] > 1) { dx[i] /= cnt[i]; dz[i] /= cnt[i]; }
+    // 位移沿賽道平滑（±8 點、三角形權重），推開的地方才是一個圓順的彎，不會出現尖角
+    const W = 8, sx = new Float64Array(n), sz = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let ax = 0, az = 0, w = 0;
+      for (let k = -W; k <= W; k++) { const q = (i + k + n) % n, wt = W + 1 - Math.abs(k); ax += dx[q] * wt; az += dz[q] * wt; w += wt; }
+      sx[i] = ax / w; sz[i] = az / w;
+    }
+    // 平滑會把位移攤薄：放大 (2W+1)/(W+1) 補回來，再乘 0.6 鬆弛，逐次逼近
+    const gain = 0.6 * (2 * W + 1) / (W + 1);
+    for (let i = 0; i < n; i++) { X[i] += sx[i] * gain; Z[i] += sz[i] * gain; }
+  }
+  return points.map((_, i) => [X[i], Z[i]] as [number, number]);
+}
+
 /** points：各國賽道的中心線（circuits.ts）；不給就是台北信義街道賽。elev：每個 points 的高度（相對起跑線）；banks：傾斜彎 */
 export function buildTrack(points: [number, number][] = CONTROL, elev?: number[], banks: Bank[] = []): Track {
   const curve = new THREE.CatmullRomCurve3(
@@ -150,18 +203,23 @@ export function buildTrack(points: [number, number][] = CONTROL, elev?: number[]
   // 傾斜的軸在路面內側邊緣：中心線跟著抬高半個路寬，內側路緣維持原本高度（旁邊的地面才不會穿出路面）
   for (let i = 0; i < N; i++) py[i] += HALF_WIDTH * Math.abs(bank[i]);
   for (let i = 0; i < N; i++) grade[i] = (py[(i + 2) % N] - py[(i - 2 + N) % N]) / (4 * ds);
-  // 別的路段有多近：格子索引（每 40 m 一格），只看前後 200 m 以外的點
+  // 別的路段有多近：格子索引（每 40 m 一格）。
+  // 怎麼分「同一段」和「別段（折返、髮夾的另一條腿）」：同一個彎的弧線上，沿賽道 s 公尺的兩點直線距離大約也是 s（急彎 R = 10 m 時 s = 30 → d = 20）；
+  // 折返的兩條腿則是沿賽道很長、直線卻很短（英國 Copse 後的髮夾：沿賽道 30 m、直線 9.5 m）。
+  // 所以用「沿賽道距離 > 1.6 × 直線距離」判斷是別段，另外 12 m 以內一律是同一段（相鄰點、取樣誤差）。
+  // 之前用固定的 50 m 排除：髮夾兩腿只隔 30 m，被當成同一段，護牆就畫到對方的路面上
   const gap = new Float32Array(N).fill(1e3);
   {
-    const G = 40, cells = new Map<string, number[]>(), skip = Math.round(50 / ds); // 50 m 以內是同一個彎的相鄰點（上海蝸牛彎這種彎自己繞回來，比 200 m 小）
+    const G = 40, cells = new Map<string, number[]>();
     for (let i = 0; i < N; i++) { const k = `${Math.floor(px[i] / G)},${Math.floor(pz[i] / G)}`; (cells.get(k) ?? cells.set(k, []).get(k)!).push(i); }
     for (let i = 0; i < N; i++) {
       const cx = Math.floor(px[i] / G), cz = Math.floor(pz[i] / G);
       let best = 1e3;
       for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (const j of cells.get(`${cx + a},${cz + b}`) ?? []) {
-        const di = Math.abs(i - j);
-        if (Math.min(di, N - di) <= skip) continue;
+        const di = Math.abs(i - j), s = Math.min(di, N - di) * ds;
+        if (s <= 12) continue;
         const d = Math.hypot(px[i] - px[j], pz[i] - pz[j]);
+        if (s <= 1.6 * d) continue; // 沿賽道的距離跟直線差不多 = 同一段彎道的弧線
         if (d < best) best = d;
       }
       gap[i] = best;
