@@ -4,7 +4,8 @@
 //   美國三站（COTA、邁阿密、拉斯維加斯）用 USGS 3DEP 1/3 角秒（ned10m，10 m、去掉建物與樹的「地面」高度）
 //   其他用 NASA SRTM 30 m（srtm30m）：量的是「表面」高度，會把大樓、高架、樹冠算進去 →
 //   街道賽改取「前後 ±200 m 內偏低的那四分之一」（第 25 百分位）當地面：大樓、高架、樹冠連成一片也能排掉
-// 之後沿賽道平滑（SRTM 有 ±5 m 左右的雜訊，平滑三次；ned10m 雜訊小，只平滑一次，才不會把陡坡磨平）、限制坡度（真的 F1 最陡的 Eau Rouge 約 17~18%），內插回每 4 m 一點
+// 之後沿賽道平滑（SRTM 有 ±5 m 左右的雜訊，平滑三次；ned10m 雜訊小，只平滑一次，才不會把陡坡磨平）、限制坡度（真的 F1 最陡的 Eau Rouge 約 17~18%），內插回每 4 m 一點，
+// 最後把過線處的高度接縫（取樣不等距造成的台階）沿整圈線性分攤掉
 // 用法：node tools/fetch-elevation.mjs（快取在 tools/circuits-cache/elev-{id}[-資料集].json）
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +66,15 @@ for (const f of readdirSync(dir).filter((n) => n.endsWith('.json') && n !== 'out
     const d = out[i] - out[i - 1];
     if (Math.abs(d) > MAXD) out[i] = out[i - 1] + Math.sign(d) * MAXD;
   }
+  // 頭尾接縫：取樣不等距（最後一個取樣到繞回起跑線之間只有 N%10 點，不是 10 點），上面的內插走不完最後一段，
+  // 剩下的高度差全堆在過線那一步（斯帕多出約 0.75 m，就是過線前那個突然的隆起）。
+  // 量出「過線那一步比前後各 6 步的平均多出多少」E，沿整圈線性分攤：每點加 E × i / N，起跑線不動，整圈只微微傾斜。
+  // 不改成按實際點數內插：差值被擠進最後 2~3 點，那幾步會陡到 3 倍（斯帕前兩步各 35 cm、鈴鹿 −60 cm，自然是 10~12 cm），變成新的隆起
+  const M = 6, rise = (k) => out[(k + 1) % N] - out[k];
+  let nat = 0;
+  for (let k = 1; k <= M; k++) nat += rise(N - 1 - k) + rise(k - 1);
+  const E = rise(N - 1) - nat / (2 * M);
+  for (let i = 0; i < N; i++) out[i] += (E * i) / N;
   const base = out[0];
   c.elev = out.map((v) => +(v - base).toFixed(2));
   c.alt = Math.round([...raw].sort((a, b) => a - b)[Math.floor(n / 2)]); // 平均海拔（中位數）

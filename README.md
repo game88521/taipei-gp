@@ -190,7 +190,7 @@ Vercel 專案 → Storage → Create / Connect → **Upstash for Redis**（免�
 測試：`?circuit=italy&bot&sim=220`（計時賽）、`?circuit=japan&bot&gp&sim=400`（正賽）。
 各國賽道用比較接近真實 F1 的性能（`main.ts` 的 `REAL_PERF`：極速 342 km/h、煞車約 5g、高速彎約 6.7g，AI 排位圈速跟真實竿位差 ±5%）；
 台北街道賽維持原本的手感。`?perf=vmax,engine,brake,g0,gk,gmax` 可以覆寫測試。
-高低起伏：`node tools/fetch-elevation.mjs` 沿賽道每 40 m 查 SRTM 30 m 海拔（OpenTopoData），平滑、限制坡度後寫進中心線的 `elev`；
+高低起伏：`node tools/fetch-elevation.mjs` 沿賽道每 40 m 查 SRTM 30 m 海拔（OpenTopoData），平滑、限制坡度、把過線處的接縫高度差沿整圈線性分攤掉後寫進中心線的 `elev`；
 路面、護牆、車子、鏡頭跟著高度走，上坡掉速、下坡加速，周圍地形照賽道高度長出來（斯帕高低差約 100 m、史匹堡 57 m、摩納哥 47 m）。
 
 ### 賽季模式
