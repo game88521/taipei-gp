@@ -600,8 +600,10 @@ function step(dt: number) {
   // 在維修區裡：自動駕駛（限速、停進停車格、換胎、放行），位置由 field.update 推進
   const inPit = raceKind === 'gp' && !!field.me.pit;
   let impact = inPit ? 0 : car.update(dt, track, inp.steer, inp.brake);
+  let carImpact = 0;
   if (raceKind === 'gp') {
-    impact = Math.max(impact, field.update(dt, true));
+    carImpact = field.update(dt, true); // 撞到別台賽車的力道
+    impact = Math.max(impact, carImpact);
     if (impact > 22 && car.v < 3) field.incident(); // 玩家重撞、車停住了也可能出安全車
     if (SC_AT != null && field.raceTime >= SC_AT) field.incident(true); // 測試：&scat=秒數 強制出安全車
     for (const ev of field.events.splice(0)) gpEvent(ev);
@@ -609,7 +611,8 @@ function step(dt: number) {
     const me = field.racers.find((r) => r.isPlayer)!;
     if (me.finish != null && state === 'race') { if (BOT && !new URLSearchParams(location.search).has('podium')) showResults(); else startPodium(); return; } // 測試：&podium 也播頒獎典禮
   }
-  if (impact && performance.now() - lastHitSound > 250) { sound.hit(impact); lastHitSound = performance.now(); botHits++; }
+  if (impact && performance.now() - lastHitSound > 250) { sound.hit(impact, carImpact >= impact * 0.9 ? 'car' : 'wall'); lastHitSound = performance.now(); botHits++; }
+  sound.scrape(car.touch && car.v > 8 && !inPit ? Math.min(1, car.v / 60) : 0);
   lapTime += dt;
 
   const s = car.pos.s, L = track.length;
@@ -651,6 +654,28 @@ function step(dt: number) {
   const gear = gearOf(car.v);
   sound.setEngine('f1');
   sound.engine(gear.rpm, inp.brake ? 0.15 : 1, true);
+  raceAudio(dt);
+}
+
+/** 正賽：其他賽車的引擎聲（最近的幾台，在維修區裡的也聽得到）、看台觀眾、雨 */
+let raceAudioAcc = 0;
+function raceAudio(dt: number) {
+  if (!sound.started) return;
+  raceAudioAcc += dt;
+  if (raceAudioAcc < 1 / 30) return;
+  raceAudioAcc = 0;
+  const cars: Heard[] = [];
+  if (raceKind === 'gp') for (const r of field.racers) {
+    if (r.isPlayer) continue;
+    const c = r.car, d = Math.hypot(c.x - car.x, c.z - car.z);
+    if (d > 300) continue;
+    const still = c.v < 1; // 停著（起跑格、進站停車格）：引擎怠速
+    cars.push({ key: r.name, voice: 'f1', x: c.x, z: c.z, vx: Math.sin(c.h) * c.v, vz: Math.cos(c.h) * c.v, rpm: still ? 0.12 : gearOf(c.v).rpm, load: still ? 0.15 : c.v > 5 ? 0.9 : 0.3, d });
+  }
+  cars.sort((a, b) => a.d - b.d);
+  sound.otherEngines(cars, car.x, car.z, Math.sin(car.h) * car.v, Math.cos(car.h) * car.v, car.h);
+  // 觀眾：在看台附近才大聲；歡呼（起跑、超車、完賽）時整個拉高；雨賽時有雨聲
+  sound.ambience({ crowd: circuitEnv ? Math.max(0.2, circuitEnv.crowd.near(car.x, car.z)) : 0, excite: circuitEnv?.crowd.excite ?? 0, city: circuitEnv ? 0 : 0.5, rain: raceKind === 'gp' && field.wet > 0.05 ? Math.min(1, field.wet * 1.3) : 0 });
 }
 
 const GEARS = [0, 17, 28, 38, 48, 57, 66, 75];
@@ -992,7 +1017,9 @@ function updateCountdown(dt: number) {
     world.setStartLights(lit);
     if (lit > 0) sound.beep(440);
   }
+  sound.setEngine('f1');
   sound.engine(0.25 + (lit / 5) * 0.3, 0.4, true);
+  raceAudio(dt);
   if (countdown >= lightsOutAt) {
     lights.forEach((l) => l.classList.remove('on'));
     world.setStartLights(0);
@@ -1720,6 +1747,7 @@ function podiumFrame(dt: number) {
   podiumT += dt;
   carModel.root.visible = false; // updateVisuals 每格會把玩家的車打開
   podium!.frame(dt, camera);
+  sound.ambience({ crowd: 1, excite: 1 }, true); // 頒獎台：滿場歡呼（沒有引擎在跑，所以用 alive 維持環境音）
   world.sky.position.copy(camera.position);
   world.mountains.position.y = -camera.position.y;
   if (podiumT > 12) endPodium();
@@ -2326,6 +2354,7 @@ function freeStep(dt: number) {
   if (hb && !inp.brake) inp = { ...inp, throttle: true }; // 甩尾時自動給油（手機右手大拇指只要按住 🌀）
   let impact = fcar.update(dt, inp.steer, inp.throttle, inp.brake, collider);
   lastImpact = impact;
+  let carHit = 0; // 撞到別的車（車流、街頭對手）：金屬聲
   if (FREE_SIM && impact > 6 && hitLog.length < 6) hitLog.push(`${fcar.x.toFixed(0)},${fcar.z.toFixed(0)} y${fcar.y.toFixed(1)} 撞${impact.toFixed(0)}${fcar.landed > 4 ? "（落地）" : ""}${fcar.deck ? "（橋上）" : ""}`);
   const grounded = onGround(); // 在高架上：不會撞到地面的樹、路燈、車流、行人
   const knockHit = breakables && grounded ? breakables.hit(fcar) : 0; // 樹、路燈：撞倒過去
@@ -2334,7 +2363,9 @@ function freeStep(dt: number) {
   if (sr) {
     const msg = sr.update(dt, fcar, traffic);
     if (msg) { bigMsg(msg); if (msg.length <= 3) sound.beep(msg === 'GO!' ? 880 : 520, 0.25); }
-    impact = Math.max(impact, sr.collide(fcar));
+    const srHit = sr.collide(fcar);
+    carHit = Math.max(carHit, srHit);
+    impact = Math.max(impact, srHit);
     if (sr.phase === 'done' && !srShown) showStreetResult();
     if (sr.phase === 'idle' || sr.phase === 'offer') updateOffer(taxiOn() ? null : sr.checkOffer(fcar.x, fcar.z, fcar.v)); // 載客時不接街頭挑戰
   }
@@ -2347,9 +2378,10 @@ function freeStep(dt: number) {
   }
   if (traffic && !NO_TRAFFIC && !heavy) trafficHit = traffic.collidePlayer(fcar);
   impact = Math.max(impact, trafficHit);
+  carHit = Math.max(carHit, trafficHit);
   if (peds && heavy && peds.update(heavyAcc, grounded ? fcar : { x: fcar.x, z: fcar.z, h: fcar.h, v: 0 }, traffic)) {
     fcar.v *= 0.7; // 碰到行人：車子也被擋一下
-    sound.hit(6);
+    sound.hit(6, 'soft');
     pedHit = true;
   }
   if (heavy) heavyAcc = 0;
@@ -2384,7 +2416,13 @@ function freeStep(dt: number) {
       }
     }
   }
-  if (impact) sound.hit(impact * 2.5);
+  if (impact && performance.now() - lastHitSound > 120) {
+    // 哪一種撞得最大力就用哪一種聲音：撞車 → 金屬、撞樹／路燈 → 木頭與鐵桿、其他 → 撞牆
+    sound.hit(impact * 2.5, carHit >= impact * 0.9 ? 'car' : knockHit >= impact * 0.9 && hardHit < knockHit ? 'soft' : 'wall');
+    lastHitSound = performance.now();
+  }
+  // 貼著牆刮（接觸中、沒有大力撞擊）：持續的摩擦聲，音量跟車速
+  sound.scrape(fcar.touch && Math.abs(fcar.v) > 3 && grounded ? Math.min(1, Math.abs(fcar.v) / 22) : 0);
   // 甩尾計分：入帳時換成一點錢（每 100 分 NT$1）
   {
     const r = drift.update(dt, fcar, impact);
@@ -2411,8 +2449,9 @@ function freeStep(dt: number) {
       if (msg.startsWith('💰')) { save.taxi = { money: taxi.money, trips: taxi.trips }; writeSave(); refreshGarage(); sound.beep(990, 0.3); }
     }
   }
-  sound.setEngine(streetRacing() ? 'f1' : chosen.id); // 每台車的引擎聲不一樣（audio.ts ENGINES）
+  sound.setEngine(streetRacing() ? 'f1' : chosen.id); // 每台車的引擎聲不一樣（enginevoice.ts）
   sound.engine(0.15 + 0.55 * carGear(Math.abs(fcar.v)).rpm, inp.throttle ? 1 : 0.2, true);
+  freeAudio(dt);
   // 警笛：被通緝時照最近那台警車的距離；自己開巡邏車追嫌犯時自己的警笛
   let siren = 0;
   if (police) {
@@ -2422,6 +2461,33 @@ function freeStep(dt: number) {
   sound.sirenAt(Math.max(0, siren), performance.now() / 1000);
   // 直升機旋翼聲
   if (police?.heli.on) { heliAcc += dt; if (heliAcc > 0.12) { heliAcc = 0; sound.thump(police.heliVol); } }
+}
+type Heard = { key: string; voice: string; x: number; z: number; vx: number; vz: number; rpm: number; load: number; d: number };
+/** 自由駕駛：其他車的引擎聲（最近的幾台，含車流、警車、嫌犯、街頭對手）、城市環境音、雨、隧道殘響 */
+let audioAcc = 0;
+function freeAudio(dt: number) {
+  if (!sound.started) return; // 還沒點過畫面（含自動測試）：不用白算
+  audioAcc += dt;
+  if (audioAcc < 1 / 30) return; // 一秒更新 30 次就夠
+  audioAcc = 0;
+  const cars: Heard[] = [];
+  const dist = (x: number, z: number) => Math.hypot(x - fcar.x, z - fcar.z);
+  if (traffic && !NO_TRAFFIC) for (const a of traffic.near(fcar.x, fcar.z, 150)) {
+    if (Math.abs(a.y - fcar.y) > 8) continue; // 高架上下層的車：隔著橋面聽不太到
+    const voice = a.kind === 2 ? 'bus' : a.kind === 3 ? 'scooter' : 'traffic';
+    // 轉速：停著 = 怠速、開起來隨車速；公車、機車的檔位比較少所以拉得開一點
+    cars.push({ key: 't' + traffic.agents.indexOf(a), voice, x: a.x, z: a.z, vx: Math.sin(a.h) * a.v, vz: Math.cos(a.h) * a.v, rpm: 0.04 + 0.5 * Math.min(1, a.v / 20), load: a.v > 0.5 ? 0.55 : 0.1, d: dist(a.x, a.z) });
+  }
+  // 警車、嫌犯、街頭對手：比車流更值得聽（距離打六折，排序時優先）
+  const add = (key: string, voice: string, c: { x: number; z: number; v: number; h: number }, vmax: number) =>
+    cars.push({ key, voice, x: c.x, z: c.z, vx: Math.sin(c.h) * c.v, vz: Math.cos(c.h) * c.v, rpm: Math.min(1, 0.15 + (Math.abs(c.v) / vmax) * 0.85), load: Math.abs(c.v) > 2 ? 0.85 : 0.2, d: dist(c.x, c.z) * 0.6 });
+  police?.units.forEach((u, k) => add('p' + k, 'police', { x: u.car.x, z: u.car.z, v: u.car.v, h: u.car.h }, 40));
+  if (police?.suspect) { const c = police.suspect.car; add('s', 'super', { x: c.x, z: c.z, v: c.v, h: c.h }, 50); }
+  if (sr?.active && sr.phase !== 'idle' && sr.phase !== 'offer') sr.rivals.forEach((r, k) => { if (r.done == null) add('r' + k, 'f1', r.pos, 60); });
+  cars.sort((a, b) => a.d - b.d);
+  sound.otherEngines(cars.filter((c) => c.d < 180), fcar.x, fcar.z, fcar.vx, fcar.vz, fcar.h);
+  const inTunnel = fcar.deck?.way.e === 2 && !!surface && surface.groundY(fcar.x, fcar.z) - fcar.y > CEIL;
+  sound.ambience({ city: CIRCUIT ? 0 : inTunnel ? 0.3 : 1, rain: weather.raining && !inTunnel ? 1 : 0, tunnel: inTunnel ? 1 : 0 });
 }
 function updateFreeHud(dt: number) {
   const v = fcar.v;

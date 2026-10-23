@@ -24,6 +24,8 @@ export class Car {
   energy = 1; // 電池 0~1
   speedCap = Infinity; // 安全車期間的限速（m/s）
   pos: Locate = { i: 0, lat: 0, s: 0 };
+  /** 這一步車身貼著護牆（音效的「刮牆」聲看這個；撞擊力道在冷卻期間會回報 0） */
+  touch = false;
   private hitCool = 0;
 
   placeAt(t: Track, i: number) {
@@ -71,6 +73,7 @@ export class Car {
     locate(t, this.x, this.z, this.pos);
     this.hitCool = Math.max(0, this.hitCool - dt);
     const over = Math.abs(this.pos.lat) - LIMIT;
+    this.touch = over > -0.05; // 貼到牆（含剛好被推回來的那一步）
     if (over <= 0) return 0;
 
     const i = this.pos.i, side = Math.sign(this.pos.lat);

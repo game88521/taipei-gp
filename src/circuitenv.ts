@@ -520,6 +520,10 @@ export function buildCircuitEnv(scene: THREE.Scene, t: Track, meta: CircuitMeta,
   };
   const crowd = {
     cheer(k = 1) { cheerLv = Math.max(cheerLv, k); },
+    /** 音效用：(x, z) 離最近的看台多近（0 = 遠、1 = 就在看台前，200 m 內漸強） */
+    near(px: number, pz: number) { let best = 1e12; for (const [x, z] of standSpots) best = Math.min(best, (x - px) ** 2 + (z - pz) ** 2); return Math.max(0, 1 - Math.sqrt(best) / 200); },
+    /** 音效用：現在的興奮程度 0~1（看台跳、人浪的那個值） */
+    get excite() { return crowdU.uExcite.value; },
     tick(dt: number, px: number, pz: number) {
       crowdU.uTime.value += dt;
       cheerLv = Math.max(0, cheerLv - dt * 0.22);

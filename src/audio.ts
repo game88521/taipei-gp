@@ -1,4 +1,7 @@
 // 音效全部用 Web Audio 即時合成，沒有音檔
+// 引擎：public/engine-worklet.js 逐樣本模擬點火脈衝＋排氣共鳴（enginevoice.ts 是各車的參數）；
+// 瀏覽器不支援 AudioWorklet 時退回舊的「兩個振盪器＋濾波器」
+import { VOICES, realRpm, type EngineVoice } from './enginevoice';
 
 /**
  * 引擎聲的個性：base/range 轉速對應的基頻（Hz）、兩個振盪器的波形與第二個的頻率倍數／音量、
@@ -34,6 +37,23 @@ export class Sound {
   private profKey = 'sedan';
   private engBus!: GainNode;
   private fx!: GainNode;
+  // ---- 新版引擎（AudioWorklet）
+  private worklet = false; // 載入成功才用
+  private eng: AudioWorkletNode | null = null;
+  private voice: EngineVoice = VOICES.sedan;
+  private lastRpmFrac = 0;
+  /** 其他車的引擎聲源（大獎賽 AI、車流、警車）：固定幾個，每格指派給最近的幾台車；idleAt = 上次空出來的時間（挑安靜最久的來接手） */
+  private others: { node: AudioWorkletNode; pan: PannerNode; lp: BiquadFilterNode; g: GainNode; key: string; voice: string; idleAt: number }[] = [];
+  private hushed = true; // 持續的聲音（其他車、刮擦、環境）是不是已經關掉了；engine(…, false) 會關
+  // ---- 環境
+  private amb!: GainNode; // 環境音的總音量（城市嗡嗡、觀眾、雨）
+  private city: { src: AudioBufferSourceNode; g: GainNode } | null = null;
+  private crowd: { src: AudioBufferSourceNode; g: GainNode; bp: BiquadFilterNode } | null = null;
+  private rain: { src: AudioBufferSourceNode; g: GainNode } | null = null;
+  private verb!: ConvolverNode; // 隧道殘響
+  private verbSend!: GainNode;
+  private scrapeG: GainNode | null = null; // 刮護欄（持續的）
+  private ambBuf: AudioBuffer | null = null;
   /** 音量 0~1：主音量、引擎聲、音效 */
   vol = { master: 1, engine: 1, fx: 1 };
   setVolume(v: Partial<{ master: number; engine: number; fx: number }>) { Object.assign(this.vol, v); this.applyVolume(); }
@@ -52,7 +72,14 @@ export class Sound {
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
     this.master.gain.value = 0.6;
-    this.master.connect(ctx.destination);
+    // 軟限幅：好幾台引擎＋撞擊＋喇叭疊在一起時不會爆音。y = c·tanh(x/c)：小音量時增益剛好是 1（平常聽起來一樣），
+    // 輸入到 ±1 時輸出約 ±0.91，不會削到喇叭的硬削波
+    const soft = ctx.createWaveShaper();
+    const curve = new Float32Array(2049);
+    for (let i = 0; i < curve.length; i++) curve[i] = 1.8 * Math.tanh((i / 1024 - 1) / 1.8);
+    soft.curve = curve;
+    soft.oversample = '2x';
+    this.master.connect(soft).connect(ctx.destination);
     // 引擎與其他音效分開兩個通道，選單可以各自調音量
     this.engBus = ctx.createGain();
     this.engBus.connect(this.master);
@@ -90,6 +117,77 @@ export class Sound {
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
+    // 隧道殘響：程式產生的脈衝響應（0.9 秒、指數衰減的雜訊）；平常送進去的量是 0
+    this.verb = ctx.createConvolver();
+    // 不用內建的正規化：它會把這段脈衝響應縮到約 0.24 倍（−12 dB），送出量 0.9 時殘響只剩乾聲的 −15 dB，幾乎聽不到。
+    // impulse() 自己把能量正規化成 1，送出量就是濕聲相對乾聲的比例（normalize 要在設定 buffer 之前關掉）
+    this.verb.normalize = false;
+    this.verb.buffer = this.impulse(0.9, 2.6);
+    this.verbSend = ctx.createGain();
+    this.verbSend.gain.value = 0;
+    // 隧道的殘響偏暗（混凝土、空氣吸收高頻）
+    const verbLp = ctx.createBiquadFilter();
+    verbLp.type = 'lowpass';
+    verbLp.frequency.value = 3200;
+    this.verbSend.connect(this.verb).connect(verbLp).connect(this.master);
+    this.engBus.connect(this.verbSend);
+    this.fx.connect(this.verbSend); // 撞擊、喇叭、警笛在隧道裡也有回音
+    // 環境音
+    this.amb = ctx.createGain();
+    this.amb.gain.value = 1;
+    this.amb.connect(this.fx);
+    // 引擎合成器（AudioWorklet）：載入成功之後才切過去，載入中仍用舊的振盪器
+    void this.loadWorklet();
+    // 看門狗：音訊時鐘 0.6 秒沒人餵引擎（遊戲不再步進）就把持續的聲音全部關掉；暫停（suspend）時時鐘不走，不會誤關
+    setInterval(() => { if (this.ctx && !this.hushed && this.ctx.currentTime - this.lastFeed > 0.6) this.hush(); }, 300);
+  }
+
+  /** 載入 public/engine-worklet.js；成功就建主引擎節點，舊的振盪器靜音 */
+  private async loadWorklet() {
+    const ctx = this.ctx!;
+    if (!ctx.audioWorklet) return;
+    try {
+      await ctx.audioWorklet.addModule(`${import.meta.env.BASE_URL}engine-worklet.js`);
+    } catch { return; }
+    this.eng = this.makeEngine(this.voice);
+    this.eng.connect(this.engBus);
+    this.worklet = true;
+    this.engGain.gain.value = 0; // 舊的振盪器從此不出聲
+    // 其他車的聲源：電腦 6 個、手機 4 個（每個都是一個 worklet，逐樣本合成很吃 CPU）
+    const n = matchMedia('(pointer: coarse)').matches ? 4 : 6;
+    for (let k = 0; k < n; k++) {
+      const node = this.makeEngine(VOICES.traffic);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 6000;
+      const g = ctx.createGain(); // 固定 1：淡入淡出走 worklet 自己的 gain 參數（降到 0 時 worklet 直接輸出靜音、不耗 CPU）
+      g.gain.value = 1;
+      const pan = ctx.createPanner();
+      pan.panningModel = 'equalpower';
+      // 真實的距離衰減（每遠一倍 −6 dB）：6 m 內全音量、12 m 剩一半、50 m 約一成、180 m 約 3%
+      pan.distanceModel = 'inverse';
+      pan.refDistance = 6;
+      pan.maxDistance = 400;
+      pan.rolloffFactor = 1.1;
+      node.connect(lp).connect(g).connect(pan).connect(this.engBus);
+      this.others.push({ node, pan, lp, g, key: '', voice: 'traffic', idleAt: -10 });
+    }
+  }
+  private makeEngine(v: EngineVoice): AudioWorkletNode {
+    const node = new AudioWorkletNode(this.ctx!, 'engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+    node.port.postMessage({ type: 'profile', ...v });
+    return node;
+  }
+  /** 殘響的脈衝響應：左右各一段指數衰減的白噪音，每聲道能量正規化成 1（寬頻的聲音進去，出來一樣大聲） */
+  private impulse(sec: number, decay: number) {
+    const ctx = this.ctx!, n = Math.round(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c);
+      let e = 0;
+      for (let i = 0; i < n; i++) { d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); e += d[i] * d[i]; }
+      for (let i = 0, k = 1 / Math.sqrt(e); i < n; i++) d[i] *= k;
+    }
+    return b;
   }
 
   suspend() { void this.ctx?.suspend(); }
@@ -111,6 +209,13 @@ export class Sound {
     playbackSession();
   }
   get state() { return this.ctx?.state ?? 'none'; }
+  /** 音效系統已經啟動（使用者點過畫面）；自動測試時沒有，main 就不用白算其他車的資料 */
+  get started() { return this.ctx !== null; }
+  /** 除錯用：狀態一行字（?audiodebug 會顯示在標題） */
+  debug() {
+    const busy = this.others.filter((o) => o.key).length;
+    return `${this.state} worklet=${this.worklet ? 'on' : 'off'} others=${busy}/${this.others.length}`;
+  }
 
   /** 換引擎聲（車種 id，或 'f1'） */
   setEngine(key: string) {
@@ -118,6 +223,8 @@ export class Sound {
     this.profKey = key;
     this.prof = ENGINES[key] ?? ENGINES.sedan;
     this.applyProfile();
+    this.voice = VOICES[key] ?? VOICES.sedan;
+    this.eng?.port.postMessage({ type: 'profile', ...this.voice });
   }
   private applyProfile() {
     if (!this.ctx) return;
@@ -138,10 +245,45 @@ export class Sound {
     this.sirenGain.gain.setTargetAtTime(this.enabled ? vol * 0.07 : 0, now, 0.15);
   }
 
+  /**
+   * 持續的聲音（其他車、刮擦、環境）都是「每格餵一次目標值」的；遊戲停止步進（選單、成績表、暫停）後沒人再餵，
+   * 會一直卡在最後一個音量上。所以：engine(…, false) 時全部淡出，另外有個看門狗（start 裡的計時器）處理沒呼叫 engine 的情況
+   */
+  private hush() {
+    if (this.hushed || !this.ctx) return;
+    this.hushed = true; // 關掉之後，在下一次 engine(…, true) 以前 otherEngines／ambience／scrape 都不會把聲音再打開
+    const t = this.ctx.currentTime;
+    for (const o of this.others) {
+      if (!o.key) continue;
+      (o.node.parameters as unknown as Map<string, AudioParam>).get('gain')!.setTargetAtTime(0, t, 0.05);
+      o.key = ''; o.idleAt = t;
+    }
+    this.scrapeG?.gain.setTargetAtTime(0, t, 0.05);
+    this.city?.g.gain.setTargetAtTime(0, t, 0.3);
+    this.crowd?.g.gain.setTargetAtTime(0, t, 0.3);
+    this.rain?.g.gain.setTargetAtTime(0, t, 0.3);
+    this.verbSend.gain.setTargetAtTime(0, t, 0.2);
+    // 主引擎也關：遊戲停止步進（選單、成績表、分頁被丟到背景）時不要卡在最後的轉速上一直響
+    if (this.worklet && this.eng) (this.eng.parameters as unknown as Map<string, AudioParam>).get('gain')!.setTargetAtTime(0, t, 0.05);
+    else this.engGain.gain.setTargetAtTime(0, t, 0.05);
+  }
+  private lastFeed = 0; // 上一次 engine(…, true) 的時間（音訊時鐘）
+
   /** rpm 0..1，load 0..1（踩油門的程度） */
   engine(rpm: number, load: number, running: boolean) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    if (running) { this.hushed = false; this.lastFeed = t; } else this.hush();
+    if (this.worklet && this.eng) {
+      // 換檔：轉速比例突然往下掉一大截 → 斷火一下（真的換檔會有一瞬間沒動力）
+      if (running && this.lastRpmFrac - rpm > 0.25) this.eng.port.postMessage({ type: 'shift' });
+      this.lastRpmFrac = rpm;
+      const P = this.eng.parameters as unknown as Map<string, AudioParam>;
+      P.get('rpm')!.setTargetAtTime(realRpm(this.voice, rpm), t, 0.02);
+      P.get('load')!.setTargetAtTime(load, t, 0.04);
+      P.get('gain')!.setTargetAtTime(this.enabled && running ? 0.78 * this.voice.gain : 0, t, 0.08);
+      return;
+    }
     const p = this.prof;
     const f = p.base + rpm * p.range;
     this.o1.frequency.setTargetAtTime(f, t, 0.025);
@@ -151,14 +293,179 @@ export class Sound {
     this.engGain.gain.setTargetAtTime(this.enabled && running ? (0.05 + 0.08 * load) * p.gain : 0, t, 0.08);
   }
 
-  hit(power: number) {
+  /**
+   * 撞擊：kind = 'wall' 撞牆（悶響＋碎屑）、'car' 撞車（金屬：幾個不諧和的衰減正弦）、'soft' 撞樹／路燈（木頭、鐵桿）。
+   * power 是撞擊力道（跟以前一樣），越大越響、越低沉
+   */
+  hit(power: number, kind: 'wall' | 'car' | 'soft' = 'wall') {
     if (!this.ctx || !this.enabled || power < 2) return;
-    const src = this.ctx.createBufferSource();
+    const ctx = this.ctx, t = ctx.currentTime, v = Math.min(1, power / 40);
+    const out = ctx.createGain();
+    out.gain.value = kind === 'soft' ? 1.3 : 1.7;
+    out.connect(this.fx);
+    // 1. 衝擊的悶響：低通後的噪音爆發（所有撞擊都有）
+    const src = ctx.createBufferSource();
     src.buffer = this.noise;
-    const g = this.ctx.createGain();
-    g.gain.value = Math.min(1, power / 40);
-    src.connect(g).connect(this.fx);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = kind === 'soft' ? 900 : 380 + 1200 * (1 - v);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(v * (kind === 'car' ? 0.7 : 1), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25 + v * 0.25);
+    src.connect(lp).connect(g).connect(out);
+    src.start(t);
+    src.stop(t + 0.6);
+    // 2. 碎屑：高頻的噪音尾巴（撞牆、撞車：玻璃、碳纖維碎片）
+    if (kind !== 'soft' && v > 0.15) {
+      const s2 = ctx.createBufferSource();
+      s2.buffer = this.noise;
+      s2.playbackRate.value = 1.6;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 2500;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(0.25 * v, t + 0.03);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      s2.connect(hp).connect(g2).connect(out);
+      s2.start(t);
+      s2.stop(t + 0.55);
+    }
+    // 3. 金屬的鏗鏘：不諧和的幾個頻率（車身鈑金、碳纖維）
+    if (kind === 'car' || (kind === 'wall' && v > 0.4)) {
+      for (const [f, a, d] of [[310, 0.2, 0.35], [517, 0.14, 0.28], [893, 0.1, 0.2], [1471, 0.06, 0.14]] as const) {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f * (0.9 + Math.random() * 0.2);
+        const og = ctx.createGain();
+        og.gain.setValueAtTime(a * v, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + d * (0.6 + v));
+        o.connect(og).connect(out);
+        o.start(t);
+        o.stop(t + d * (0.6 + v) + 0.05);
+      }
+    }
+  }
+
+  /** 刮護欄：持續的摩擦聲，v 0..1（0 = 沒刮）；每格呼叫 */
+  scrape(v: number) {
+    if (!this.ctx || this.hushed) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.scrapeG) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.loopNoise();
+      src.loop = true;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1700;
+      bp.Q.value = 1.4;
+      this.scrapeG = ctx.createGain();
+      this.scrapeG.gain.value = 0;
+      src.connect(bp).connect(this.scrapeG).connect(this.fx);
+      src.start();
+    }
+    this.scrapeG.gain.setTargetAtTime(this.enabled ? Math.min(1, v) * 0.35 : 0, t, v > 0 ? 0.02 : 0.12);
+  }
+
+  /** 3 秒、可以無縫循環的白噪音（環境音、刮擦共用） */
+  private loopNoise() {
+    if (this.ambBuf) return this.ambBuf;
+    const ctx = this.ctx!, n = ctx.sampleRate * 3, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return (this.ambBuf = b);
+  }
+  private loopSrc(filter: BiquadFilterNode, gain: number) {
+    const ctx = this.ctx!, src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = this.loopNoise();
+    src.loop = true;
+    src.playbackRate.value = 0.9 + Math.random() * 0.2;
+    g.gain.value = gain;
+    src.connect(filter).connect(g).connect(this.amb);
     src.start();
+    return { src, g };
+  }
+
+  /**
+   * 環境音（每格呼叫）：city 0..1 城市車流的遠處嗡嗡、crowd 0..1 看台觀眾（excite 0..1 歡呼程度）、
+   * rain 0..1 雨聲、tunnel 0..1 隧道殘響（引擎、其他車的聲音送進去多少）
+   */
+  ambience(a: { city?: number; crowd?: number; excite?: number; rain?: number; tunnel?: number }, alive = false) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime, on = this.enabled ? 1 : 0;
+    if (alive) { this.hushed = false; this.lastFeed = t; } else if (this.hushed) return; // alive = 這一格沒有引擎在跑（頒獎台），靠環境音自己維持
+    if ((a.city ?? 0) > 0 && !this.city) {
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+      this.city = this.loopSrc(lp, 0);
+    }
+    if ((a.crowd ?? 0) > 0 && !this.crowd) {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 0.6;
+      this.crowd = { ...this.loopSrc(bp, 0), bp };
+    }
+    if ((a.rain ?? 0) > 0 && !this.rain) {
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+      this.rain = this.loopSrc(hp, 0);
+    }
+    this.city?.g.gain.setTargetAtTime(on * (a.city ?? 0) * 0.1, t, 0.6);
+    if (this.crowd) {
+      const ex = a.excite ?? 0;
+      this.crowd.g.gain.setTargetAtTime(on * (a.crowd ?? 0) * (0.06 + 0.5 * ex), t, ex > 0.3 ? 0.08 : 0.8);
+      this.crowd.bp.frequency.setTargetAtTime(600 + 900 * ex, t, 0.2); // 歡呼時人聲變亮
+    }
+    this.rain?.g.gain.setTargetAtTime(on * (a.rain ?? 0) * 0.16, t, 0.8);
+    this.verbSend.gain.setTargetAtTime(on * (a.tunnel ?? 0) * 0.9, t, 0.3);
+  }
+
+  /**
+   * 其他車的引擎聲：cars = 附近的車（最多 others.length 台會發聲，main 依距離排好）。
+   * 每台：key 讓同一台車黏著同一個聲源（不會換來換去）、voice 車種、x z 位置、vx vz 速度、rpm 0..1、load 0..1。
+   * 聽者在 (lx, lz)、速度 (lvx, lvz)、面向 lh：算距離衰減、左右聲像、都卜勒（呼嘯而過）、遠處變悶
+   */
+  otherEngines(cars: { key: string; voice: string; x: number; z: number; vx: number; vz: number; rpm: number; load: number; d?: number }[], lx: number, lz: number, lvx: number, lvz: number, lh: number) {
+    if (!this.ctx || !this.worklet || !this.others.length || this.hushed) return;
+    const ctx = this.ctx, t = ctx.currentTime, L = ctx.listener;
+    // 聽者：在原點、面向 lh（遊戲的前進方向 = (sin h, cos h)；Web Audio 的「右」= 前 × 上 = (−cos h, 0, sin h)，剛好是遊戲裡車子的右邊）
+    const fx = Math.sin(lh), fz = Math.cos(lh);
+    if (L.forwardX) { L.forwardX.value = fx; L.forwardY.value = 0; L.forwardZ.value = fz; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; L.positionX.value = 0; L.positionY.value = 0; L.positionZ.value = 0; }
+    else (L as unknown as { setOrientation: (...a: number[]) => void }).setOrientation(fx, 0, fz, 0, 1, 0);
+    // 選出要發聲的車：已經佔著聲源的車排序時距離打八折（遲滯），兩台差不多遠的車不會一直互相搶
+    const held = new Set(this.others.map((o) => o.key).filter(Boolean));
+    const dist = (c: (typeof cars)[number]) => (c.d ?? Math.hypot(c.x - lx, c.z - lz)) * (held.has(c.key) ? 0.8 : 1);
+    const want = [...cars].sort((a, b) => dist(a) - dist(b)).slice(0, this.others.length);
+    const used = new Set<(typeof this.others)[number]>();
+    for (const c of want) {
+      let o = this.others.find((q) => q.key === c.key);
+      if (!o) {
+        // 新的車：找一個已經安靜夠久的聲源（淡出後音量 < 0.1%，換車不會有喀聲）；沒有就等下一格
+        o = this.others.filter((q) => !q.key && t - q.idleAt > 0.45 && !used.has(q)).sort((a, b) => a.idleAt - b.idleAt)[0];
+        if (!o) continue;
+        o.key = c.key;
+        const G = (o.node.parameters as unknown as Map<string, AudioParam>).get('gain')!;
+        G.cancelScheduledValues(t);
+        G.setValueAtTime(0, t);
+      }
+      used.add(o);
+      if (o.voice !== c.voice) { o.voice = c.voice; o.node.port.postMessage({ type: 'profile', ...(VOICES[c.voice] ?? VOICES.traffic) }); }
+      const rx = c.x - lx, rz = c.z - lz, d = Math.hypot(rx, rz) || 0.01;
+      // 都卜勒：f' = f × (c + 聽者朝聲源的速度) / (c + 聲源遠離的速度)，聲速 343 m/s；夾在 ±30%（真的 F1 擦身而過會差一倍，遊戲裡太誇張）
+      const ux = rx / d, uz = rz / d;
+      const dop = Math.max(0.7, Math.min(1.3, (343 + lvx * ux + lvz * uz) / (343 + c.vx * ux + c.vz * uz)));
+      const v = VOICES[c.voice] ?? VOICES.traffic;
+      const P = o.node.parameters as unknown as Map<string, AudioParam>;
+      P.get('rpm')!.setTargetAtTime(realRpm(v, c.rpm) * dop, t, 0.05);
+      P.get('load')!.setTargetAtTime(c.load, t, 0.08);
+      P.get('gain')!.setTargetAtTime(this.enabled ? 0.45 * v.gain : 0, t, 0.1); // 別人的車比自己的小聲（自己是 0.78）
+      if (o.pan.positionX) { o.pan.positionX.setTargetAtTime(rx, t, 0.03); o.pan.positionY.setTargetAtTime(0, t, 0.03); o.pan.positionZ.setTargetAtTime(rz, t, 0.03); }
+      else (o.pan as unknown as { setPosition: (x: number, y: number, z: number) => void }).setPosition(rx, 0, rz);
+      // 遠處變悶（空氣吸收高頻）：近處全亮、200 m 剩 1 kHz
+      o.lp.frequency.setTargetAtTime(Math.max(900, 9000 - d * 40), t, 0.1);
+    }
+    // 沒分到車的聲源：用 worklet 自己的 gain 淡出（降到 0 之後 worklet 直接輸出靜音，不耗 CPU）
+    for (const o of this.others) {
+      if (used.has(o) || !o.key) continue;
+      (o.node.parameters as unknown as Map<string, AudioParam>).get('gain')!.setTargetAtTime(0, t, 0.05);
+      o.key = '';
+      o.idleAt = t;
+    }
   }
 
   /** 汽車喇叭：兩個差三度的方波（像真的雙音喇叭）＋低通；vol 0..1、pitch 倍率（每台車不太一樣） */

@@ -40,6 +40,8 @@ export class FreeCar {
   roll = 0;
   /** 這次落地的力道（從橋上掉下來）；update 回傳的撞擊力道也會算進去 */
   landed = 0;
+  /** 這一步車身有碰到東西（牆、建築）：撞擊力道在冷卻期間會回報 0，音效要知道「貼著牆刮」要看這個 */
+  touch = false;
   /** 立體路面（main 設定）：(x, z, 上一刻高度) → 路面高度；沒設定 = 平地 */
   static surface: ((x: number, z: number, prevY: number, out?: SurfaceHit) => SurfaceHit) | null = null;
   private sh: SurfaceHit = { y: 0, seg: null };
@@ -171,6 +173,7 @@ export class FreeCar {
       this.pitch += (Math.atan2(Math.max(-1.2, Math.min(1.2, yf - yb)), 2.9) - this.pitch) * k;
       this.roll += (Math.atan2(Math.max(-0.6, Math.min(0.6, yl - yr)), 1.6) - this.roll) * k;
     }
+    this.touch = false;
     if (!col) return this.landed > 4 ? this.landed : 0;
     // ---- 與建築、樹幹碰撞：三個圓各自找接觸，逐一施加衝量
     let impact = 0;
@@ -178,6 +181,7 @@ export class FreeCar {
     for (const off of OFFS) {
       const cx = this.x + nfx * off, cz = this.z + nfz * off;
       for (const c of col.contacts(cx, cz, R, this.contacts, this.y)) {
+        this.touch = true;
         impact = Math.max(impact, this.contact(c.nx, c.nz, c.depth, cx - c.nx * R, cz - c.nz * R));
       }
     }
