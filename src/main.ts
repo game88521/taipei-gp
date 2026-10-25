@@ -181,6 +181,7 @@ async function loadCircuitScene() {
   await stage('準備畫面', 0.9);
   applyShadowFlags();
   weather.collect();
+  weather.prepareWet(scene); // 濕路材質先建好，跟下面的 compileAsync 一起編著色器（不然第一次下雨那一格會卡一下）
   applyWeather();
   const hidden: THREE.Object3D[] = [];
   scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
@@ -252,6 +253,7 @@ const cityLoad = CIRCUIT ? loadCircuitScene() : loadCity(scene, track, Q, { all:
   await stage('準備畫面', 0.98);
   applyShadowFlags();
   weather.collect();
+  weather.prepareWet(scene); // 濕路材質先建好，跟下面的 compileAsync 一起編著色器（不然第一次下雨那一格會卡一下）
   applyWeather();
   const hidden: THREE.Object3D[] = [];
   scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
@@ -319,6 +321,7 @@ let cycleT = +(new URLSearchParams(location.search).get('cyclet') ?? 0), cycleAc
 let envFor = 'dusk'; // 環境反射目前是照哪個時段做的（開場的 buildEnv() 是黃昏）
 function applyWeather() {
   weather.apply(timeKind, Q.fogFar, bloom, gradePass, cycleT);
+  // 環境反射（PMREM，很花時間）照「基底時段」做：選了雨天／雨夜 → 照雨天的天空；其他時段下雨是漸變，反射沿用原時段的天空，不在下雨當格重做（會卡一下）
   const k = timeKind === 'auto' ? `auto${cycleAt(cycleT).seg}` : timeKind;
   if (k !== envFor) { envFor = k; buildEnv(weather.envSun); } // 很花時間：時段真的變了才重做
   if (traffic) traffic.lightsOn = weather.night || weather.raining;
@@ -339,6 +342,7 @@ function tickCycle(dt: number) {
   clock.style.display = state === 'free' || state === 'race' ? '' : 'none';
   clock.textContent = `🕐 ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
+weather.pick(timeKind, true); // 存檔／網址選了雨天：一開場就是雨天，不從晴天慢慢下起
 applyWeather(); // 載入中的天空就先換好（城市載入完會再套一次，連窗戶、路燈）
 
 const car = new Car(); // 街道賽的 F1
@@ -366,7 +370,17 @@ addEventListener('resize', () => {
 let steerMode: SteerMode = save.steer ?? (save.opts.tilt ? 'tilt' : 'buttons');
 const timeSel = $<HTMLSelectElement>('opt-time');
 timeSel.value = timeKind;
-timeSel.addEventListener('change', () => { timeKind = timeSel.value as TimeKind; save.time = timeKind; writeSave(); applyWeather(); });
+timeSel.addEventListener('change', () => {
+  timeKind = timeSel.value as TimeKind; save.time = timeKind; writeSave();
+  // 環境反射（PMREM）是照「當下的天空」做的，而且很花時間：在選單裡先讓雨強度跳到目標、照目標的天空做一次（卡一下沒關係），
+  // 再退回原本的強度，之後由 weather.stepPicked 慢慢推——這樣不會在開車中才重做，反射也跟最後的天氣一致
+  const from = weather.pickedNow;
+  weather.pick(timeKind, true);
+  applyWeather();
+  weather.pickedNow = from;
+  weather.pick(timeKind, false);
+  applyWeather();
+});
 // 轉向靈敏度、音量（滑桿；記在存檔）
 {
   const sens = $<HTMLInputElement>('opt-sens');
@@ -675,7 +689,7 @@ function raceAudio(dt: number) {
   cars.sort((a, b) => a.d - b.d);
   sound.otherEngines(cars, car.x, car.z, Math.sin(car.h) * car.v, Math.cos(car.h) * car.v, car.h);
   // 觀眾：在看台附近才大聲；歡呼（起跑、超車、完賽）時整個拉高；雨賽時有雨聲
-  sound.ambience({ crowd: circuitEnv ? Math.max(0.2, circuitEnv.crowd.near(car.x, car.z)) : 0, excite: circuitEnv?.crowd.excite ?? 0, city: circuitEnv ? 0 : 0.5, rain: raceKind === 'gp' && field.wet > 0.05 ? Math.min(1, field.wet * 1.3) : 0 });
+  sound.ambience({ crowd: circuitEnv ? Math.max(0.2, circuitEnv.crowd.near(car.x, car.z)) : 0, excite: circuitEnv?.crowd.excite ?? 0, city: circuitEnv ? 0 : 0.5, rain: raceKind === 'gp' ? Math.max(0, (weather.rain01 - 0.3) / 0.7) : 0 }); // 雨聲跟畫面的雨一起：預兆期（強度 < 0.3）還沒有聲音
 }
 
 const GEARS = [0, 17, 28, 38, 48, 57, 66, 75];
@@ -888,8 +902,9 @@ function updateVisuals(dt: number) {
   trains?.update(dt);
   // 下雨：路人撐傘、路上積水、開過去噴水花
   if (peds) peds.raining = weather.raining;
+  if (peds) peds.rain01 = weather.rain01;
   if (rainfx) {
-    rainfx.update(dt, weather.raining && mode === 'free', fcar);
+    rainfx.update(dt, mode === 'free' ? weather.rain01 : 0, fcar);
     if (rainfx.splash) sound.splash(rainfx.splash);
   }
   if (police) { if (mode === 'free') police.render(dt, performance.now() / 1000); else police.hide(); }
@@ -956,7 +971,7 @@ function updateVisuals(dt: number) {
     camera.position.set(vc.x + lx * ex + hx * ez, base + ey, vc.z + lz * ex + hz * ez);
     camera.lookAt(vc.x + lx * ex + hx * 30, base + ey - 0.8, vc.z + lz * ex + hz * 30);
     if (Math.abs(camera.fov - 72) > 0.05) { camera.fov = 72; camera.updateProjectionMatrix(); }
-    cockpit.draw(dt, f1Look || chosen.id === 'f1', weather.raining, vc.v, vc.steer);
+    cockpit.draw(dt, f1Look || chosen.id === 'f1', weather.rain01, vc.v, vc.steer);
   } else cockpit.hide();
   if (state === 'menu' && cityReady && !CAM && !VIEW_FRONT && !MENU_CAM_OFF) menuCamera(dt);
   if (CAM) { camera.position.set(CAM[0], CAM[1], CAM[2]); camera.lookAt(CAM[3], CAM[4], CAM[5]); }
@@ -1657,10 +1672,35 @@ $('quali-go').addEventListener('click', async () => { await userStart(); startGp
 $('quali-again').addEventListener('click', async () => { await userStart(); $('quali-res').classList.add('hidden'); startQuali(); });
 $('quali-menu').addEventListener('click', () => { $('quali-res').classList.add('hidden'); qualiGrid = null; state = 'menu'; showMenu(false); });
 
-/** 正賽中下雨：天空、雨滴、路面換成雨天（夜晚就是雨夜）；比賽結束回到選單的時段天氣 */
+/**
+ * 正賽的雨強度 0~1，只看 raceTime／rainAt／wet（純函式，同步模擬、截圖測試也一樣）：
+ *   預兆：rainAt 前 25 秒開始天色變暗、霧變近（0 → 0.3），這段賽道還是乾的、也還沒有雨絲
+ *   下雨：rainAt 之後跟著賽道變濕的 wet（40 秒 0 → 1）一路下到全雨（0.3 → 1），畫面、雨聲、抓地力一起慢慢變
+ *   雨戰（rainAt < 0）一開始就是全雨；不下雨的場次（rainAt = Infinity）恆為 0
+ */
+const RAIN_OMEN = 25;
+function raceRainLevel() {
+  const ra = field.rainAt;
+  if (!isFinite(ra)) return 0;
+  if (ra < 0) return field.wet;
+  if (field.wet > 0) return 0.3 + 0.7 * field.wet;
+  const len = Math.min(RAIN_OMEN, Math.max(ra, 0.001)); // rainAt 小於 25 秒（測試參數 &rainat=）時預兆縮短，開賽那一刻仍是 0
+  return Math.max(0, Math.min(1, (field.raceTime - (ra - len)) / len)) * 0.3;
+}
+let rainTarget = 0, rainAcc = 0;
+/** 每格：正賽的雨強度跟著比賽進度走，變化夠大才重套天氣（約 4 Hz，跟自動日夜循環一樣） */
+function tickRain(dt: number) {
+  if ((state === 'race' || state === 'countdown') && raceKind === 'gp') rainTarget = raceRainLevel();
+  else if (state === 'menu' || state === 'free') rainTarget = 0; // 不管從哪條路離開大獎賽，回到選單／自由駕駛雨強度都歸零（設定選的雨天由 weather.pick 管，不在這裡）
+  rainAcc += dt;
+  const d = Math.abs(rainTarget - weather.rainLevel);
+  if ((d > 0.004 || (d > 0 && (rainTarget <= 0 || rainTarget >= 1))) && rainAcc > 0.25) { rainAcc = 0; weather.rainLevel = rainTarget; applyWeather(); }
+}
+/** 開賽、回選單時直接到位（不漸變）；比賽中下雨靠 tickRain 跟著進度慢慢變 */
 function setRaceRain(on: boolean) {
-  if (on) weather.apply(timeKind === 'night' || timeKind === 'rainnight' ? 'rainnight' : 'rain', Q.fogFar, bloom, gradePass, cycleT);
-  else applyWeather();
+  rainTarget = on ? raceRainLevel() : 0;
+  weather.rainLevel = rainTarget;
+  applyWeather();
 }
 function scBanner(text: string, green = false) {
   const el = $('sc-banner');
@@ -1679,7 +1719,7 @@ function gpEvent(ev: string) {
   if (ev === 'sc-out') { scBanner('🟡 安全車'); radio.say('sc', '安全車出動！保持車距、不要超車，DRS 關閉', Infinity); sound.beep(660, 0.3); }
   else if (ev === 'sc-in') { scBanner('🟡 安全車本圈進站'); radio.say('sc-in', '安全車這圈進站，準備重新起跑', Infinity); }
   else if (ev === 'green') { scBanner('🟢 綠旗！', true); setTimeout(() => scBanner(''), 3000); radio.say('green', '綠旗！衝！', Infinity); }
-  else if (ev === 'rain') { setRaceRain(true); toast('🌧️ 開始下雨了', ''); radio.say('rain', '開始下雨了，賽道會越來越濕——準備進站換雨胎', Infinity); }
+  else if (ev === 'rain') { toast('🌧️ 開始下雨了', ''); radio.say('rain', '開始下雨了，賽道會越來越濕——準備進站換雨胎', Infinity); } // 畫面早在預兆期就慢慢暗下來了，由 tickRain 推進
 }
 /** 車隊無線電：每 0.5 秒看一次狀況，有事就說（同一件事有冷卻時間） */
 function radioTick(dt: number) {
@@ -1704,6 +1744,8 @@ function radioTick(dt: number) {
   if (car.r26 && car.energy < 0.2) radio.say('batt', '電量剩 20%，先別開超車，煞車多回收一點', Infinity);
   if (car.energy > 0.5) radio.rearm('batt');
   if (field.wet > 0.35 && me.compound !== RAIN && !me.pitReq && !me.pit && field.laps - me.laps >= 1) radio.say('wet', '路面已經很濕了，這圈進站換雨胎！', 45);
+  // 預報：快要下雨了（天色開始變暗的時候說；只有會下雨的場次才有，晴天的場次 rainAt = Infinity 不會進來）
+  if (isFinite(field.rainAt) && field.rainAt > 0 && field.wet === 0 && field.rainAt - field.raceTime < RAIN_OMEN - 3) radio.say('rain-soon', '天色變暗了，雷達顯示快要下雨——先別急著換胎，等路面濕了再進站', Infinity);
   // 名次創新高才報（在兩個名次之間跳來跳去不要一直說）；掉了兩名以上之後重新算
   if (lastPos < 0) lastPos = k;
   if (k < lastPos && field.raceTime > 5) { radio.say('gain', `漂亮！上到第 ${k + 1} 名`, 12); lastPos = k; circuitEnv?.crowd.cheer(0.8); }
@@ -2487,7 +2529,7 @@ function freeAudio(dt: number) {
   cars.sort((a, b) => a.d - b.d);
   sound.otherEngines(cars.filter((c) => c.d < 180), fcar.x, fcar.z, fcar.vx, fcar.vz, fcar.h);
   const inTunnel = fcar.deck?.way.e === 2 && !!surface && surface.groundY(fcar.x, fcar.z) - fcar.y > CEIL;
-  sound.ambience({ city: CIRCUIT ? 0 : inTunnel ? 0.3 : 1, rain: weather.raining && !inTunnel ? 1 : 0, tunnel: inTunnel ? 1 : 0 });
+  sound.ambience({ city: CIRCUIT ? 0 : inTunnel ? 0.3 : 1, rain: inTunnel ? 0 : Math.max(0, (weather.rain01 - 0.3) / 0.7), tunnel: inTunnel ? 1 : 0 });
 }
 function updateFreeHud(dt: number) {
   const v = fcar.v;
@@ -2768,6 +2810,8 @@ renderer.setAnimationLoop(() => {
   } else {
     if (state === 'countdown') updateCountdown(dt);
   }
+  tickRain(dt); // 正賽的雨強度跟著 raceTime／rainAt／wet 慢慢推（先於 updateVisuals，雨絲、雨聲、座艙吃到的是這一格的值）
+  weather.stepPicked(dt, applyWeather); // 設定選了雨天／雨夜：雨慢慢下大，不是一選就整組換
   if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
   if (state === 'podium') { podiumFrame(dt); circuitEnv?.crowd.cheer(1); }
   circuitEnv?.crowd.tick(dt, camera.position.x, camera.position.z); // 看台觀眾：鏡頭靠近時興奮一點
@@ -2818,4 +2862,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; }, get traffic() { return traffic; }, get police() { return police; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get weather() { return weather; }, applyWeather: () => applyWeather(), field, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; }, get traffic() { return traffic; }, get police() { return police; } };

@@ -205,6 +205,10 @@ export class Pedestrians {
   /** 回傳被碰到的行人數（給音效用） */
   /** 下雨（main 每格設）：撐傘、走快一點 */
   raining = false;
+  /** 雨強度 0~1：每個人在不同的強度才撐傘（先撐的先開，大雨才全部撐），不是下雨那一格全部同時舉起來 */
+  rain01 = 0;
+  /** 第 k 個人撐傘的強度門檻 0.32 ~ 0.8（0.3 以下是還沒下的預兆）：用索引雜湊，不碰 this.rand()（rng(88) 的序列一位移，自由駕駛的行人配置就全變了） */
+  private umbAt(k: number) { return 0.32 + 0.48 * (((k * 2654435761) >>> 0) / 4294967296); }
   /** 尖叫（給 main 播）：位置 */
   screams: { x: number; z: number }[] = [];
   screamCount = 0; // 測試用
@@ -380,17 +384,19 @@ export class Pedestrians {
     const j = new THREE.Matrix4(), t = new THREE.Matrix4(), r = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
     let n = 0;
     const put = (k: Part, mat: THREE.Matrix4, c: THREE.Color) => { this.mesh[k].setMatrixAt(n, mat); this.mesh[k].setColorAt(n, c); };
-    for (const p of this.peds) {
+    for (let pi = 0; pi < this.peds.length; pi++) {
+      const p = this.peds[pi];
       if (!p.alive) continue;
       q.setFromAxisAngle(up, p.h);
       const sitting = p.sit > 0;
+      const rainy = this.rain01 > this.umbAt(pi); // 這個人撐不撐傘
       const bob = sitting ? 0 : Math.abs(Math.sin(p.phase)) * 0.03;
       m.compose(pos.set(p.x, groundH(p.x, p.z) - 0.25 + bob - (sitting ? 0.5 : 0), p.z), q, sc.setScalar(p.scale));
       for (const k of ['torso', 'pelvis', 'neck', 'head'] as const) put(k, m, k === 'torso' ? p.shirt : k === 'pelvis' ? p.pants : p.skin);
       put('hair', m, p.hair);
       put('blob', m, p.hair);
       put('bag', p.bag ? m : zero, p.bagColor);
-      const umb = this.raining && !sitting; // 被撞倒坐在地上時傘掉了
+      const umb = rainy && !sitting; // 被撞倒坐在地上時傘掉了
       put('umb', umb ? m : zero, p.umbColor);
       put('umbPole', umb ? m : zero, p.shoe);
       const swing = sitting || p.mode === 'wait' || (p.look > 0 && p.scared <= 0) ? 0 : Math.sin(p.phase) * (p.scared > 0 ? 0.8 : 0.5); // 等紅燈、轉頭看時站好；跑的時候擺比較大
@@ -403,7 +409,7 @@ export class Pedestrians {
       // 手：肩關節 (±0.23, 1.44)，跟同側的腿反向擺
       for (const [arm, side, sgn] of [['armL', -0.23, -1], ['armR', 0.23, 1]] as const) {
         // 嚇到：雙手舉高；下雨撐傘：右手往前上方舉著傘柄
-        const raise = p.scared > 0 && !sitting ? Math.PI - 0.35 : this.raining && !sitting && side > 0 ? 1.15 : 0;
+        const raise = p.scared > 0 && !sitting ? Math.PI - 0.35 : rainy && !sitting && side > 0 ? 1.15 : 0;
         j.copy(m).multiply(t.makeTranslation(side, 1.44, 0)).multiply(r.makeRotationX(sitting ? -0.3 : raise ? raise : swing * sgn * 0.8)).multiply(r.makeRotationZ(side * (raise ? 0.6 : 0.25)));
         put(arm, j, p.sleeve);
       }

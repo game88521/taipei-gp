@@ -77,9 +77,12 @@ export class RainFx {
     d.s.visible = true;
   }
 
-  /** raining：現在有沒有下雨；car：玩家的車（位置、速度、車頭方向） */
-  update(dt: number, raining: boolean, car: { x: number; z: number; vx: number; vz: number; h: number; v: number }) {
-    this.puddles.visible = raining;
+  /** rain：雨強度 0~1（0.3 以下是預兆、還沒下；積水 0.5 之後才浮現、到 0.9 全開，有積水才有水花）；car：玩家的車（位置、速度、車頭方向） */
+  update(dt: number, rain: number, car: { x: number; z: number; vx: number; vz: number; h: number; v: number }) {
+    const f = Math.max(0, Math.min(1, (rain - 0.5) / 0.4));
+    const raining = f > 0;
+    this.puddles.visible = f > 0;
+    (this.puddles.material as THREE.MeshStandardMaterial).opacity = 0.62 * f;
     this.splash = 0;
     const sp = Math.abs(car.v), fx = Math.sin(car.h), fz = Math.cos(car.h), rx = -fz, rz = fx;
     if (raining && sp > 5) {

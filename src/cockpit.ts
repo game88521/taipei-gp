@@ -16,8 +16,11 @@ export class Cockpit {
 
   hide() { this.c.style.display = 'none'; this.drops.length = 0; }
 
-  /** open：F1（開放式座艙，沒有擋風玻璃與雨刷）；raining：下雨；v：車速 m/s */
-  draw(dt: number, open: boolean, raining: boolean, v: number, steer: number) {
+  /** open：F1（開放式座艙，沒有擋風玻璃與雨刷）；rain：雨強度 0~1（0.3 以下是還沒下的預兆；之後越大雨滴越多，雨刷 0.45 才開）；v：車速 m/s */
+  draw(dt: number, open: boolean, rain: number, v: number, steer: number) {
+    const fall = Math.max(0, Math.min(1, (rain - 0.3) / 0.7)); // 真的在下的程度
+    const raining = rain > 0.45; // 雨刷開不開（剛開始下的零星幾滴不用刷）
+    const drizzle = fall > 0;
     const c = this.c, g = this.g;
     c.style.display = 'block';
     const W = Math.round(innerWidth), H = Math.round(innerHeight);
@@ -25,8 +28,8 @@ export class Cockpit {
     g.clearRect(0, 0, W, H);
 
     // ---- 雨滴：隨機落在玻璃上，慢慢變大；車速快時往上滑走
-    if (raining) {
-      const rate = (open ? 25 : 60) * dt * (W * H) / (1280 * 720);
+    if (drizzle) {
+      const rate = (open ? 25 : 60) * fall * dt * (W * H) / (1280 * 720);
       for (let k = 0; k < rate || (k === 0 && Math.random() < rate); k++) {
         if (this.drops.length > 260) break;
         this.drops.push({ x: Math.random() * W, y: Math.random() * H * 0.78, r: 1.5 + Math.random() * 3.5, age: 0 });

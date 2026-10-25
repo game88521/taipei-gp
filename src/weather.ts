@@ -38,6 +38,8 @@ export function cycleAt(t: number) {
   }
   return { from: 'day' as const, to: 'day' as const, f: 0, clock: 12, inFade: false, seg: 0 };
 }
+/** 濕路面的顏色（乾路顏色隨雨強度往這個色靠近；原本一下子換成這個色） */
+const WET_COLOR = new THREE.Color('#8a8c92');
 const lerpC = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString();
 const lerpN = (a: number, b: number, t: number) => a + (b - a) * t;
 function blend(a: Preset, b: Preset, t: number): Preset {
@@ -50,6 +52,7 @@ function blend(a: Preset, b: Preset, t: number): Preset {
     hemiSky: lerpC(a.hemiSky, b.hemiSky, t), hemiGround: lerpC(a.hemiGround, b.hemiGround, t), hemi: lerpN(a.hemi, b.hemi, t),
     sun: lerpC(a.sun, b.sun, t), sunI: lerpN(a.sunI, b.sunI, t), disc: lerpN(a.disc, b.disc, t), cloud: lerpC(a.cloud, b.cloud, t), cloudOp: lerpN(a.cloudOp, b.cloudOp, t),
     windows: lerpN(a.windows, b.windows, t), lamp: lerpN(a.lamp, b.lamp, t), night: pick.night, rain: false, bloom: lerpN(a.bloom, b.bloom, t), env: lerpN(a.env, b.env, t),
+    // 自動日夜循環裡 a、b 都不是雨天（rain 一律 false）；基底 ↔ 雨天的混合另外走 Weather.apply 的 rainLevel，不經過這個旗標
     tint: [0, 1, 2].map((i) => lerpN(a.tint[i], b.tint[i], t)) as [number, number, number], shadow: lerpN(a.shadow, b.shadow, t),
     mtn: a.mtn.map((l, i) => [lerpC(l[0], b.mtn[i][0], t), lerpC(l[1], b.mtn[i][1], t)] as [string, string]), beam: lerpN(a.beam, b.beam, t),
   };
@@ -60,8 +63,10 @@ class Rain {
   mesh: THREE.LineSegments;
   private pos: Float32Array;
   private n: number;
+  private shown: number; // 目前畫幾條（雨越大越多：下雨開始時是稀稀落落幾滴，不是整批一起出現）
   constructor(scene: THREE.Scene, n: number) {
     this.n = n;
+    this.shown = n;
     this.pos = new Float32Array(n * 6);
     for (let i = 0; i < n; i++) {
       const x = (Math.random() - 0.5) * 70, y = Math.random() * 40, z = (Math.random() - 0.5) * 70;
@@ -74,10 +79,21 @@ class Rain {
     this.mesh.visible = false;
     scene.add(this.mesh);
   }
+  /**
+   * 雨強度 0~1 → 畫幾條、多透明。0.3 以下是預兆（天色變暗、還沒下）：沒有雨絲；
+   * 0.3 → 1 條數照 ((強度−0.3)/0.7) 的 1.5 次方：剛下時稀稀落落，到大雨才密
+   */
+  setLevel(level: number) {
+    const f = Math.max(0, Math.min(1, (level - 0.3) / 0.7));
+    this.shown = Math.round(this.n * Math.pow(f, 1.5));
+    this.mesh.geometry.setDrawRange(0, this.shown * 2);
+    (this.mesh.material as THREE.LineBasicMaterial).opacity = 0.22 + 0.23 * f;
+    this.mesh.visible = this.shown > 0;
+  }
   update(dt: number, cam: THREE.Vector3) {
     if (!this.mesh.visible) return;
     const p = this.pos, fall = 26 * dt;
-    for (let i = 0; i < this.n; i++) {
+    for (let i = 0; i < this.shown; i++) { // 沒畫的雨絲不用動（小雨時省下大半運算）
       const k = i * 6;
       p[k + 1] -= fall; p[k + 4] -= fall;
       p[k] += 0.12 * fall / 0.9 * 0.1; p[k + 3] += 0.12 * fall / 0.9 * 0.1;
@@ -161,11 +177,36 @@ export class Weather {
   }
 
   private cur: Preset = P.dusk;
+  /**
+   * 雨強度 0~1（main 每格設）：天空、霧、光、路面、雨絲都在「基底時段」與「同一時段的雨天」之間照強度混合，
+   * 所以下雨是慢慢變暗、慢慢變濕，不是同一格整組切換。基底本身是雨天（設定選了雨天／雨夜）時，強度固定當 1
+   */
+  rainLevel = 0;
+  /**
+   * 設定選了「雨天／雨夜」時，雨不是一選就整組換：從 0 慢慢下大。這個值是已經下到哪（0~1），由 update 推進；
+   * 基底是白天（雨天）或夜晚（雨夜），所以選到雨天 = 白天慢慢下起雨，不是先跳到另一組天空
+   */
+  private picked = 0;
+  private pickedWant = 0;
+  /** 設定選了這個時段：雨天／雨夜 → 雨要下到 1，其他 → 收到 0；snap = true 就直接到位（開場、測試），否則慢慢推 */
+  pick(kind: TimeKind, snap: boolean) {
+    this.pickedWant = kind === 'rain' || kind === 'rainnight' ? 1 : 0;
+    if (snap) this.picked = this.pickedWant;
+  }
+  /** 目前已經下到哪（0~1）；main 在選單裡換時段時，先 snap 到目標做環境反射，再退回這個值慢慢推 */
+  get pickedNow() { return this.picked; }
+  set pickedNow(v: number) { this.picked = v; }
   /** 套用時段（auto 時 t = 循環到第幾秒，會在兩個時段之間漸變） */
   apply(kind: TimeKind, fogFar: number, bloom: { strength: number } | null, grade: { uniforms: Record<string, { value: unknown }> } | null, t = 0) {
     this.kind = kind;
-    let p: Preset;
-    if (kind === 'auto') { const c = cycleAt(t); p = blend(P[c.from], P[c.to], c.f); } else p = P[kind];
+    // 選的是雨天／雨夜：基底改成白天／夜晚，雨強度由 picked 慢慢推到 1；其他時段維持原本的做法
+    const effKind: Exclude<TimeKind, 'auto'> | 'auto' = kind === 'rain' ? 'day' : kind === 'rainnight' ? 'night' : kind;
+    let base: Preset;
+    if (effKind === 'auto') { const c = cycleAt(t); base = blend(P[c.from], P[c.to], c.f); } else base = P[effKind];
+    // 同一個時段的雨天：晚上就是雨夜（auto 循環在夜晚段 night = true）
+    const lv = Math.max(0, Math.min(1, Math.max(this.rainLevel, this.picked)));
+    const p: Preset = lv > 0 ? { ...blend(base, base.night ? P.rainnight : P.rain, lv), night: base.night } : base;
+    this.level = lv;
     this.cur = p;
     const w = this.world;
     w.setSky(...p.sky);
@@ -196,29 +237,80 @@ export class Weather {
     for (const m of this.nightEmis) { const [d, n] = m.userData.nightEmissive as [string, string]; m.emissive.set(d).lerp(new THREE.Color(n), nightness); }
     if (bloom) bloom.strength = p.bloom;
     if (grade) (grade.uniforms.tint.value as THREE.Vector3).set(...p.tint);
-    this.rain.mesh.visible = p.rain;
-    for (const o of this.rainOnly) o.visible = p.rain;
-    // 濕路面：換成會反光（映出天空與燈）的材質，顏色暗一點
+    // 雨絲：強度越大越密（小雨稀稀落落）
+    this.rain.setLevel(lv);
+    // 強度 0~0.3 是預兆（天色變暗、霧變近，還沒下）；0.3 之後才真的在下，下面這些都從 0.3 開始算
+    // 只在下雨才有的東西：積水（透明材質）隨強度浮現，0.5 之後才看得到、到 0.9 全開；F1 雨燈（不透明）一開始下就亮
+    for (const o of this.rainOnly) {
+      const m = (o as THREE.Mesh).material as THREE.Material & { opacity: number };
+      if (m.transparent) {
+        m.userData.baseOpacity ??= m.opacity;
+        const f = Math.max(0, Math.min(1, (lv - 0.5) / 0.4));
+        m.opacity = (m.userData.baseOpacity as number) * f;
+        o.visible = f > 0;
+      } else o.visible = lv > 0.3;
+    }
+    // 濕路面：換成會反光（映出天空與燈）的材質，顏色暗一點。乾路是 Lambert、濕路是 Standard，著色器不同不能直接插值，
+    // 所以一開始下（強度過 0.3）就換材質，但換上去的那一刻顏色、粗糙度還接近乾路，再隨強度慢慢變暗、變亮面（看不出換材質的那一格）
+    const wet = Math.max(0, Math.min(1, (lv - 0.3) / 0.7));
     for (const r of this.roads) {
-      if (p.rain) {
-        if (!r.wet) {
-          const d = r.dry as THREE.MeshLambertMaterial;
-          r.wet = new THREE.MeshStandardMaterial({ map: d.map, color: '#8a8c92', roughness: 0.28, metalness: 0.15, side: d.side, polygonOffset: true, polygonOffsetFactor: d.polygonOffsetFactor, polygonOffsetUnits: d.polygonOffsetUnits, envMapIntensity: 1.4 });
-        }
-        r.mesh.material = r.wet;
+      if (lv > 0.3) {
+        const w = this.wetOf(r.dry), d = r.dry as THREE.MeshLambertMaterial;
+        w.color.copy(d.color).lerp(WET_COLOR, wet);
+        w.roughness = 0.9 - (0.9 - 0.28) * wet;
+        w.metalness = 0.15 * wet;
+        r.mesh.material = w;
       } else r.mesh.material = r.dry;
     }
     return true;
+  }
+  /** 雨強度（套用後的值；基底是雨天時是 1） */
+  private level = 0;
+  /** 每個乾路材質共用一個濕路材質（同一種乾路有很多個 mesh） */
+  private wetMats = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+  private wetOf(dry: THREE.Material) {
+    let w = this.wetMats.get(dry);
+    if (!w) {
+      const d = dry as THREE.MeshLambertMaterial;
+      // 反光強弱靠 roughness／metalness（材質沒有自己的 envMap 時，three 一律用 scene.environmentIntensity，envMapIntensity 設了也沒用）
+      w = new THREE.MeshStandardMaterial({ map: d.map, color: d.color.clone(), roughness: 0.9, metalness: 0, side: d.side, polygonOffset: true, polygonOffsetFactor: d.polygonOffsetFactor, polygonOffsetUnits: d.polygonOffsetUnits });
+      this.wetMats.set(dry, w);
+    }
+    return w;
+  }
+  /** 開場就把濕路材質建好、掛在一個隱藏的代表上，讓 main 的 compileAsync 一起編著色器（不然第一次下雨那一格會卡） */
+  prepareWet(scene: THREE.Scene) {
+    for (const r of this.roads) {
+      const w = this.wetOf(r.dry);
+      if (w.userData.proxy) continue;
+      const proxy = new THREE.Mesh(r.mesh.geometry, w);
+      proxy.visible = false;
+      proxy.frustumCulled = false;
+      w.userData.proxy = proxy;
+      scene.add(proxy);
+    }
   }
 
   /** 目前時段的太陽、天空光強度（隧道裡調暗用） */
   get sunI() { return this.cur.sunI; }
   get hemiI() { return this.cur.hemi; }
   get night() { return this.cur.night; }
-  get raining() { return this.cur.rain; }
+  /** 有在下雨（強度過 0.3，預兆期之後：車開燈這類「下或不下」的東西看這個） */
+  get raining() { return this.level > 0.3; }
+  /** 雨強度 0~1（雨聲、座艙雨滴、積水水花這類「越大越多」的東西看這個） */
+  get rain01() { return this.level; }
   /** 環境反射用：太陽（月亮）的亮度顏色 */
   get envSun() { const p = this.cur; return new THREE.Color(p.sun).multiplyScalar(p.disc > 0.3 ? 4 : p.night ? 0.3 : 1.2); }
 
+  /** 選了雨天／雨夜之後，雨強度慢慢推到目標（下大約 8 秒、收掉約 6 秒）；變化夠大才重套天氣 */
+  private pickedAcc = 0;
+  stepPicked(dt: number, reapply: () => void) {
+    const d = this.pickedWant - this.picked;
+    if (d === 0) return;
+    this.picked += Math.max(-dt / 6, Math.min(dt / 8, d));
+    this.pickedAcc += dt;
+    if (this.pickedAcc > 0.25 || this.picked === this.pickedWant) { this.pickedAcc = 0; reapply(); }
+  }
   update(dt: number, cam: THREE.Vector3) {
     this.rain.update(dt, cam);
     for (const t of this.tickers) t.offset.x = (t.offset.x + dt * 0.035) % 1;
