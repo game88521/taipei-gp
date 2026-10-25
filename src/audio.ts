@@ -22,6 +22,7 @@ export class Sound {
   enabled = true;
   private ctx: AudioContext | null = null;
   private master!: GainNode;
+  private limiterOut!: GainNode; // 軟限幅之後、接到喇叭之前的最後一個節點（測試量真正送出去的聲音用）
   private engGain!: GainNode;
   private o1!: OscillatorNode;
   private o2!: OscillatorNode;
@@ -72,14 +73,25 @@ export class Sound {
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
     this.master.gain.value = 0.6;
-    // 軟限幅：好幾台引擎＋撞擊＋喇叭疊在一起時不會爆音。y = c·tanh(x/c)：小音量時增益剛好是 1（平常聽起來一樣），
-    // 輸入到 ±1 時輸出約 ±0.91，不會削到喇叭的硬削波
+    // 軟限幅：好幾台引擎＋撞擊＋喇叭疊在一起時不會爆音。
+    // 0.6 以下完全不動（一般音量聽起來跟沒有限幅一樣），超過之後 T + (C−T)·tanh((|x|−T)/(C−T)) 平順地逼近 C = 0.95：
+    // 輸入 1.0 → 0.885、1.5 → 0.946，永遠到不了 1 被喇叭削掉。
+    // WaveShaper 的曲線只定義在輸入 ±1，超過的輸入會變成平頂（硬削波，聽起來很刺，舊版輸入大於 1 就是這樣）；
+    // 所以前面先除以 K、後面乘回 K，讓這條曲線實際涵蓋 ±K（輸入 4 倍滿幅也還在曲線上）
+    const K = 4, T = 0.6, C = 0.95;
+    const pre = ctx.createGain();
+    pre.gain.value = 1 / K;
     const soft = ctx.createWaveShaper();
-    const curve = new Float32Array(2049);
-    for (let i = 0; i < curve.length; i++) curve[i] = 1.8 * Math.tanh((i / 1024 - 1) / 1.8);
+    const curve = new Float32Array(8193);
+    for (let i = 0; i < curve.length; i++) {
+      const x = K * (i / 4096 - 1), a = Math.abs(x);
+      curve[i] = (Math.sign(x) * (a <= T ? a : T + (C - T) * Math.tanh((a - T) / (C - T)))) / K;
+    }
     soft.curve = curve;
     soft.oversample = '2x';
-    this.master.connect(soft).connect(ctx.destination);
+    this.limiterOut = ctx.createGain();
+    this.limiterOut.gain.value = K;
+    this.master.connect(pre).connect(soft).connect(this.limiterOut).connect(ctx.destination);
     // 引擎與其他音效分開兩個通道，選單可以各自調音量
     this.engBus = ctx.createGain();
     this.engBus.connect(this.master);
@@ -179,12 +191,16 @@ export class Sound {
     return node;
   }
   /** 殘響的脈衝響應：左右各一段指數衰減的白噪音，每聲道能量正規化成 1（寬頻的聲音進去，出來一樣大聲） */
-  private impulse(sec: number, decay: number) {
+  private impulse(sec: number, decay: number, seed = 1) {
     const ctx = this.ctx!, n = Math.round(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    // 固定種子：引擎聲只有幾條諧波，進出殘響的音量取決於脈衝響應的頻率起伏；用 Math.random 的話每次載入會差到 5 dB。
+    // 種子 1 是掃 6 個種子 × 5 個轉速挑出來的：隧道殘響讓整體多 +2.5 ~ +3.7 dB（離 0 與 6 dB 的門檻都有餘裕）
+    let rs = seed >>> 0;
+    const rnd = () => (rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0) / 4294967296;
     for (let c = 0; c < 2; c++) {
       const d = b.getChannelData(c);
       let e = 0;
-      for (let i = 0; i < n; i++) { d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); e += d[i] * d[i]; }
+      for (let i = 0; i < n; i++) { d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / n, decay); e += d[i] * d[i]; }
       for (let i = 0, k = 1 / Math.sqrt(e); i < n; i++) d[i] *= k;
     }
     return b;
