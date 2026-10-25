@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { Car } from './car';
 import type { CarModel } from './carModel';
-import { makeF1, TEAMS } from './f1model';
+import { makeF1, setTyre, TEAMS } from './f1model';
 import { CIRCUIT } from './circuits';
 import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, type Track } from './track';
-import { PIT, boxS, laneLat, signedS, type PitLane, type StopInfo } from './pitlane';
+import { PIT, boxS, laneLat, signedS, mountedAt, type PitLane, type StopInfo } from './pitlane';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
 // 被慢車擋住就挑比較空的一側超車、尾流加速、車與車照動量交換互相撞開
@@ -134,6 +134,8 @@ export class RaceField {
   form: Record<string, number> = {};
   /** 維修區（main 建好之後設定）：外觀與維修人員動畫；限速 */
   pitlane: PitLane | null = null;
+  /** 玩家的車模（main 設定；玩家的 Racer.model 是 null，位置由 main 擺）：換胎動畫、胎色圈用 */
+  playerModel: CarModel | null = null;
   private pitSeed = 11;
   private pitRnd() { this.pitSeed = (this.pitSeed * 16807) % 2147483647; return this.pitSeed / 2147483647; }
   private stops = new Map<number, StopInfo>();
@@ -476,16 +478,23 @@ export class RaceField {
     if (r.isPlayer) this.events.push('pit-in');
   }
 
+  /** 停在格子裡的 r 現在放出去安不安全：快車道後面 12 m 內沒有別隊的車正要開過來（同隊排隊等格子的不算） */
+  private pitClear(r: Racer) {
+    const p = r.pit!;
+    return !this.racers.some((o) => o !== r && o.pit && o.pit.ph === 'in' && o.pit.team !== p.team && o.pit.sd > p.box - 12 && o.pit.sd < p.box + 2 && o.pit.box - o.pit.sd > 18);
+  }
+
   /** 維修區裡的自動駕駛：限速線前減速、轉進停車格、換胎、放行、限速線後加速、匯回賽道 */
   private pitStep(r: Racer, dt: number) {
     const p = r.pit!, c = r.car, VP = this.pitlane?.speed ?? 80 / 3.6;
     if (p.ph === 'box') {
       p.t += dt;
       c.v = 0;
-      r.lift = p.t < p.T - 0.3 ? Math.min(0.1, p.t * 0.6) : Math.max(0, r.lift - dt * 0.5);
+      // 千斤頂（純視覺，只影響車模的高度）：一停好就頂起 0.22 m（約 0.15 秒），停站的 84~94% 放下（pitlane.ts 的 TL.DROP，跟維修人員同一條時間軸）
+      const up = Math.min(1, p.t / 0.15), down = Math.max(0, Math.min(1, (p.t - 0.84 * p.T) / (0.1 * p.T)));
+      r.lift = 0.22 * up * (1 - down);
       // 放行：時間到、而且快車道後面 12 m 內沒有車正要開過來（不會放出去撞到人；同隊排隊等格子的不算）
-      const clear = !this.racers.some((o) => o !== r && o.pit && o.pit.ph === 'in' && o.pit.team !== p.team && o.pit.sd > p.box - 12 && o.pit.sd < p.box + 2 && o.pit.box - o.pit.sd > 18);
-      if (p.t >= p.T && clear) {
+      if (p.t >= p.T && this.pitClear(r)) {
         r.wear = 0; r.compound = p.next; r.pits++; r.lastStop = p.t; r.lift = 0;
         p.ph = 'out';
         if (r.isPlayer) this.events.push(`stop:${p.t.toFixed(1)}:${p.next}:${p.slow}`);
@@ -553,7 +562,11 @@ export class RaceField {
       const cur = this.stops.get(p.team);
       if (cur && cur.phase === 'service') continue;
       const phase: StopInfo['phase'] = p.ph === 'in' ? 'approach' : p.ph === 'box' && p.t < p.T ? 'service' : 'release';
-      this.stops.set(p.team, { phase, t: p.t, T: p.T, slow: p.slow, newColor: TYRES[p.next].color });
+      // 純視覺（不影響放行與停站時間）：時間到了但還在格子裡 = 被快車道的車擋住了；
+      // 放行燈在時間到前 0.25 秒、而且快車道沒有車要過來時轉綠（車手看到綠燈才起步）
+      const hold = p.ph === 'box' && p.t >= p.T;
+      const go = p.ph === 'out' || (p.ph === 'box' && p.t >= p.T - 0.25 && this.pitClear(r));
+      this.stops.set(p.team, { phase: hold ? 'service' : phase, t: p.t, T: p.T, slow: p.slow, newColor: TYRES[p.next].color, oldColor: TYRES[r.compound].color, model: p.ph === 'box' ? (r.isPlayer ? this.playerModel : r.model) : null, hold, go, lift: r.lift, x: r.car.x, z: r.car.z });
     }
     return this.stops;
   }
@@ -660,8 +673,12 @@ export class RaceField {
 
   render(dt: number) {
     for (const r of this.racers) {
-      if (!r.model) continue;
-      const c = r.car, m = r.model;
+      const own = r.isPlayer ? this.playerModel : r.model;
+      // 胎色圈跟著實際的胎種；停站中新胎裝上車（mountedAt）那一刻就換色（compound 要到放行那一刻才變）。顏色沒變就不動
+      if (own) setTyre(own, TYRES[r.pit?.ph === 'box' && r.pit.t >= mountedAt(r.pit.T) ? r.pit.next : r.compound].color);
+      const m = r.model; // 玩家的車由 main 擺位置，這裡只擺 AI
+      if (!m) continue;
+      const c = r.car;
       m.root.position.set(c.x, surfaceY(this.t, c.pos.i, c.pos.lat) + r.lift, c.z); // 換胎時千斤頂把車抬起來
       m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, bankRoll(this.t, c.pos.i, c.pos.lat), 'YXZ');
       m.body.rotation.z = c.steer * Math.min(1, c.v / 40) * 0.04;

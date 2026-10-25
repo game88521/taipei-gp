@@ -284,6 +284,19 @@ export class Sound {
     else this.engGain.gain.setTargetAtTime(0, t, 0.05);
   }
   private lastFeed = 0; // 上一次 engine(…, true) 的時間（音訊時鐘）
+  private limiterAt = 0; // 上一次限速器斷火的時間（音訊時鐘）
+
+  /**
+   * 維修區限速器（每格呼叫，跟 engine 一起）：真的 F1 按了限速器之後，ECU 一直切斷點火把車速壓在限速，
+   * 引擎是「噗噗噗」一頓一頓的。這裡每 0.11 秒送一次斷火（worklet 的 shift：70 ms 不點火），聽起來就是那個顫音
+   */
+  limiter() {
+    if (!this.ctx || !this.worklet || !this.eng || this.hushed) return;
+    const t = this.ctx.currentTime;
+    if (t - this.limiterAt < 0.11) return;
+    this.limiterAt = t;
+    this.eng.port.postMessage({ type: 'shift' });
+  }
 
   /** rpm 0..1，load 0..1（踩油門的程度） */
   engine(rpm: number, load: number, running: boolean) {
@@ -543,6 +556,48 @@ export class Sound {
     src.connect(lp).connect(g).connect(this.fx);
     src.start(t);
     src.stop(t + 0.1);
+  }
+
+  /**
+   * 維修區的聲音（換胎）：在 (x, z) 發生，聽者在 (lx, lz)；距離衰減跟其他車一樣（每遠一倍 −6 dB，6 m 內全音量）。
+   * kind：'gun' 氣動扳手（高速的「滋——」：帶通噪音被 ~45 Hz 的方波斬成一串，鬆開時尾音往下掉）、
+   *       'jack' 千斤頂頂起／放下（低沉的「咚」＋一點金屬聲）、'go' 放行（短促的高音嗶）
+   */
+  pitSound(kind: 'gun' | 'jack' | 'go', x: number, z: number, lx: number, lz: number, vol = 1) {
+    if (!this.ctx || !this.enabled) return;
+    const d = Math.hypot(x - lx, z - lz), att = 6 / (6 + 1.1 * Math.max(0, d - 6));
+    const v = vol * att;
+    if (v < 0.01) return;
+    const ctx = this.ctx, t = ctx.currentTime, g = ctx.createGain();
+    g.connect(this.fx);
+    if (kind === 'gun') {
+      // 扳手：噪音 → 帶通（3.2 kHz 的金屬嘶聲）→ 被 45 Hz 方波調幅（衝擊扳手一下一下打的那個「達達達」）
+      const dur = 0.32;
+      const src = ctx.createBufferSource(); src.buffer = this.loopNoise(); src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(3200, t); bp.frequency.exponentialRampToValueAtTime(1800, t + dur); bp.Q.value = 2.5;
+      const am = ctx.createGain(); am.gain.value = 0;
+      const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.setValueAtTime(46, t); lfo.frequency.linearRampToValueAtTime(30, t + dur);
+      const lg = ctx.createGain(); lg.gain.value = 0.5;
+      const bias = ctx.createConstantSource(); bias.offset.value = 0.5; // 方波（−1~1）× 0.5 + 0.5 → 0~1 的開關
+      lfo.connect(lg).connect(am.gain); bias.connect(am.gain);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.32 * v, t + 0.01); g.gain.setValueAtTime(0.32 * v, t + dur - 0.06); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(bp).connect(am).connect(g);
+      for (const n of [src, lfo, bias]) { n.start(t); n.stop(t + dur + 0.02); }
+    } else if (kind === 'jack') {
+      // 千斤頂：低通噪音的悶響＋一個短的金屬正弦（鋼管碰到車底）
+      const src = ctx.createBufferSource(); src.buffer = this.noise;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+      g.gain.setValueAtTime(0.7 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      src.connect(lp).connect(g);
+      src.start(t); src.stop(t + 0.2);
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'sine'; o.frequency.value = 620;
+      og.gain.setValueAtTime(0.08 * v, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(og).connect(this.fx); o.start(t); o.stop(t + 0.13);
+    } else {
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 1760;
+      g.gain.setValueAtTime(0.06 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(g); o.start(t); o.stop(t + 0.13);
+    }
   }
 
   /** 開過積水的「唰」：高頻一點的噪音 */

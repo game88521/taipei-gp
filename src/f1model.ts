@@ -183,6 +183,22 @@ function badgeTexture(l: F1Livery, team: string) {
   });
 }
 
+/**
+ * 換胎：四個輪子兩側的胎色圈換成這個胎種的顏色（真實 F1：紅＝軟、黃＝中性、白＝硬、綠＝雨胎）。
+ * 胎色圈是合併在輪子網格裡的頂點顏色，改那一段頂點的 color 就好，不用多畫一次；顏色一樣就不動（每格呼叫也沒成本）
+ */
+export function setTyre(m: CarModel, color: string) {
+  if (m.root.userData.tyre === color) return;
+  m.root.userData.tyre = color;
+  const c = new THREE.Color(color);
+  for (const w of m.spin) {
+    const g = w.geometry, rings = g.userData.rings as [number, number][] | undefined, col = g.attributes.color as THREE.BufferAttribute | undefined;
+    if (!rings || !col) continue;
+    for (const [s, n] of rings) for (let i = s; i < s + n; i++) col.setXYZ(i, c.r, c.g, c.b);
+    col.needsUpdate = true;
+  }
+}
+
 export function makeF1(l: F1Livery, ghost = false): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -375,15 +391,20 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     // 胎面：側面輪廓繞軸轉一圈（軸先沿 y，再轉成沿 x）
     const prof = [[rr, -w / 2], [r * 0.9, -w / 2], [r - 0.012, -w / 2 + sh * 0.35], [r, -w / 2 + sh], [r, w / 2 - sh], [r - 0.012, w / 2 - sh * 0.35], [r * 0.9, w / 2], [rr, w / 2]].map(([a, b]) => new THREE.Vector2(a, b));
     const pieces = [tint(new THREE.LatheGeometry(prof, 24), '#141414')];
+    const rings: [number, number][] = []; // 兩側胎色圈在合併後網格裡的頂點範圍 [起點, 個數]（換胎時改顏色用：setTyre）
+    let at = pieces[0].attributes.position.count;
     for (const side of [-1, 1]) {
       const y = side * (w / 2 + 0.003), face = (geo: THREE.BufferGeometry) => geo.rotateX(side * -Math.PI / 2).translate(0, y, 0);
-      pieces.push(tint(face(new THREE.RingGeometry(r * 0.76, r * 0.84, 24)), l.tyre ?? '#e10600')); // 胎色圈
-      pieces.push(tint(face(new THREE.CircleGeometry(rr, 18)), '#1c1f24')); // 輪框罩
-      pieces.push(tint(face(new THREE.RingGeometry(rr * 0.93, rr, 18)), '#6a7078')); // 輪框邊
-      for (let k = 0; k < 3; k++) pieces.push(tint(face(new THREE.PlaneGeometry(0.025, rr * 0.8).translate(0, rr * 0.5, 0).rotateZ((k / 3) * Math.PI * 2)).translate(0, side * 0.001, 0), l.accent));
+      const ring = tint(face(new THREE.RingGeometry(r * 0.76, r * 0.84, 24)), l.tyre ?? '#e10600'); // 胎色圈
+      rings.push([at, ring.attributes.position.count]);
+      pieces.push(ring);
+      at += ring.attributes.position.count;
+      for (const p of [tint(face(new THREE.CircleGeometry(rr, 18)), '#1c1f24'), tint(face(new THREE.RingGeometry(rr * 0.93, rr, 18)), '#6a7078')]) { pieces.push(p); at += p.attributes.position.count; } // 輪框罩、輪框邊
+      for (let k = 0; k < 3; k++) { const p = tint(face(new THREE.PlaneGeometry(0.025, rr * 0.8).translate(0, rr * 0.5, 0).rotateZ((k / 3) * Math.PI * 2)).translate(0, side * 0.001, 0), l.accent); pieces.push(p); at += p.attributes.position.count; }
     }
     pieces.push(tint(new THREE.CylinderGeometry(0.045, 0.045, w + 0.03, 10), l.accent2)); // 中心鎖
     const wheelGeo = mergeGeometries(pieces).rotateZ(Math.PI / 2);
+    wheelGeo.userData.rings = rings;
     const tyre = new THREE.Mesh(wheelGeo, wheelMat);
     g.add(tyre);
     // 煞車導管（輪子內側的碳纖維鼓）

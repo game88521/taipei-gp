@@ -87,11 +87,34 @@ export interface StopInfo {
   T: number; // 這次停站總共幾秒
   slow: number; // 出包的那個輪子（-1 沒有）
   newColor: string; // 新胎的顏色（胎種）
+  oldColor: string; // 舊胎的顏色（拆下來的那顆）
+  /** 停在格子裡的那台車的模型（換胎動畫要動車上的輪子）；null = 還沒停好或沒有模型 */
+  model: import('./carModel').CarModel | null;
+  /** 擋住了：時間到了但快車道有車要過來，還不能放行 */
+  hold: boolean;
+  /** 放行燈：綠燈（放行前 0.25 秒、而且快車道沒有車要過來才亮；車手看到綠燈才起步） */
+  go: boolean;
+  /** 千斤頂把車頂起多高（m）：扳手跟著輪子中心的高度 */
+  lift: number;
+  /** 停車格在世界座標的位置（定位音效用） */
+  x: number; z: number;
 }
 
 // 維修人員的角色：在停車格座標（a 沿賽道往前、b 往車庫方向）的站位
 const WHEELS: [number, number][] = [[1.75, -0.95], [1.75, 0.95], [-1.6, -0.95], [-1.6, 0.95]]; // 左前、右前、左後、右後
+/** WHEELS 的第 w 個輪子 → 車模 spin[] 的第幾個（f1model 的順序是 右前、右後、左前、左後；模型 +x 是車子左邊） */
+const SPIN_OF = [2, 0, 3, 1];
 const CREW_N = 15; // 每個輪子 3 人（槍手、拆胎、裝胎）＋前後千斤頂＋放行
+/**
+ * 一次停站的時間軸（停站總長 T 的比例；T 在進站口就決定了，動作排成比例就一定剛好在 T 做完，不用動停站時間）：
+ *   0 ~ JACK 千斤頂前後同時頂起 → 槍手鬆螺帽（GUN1）→ 拆舊胎（OFF）→ 裝新胎（ON）→ 槍手鎖螺帽（GUN2）→ 千斤頂放下（DROP）→ 放行
+ * 出包的那個輪子（slow）：裝新胎晚到，這一輪的後半段整個往後推，車子要等它
+ */
+const TL = { JACK: 0.08, GUN1: [0.08, 0.2], OFF: [0.2, 0.42], ON: [0.42, 0.66], GUN2: [0.66, 0.8], DROP: [0.84, 0.94] } as const;
+/** 時間軸的基準長度：卡住的那次 T 會到 5~10 秒，其他三個輪子照正常節奏（最多 2.9 秒）做完，不跟著拖 */
+const baseOf = (T: number) => Math.min(T, 2.9);
+/** 新胎裝上車的時間（秒）：車上胎色圈從這一刻起換成新胎的顏色（rivals.ts 用；出包的那顆另外晚到，但拆下來時看不到） */
+export const mountedAt = (T: number) => TL.ON[1] * baseOf(T);
 
 export class PitLane {
   readonly speed: number;
@@ -100,6 +123,7 @@ export class PitLane {
   private tyre: THREE.InstancedMesh;
   private band: THREE.InstancedMesh;
   private sign: THREE.InstancedMesh;
+  private tool: THREE.InstancedMesh;
   /** 每隊每人目前的 [a, b, 蹲（0 站 ~ 1 蹲）] */
   private pose: Float32Array;
   /** 每隊 8 顆輪胎（4 舊 4 新）目前的 [a, b, 高度]；看不到的高度設 -9 */
@@ -223,6 +247,9 @@ export class PitLane {
     this.tyre = new THREE.InstancedMesh(tyreGeo, new THREE.MeshLambertMaterial({ color: '#1b1b1d' }), TEAMS.length * 8);
     this.band = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.38, 14, 1, true).rotateZ(Math.PI / 2), new THREE.MeshBasicMaterial({ side: D }), TEAMS.length * 8);
     this.sign = new THREE.InstancedMesh(mergeGeometries([new THREE.BoxGeometry(0.04, 1.4, 0.04).translate(0, 0.7, 0), new THREE.CylinderGeometry(0.3, 0.3, 0.03, 16).rotateX(Math.PI / 2).translate(0, 1.55, 0)]), new THREE.MeshBasicMaterial(), TEAMS.length);
+    // 工具（全部隊伍共用一個 InstancedMesh，+1 次繪製）：每隊 4 支氣動扳手（槍身＋握把，槍口朝 −z 頂著輪子中心）＋前後 2 支千斤頂（長柄＋底座）
+    // 扳手與千斤頂的幾何不同，合成一個 InstancedMesh 時用同一個幾何、各自縮放：先做一個單位方塊，place 時照用途給不同的大小
+    this.tool = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#2b2e33' }), TEAMS.length * 6);
     this.pose = new Float32Array(n * 3);
     this.tyres = new Float32Array(TEAMS.length * 8 * 3);
     TEAMS.forEach((tm, k) => {
@@ -234,7 +261,7 @@ export class PitLane {
       this.sign.setColorAt(k, new THREE.Color('#d81e2a'));
       this.place(k);
     });
-    for (const im of [this.body, this.head, this.tyre, this.band, this.sign]) { im.computeBoundingSphere(); im.frustumCulled = false; parent.add(im); }
+    for (const im of [this.body, this.head, this.tyre, this.band, this.sign, this.tool]) { im.computeBoundingSphere(); im.frustumCulled = false; parent.add(im); }
   }
 
   /** 台北的臨時車庫：每隊一間（白色帳篷式），門楣車隊色＋隊名，裡面暗暗的 */
@@ -285,31 +312,50 @@ export class PitLane {
     const o = (k * CREW_N + m) * 3;
     this.pose[o] = -6.5 + m * 0.92; this.pose[o + 1] = 2.1; this.pose[o + 2] = 0;
   }
+  /**
+   * 第 w 個輪子在這次停站的時間軸（秒）：[鬆螺帽開始, 拆下, 裝上, 鎖好]。
+   * 一般輪子照 TL 的比例排；出包的那個（slow）裝新胎卡住，裝上與鎖好往後推到 T 前面一點（車子在等它）
+   */
+  private wheelTimes(w: number, s: StopInfo): [number, number, number, number] {
+    const T = s.T, base = baseOf(T);
+    const k = (f: number) => f * base;
+    if (w !== s.slow) return [k(TL.GUN1[0]), k(TL.OFF[1]), k(TL.ON[1]), k(TL.GUN2[1])];
+    return [k(TL.GUN1[0]), k(TL.OFF[1]), T * 0.82, T * 0.9];
+  }
   /** 第 m 個人在停站的第 t 秒（總長 T）該站哪、蹲多低；slow = 出包的輪子 */
   private servicePose(m: number, s: StopInfo): [number, number, number] {
-    const T = s.T, tt = s.phase === 'approach' ? -1 : s.t;
+    const T = s.T, tt = s.phase === 'approach' ? -1 : s.hold ? T : s.t;
     if (m < 12) {
       const w = Math.floor(m / 3), role = m % 3, [wa, wb] = WHEELS[w], sb = Math.sign(wb);
-      if (role === 0) return [wa, wb + sb * 0.55, 1]; // 槍手：蹲在輪子旁
-      if (role === 1) { // 拆胎：抱著舊胎往外走
-        const f = tt < 0 ? 0 : smooth((tt - 0.3) / 0.45);
+      const [, off, on, lock] = this.wheelTimes(w, s);
+      if (role === 0) { // 槍手：蹲在輪子正外側（扳手頂著輪子中心），鎖好之後站起來、往後退一步讓車走
+        const back = tt < 0 ? 0 : smooth((tt - lock) / 0.25);
+        return [wa, wb + sb * (0.62 + back * 0.6), 1 - back * 0.7];
+      }
+      if (role === 1) { // 拆胎：螺帽一鬆就把舊胎拔出來、抱著往外走
+        const f = tt < 0 ? 0 : smooth((tt - off * 0.85) / 0.35);
         return [wa + 0.15, wb + sb * (1.15 + f * 1.4), 0.25 * (1 - f)];
       }
-      const late = w === s.slow ? Math.min(T - 1.1, 3.5) : 0; // 裝胎：從外面把新胎推進去（出包的那顆晚到）
-      const f = tt < 0 ? 0 : smooth((tt - 0.55 - late) / 0.4);
+      // 裝胎：一開始就抱著新胎在外面等，舊胎一離開就推進去（出包的那顆晚到）
+      const f = tt < 0 ? 0 : smooth((tt - (on - 0.3)) / 0.3);
       return [wa - 0.35, wb + sb * (2.4 - f * 1.2), 0.2 + f * 0.3];
     }
-    if (m === 12) return [3.9, 0, 0.55]; // 前千斤頂
-    if (m === 13) return [-3.5, 0, 0.55]; // 後千斤頂
+    if (m === 12 || m === 13) { // 前、後千斤頂：一停好就頂進去（蹲低），放下之後拉出來站開
+      const drop = tt < 0 ? 0 : smooth((tt - TL.DROP[1] * T) / 0.25);
+      return [m === 12 ? 3.9 + drop * 1.1 : -3.5 - drop * 1.1, 0, 0.7 - drop * 0.6];
+    }
     return [5.4, -0.6, 0]; // 放行（拿牌子的）
   }
 
   /** 每格：stops = 正在進站的隊伍 → 那一隊的停站狀態 */
   update(dt: number, stops: Map<number, StopInfo>) {
     const k8 = Math.min(1, dt * 6);
-    for (const [k, s] of stops) { this.active.add(k); this.linger[k] = 1.6; this.animate(k, s, k8); }
+    this.sounds.length = 0;
+    for (const [k, s] of stops) { this.active.add(k); this.linger[k] = 1.6; if (s.phase === 'approach') this.released[k] = 0; this.animate(k, s, k8); }
     for (const k of [...this.active]) {
       if (stops.has(k)) continue;
+      this.lastT[k] = -1;
+      this.released[k] = 0;
       this.linger[k] -= dt;
       // 停站結束：慢慢走回車庫門口、輪胎收走
       let moving = false;
@@ -320,36 +366,68 @@ export class PitLane {
       }
       for (let q = 0; q < 8; q++) this.tyres[(k * 8 + q) * 3 + 2] = -9;
       this.sign.setColorAt(k, new THREE.Color('#d81e2a'));
+      this.toolOn[k] = 0;
       this.place(k);
       if (!moving && this.linger[k] <= 0) this.active.delete(k);
     }
     if (this.body.instanceColor) this.body.instanceColor.needsUpdate = true;
-    for (const im of [this.body, this.head, this.tyre, this.band, this.sign]) im.instanceMatrix.needsUpdate = true;
+    for (const im of [this.body, this.head, this.tyre, this.band, this.sign, this.tool]) im.instanceMatrix.needsUpdate = true;
     if (this.band.instanceColor) this.band.instanceColor.needsUpdate = true;
     if (this.sign.instanceColor) this.sign.instanceColor.needsUpdate = true;
   }
 
+  /**
+   * 這一格發生的維修區聲音（main 拿去播）：每個停站在 t 跨過時間軸上的點時記一筆。
+   * 跨點判斷用每隊上一格的 t，所以暫停、畫面卡住都不會重複播
+   */
+  sounds: { kind: 'gun' | 'jack' | 'go'; x: number; z: number }[] = [];
+  private lastT = new Float32Array(TEAMS.length).fill(-1);
+  private released = new Uint8Array(TEAMS.length); // 這次停站已經播過放行聲了（停站結束時清掉）
   private animate(k: number, s: StopInfo, k8: number) {
     for (let m = 0; m < CREW_N; m++) {
       const o = (k * CREW_N + m) * 3, [a, b, c] = this.servicePose(m, s);
       const kk = s.phase === 'approach' ? k8 * 0.6 : Math.min(1, k8 * 3); // 停好之後動作要快
       this.pose[o] += (a - this.pose[o]) * kk; this.pose[o + 1] += (b - this.pose[o + 1]) * kk; this.pose[o + 2] += (c - this.pose[o + 2]) * kk;
     }
-    // 輪胎：舊胎（0~3）跟著拆胎的人、新胎（4~7）跟著裝胎的人
-    const col = new THREE.Color(s.newColor);
+    const inBox = s.phase !== 'approach', tt = inBox ? s.t : -1;
+    // 聲音：千斤頂頂起、四個輪子各自的扳手（鬆、鎖）、千斤頂放下、放行
+    // 上一格的 t：approach（還沒停好）是 -1，所以停好的那一格 prev = -1、tt = 0.0x，「頂起」也會被算到
+    const prev = this.lastT[k];
+    this.lastT[k] = tt;
+    const cross = (at: number) => prev < at && tt >= at;
+    if (inBox) {
+      if (cross(0.02)) this.sounds.push({ kind: 'jack', x: s.x, z: s.z });
+      for (let w = 0; w < 4; w++) { const [g1, , , lock] = this.wheelTimes(w, s); if (cross(g1 + w * 0.03) || cross(lock - 0.3 + w * 0.02)) this.sounds.push({ kind: 'gun', x: s.x, z: s.z }); }
+      if (cross(TL.DROP[0] * s.T)) this.sounds.push({ kind: 'jack', x: s.x, z: s.z });
+      if (s.phase === 'release' && !s.hold && !this.released[k]) { this.released[k] = 1; this.sounds.push({ kind: 'go', x: s.x, z: s.z }); }
+    }
+    // 輪胎：舊胎（0~3）從車上拆下來、抱著走；新胎（4~7）一開始在裝胎的人手上，裝上之後交給車上的輪子
+    const colNew = new THREE.Color(s.newColor), colOld = new THREE.Color(s.oldColor);
     for (let w = 0; w < 4; w++) {
       const off = (k * CREW_N + w * 3 + 1) * 3, on = (k * CREW_N + w * 3 + 2) * 3, sb = Math.sign(WHEELS[w][1]);
-      const show = s.phase !== 'approach';
+      const [, offT, onT] = this.wheelTimes(w, s);
       const T0 = (k * 8 + w) * 3, T1 = (k * 8 + 4 + w) * 3;
-      const offF = show ? smooth((s.t - 0.3) / 0.2) : 0; // 拆下來之後才看得到
-      this.tyres[T0] = this.pose[off] - 0.1; this.tyres[T0 + 1] = this.pose[off + 1] - sb * 0.45; this.tyres[T0 + 2] = offF > 0.5 ? 0.62 : -9;
-      this.tyres[T1] = this.pose[on] + 0.3; this.tyres[T1 + 1] = this.pose[on + 1] - sb * 0.5; this.tyres[T1 + 2] = 0.42;
-      this.band.setColorAt(k * 8 + 4 + w, col);
-      this.band.setColorAt(k * 8 + w, new THREE.Color('#5b5b5b')); // 舊胎磨得看不清楚顏色
+      const offNow = inBox && tt >= offT * 0.85, onNow = inBox && tt >= onT; // 舊胎已經拔下來了、新胎已經裝上去了
+      // 舊胎：拔下來之後跟著拆胎的人走（拔下來以前它在車上，由車模的輪子顯示）
+      this.tyres[T0] = this.pose[off] - 0.1; this.tyres[T0 + 1] = this.pose[off + 1] - sb * 0.45; this.tyres[T0 + 2] = offNow ? 0.62 : -9;
+      // 新胎：裝上以前在裝胎的人手上；裝上之後藏起來（換成車上的輪子，顏色是新胎）
+      this.tyres[T1] = this.pose[on] + 0.3; this.tyres[T1 + 1] = this.pose[on + 1] - sb * 0.5; this.tyres[T1 + 2] = inBox && !onNow ? 0.42 : s.phase === 'approach' ? 0.42 : -9;
+      this.band.setColorAt(k * 8 + 4 + w, colNew);
+      this.band.setColorAt(k * 8 + w, colOld); // 拆下來的舊胎還看得出是什麼胎（真的 F1 磨過也看得出顏色）
+      // 車上的輪子：拔下來到裝上之間不在車上（scale 0：玩家的車每格會重設 visible，不能用 visible）
+      const sp = s.model?.spin[SPIN_OF[w]];
+      if (sp) { const gone = offNow && !onNow; sp.scale.setScalar(gone ? 1e-4 : 1); }
     }
-    this.sign.setColorAt(k, new THREE.Color(s.phase === 'release' ? '#22ff66' : '#d81e2a'));
+    // 放行牌：放行前 0.25 秒、而且快車道沒有車要過來才轉綠（被擋住時維持紅色；以前時間一到就綠、而且跟起步同一格）
+    this.sign.setColorAt(k, new THREE.Color(s.go ? '#22ff66' : '#d81e2a'));
+    // 工具：槍手的氣動扳手頂在輪子中心（跟著千斤頂的高度），千斤頂的長柄從車頭、車尾伸進車底
+    this.toolLift[k] = inBox ? s.lift : 0;
+    this.toolOn[k] = inBox ? 1 : s.phase === 'approach' ? 1 : 0;
     this.place(k);
   }
+  /** 每隊：工具在不在手上、千斤頂把車頂多高（place 用） */
+  private toolOn = new Uint8Array(TEAMS.length);
+  private toolLift = new Float32Array(TEAMS.length);
 
   /** 把第 k 隊的人、輪胎、放行牌放到世界座標 */
   private place(k: number) {
@@ -376,5 +454,22 @@ export class PitLane {
     Q.setFromAxisAngle(up, f.h + Math.PI / 2);
     M.compose(V.set(x, f.y + 0.6, z), Q, S.set(1, 1, 1));
     this.sign.setMatrixAt(k, M);
+    // 工具：4 支氣動扳手（槍手手上，從輪子外側水平頂著輪子中心）＋前後 2 支千斤頂（長柄從車頭、車尾伸進車底，跟著千斤頂的人）
+    const on = this.toolOn[k] === 1, lift = this.toolLift[k];
+    for (let w = 0; w < 4; w++) {
+      const g = (k * CREW_N + w * 3) * 3, sb = Math.sign(WHEELS[w][1]);
+      // 扳手從槍手的位置往輪子中心伸 0.45 m：槍身 0.12×0.12、長 0.45，中心在槍手與輪子之間
+      const [gx, gz] = W(this.pose[g], this.pose[g + 1] - sb * 0.3);
+      Q.setFromAxisAngle(up, f.h + Math.PI / 2);
+      M.compose(V.set(gx, on ? f.y + 0.38 + lift : -50, gz), Q, S.set(0.45, 0.12, 0.12));
+      this.tool.setMatrixAt(k * 6 + w, M);
+    }
+    for (const [j, m, dir] of [[4, 12, 1], [5, 13, -1]] as const) {
+      // 千斤頂：一支 1.6 m 的長柄，從千斤頂的人手上斜斜伸到車頭（車尾）底下
+      const p = (k * CREW_N + m) * 3, [jx, jz] = W(this.pose[p] - dir * 0.8, this.pose[p + 1]);
+      Q.setFromAxisAngle(up, f.h);
+      M.compose(V.set(jx, on ? f.y + 0.25 + lift * 0.5 : -50, jz), Q, S.set(0.1, 0.1, 1.6));
+      this.tool.setMatrixAt(k * 6 + j, M);
+    }
   }
 }

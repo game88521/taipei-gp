@@ -11,7 +11,7 @@ import { GaragePreview } from './garage3d';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
 import { driverStandings, teamStandings, standingsHtml, roundName, roundPoints, pointsAfterEachRound, titleFight, nextForm, formTag, seasonPrize, defaultSeason, POINTS, FASTEST_LAP_POINT, type SeasonSave, type RoundResult } from './season';
 import { buildCircuitEnv } from './circuitenv';
-import { PitLane } from './pitlane';
+import { PitLane, PIT } from './pitlane';
 import { setupInstall } from './install';
 import { PedZones } from './pedzone';
 import { bootProgress, bootDone } from './boot';
@@ -348,6 +348,7 @@ applyWeather(); // 載入中的天空就先換好（城市載入完會再套一�
 const car = new Car(); // 街道賽的 F1
 const field = new RaceField(scene, track, car); // 正賽的 7 台 AI 對手
 field.pitlane = new PitLane(world.race, track, !CIRCUIT, CIRCUIT?.id); // 維修區：起跑線右側（台北搭臨時車庫，各國賽道用 circuitenv 的車庫）
+field.playerModel = carModel; // 換胎動畫、胎色圈（玩家的車由 main 擺位置，RaceField 只管輪子）
 let raceKind: 'gp' | 'tt' = 'tt'; // 正賽 or 計時賽
 const fcar = new FreeCar(); // 自由駕駛的汽車
 type Mode = 'free' | 'race';
@@ -667,7 +668,12 @@ function step(dt: number) {
   if (state !== 'race') return;
   const gear = gearOf(car.v);
   sound.setEngine('f1');
-  sound.engine(gear.rpm, inp.brake ? 0.15 : 1, true);
+  // 進站：停在格子裡是怠速（以前照 0 速的檔位算成 0.3 轉速＋全油門，像在格子裡空催）；
+  // 維修區限速中按了限速器，轉速固定在一個值、引擎一頓一頓的（限速器斷火）
+  const mp = raceKind === 'gp' ? field.me.pit : null;
+  if (mp?.ph === 'box') sound.engine(0.12, 0.15, true);
+  else if (mp && (mp.ph === 'in' || mp.sd < PIT.LIM_OUT)) { sound.engine(0.42, 0.55, true); sound.limiter(); }
+  else sound.engine(gear.rpm, inp.brake ? 0.15 : 1, true);
   raceAudio(dt);
 }
 
@@ -702,6 +708,7 @@ function gearOf(v: number) {
 
 // ---------------------------------------------------------------- 畫面
 let camSnap = true;
+let pitCam = 0; // 進站停車時的換胎鏡頭 0~1（慢慢轉過去、出站時慢慢轉回來）
 // ?cam=x,y,z,看向x,y,z：固定鏡頭（截圖檢查街景用）
 const CAM = new URLSearchParams(location.search).get('cam')?.split(',').map(Number) ?? null;
 const VIEW_FRONT = new URLSearchParams(location.search).get('view') === 'front';
@@ -886,7 +893,11 @@ function updateVisuals(dt: number) {
     traffic.visible = mode === 'free';
     if (mode === 'free') traffic.render(dt);
   }
-  if (mode === 'race' && raceKind === 'gp') field.render(dt);
+  if (mode === 'race' && raceKind === 'gp') {
+    field.render(dt);
+    // 維修區的聲音（扳手、千斤頂、放行），在停車格的位置發聲、照距離衰減（AI 的停站遠遠也聽得到一點）
+    for (const p of field.pitlane?.sounds ?? []) sound.pitSound(p.kind, p.x, p.z, car.x, car.z);
+  }
   // 安全車：在領先者前面 35 m 帶隊，車頂黃燈閃
   const scOn = mode === 'race' && raceKind === 'gp' && field.sc.phase !== 'off' && (state === 'race' || state === 'paused');
   scCar.model.root.visible = scOn;
@@ -950,6 +961,14 @@ function updateVisuals(dt: number) {
   const lowCar = f1Look || chosen.id === 'f1', back = lowCar ? 8 : chosen.id === 'pickup' ? 8 : 7.5, up = lowCar ? 2.9 : chosen.id === 'pickup' ? 3.7 : 3.3;
   const target = new THREE.Vector3(vc.x - fx * back, up + ry, vc.z - fz * back);
   const look = new THREE.Vector3(vc.x + fx * 6, 1.2 + ry, vc.z + fz * 6);
+  // 進站停在格子裡：鏡頭轉到車子左前方、稍微高一點，看得到維修人員換胎（車庫在車子右邊，從賽道那側看過去）
+  const myPit = mode === 'race' && raceKind === 'gp' ? field.me.pit : null;
+  pitCam += ((myPit?.ph === 'box' ? 1 : 0) - pitCam) * Math.min(1, dt * 2.5);
+  if (pitCam > 0.002) {
+    const lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 車子的左邊（賽道那側）
+    target.lerp(new THREE.Vector3(vc.x + lx * 6.5 + Math.sin(vc.h) * 4.5, 3.4 + ry, vc.z + lz * 6.5 + Math.cos(vc.h) * 4.5), pitCam);
+    look.lerp(new THREE.Vector3(vc.x - lx * 0.6, 0.5 + ry, vc.z - lz * 0.6), pitCam);
+  }
   if (camSnap) { camPos.copy(target); camLook.copy(look); camSnap = false; }
   const k = Math.min(1, dt * 10);
   camPos.lerp(target, k);
@@ -1810,9 +1829,11 @@ function updateGpHud() {
   // 胎況：胎種＋剩幾成
   const ty = TYRES[mine.compound], tyEl = $('tyre');
   const pp = mine.pit;
-  tyEl.textContent = pp?.ph === 'box' ? `🔧 停站 ${pp.t.toFixed(1)} s` : pp?.ph === 'out' && pp.sd > 150 ? '🚀 出站' : pp ? `🚧 維修區 ${Math.round((field.pitlane?.speed ?? 22.2) * 3.6)} km/h` : `${ty.short}胎 ${Math.round((1 - mine.wear) * 100)}%`;
+  tyEl.textContent = pp?.ph === 'box' ? `🔧 停站 ${pp.t.toFixed(1)} s` : pp?.ph === 'out' && pp.sd > 150 ? '🚀 出站' : pp ? `🚧 限速 ${Math.round((field.pitlane?.speed ?? 22.2) * 3.6)} km/h` : `${ty.short}胎 ${Math.round((1 - mine.wear) * 100)}%`;
   updatePitTyre(mine);
-  tyEl.style.borderColor = ty.color;
+  tyEl.style.borderColor = pp?.ph === 'box' ? TYRES[pp.next].color : ty.color; // 停站時邊框換成要裝上的新胎顏色
+  // 停站進度條：T 在進站口就決定了，所以可以照 t / T 畫（被快車道的車擋住、時間到還沒放行時停在滿格）
+  tyEl.style.background = pp?.ph === 'box' ? `linear-gradient(90deg, ${TYRES[pp.next].color}55 ${Math.min(100, (pp.t / pp.T) * 100).toFixed(0)}%, var(--panel) 0)` : '';
   tyEl.classList.toggle('worn', mine.wear > 0.6);
   $('pit').classList.toggle('on', mine.pitReq);
   $('pit').textContent = mine.pitReq ? '進站 ✓' : '進站';
