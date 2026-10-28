@@ -49,7 +49,7 @@ import { physicsTest } from './physicstest';
 import { initLeaderboard, submitLap } from './leaderboard-ui';
 
 
-import { save, writeSave, KEY, bestLapOf, type Ghost, type SteerMode } from './save';
+import { save, writeSave, KEY, bestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, type Ghost, type SteerMode } from './save';
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -111,6 +111,9 @@ const track = (() => {
   const k = (km * 1000) / t0.length;
   return buildTrack(pts.map(([x, z]) => [x * k, z * k] as [number, number]), circuitData.elev, CIRCUIT?.bank);
 })();
+// 存檔裡的最快圈、影子車是照哪一版賽道跑的：賽道形狀改過（換了資料、修了接縫）就清掉，不然影子車會穿牆、最快圈不能比
+const trackCleared = checkTrackStamp(trackStamp(track));
+if (trackCleared) writeSave();
 const world = buildWorld(scene, track, CIRCUIT?.banner, CIRCUIT ? `${CIRCUIT.banner[1]}  ${CIRCUIT.banner[0]}` : undefined);
 let circuitEnv: ReturnType<typeof buildCircuitEnv> | null = null;
 (scene.fog as THREE.Fog).far = Q.fogFar;
@@ -409,6 +412,20 @@ timeSel.addEventListener('change', () => {
   tcOp.addEventListener('input', () => { tc.op = +tcOp.value; saveTc(); });
   tcPos.addEventListener('change', () => { tc.pos = tcPos.value as typeof tc.pos; saveTc(); });
   applyTc();
+  // 傾斜轉向：反過來、死區、中立角度（存檔 save.tilt）
+  const tl: NonNullable<typeof save.tilt> = { inv: false, zero: 0, dead: 2, ...save.tilt };
+  const tInv = $<HTMLInputElement>('opt-tilt-inv'), tDead = $<HTMLInputElement>('opt-tilt-dead');
+  const applyTilt = () => {
+    input.tiltInvert = tl.inv; input.tiltZero = tl.zero; input.tiltDead = tl.dead;
+    $('tilt-dead-val').textContent = `${tl.dead}°`;
+    $('tilt-zero-val').textContent = tl.zero ? `目前 ${tl.zero > 0 ? '+' : ''}${tl.zero.toFixed(0)}°` : '水平';
+  };
+  const saveTilt = () => { save.tilt = { ...tl }; writeSave(); applyTilt(); };
+  tInv.checked = tl.inv; tDead.value = String(tl.dead);
+  tInv.addEventListener('change', () => { tl.inv = tInv.checked; saveTilt(); });
+  tDead.addEventListener('input', () => { tl.dead = +tDead.value; saveTilt(); });
+  $('opt-tilt-zero').addEventListener('click', () => { tl.zero = Math.round(input.tiltRaw); saveTilt(); });
+  applyTilt();
   const vol = save.vol ?? { master: 1, engine: 1, fx: 1 };
   sound.setVolume(vol);
   for (const k of ['master', 'engine', 'fx'] as const) {
@@ -472,6 +489,7 @@ function applyOpts() {
   world.assist.visible = opts.assist;
   sound.enabled = opts.sound;
   input.tilt = steerMode === 'tilt';
+  $('tilt-opts').style.display = steerMode === 'tilt' ? '' : 'none'; // 傾斜的細項只在選了傾斜轉向時出現
   // 傾斜模式仍顯示拖曳滑桿（陀螺儀不能用時可以改用手指）
   document.documentElement.dataset.steer = steerMode === 'buttons' ? 'buttons' : 'drag';
 }
@@ -734,7 +752,13 @@ function setNav(x: number, z: number, nm?: string) {
   toast(`🧭 導航到 ${nm}`, '');
 }
 function updateNav(dt: number) {
-  if (!nav || !router) { navArrows.update(null, 0, 0, 0); $('nav-hud').style.display = 'none'; return; }
+  if (!nav || !router) {
+    $('nav-hud').style.display = 'none';
+    // 開計程車（沒有另外點導航）：路上的箭頭照乘客／目的地的路線走（以前只畫在小地圖上，要一直低頭看）
+    if (taxiOn() && taxi?.route) navArrows.update(taxi.route, fcar.x, fcar.z, performance.now() / 1000, taxi.routeYs);
+    else navArrows.update(null, 0, 0, 0);
+    return;
+  }
   nav.t += dt;
   const d = Math.hypot(nav.x - fcar.x, nav.z - fcar.z);
   // 偏離路線 25 m 以上、或每 6 秒，重新規劃
@@ -815,13 +839,17 @@ function checkAchievements(): boolean {
   let any = false;
   for (const a of newlyUnlocked(stats, save.ach!)) {
     save.ach!.push(a.id);
-    toast(`🏆 成就解鎖：${a.icon} ${a.name}`, 'purple');
+    // 解鎖給獎金（直接進錢包；不算進「累積賺到」，不然「小有積蓄」會被成就獎金自己推上去）
+    setMoney(money() + a.prize);
+    toast(`🏆 成就解鎖：${a.icon} ${a.name}　💰 +NT$ ${a.prize.toLocaleString()}`, 'purple');
     sound.beep(1180, 0.3);
     any = true;
   }
   return any;
 }
 initLeaderboard(toast, fmt);
+setOnSaveFail(() => toast('⚠️ 存檔寫不進去（瀏覽器儲存空間滿了或被封鎖），這次的紀錄可能不會保留', 'bad'));
+if (trackCleared) setTimeout(() => toast('這條賽道更新過，舊的最快圈與影子車已清除', ''), 1500);
 $('btn-ach').addEventListener('click', () => {
   $('ach-body').innerHTML = renderAchPage(stats, save.ach ?? []);
   $('ach-page').classList.remove('hidden');
@@ -2058,7 +2086,7 @@ function updateTaxiHud() {
   const d = Math.hypot(fcar.x - taxi.target.x, fcar.z - taxi.target.z);
   // 每 5 秒照目前位置重算一次路線（開錯路也會導回來）
   rerouteAcc += 0.25;
-  if (rerouteAcc > 5) { rerouteAcc = 0; taxi.reroute(fcar.x, fcar.z); }
+  if (rerouteAcc > 5) { rerouteAcc = 0; taxi.reroute(fcar.x, fcar.z, fcar.y); }
   el.innerHTML = '';
   const add = (t: string, cls = '') => { const s = document.createElement('span'); s.textContent = t; if (cls) s.className = cls; el.appendChild(s); };
   if (taxi.phase === 'seek') {
@@ -2678,7 +2706,8 @@ function watchFps() {
       circuitDetail(level);
       applyWeather(); // 霧的距離跟著新的畫質
       updatePixelRatio();
-      try { localStorage.setItem(KEY + '-auto-level', level); } catch { /* 不重要 */ }
+      try { localStorage.setItem(KEY + '-auto-level', level); localStorage.setItem(KEY + '-auto-at', String(Date.now())); localStorage.removeItem(KEY + '-auto-up'); } catch { /* 不重要 */ }
+      smoothSecs = 0;
       toast(`畫面有點卡（${fps.toFixed(0)} fps），已自動調成「${LEVEL_NAME[level]}」畫質`, '');
     } else if (dynRatio > 0.7) {
       dynRatio = Math.max(0.7, +(dynRatio - 0.1).toFixed(2));
@@ -2688,12 +2717,34 @@ function watchFps() {
     dynRatio = Math.min(1, +(dynRatio + 0.05).toFixed(2));
     updatePixelRatio();
   }
+  // 很順就記一筆：自動降過級、而且之後連續 5 分鐘都在 50 fps 以上，下次開遊戲就往上試一級（以前一降就永遠回不去）。
+  // 只在這次跑的就是降級後的那一級時才算（剛好卡一下降了、其實手機跑得動的，會慢慢升回來）
+  if (fps >= 50) smoothSecs += 4; else smoothSecs = 0;
+  if (smoothSecs >= 300 && autoLevelSaved()) {
+    smoothSecs = 0;
+    try { localStorage.setItem(KEY + '-auto-up', '1'); } catch { /* 不重要 */ }
+  }
   showQualityNow();
 }
+let smoothSecs = 0;
+const autoLevelSaved = () => { try { return !!localStorage.getItem(KEY + '-auto-level'); } catch { return false; } };
 {
-  // 上次自動降過級就沿用
+  // 上次自動降過級就沿用；但如果降級之後一直很順（上面 watchFps 記的 auto-up），或已經降級超過 7 天，這次先往上試一級
+  // （這一級還是卡的話，watchFps 會再降回來）
   try {
-    const autoLv = localStorage.getItem(KEY + '-auto-level') as Level | null;
+    let autoLv = localStorage.getItem(KEY + '-auto-level') as Level | null;
+    const at = +(localStorage.getItem(KEY + '-auto-at') ?? 0);
+    const up = localStorage.getItem(KEY + '-auto-up') === '1' || (at > 0 && Date.now() - at > 7 * 24 * 3600 * 1000);
+    if (qPref === 'auto' && autoLv && up && ['high', 'medium', 'low'].includes(autoLv)) {
+      const higher: Record<Level, Level | null> = { low: 'medium', medium: 'high', high: null };
+      const next = higher[autoLv];
+      const def = defaultLevel(MOBILE);
+      const order0: Level[] = ['high', 'medium', 'low'];
+      // 升到預設那一級（或更高）就等於沒有降級了：把紀錄清掉
+      if (!next || order0.indexOf(next) <= order0.indexOf(def)) { localStorage.removeItem(KEY + '-auto-level'); localStorage.removeItem(KEY + '-auto-at'); autoLv = null; }
+      else { localStorage.setItem(KEY + '-auto-level', next); localStorage.setItem(KEY + '-auto-at', String(Date.now())); autoLv = next; }
+      localStorage.removeItem(KEY + '-auto-up');
+    }
     if (qPref === 'auto' && autoLv && autoLv !== level && ['high', 'medium', 'low'].includes(autoLv)) {
       const order: Level[] = ['high', 'medium', 'low'];
       if (order.indexOf(autoLv) > order.indexOf(level)) {
@@ -2715,7 +2766,7 @@ qSel.value = qPref;
 showQualityNow();
 qSel.addEventListener('change', () => {
   save.quality = qSel.value as Level | 'auto';
-  try { localStorage.removeItem(KEY + '-auto-level'); } catch { /* 不重要 */ }
+  try { for (const k of ['-auto-level', '-auto-at', '-auto-up']) localStorage.removeItem(KEY + k); } catch { /* 不重要 */ }
   writeSave();
   location.reload(); // 陰影、車流數量要重新建立，直接重新載入最單純
 });
@@ -2865,7 +2916,8 @@ function runSim() {
 }
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (mapOpen && bigmap) bigmap.draw(fcar.x, fcar.z, fcar.h, nav, nav?.path ?? null);
+  // 大地圖：有點導航就畫導航；開計程車（沒點導航）就畫乘客／目的地的路線
+  if (mapOpen && bigmap) { const tx = !nav && taxiOn() ? taxi?.target ?? null : null; bigmap.draw(fcar.x, fcar.z, fcar.h, nav ?? tx, nav?.path ?? (tx ? taxi!.route : null)); }
   if ((state === 'race' || state === 'free') && dt > 0 && !mapOpen) {
     // 每一幀剛好把物理推進到這一幀的時間：切成 n 小步（每步 ≤ 1/120 秒）。
     // 之前固定 1/120 秒一步、剩下的留到下一幀，幀率不是 60/120 時每幀步數忽多忽少，畫面會一頓一頓。

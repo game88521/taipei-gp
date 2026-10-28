@@ -203,7 +203,7 @@
                     <option value="auto">自動（日夜交替）</option>
                   </select>
                 </label>
-                <label class="q">畫質
+                <label class="q">畫質<small>（改了會重新載入）</small>
                   <select id="opt-quality">
                     <option value="auto">自動</option>
                     <option value="high">高（陰影＋光暈）</option>
@@ -223,6 +223,11 @@
                     <option value="tilt">傾斜手機（陀螺儀）</option>
                   </select>
                 </label>
+                <div id="tilt-opts">
+                  <label class="sw">傾斜方向反過來<small>往左傾卻往右轉時打開</small><input type="checkbox" id="opt-tilt-inv" /></label>
+                  <label class="q rng">傾斜死區<input type="range" id="opt-tilt-dead" min="0" max="8" step="1" /><small id="tilt-dead-val"></small></label>
+                  <label class="q">中立角度<button id="opt-tilt-zero" type="button" class="ghost-btn">用現在的角度當直走</button><small id="tilt-zero-val"></small></label>
+                </div>
                 <label class="q">觸控按鈕
                   <select id="opt-touch">
                     <option value="auto">自動</option>

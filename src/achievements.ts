@@ -25,29 +25,31 @@ export interface Stats {
 }
 export const emptyStats = (): Stats => ({ dist: 0, nightDist: 0, topSpeed: 0, trips: 0, earned: 0, knocked: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, gpWins: 0, streetWins: 0, honks: 0, playTime: 0, bestDrift: 0, totalDrift: 0, seasonsDone: 0, seasonTitles: 0, teamTitles: 0, seasonWins: 0, perfectSeason: 0 });
 
-interface Ach { id: string; icon: string; name: string; desc: string; value: (s: Stats) => number; goal: number }
+/** prize：解鎖時給的獎金（NT$）；越難的成就給越多 */
+interface Ach { id: string; icon: string; name: string; desc: string; value: (s: Stats) => number; goal: number; prize: number }
 export const ACHIEVEMENTS: Ach[] = [
-  { id: 'trip1', icon: '🚕', name: '第一趟', desc: '完成一趟計程車載客', value: (s) => s.trips, goal: 1 },
-  { id: 'trip50', icon: '🚖', name: '小黃達人', desc: '累積載客 50 趟', value: (s) => s.trips, goal: 50 },
-  { id: 'rich', icon: '💰', name: '小有積蓄', desc: '累積賺到 NT$ 10,000', value: (s) => s.earned, goal: 10000 },
-  { id: 'v200', icon: '⚡', name: '時速 200', desc: '開到時速 200 km', value: (s) => s.topSpeed, goal: 200 },
-  { id: 'v300', icon: '🏎️', name: '時速 300', desc: '開到時速 300 km（F1 才辦得到）', value: (s) => s.topSpeed, goal: 300 },
-  { id: 'km100', icon: '🛣️', name: '開了一百公里', desc: '累積駕駛 100 公里', value: (s) => s.dist / 1000, goal: 100 },
-  { id: 'night', icon: '🌙', name: '夜貓子', desc: '晚上累積開 10 公里', value: (s) => s.nightDist / 1000, goal: 10 },
-  { id: 'wreck', icon: '🌳', name: '拆遷大隊', desc: '撞倒 100 個行道樹、路燈或號誌', value: (s) => s.knocked, goal: 100 },
-  { id: 'escape', icon: '😎', name: '甩掉警察', desc: '被通緝後成功甩掉警車', value: (s) => s.escapes, goal: 1 },
-  { id: 'escape5', icon: '🔥', name: '亡命之徒', desc: '甩掉 5 星通緝', value: (s) => s.maxEscaped, goal: 5 },
-  { id: 'cop', icon: '🚔', name: '正義使者', desc: '開巡邏車逮捕 10 個嫌犯', value: (s) => s.arrests, goal: 10 },
-  { id: 'gp', icon: '🏆', name: '冠軍', desc: '贏得一場 F1 正賽', value: (s) => s.gpWins, goal: 1 },
-  { id: 'street5', icon: '👑', name: '街頭之王', desc: '贏 5 場街頭比賽', value: (s) => s.streetWins, goal: 5 },
-  { id: 'honk', icon: '📯', name: '喇叭狂', desc: '按喇叭 100 次', value: (s) => s.honks, goal: 100 },
-  { id: 'drift1', icon: '🌀', name: '甩尾新手', desc: '單次甩尾拿到 3,000 分', value: (s) => s.bestDrift, goal: 3000 },
-  { id: 'drift2', icon: '🔥', name: '甩尾大師', desc: '單次甩尾拿到 20,000 分', value: (s) => s.bestDrift, goal: 20000 },
-  { id: 'season1', icon: '🗓️', name: '跑完一季', desc: '完成一個 23 站的賽季', value: (s) => s.seasonsDone, goal: 1 },
-  { id: 'title', icon: '👑', name: '年度車手冠軍', desc: '賽季結束時積分第一', value: (s) => s.seasonTitles, goal: 1 },
-  { id: 'teamtitle', icon: '🏁', name: '車隊冠軍', desc: '賽季結束時你的車隊積分第一', value: (s) => s.teamTitles, goal: 1 },
-  { id: 'win5', icon: '🥇', name: '一季五勝', desc: '單一賽季贏 5 站', value: (s) => s.seasonWins, goal: 5 },
-  { id: 'perfect', icon: '💎', name: '全勝賽季', desc: '一季 23 站全部奪冠', value: (s) => s.perfectSeason, goal: 1 },
+  { id: 'trip1', icon: '🚕', name: '第一趟', desc: '完成一趟計程車載客', value: (s) => s.trips, goal: 1, prize: 200 },
+  { id: 'trip50', icon: '🚖', name: '小黃達人', desc: '累積載客 50 趟', value: (s) => s.trips, goal: 50, prize: 2000 },
+  { id: 'rich', icon: '💰', name: '小有積蓄', desc: '累積賺到 NT$ 10,000', value: (s) => s.earned, goal: 10000, prize: 1000 },
+  { id: 'v200', icon: '⚡', name: '時速 200', desc: '開到時速 200 km', value: (s) => s.topSpeed, goal: 200, prize: 300 },
+  // 自由駕駛的 F1 極速約 288 km/h、街頭比賽強制用一般性能：只有計時賽、大獎賽的 F1 開得到 300
+  { id: 'v300', icon: '🏎️', name: '時速 300', desc: '開到時速 300 km（計時賽或大獎賽的 F1）', value: (s) => s.topSpeed, goal: 300, prize: 800 },
+  { id: 'km100', icon: '🛣️', name: '開了一百公里', desc: '累積駕駛 100 公里', value: (s) => s.dist / 1000, goal: 100, prize: 1500 },
+  { id: 'night', icon: '🌙', name: '夜貓子', desc: '晚上累積開 10 公里', value: (s) => s.nightDist / 1000, goal: 10, prize: 500 },
+  { id: 'wreck', icon: '🌳', name: '拆遷大隊', desc: '撞倒 100 個行道樹、路燈或號誌', value: (s) => s.knocked, goal: 100, prize: 500 },
+  { id: 'escape', icon: '😎', name: '甩掉警察', desc: '被通緝後成功甩掉警車', value: (s) => s.escapes, goal: 1, prize: 300 },
+  { id: 'escape5', icon: '🔥', name: '亡命之徒', desc: '甩掉 5 星通緝', value: (s) => s.maxEscaped, goal: 5, prize: 2000 },
+  { id: 'cop', icon: '🚔', name: '正義使者', desc: '開巡邏車逮捕 10 個嫌犯', value: (s) => s.arrests, goal: 10, prize: 1500 },
+  { id: 'gp', icon: '🏆', name: '冠軍', desc: '贏得一場 F1 正賽', value: (s) => s.gpWins, goal: 1, prize: 1000 },
+  { id: 'street5', icon: '👑', name: '街頭之王', desc: '贏 5 場街頭比賽', value: (s) => s.streetWins, goal: 5, prize: 1500 },
+  { id: 'honk', icon: '📯', name: '喇叭狂', desc: '按喇叭 100 次', value: (s) => s.honks, goal: 100, prize: 100 },
+  { id: 'drift1', icon: '🌀', name: '甩尾新手', desc: '單次甩尾拿到 3,000 分', value: (s) => s.bestDrift, goal: 3000, prize: 300 },
+  { id: 'drift2', icon: '🔥', name: '甩尾大師', desc: '單次甩尾拿到 20,000 分', value: (s) => s.bestDrift, goal: 20000, prize: 1500 },
+  { id: 'season1', icon: '🗓️', name: '跑完一季', desc: '完成一個 23 站的賽季', value: (s) => s.seasonsDone, goal: 1, prize: 3000 },
+  { id: 'title', icon: '👑', name: '年度車手冠軍', desc: '賽季結束時積分第一', value: (s) => s.seasonTitles, goal: 1, prize: 5000 },
+  { id: 'teamtitle', icon: '🏁', name: '車隊冠軍', desc: '賽季結束時你的車隊積分第一', value: (s) => s.teamTitles, goal: 1, prize: 3000 },
+  { id: 'win5', icon: '🥇', name: '一季五勝', desc: '單一賽季贏 5 站', value: (s) => s.seasonWins, goal: 5, prize: 3000 },
+  { id: 'perfect', icon: '💎', name: '全勝賽季', desc: '一季 23 站全部奪冠', value: (s) => s.perfectSeason, goal: 1, prize: 10000 },
 ];
 
 /** 新達成的成就（還沒在 got 裡的） */
@@ -68,7 +70,7 @@ export function renderAchPage(s: Stats, got: string[]): string {
   const stat = rows.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('');
   const ach = ACHIEVEMENTS.map((a) => {
     const done = got.includes(a.id), f = Math.min(1, a.value(s) / a.goal);
-    return `<div class="ach${done ? ' done' : ''}"><i>${a.icon}</i><span><b>${a.name}</b><small>${a.desc}</small>${done ? '' : `<em style="--f:${(f * 100).toFixed(0)}%"></em>`}</span></div>`;
+    return `<div class="ach${done ? ' done' : ''}"><i>${a.icon}</i><span><b>${a.name}</b><small>${a.desc}　${done ? '已領' : '獎金'} NT$ ${a.prize.toLocaleString()}</small>${done ? '' : `<em style="--f:${(f * 100).toFixed(0)}%"></em>`}</span></div>`;
   }).join('');
   return `<div class="stats">${stat}</div><h3>成就 ${got.length} / ${ACHIEVEMENTS.length}</h3><div class="achs">${ach}</div>`;
 }

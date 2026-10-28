@@ -4,6 +4,12 @@ const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
 export class Input {
   tilt = false;
+  /** 傾斜轉向：反過來（有些手機方向相反）、中立角度（按「校正」時記下的角度，握著不轉 = 這個角度）、死區（角度小於這個不轉） */
+  tiltInvert = false;
+  tiltZero = 0;
+  tiltDead = 2;
+  /** 目前手機轉了幾度（扣掉中立角度之前；給「校正」用） */
+  tiltRaw = 0;
   /** 轉向靈敏度（0.5~1.5）：手機按鈕、拖曳、傾斜、鍵盤都乘上這個 */
   sens = 1;
   private padSteer = 0;
@@ -91,14 +97,18 @@ export class Input {
     addEventListener('blur', () => { this.keys.clear(); this.brakeIds.clear(); this.gasIds.clear(); brakeBtn.classList.remove('on'); gasBtn.classList.remove('on'); });
 
     // 橫向握手機像握方向盤：左右轉動手機就是 beta 的變化。
-    // 方向在不同手機上可能相反，相反的話把下面 sign 對調即可。
+    // 方向在不同手機上可能相反：設定裡可以「反轉」；握的姿勢不一定剛好水平：可以「校正」把現在的角度當成直走
     addEventListener('deviceorientation', (e) => {
       const angle = screen.orientation?.angle ?? 0;
       const beta = e.beta ?? 0, gamma = e.gamma ?? 0;
       let s = gamma;
       if (angle === 90) s = beta;
       else if (angle === 270 || angle === -90) s = -beta;
-      this.tiltSteer = clamp(s / 17); // 手機轉 17° 就打滿
+      this.tiltRaw = s;
+      let a = s - this.tiltZero;
+      // 死區：小於 tiltDead 度不轉；超過的部分從 0 開始算（不會一出死區就跳一下）
+      a = Math.abs(a) <= this.tiltDead ? 0 : a - Math.sign(a) * this.tiltDead;
+      this.tiltSteer = clamp(((this.tiltInvert ? -1 : 1) * a) / 17); // 手機轉 17° 就打滿（死區外）
     });
   }
 

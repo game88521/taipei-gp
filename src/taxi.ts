@@ -24,6 +24,7 @@ export class TaxiJob {
   target: { x: number; z: number; nm: string } | null = null;
   from = '';
   route: [number, number][] | null = null;
+  routeYs: number[] | null = null; // 路線每一點的路面高度（路上的導航箭頭跟著上高架）
   routeLen = 0;
   timeLeft = 0;
   timeLimit = 0;
@@ -79,6 +80,7 @@ export class TaxiJob {
     this.phase = 'off';
     this.target = null;
     this.route = null;
+    this.routeYs = null;
     this.beam.visible = this.person.visible = false;
   }
 
@@ -90,6 +92,7 @@ export class TaxiJob {
     this.from = p.nm;
     const r = this.router.route(px, pz, p.x, p.z);
     this.route = r?.path ?? null;
+    this.routeYs = r?.ys ?? null;
     this.routeLen = r?.length ?? 0;
     this.wait = 0;
   }
@@ -101,6 +104,7 @@ export class TaxiJob {
     this.target = p;
     const r = this.router.route(px, pz, p.x, p.z);
     this.route = r?.path ?? null;
+    this.routeYs = r?.ys ?? null;
     this.routeLen = r?.length ?? Math.hypot(p.x - px, p.z - pz) * 1.3;
     this.timeLimit = this.timeLeft = Math.round(this.routeLen / 11 + 15);
     this.odo = 0;
@@ -172,9 +176,9 @@ export class TaxiJob {
   }
 
   /** 重算路線（偏離太多時） */
-  reroute(px: number, pz: number) {
+  reroute(px: number, pz: number, py?: number) {
     if (!this.target) return;
-    const r = this.router.route(px, pz, this.target.x, this.target.z);
-    if (r) { this.route = r.path; if (this.phase === 'seek') this.routeLen = r.length; }
+    const r = this.router.route(px, pz, this.target.x, this.target.z, py); // 從現在這層（橋上／地面）出發
+    if (r) { this.route = r.path; this.routeYs = r.ys; if (this.phase === 'seek') this.routeLen = r.length; }
   }
 }
