@@ -406,6 +406,8 @@ html:not(.touch) #gas { display: none; }
 }
 #sr-hud .good { color: var(--green); }
 #sr-hud .bad { color: #ff5a5a; }
+#sr-quit { align-self: center; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px; background: var(--panel); color: #fff; font: 700 13px var(--mono); pointer-events: auto; }
+@media (hover: hover) { #sr-quit:hover { background: rgba(255, 255, 255, 0.16); } }
 #big {
   position: absolute;
   top: 30%;
@@ -918,6 +920,8 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-hint { color: var(--muted); font-size: 12px; }
 #menu #menu-best { margin: 0; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--m-line); background: var(--m-glass); font: 700 14px var(--mono); color: #d8dbe4; white-space: nowrap; }
 #menu #menu-best:empty { display: none; }
+#m-update { margin-top: 10px; width: 100%; padding: 9px 10px; border: 1px solid #ffd400; border-radius: 10px; background: rgba(255, 212, 0, 0.14); color: #ffd400; font: 700 13px var(--mono); cursor: pointer; }
+@media (hover: hover) { #m-update:hover { background: rgba(255, 212, 0, 0.26); } }
 #menu #load { margin: 0 0 14px; height: 3px; }
 #menu #btn-resume { margin-bottom: 12px; padding: 12px; font-size: 18px; letter-spacing: 4px; border-radius: 14px; background: linear-gradient(135deg, #ff2a1f, #b30500); box-shadow: 0 10px 26px rgba(225, 6, 0, 0.35); }
 #menu .credit { margin: auto 0 0; padding-top: 16px; font-size: 11px; color: rgba(255, 255, 255, 0.38); text-align: right; }

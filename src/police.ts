@@ -6,7 +6,7 @@ import type { Traffic } from './traffic';
 import { buildPlayerVehicle, vehicleById, type PlayerVehicle } from './vehicles';
 
 // 警察追逐（GTA 風）：撞車、撞人、闖紅燈、撞警車會累積通緝（最多 5 星），星數越多警車越多越快；
-// 警車照路網追過來，近了直接衝撞；停在警車旁邊 3 秒＝被逮捕（罰款）；離所有警車夠遠撐 12 秒＝甩掉。
+// 警車照路網追過來，近了直接衝撞；停在警車旁邊 3 秒＝被逮捕（罰款）；離所有警車夠遠撐 7 秒＝甩掉（LOSE_DIST／LOSE_TIME）。
 // 反過來：開巡邏車按「追緝」會冒出一台逃逸的嫌犯車，撞到它停下來就逮捕成功
 
 interface Unit {

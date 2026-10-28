@@ -49,6 +49,27 @@ export interface Challenge {
   twoWay: boolean; // 起點是雙向道路（路線在中線上，車都要排在右側車道）
 }
 
+/**
+ * (px, pz) 在路線上最近的點的索引，只在「第 next 個檢查點前後」那段裡找（上一個檢查點 −20 m ～ 下一個檢查點 +20 m）：
+ * 去回同一條路的路線（信義大環線）整條找的話，回程會被投影到去程上。測試駕駛（main.ts 的 srBot）也用這個
+ */
+export function routeIndexNear(c: Challenge, next: number, px: number, pz: number, hint?: number): number {
+  const cps = c.checkpoints, cum = c.cum;
+  let s0 = next > 0 ? cum[cps[next - 1]] - 20 : -Infinity;
+  const s1 = next < cps.length ? cum[cps[next]] + 20 : Infinity;
+  // 只能往前走：比上一次的位置倒退 25 m 以上的點不算，倒退得越多也越不像（每倒退 1 m 算多 1 m 遠）。
+  // 去回同一條路時，回程的點跟去程的點座標完全一樣（距離 0）：只擋 25 m 的話，每一步都會往回滑一點，一路沿著去程倒退
+  if (hint != null) s0 = Math.max(s0, hint - 25);
+  let bi = -1, bd = Infinity;
+  for (let i = 0; i < c.path.length; i++) {
+    if (cum[i] < s0 || cum[i] > s1) continue;
+    const back = hint != null && cum[i] < hint ? hint - cum[i] : 0;
+    const d = (c.path[i][0] - px) ** 2 + (c.path[i][1] - pz) ** 2 + back * back;
+    if (d < bd) { bd = d; bi = i; }
+  }
+  return bi < 0 ? (hint != null ? Math.max(0, cum.findIndex((q) => q >= hint)) : 0) : bi;
+}
+
 export interface Rival {
   name: string;
   color: string;
@@ -85,6 +106,7 @@ export class StreetRace {
   private rings: THREE.Mesh[] = [];
   private finishRing: THREE.Mesh;
   private playerProg = 0;
+  private lastProj = 0; // 上一次把玩家投影到路線上的位置（折返點選哪條腿的提示）
   maxKnock = 0; // 測試用：對手被撞離路線的最大距離（m）
 
   constructor(private scene: THREE.Scene, d: CityData, landmarks: Landmark[]) {
@@ -240,6 +262,7 @@ export class StreetRace {
     this.time = 0;
     this.playerDone = null;
     this.playerProg = 0;
+    this.lastProj = 0;
     const A = c.twoWay ? 1.8 : -1.8, B = c.twoWay ? 5.1 : 1.8;
     const field: [string, string, number, number][] = duel ? DUEL_FIELD : [[c.def.rival, c.def.color, SOLO_TOP, SOLO_CORNER]];
     const slots = duel ? [[24, A], [24, B], [15, A], [15, B]] : [[6, B]];
@@ -481,12 +504,14 @@ export class StreetRace {
     };
   }
 
-  /** 玩家在路線上的投影距離 */
+  /**
+   * 玩家在路線上的投影距離。只在「上一個檢查點 −20 m ～ 下一個檢查點 +20 m」這段找最近的點：
+   * 信義大環線這種去程、回程同一條路的路線，整條找會把回程投影到去程上，HUD 就顯示落後幾百公尺、名次亂跳
+   */
   private project(px: number, pz: number) {
-    const c = this.active!;
-    let bi = 0, bd = Infinity;
-    for (let i = 0; i < c.path.length; i += 2) { const d = (c.path[i][0] - px) ** 2 + (c.path[i][1] - pz) ** 2; if (d < bd) { bd = d; bi = i; } }
-    return c.cum[bi];
+    const c = this.active!, i = routeIndexNear(c, this.next, px, pz, this.lastProj);
+    this.lastProj = c.cum[i];
+    return c.cum[i];
   }
 
   /** 玩家與最前面那位對手的差距（m，正 = 玩家領先） */
