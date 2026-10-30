@@ -105,6 +105,9 @@ const WHEELS: [number, number][] = [[1.75, -0.95], [1.75, 0.95], [-1.6, -0.95], 
 /** WHEELS 的第 w 個輪子 → 車模 spin[] 的第幾個（f1model 的順序是 右前、右後、左前、左後；模型 +x 是車子左邊） */
 const SPIN_OF = [2, 0, 3, 1];
 const CREW_N = 15; // 每個輪子 3 人（槍手、拆胎、裝胎）＋前後千斤頂＋放行
+const SEG_PER = 12; // 每人的骨頭段數：上臂、前臂、大腿、小腿（左右各一）＋手套、靴子（左右各一）
+const TOOL_SEG = 4 * 5 + 2 * 3 + 4; // 每隊的工具段數：4 支扳手×5 段（套筒、槍身、槍把、兩段氣管）＋2 支千斤頂×3 段（長柄、立柱、墊頭）＋4 根軸頭（輪子拆掉時露出來）
+const SEG_PER_TEAM = CREW_N * SEG_PER + TOOL_SEG;
 /**
  * 一次停站的時間軸（停站總長 T 的比例；T 在進站口就決定了，動作排成比例就一定剛好在 T 做完，不用動停站時間）：
  *   0 ~ JACK 千斤頂前後同時頂起 → 槍手鬆螺帽（GUN1）→ 拆舊胎（OFF）→ 裝新胎（ON）→ 槍手鎖螺帽（GUN2）→ 千斤頂放下（DROP）→ 放行
@@ -116,6 +119,38 @@ const baseOf = (T: number) => Math.min(T, 2.9);
 /** 新胎裝上車的時間（秒）：車上胎色圈從這一刻起換成新胎的顏色（rivals.ts 用；出包的那顆另外晚到，但拆下來時看不到） */
 export const mountedAt = (T: number) => TL.ON[1] * baseOf(T);
 
+// ---- 人形的骨架：停車格座標 (a, b, y)（a 沿賽道、b 往車庫、y 離地高度；三軸互相垂直）
+type V3 = [number, number, number];
+const dot = (p: V3, q: V3) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+const addV = (p: V3, q: V3, s = 1): V3 => [p[0] + q[0] * s, p[1] + q[1] * s, p[2] + q[2] * s];
+const unitV = (p: V3): V3 => { const l = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0] / l, p[1] / l, p[2] / l]; };
+const lerpV = (p: V3, q: V3, t: number): V3 => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
+const wrapA = (x: number) => Math.atan2(Math.sin(x), Math.cos(x)); // 角度差拉回 −π ~ π
+/** 第 k 隊第 m 個人的第 j 段骨頭在 bone 這個 InstancedMesh 裡的編號（j：0~3 手臂、4~7 腿、8~9 手套、10~11 靴子） */
+const boneAt = (k: number, m: number, j: number) => k * SEG_PER_TEAM + m * SEG_PER + j;
+type P3 = [number, number, number];
+/** 一個人這一格的骨架基準（place 用）：hip 髖、fw 面向、lf 他的左手邊、td 軀幹往上的方向、sc 兩肩中心、ph 步伐相位、sp 走路速度、c 蹲的程度 */
+interface Body { hip: V3; fw: V3; lf: V3; td: V3; sc: V3; ph: number; sp: number; c: number }
+/** 依時間走路徑點：k = [[時間, [a, b, 蹲]], …]（時間遞增）；之前停在第一點、之後停在最後一點，中間用 smooth 補（目標位置；走多快由 animate 限制） */
+const seq = (tt: number, k: [number, P3][]): P3 => {
+  if (tt <= k[0][0]) return k[0][1];
+  for (let i = 1; i < k.length; i++) {
+    if (tt >= k[i][0]) continue;
+    const [t0, p0] = k[i - 1], [t1, p1] = k[i], u = smooth((tt - t0) / Math.max(1e-3, t1 - t0));
+    return [p0[0] + (p1[0] - p0[0]) * u, p0[1] + (p1[1] - p0[1]) * u, p0[2] + (p1[2] - p0[2]) * u];
+  }
+  return k[k.length - 1][1];
+};
+/** 四個輪子的軸頭：[沿賽道位置, 離車中心線, 輪胎半徑]（f1model 的輪子位置；WHEELS 是站位用的概略值） */
+const HUB: [number, number, number][] = [[1.78, 0.86, 0.36], [1.78, 0.86, 0.36], [-1.72, 0.82, 0.37], [-1.72, 0.82, 0.37]];
+/** 兩段骨架的解析 IK：肩（髖）S 到手（腳）T，上段 L1、下段 L2 夾住，關節往 pole 的方向彎；回傳 [關節, 末端]（夠不到就停在伸直的位置） */
+function ik2(S: V3, T: V3, L1: number, L2: number, pole: V3): [V3, V3] {
+  const n = unitV(addV(T, S, -1)), D = Math.max(1e-4, Math.min(Math.hypot(T[0] - S[0], T[1] - S[1], T[2] - S[2]), L1 + L2 - 1e-3));
+  const x = (L1 * L1 - L2 * L2 + D * D) / (2 * D), r = Math.sqrt(Math.max(0, L1 * L1 - x * x));
+  const p = unitV(addV(pole, n, -dot(pole, n)));
+  return [addV(addV(S, n, x), p, r), addV(S, n, D)];
+}
+
 export class PitLane {
   readonly speed: number;
   private body: THREE.InstancedMesh;
@@ -123,11 +158,17 @@ export class PitLane {
   private tyre: THREE.InstancedMesh;
   private band: THREE.InstancedMesh;
   private sign: THREE.InstancedMesh;
-  private tool: THREE.InstancedMesh;
+  /** 四肢、手套、靴子、扳手、千斤頂、軸頭：全部是「骨頭」（六角柱，一段一個實例，place 每格用兩端點排出來） */
+  private bone: THREE.InstancedMesh;
   /** 每隊每人目前的 [a, b, 蹲（0 站 ~ 1 蹲）] */
   private pose: Float32Array;
-  /** 每隊 8 顆輪胎（4 舊 4 新）目前的 [a, b, 高度]；看不到的高度設 -9 */
+  /** 每隊 8 顆輪胎（4 舊 4 新）目前的 [在軸上的程度 0~1（1 = 在車上的輪軸、0 = 抱在人手上）, 未用, 高度]；高度 -9 = 看不到 */
   private tyres: Float32Array;
+  /** 每人目前面向的方向（世界座標繞 y 的角度）、走路速度（m/s）、步伐相位（弧度） */
+  private yaw: Float32Array; private spd: Float32Array; private gait: Float32Array;
+  /** 每隊 4 支扳手頂在輪子上的程度（0 端在身邊 ~ 1 套在螺帽上）、4 個輪子是不是拆掉了（露出軸頭） */
+  private gunEng: Float32Array; private axle: Uint8Array;
+  private D = new THREE.Vector3();
   private active = new Set<number>();
   private linger = new Float32Array(TEAMS.length);
   private frames: { x: number; y: number; z: number; h: number }[] = [];
@@ -239,29 +280,43 @@ export class PitLane {
 
     // ---- 維修人員、輪胎、放行牌（全部隊伍共用幾個 InstancedMesh）
     const n = TEAMS.length * CREW_N;
-    const legs = new THREE.BoxGeometry(0.42, 0.85, 0.26).translate(0, 0.425, 0);
-    const torso = new THREE.BoxGeometry(0.52, 0.62, 0.32).translate(0, 1.16, 0);
-    this.body = new THREE.InstancedMesh(mergeGeometries([legs, torso]), new THREE.MeshLambertMaterial(), n);
-    this.head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.17, 10, 8).translate(0, 1.66, 0), new THREE.MeshLambertMaterial({ color: '#f2f2f2' }), n);
+    // 人形：骨盆＋軀幹是一個實例，頭（安全帽＋深色面罩）一個，四肢／手套／靴子／工具全是「骨頭」（六角柱，一段一個實例）
+    const tint = (g: THREE.BufferGeometry, c: string) => { const col = new THREE.Color(c), a = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = col.r; a[i + 1] = col.g; a[i + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+    const pelvis = new THREE.BoxGeometry(0.34, 0.2, 0.22).translate(0, 0.04, 0), chest = new THREE.BoxGeometry(0.44, 0.5, 0.25).translate(0, 0.38, 0);
+    this.body = new THREE.InstancedMesh(mergeGeometries([pelvis, chest]), new THREE.MeshLambertMaterial(), n);
+    const dome = tint(new THREE.SphereGeometry(0.15, 8, 6).scale(1, 1.08, 1.1), '#ffffff'), visor = tint(new THREE.BoxGeometry(0.2, 0.07, 0.1).translate(0, 0.02, 0.12), '#0c0e12');
+    this.head = new THREE.InstancedMesh(mergeGeometries([dome, visor]), new THREE.MeshLambertMaterial({ vertexColors: true }), n);
+    this.bone = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0), new THREE.MeshLambertMaterial(), TEAMS.length * SEG_PER_TEAM); // 不封口：關節處被別段蓋住，省一半三角形
     const tyreGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.36, 14).rotateZ(Math.PI / 2);
     this.tyre = new THREE.InstancedMesh(tyreGeo, new THREE.MeshLambertMaterial({ color: '#1b1b1d' }), TEAMS.length * 8);
     this.band = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.38, 14, 1, true).rotateZ(Math.PI / 2), new THREE.MeshBasicMaterial({ side: D }), TEAMS.length * 8);
     this.sign = new THREE.InstancedMesh(mergeGeometries([new THREE.BoxGeometry(0.04, 1.4, 0.04).translate(0, 0.7, 0), new THREE.CylinderGeometry(0.3, 0.3, 0.03, 16).rotateX(Math.PI / 2).translate(0, 1.55, 0)]), new THREE.MeshBasicMaterial(), TEAMS.length);
-    // 工具（全部隊伍共用一個 InstancedMesh，+1 次繪製）：每隊 4 支氣動扳手（槍身＋握把，槍口朝 −z 頂著輪子中心）＋前後 2 支千斤頂（長柄＋底座）
-    // 扳手與千斤頂的幾何不同，合成一個 InstancedMesh 時用同一個幾何、各自縮放：先做一個單位方塊，place 時照用途給不同的大小
-    this.tool = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#2b2e33' }), TEAMS.length * 6);
     this.pose = new Float32Array(n * 3);
     this.tyres = new Float32Array(TEAMS.length * 8 * 3);
+    this.yaw = new Float32Array(n); this.spd = new Float32Array(n); this.gait = new Float32Array(n);
+    this.gunEng = new Float32Array(TEAMS.length * 4); this.axle = new Uint8Array(TEAMS.length * 4);
+    const dark = new THREE.Color('#17181b'), steel = new THREE.Color('#c4c9d1'), gunC = new THREE.Color('#5d6470'), hoseC = new THREE.Color('#25272b'), jackC = new THREE.Color('#8a9099'), padC = new THREE.Color('#202226'), hubC = new THREE.Color('#9aa0a8');
     TEAMS.forEach((tm, k) => {
       const c = boxS(k), i = iOf(c), [x, y, z] = P(c, PIT.WORK);
       this.frames.push({ x, y, z, h: Math.atan2(t.tx[i], t.tz[i]) });
-      const suit = new THREE.Color(tm.livery.main);
-      for (let m = 0; m < CREW_N; m++) { this.body.setColorAt(k * CREW_N + m, suit); this.idlePose(k, m); }
+      const suit = new THREE.Color(tm.livery.main), accent = new THREE.Color(tm.livery.accent), helmet = new THREE.Color(tm.livery.helmet);
+      for (let m = 0; m < CREW_N; m++) {
+        const idx = k * CREW_N + m;
+        this.body.setColorAt(idx, suit); this.head.setColorAt(idx, helmet);
+        for (let j = 0; j < SEG_PER; j++) this.bone.setColorAt(boneAt(k, m, j), j < 8 ? suit : dark); // 0~7 手臂、腿＝賽車服；8~11 手套、靴子
+        this.idlePose(k, m); this.yaw[idx] = this.frames[k].h + Math.PI / 2; // 沒事的時候面向賽道
+      }
+      // 工具：每隻扳手 5 段（套筒、槍身、握把、氣管×2），千斤頂 3 段（長柄、立柱、墊頭），軸頭 1 段
+      const tb = k * SEG_PER_TEAM + CREW_N * SEG_PER;
+      for (let w = 0; w < 4; w++) for (const [j, col] of [steel, gunC, accent, hoseC, hoseC].entries()) this.bone.setColorAt(tb + w * 5 + j, col);
+      for (let j = 0; j < 2; j++) for (const [q, col] of [jackC, gunC, padC].entries()) this.bone.setColorAt(tb + 20 + j * 3 + q, col);
+      for (let w = 0; w < 4; w++) this.bone.setColorAt(tb + 26 + w, hubC);
       for (let q = 0; q < 8; q++) { this.tyres[(k * 8 + q) * 3 + 2] = -9; this.band.setColorAt(k * 8 + q, new THREE.Color('#ffd400')); }
       this.sign.setColorAt(k, new THREE.Color('#d81e2a'));
       this.place(k);
     });
-    for (const im of [this.body, this.head, this.tyre, this.band, this.sign, this.tool]) { im.computeBoundingSphere(); im.frustumCulled = false; parent.add(im); }
+    this.meshes = [this.body, this.head, this.bone, this.tyre, this.band, this.sign];
+    for (const im of this.meshes) { im.computeBoundingSphere(); im.frustumCulled = false; parent.add(im); }
   }
 
   /** 台北的臨時車庫：每隊一間（白色帳篷式），門楣車隊色＋隊名，裡面暗暗的 */
@@ -307,71 +362,110 @@ export class PitLane {
     parent.add(new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ map: header, side: THREE.DoubleSide, toneMapped: false })));
   }
 
-  /** 沒事的時候：在車庫門口排一排 */
+  /** 沒事的時候：在車庫門口排一排，面向賽道（車庫在右邊） */
   private idlePose(k: number, m: number) {
     const o = (k * CREW_N + m) * 3;
     this.pose[o] = -6.5 + m * 0.92; this.pose[o + 1] = 2.1; this.pose[o + 2] = 0;
   }
+  private idleYaw(k: number) { return this.frames[k].h + Math.PI / 2; } // 面向賽道（往 −b 看）
   /**
    * 第 w 個輪子在這次停站的時間軸（秒）：[鬆螺帽開始, 拆下, 裝上, 鎖好]。
-   * 一般輪子照 TL 的比例排；出包的那個（slow）裝新胎卡住，裝上與鎖好往後推到 T 前面一點（車子在等它）
+   * 一般輪子照 TL 的比例排；出包的那個（slow）裝新胎卡住，裝上與鎖好往後推（車子在等它），但要在千斤頂放下（0.84T）之前鎖完
    */
   private wheelTimes(w: number, s: StopInfo): [number, number, number, number] {
     const T = s.T, base = baseOf(T);
     const k = (f: number) => f * base;
     if (w !== s.slow) return [k(TL.GUN1[0]), k(TL.OFF[1]), k(TL.ON[1]), k(TL.GUN2[1])];
-    return [k(TL.GUN1[0]), k(TL.OFF[1]), T * 0.82, T * 0.9];
+    return [k(TL.GUN1[0]), k(TL.OFF[1]), T * 0.74, T * 0.82];
   }
-  /** 第 m 個人在停站的第 t 秒（總長 T）該站哪、蹲多低；slow = 出包的輪子 */
-  private servicePose(m: number, s: StopInfo): [number, number, number] {
-    const T = s.T, tt = s.phase === 'approach' ? -1 : s.hold ? T : s.t;
+  /**
+   * 一個輪子的動作時間表（秒；聲音、人、輪胎、扳手都看這一份）：
+   *   A1~E1 扳手鬆螺帽 → pullS~pullE 舊胎從輪軸拔下來 → pushS（出包的輪子第一次嘗試）、finS~on 新胎推上輪軸 → V2~E2 扳手鎖緊
+   * A1 是鬆螺帽的聲音；V2 是鎖螺帽的聲音，也是畫面上扳手第二次套上去的時間：新胎還沒裝好以前槍手不能鎖，所以最早在裝好後 0.12 秒
+   */
+  private plan(w: number, s: StopInfo) {
+    const [g1, off, on, lock] = this.wheelTimes(w, s);
+    const A1 = g1 + w * 0.03, E1 = A1 + 0.26, pullS = Math.max(off * 0.85 - 0.2, E1 + 0.12), V2 = Math.max(lock - 0.3 + w * 0.02, on + 0.12 + w * 0.03);
+    return { A1, E1, pullS, pullE: pullS + 0.2, pushS: TL.ON[1] * baseOf(s.T) - 0.2, finS: on - 0.2, on, V2, E2: V2 + 0.2 };
+  }
+  /** 從 (pa, pb) 看向 (ta, tb)（停車格座標）時的面向角度（世界座標繞 y） */
+  private look(k: number, pa: number, pb: number, ta: number, tb: number) {
+    const h = this.frames[k].h, da = ta - pa, db = tb - pb;
+    return Math.atan2(Math.sin(h) * da - Math.cos(h) * db, Math.cos(h) * da + Math.sin(h) * db);
+  }
+  /**
+   * 第 m 個人在停站的第 t 秒該站哪：[a, b, 蹲（0 站 ~ 1 蹲）, 面向（世界座標繞 y 的角度）]。
+   * 每個輪子旁三個人（da = 沿車身、正 = 往車頭；ob = 離輪子中心往外多遠）：
+   *   槍手站在輪子前側斜角蹲著不動（扳手斜著伸向螺帽）；拆胎的從後面等著，鬆完就蹲到輪子正外側拔、抱著往前外側走開；
+   *   裝胎的在後外側等著，舊胎一離開就蹲進來推上輪軸，推好退回去，槍手再鎖
+   */
+  private servicePose(k: number, m: number, s: StopInfo): [number, number, number, number] {
+    const T = s.T, tt = s.phase === 'approach' ? -1 : s.hold ? T : s.t, h = this.frames[k].h;
     if (m < 12) {
-      const w = Math.floor(m / 3), role = m % 3, [wa, wb] = WHEELS[w], sb = Math.sign(wb);
-      const [, off, on, lock] = this.wheelTimes(w, s);
-      if (role === 0) { // 槍手：蹲在輪子正外側（扳手頂著輪子中心），鎖好之後站起來、往後退一步讓車走
-        const back = tt < 0 ? 0 : smooth((tt - lock) / 0.25);
-        return [wa, wb + sb * (0.62 + back * 0.6), 1 - back * 0.7];
+      const w = Math.floor(m / 3), role = m % 3, [ha, hb] = HUB[w], sb = Math.sign(WHEELS[w][1]), pl = this.plan(w, s), hub = sb * hb;
+      const at = (da: number, ob: number, c: number): P3 => [ha + da, sb * (hb + ob), c];
+      const out = (r: P3, yw?: number): [number, number, number, number] => [r[0], r[1], r[2], yw ?? this.look(k, r[0], r[1], ha, hub)];
+      if (role === 0) {
+        const wait = at(0.55, 1.15, 0.25), work = at(0.38, 0.74, 1), done = at(0.6, 1.45, 0.05);
+        return out(seq(tt, [[-1, wait], [pl.A1 - 0.3, wait], [pl.A1 - 0.08, work], [pl.E2 + 0.05, work], [pl.E2 + 0.35, done]]));
       }
-      if (role === 1) { // 拆胎：螺帽一鬆就把舊胎拔出來、抱著往外走
-        const f = tt < 0 ? 0 : smooth((tt - off * 0.85) / 0.35);
-        return [wa + 0.15, wb + sb * (1.15 + f * 1.4), 0.25 * (1 - f)];
+      if (role === 1) {
+        const wait = at(-0.62, 0.98, 0.2), grab = at(-0.05, 0.62, 0.9), pull = at(-0.05, 1.45, 0.65), away = at(0.8, 1.7, 0.1);
+        return out(seq(tt, [[-1, wait], [pl.pullS - 0.3, wait], [pl.pullS - 0.04, grab], [pl.pullS, grab], [pl.pullE, pull], [pl.pullE + 0.5, away]]));
       }
-      // 裝胎：一開始就抱著新胎在外面等，舊胎一離開就推進去（出包的那顆晚到）
-      const f = tt < 0 ? 0 : smooth((tt - (on - 0.3)) / 0.3);
-      return [wa - 0.35, wb + sb * (2.4 - f * 1.2), 0.2 + f * 0.3];
+      const wait = at(-0.75, 1.6, 0.2), push = at(-0.05, 0.62, 0.9);
+      return out(seq(tt, [[-1, wait], [pl.pushS - 0.35, wait], [pl.pushS - 0.06, push], [pl.on - 0.02, push], [pl.on + 0.14, wait]]));
     }
-    if (m === 12 || m === 13) { // 前、後千斤頂：一停好就頂進去（蹲低），放下之後拉出來站開
-      const drop = tt < 0 ? 0 : smooth((tt - TL.DROP[1] * T) / 0.25);
-      return [m === 12 ? 3.9 + drop * 1.1 : -3.5 - drop * 1.1, 0, 0.7 - drop * 0.6];
+    if (m < 14) { // 前、後千斤頂：先站在車頭（車尾）外面，車一停好就衝進去頂；車放下之後拉出來、閃到旁邊
+      const j = m - 12, sg = j === 0 ? 1 : -1, dropT = TL.DROP[1] * T;
+      const wait: P3 = [sg * 3.7, 1, 0], work: P3 = [sg * 3.7, 0, 0.55], gone: P3 = [sg * 4.4, 2.3, 0.05];
+      const r = seq(tt, [[-1, wait], [-0.02, wait], [0.2, work], [dropT - 0.1, work], [dropT + 0.35, gone]]);
+      return [r[0], r[1], r[2], h + (j === 0 ? Math.PI : 0)];
     }
-    return [5.4, -0.6, 0]; // 放行（拿牌子的）
+    // 放行（拿牌子的）：站在車頭前面，面向車子；綠燈一亮就閃到車庫那一側，把路讓出來
+    return [5.4, s.go ? 2.3 : -0.6, 0, h + Math.PI];
+  }
+  /** 第 m 個人往目標 (a, b, 蹲) 走一步：走路速度有上限 vmax（m/s）；順便更新走路速度、步伐相位、面向（走起來的時候面向行進方向） */
+  private stepCrew(k: number, m: number, a: number, b: number, c: number, yawT: number, dt: number, kk: number, vmax: number) {
+    const idx = k * CREW_N + m, o = idx * 3, da = (a - this.pose[o]) * kk, db = (b - this.pose[o + 1]) * kk, d = Math.hypot(da, db), cap = vmax * dt, sc = d > cap && d > 0 ? cap / d : 1;
+    this.pose[o] += da * sc; this.pose[o + 1] += db * sc; this.pose[o + 2] += (c - this.pose[o + 2]) * Math.min(1, kk);
+    this.spd[idx] += ((dt > 0 ? (d * sc) / dt : 0) - this.spd[idx]) * Math.min(1, dt * 12);
+    this.gait[idx] += Math.min(this.spd[idx], 3.4) * dt * 4.5;
+    let ty = yawT;
+    if (this.spd[idx] > 1.2) { const f = this.frames[k].h; ty = Math.atan2(da * Math.sin(f) - db * Math.cos(f), da * Math.cos(f) + db * Math.sin(f)); }
+    const dy = wrapA(ty - this.yaw[idx]) * Math.min(1, dt * 8), turn = 10 * dt; // 轉身最快 10 rad/s（轉 180° 至少 0.3 秒），不會一格就轉過去
+    this.yaw[idx] += Math.max(-turn, Math.min(turn, dy));
   }
 
   /** 每格：stops = 正在進站的隊伍 → 那一隊的停站狀態 */
   update(dt: number, stops: Map<number, StopInfo>) {
     const k8 = Math.min(1, dt * 6);
     this.sounds.length = 0;
-    for (const [k, s] of stops) { this.active.add(k); this.linger[k] = 1.6; if (s.phase === 'approach') this.released[k] = 0; this.animate(k, s, k8); }
+    for (const [k, s] of stops) { this.active.add(k); this.linger[k] = 1.6; if (s.phase === 'approach') this.released[k] = 0; this.animate(k, s, k8, dt); }
     for (const k of [...this.active]) {
       if (stops.has(k)) continue;
       this.lastT[k] = -1;
       this.released[k] = 0;
       this.linger[k] -= dt;
-      // 停站結束：慢慢走回車庫門口、輪胎收走
+      // 停站結束：走回車庫門口、輪胎收走
       let moving = false;
       for (let m = 0; m < CREW_N; m++) {
         const o = (k * CREW_N + m) * 3, tx = -6.5 + m * 0.92, ty = 2.1;
-        this.pose[o] += (tx - this.pose[o]) * k8 * 0.5; this.pose[o + 1] += (ty - this.pose[o + 1]) * k8 * 0.5; this.pose[o + 2] *= 1 - k8;
+        this.stepCrew(k, m, tx, ty, 0, this.idleYaw(k), dt, k8 * 0.5, 3);
         moving ||= Math.abs(tx - this.pose[o]) + Math.abs(ty - this.pose[o + 1]) > 0.02;
       }
       for (let q = 0; q < 8; q++) this.tyres[(k * 8 + q) * 3 + 2] = -9;
+      for (let w = 0; w < 4; w++) { this.gunEng[k * 4 + w] = 0; this.axle[k * 4 + w] = 0; }
       this.sign.setColorAt(k, new THREE.Color('#d81e2a'));
       this.toolOn[k] = 0;
+      this.dirty = true;
       this.place(k);
       if (!moving && this.linger[k] <= 0) this.active.delete(k);
     }
+    if (!this.dirty) return; // 沒人在動：不用把幾百 KB 的矩陣再傳一次給顯示卡
+    this.dirty = false;
+    for (const im of this.meshes) im.instanceMatrix.needsUpdate = true;
     if (this.body.instanceColor) this.body.instanceColor.needsUpdate = true;
-    for (const im of [this.body, this.head, this.tyre, this.band, this.sign, this.tool]) im.instanceMatrix.needsUpdate = true;
     if (this.band.instanceColor) this.band.instanceColor.needsUpdate = true;
     if (this.sign.instanceColor) this.sign.instanceColor.needsUpdate = true;
   }
@@ -381,14 +475,14 @@ export class PitLane {
    * 跨點判斷用每隊上一格的 t，所以暫停、畫面卡住都不會重複播
    */
   sounds: { kind: 'gun' | 'jack' | 'go'; x: number; z: number }[] = [];
-  private lastT = new Float32Array(TEAMS.length).fill(-1);
+  private lastT = new Float64Array(TEAMS.length).fill(-1); // 要用雙精度：Float32 會把「剛好差一點點到門檻」的上一格 t 進位成門檻本身，prev < at 就不成立，那一聲會掉
   private released = new Uint8Array(TEAMS.length); // 這次停站已經播過放行聲了（停站結束時清掉）
-  private animate(k: number, s: StopInfo, k8: number) {
-    for (let m = 0; m < CREW_N; m++) {
-      const o = (k * CREW_N + m) * 3, [a, b, c] = this.servicePose(m, s);
-      const kk = s.phase === 'approach' ? k8 * 0.6 : Math.min(1, k8 * 3); // 停好之後動作要快
-      this.pose[o] += (a - this.pose[o]) * kk; this.pose[o + 1] += (b - this.pose[o + 1]) * kk; this.pose[o + 2] += (c - this.pose[o + 2]) * kk;
-    }
+  private dirty = true; // 有人在動、矩陣要重傳
+  private meshes: THREE.InstancedMesh[] = [];
+  private animate(k: number, s: StopInfo, k8: number, dt: number) {
+    this.dirty = true;
+    const kk = s.phase === 'approach' ? k8 * 0.6 : Math.min(1, k8 * 3); // 停好之後動作要快
+    for (let m = 0; m < CREW_N; m++) { const [a, b, c, yw] = this.servicePose(k, m, s); this.stepCrew(k, m, a, b, c, yw, dt, kk, m >= 12 ? 6 : 4.5); }
     const inBox = s.phase !== 'approach', tt = inBox ? s.t : -1;
     // 聲音：千斤頂頂起、四個輪子各自的扳手（鬆、鎖）、千斤頂放下、放行
     // 上一格的 t：approach（還沒停好）是 -1，所以停好的那一格 prev = -1、tt = 0.0x，「頂起」也會被算到
@@ -397,26 +491,30 @@ export class PitLane {
     const cross = (at: number) => prev < at && tt >= at;
     if (inBox) {
       if (cross(0.02)) this.sounds.push({ kind: 'jack', x: s.x, z: s.z });
-      for (let w = 0; w < 4; w++) { const [g1, , , lock] = this.wheelTimes(w, s); if (cross(g1 + w * 0.03) || cross(lock - 0.3 + w * 0.02)) this.sounds.push({ kind: 'gun', x: s.x, z: s.z }); }
+      for (let w = 0; w < 4; w++) { const pl = this.plan(w, s); if (cross(pl.A1) || cross(pl.V2)) this.sounds.push({ kind: 'gun', x: s.x, z: s.z }); } // 扳手聲跟畫面上扳手套上去同一刻
       if (cross(TL.DROP[0] * s.T)) this.sounds.push({ kind: 'jack', x: s.x, z: s.z });
       if (s.phase === 'release' && !s.hold && !this.released[k]) { this.released[k] = 1; this.sounds.push({ kind: 'go', x: s.x, z: s.z }); }
     }
-    // 輪胎：舊胎（0~3）從車上拆下來、抱著走；新胎（4~7）一開始在裝胎的人手上，裝上之後交給車上的輪子
+    // 輪胎：舊胎（0~3）從輪軸被拔下來、抱著走；新胎（4~7）一開始在裝胎的人手上，推上輪軸之後交給車上的輪子
+    // tyres[輪胎編號 * 3] = 進度（舊胎：0 在輪軸 ~ 1 在人手上；新胎：0 在人手上 ~ 1 在輪軸）、[+2] = 看得到（0）／看不到（-9）
     const colNew = new THREE.Color(s.newColor), colOld = new THREE.Color(s.oldColor);
+    const bump = (a0: number, a1: number) => smooth((tt - (a0 - 0.06)) / 0.06) * (1 - smooth((tt - a1) / 0.06)); // 扳手套上去 → 放開
     for (let w = 0; w < 4; w++) {
-      const off = (k * CREW_N + w * 3 + 1) * 3, on = (k * CREW_N + w * 3 + 2) * 3, sb = Math.sign(WHEELS[w][1]);
-      const [, offT, onT] = this.wheelTimes(w, s);
-      const T0 = (k * 8 + w) * 3, T1 = (k * 8 + 4 + w) * 3;
-      const offNow = inBox && tt >= offT * 0.85, onNow = inBox && tt >= onT; // 舊胎已經拔下來了、新胎已經裝上去了
-      // 舊胎：拔下來之後跟著拆胎的人走（拔下來以前它在車上，由車模的輪子顯示）
-      this.tyres[T0] = this.pose[off] - 0.1; this.tyres[T0 + 1] = this.pose[off + 1] - sb * 0.45; this.tyres[T0 + 2] = offNow ? 0.62 : -9;
-      // 新胎：裝上以前在裝胎的人手上；裝上之後藏起來（換成車上的輪子，顏色是新胎）
-      this.tyres[T1] = this.pose[on] + 0.3; this.tyres[T1 + 1] = this.pose[on + 1] - sb * 0.5; this.tyres[T1 + 2] = inBox && !onNow ? 0.42 : s.phase === 'approach' ? 0.42 : -9;
+      const pl = this.plan(w, s), slow = w === s.slow, T0 = (k * 8 + w) * 3, T1 = (k * 8 + 4 + w) * 3;
+      const pulled = inBox && tt >= pl.pullS, mounted = inBox && tt >= pl.on; // 舊胎已經開始拔了、新胎已經裝上去了
+      this.tyres[T0] = pulled ? smooth((tt - pl.pullS) / 0.2) : 0; this.tyres[T0 + 2] = pulled ? 0 : -9; // 拔以前它在車上，由車模的輪子顯示
+      let pu = 0; // 新胎往輪軸推的進度；出包的輪子先推到六成卡住（抖動），晚到才推進去
+      if (mounted) pu = 1;
+      else if (inBox && tt >= pl.finS) pu = (slow ? 0.6 : 0) + (slow ? 0.4 : 1) * smooth((tt - pl.finS) / 0.2);
+      else if (inBox && slow && tt >= pl.pushS) pu = 0.6 * smooth((tt - pl.pushS) / 0.25) * (0.88 + 0.12 * Math.sin(tt * 16));
+      this.tyres[T1] = pu; this.tyres[T1 + 2] = mounted ? -9 : 0; // 裝上之後藏起來（換成車上的輪子，顏色是新胎）
       this.band.setColorAt(k * 8 + 4 + w, colNew);
       this.band.setColorAt(k * 8 + w, colOld); // 拆下來的舊胎還看得出是什麼胎（真的 F1 磨過也看得出顏色）
+      this.gunEng[k * 4 + w] = inBox ? Math.max(bump(pl.A1, pl.E1), bump(pl.V2, pl.E2)) : 0;
+      this.axle[k * 4 + w] = pulled && !mounted ? 1 : 0;
       // 車上的輪子：拔下來到裝上之間不在車上（scale 0：玩家的車每格會重設 visible，不能用 visible）
       const sp = s.model?.spin[SPIN_OF[w]];
-      if (sp) { const gone = offNow && !onNow; sp.scale.setScalar(gone ? 1e-4 : 1); }
+      if (sp) sp.scale.setScalar(pulled && !mounted ? 1e-4 : 1);
     }
     // 放行牌：放行前 0.25 秒、而且快車道沒有車要過來才轉綠（被擋住時維持紅色；以前時間一到就綠、而且跟起步同一格）
     this.sign.setColorAt(k, new THREE.Color(s.go ? '#22ff66' : '#d81e2a'));
@@ -429,47 +527,110 @@ export class PitLane {
   private toolOn = new Uint8Array(TEAMS.length);
   private toolLift = new Float32Array(TEAMS.length);
 
-  /** 把第 k 隊的人、輪胎、放行牌放到世界座標 */
+  /** 把第 k 隊的人、輪胎、放行牌、工具放到世界座標 */
   private place(k: number) {
     const f = this.frames[k], ca = Math.cos(f.h), sa = Math.sin(f.h);
-    // 沿賽道 (sin h, cos h)、往右（車庫方向）(-cos h, sin h)
-    const W = (a: number, b: number): [number, number] => [f.x + sa * a - ca * b, f.z + ca * a + sa * b];
-    const { M, Q, V, S, up } = this;
+    // 停車格座標（a 沿賽道、b 往車庫、y 離地）→ 世界座標
+    const W = (a: number, b: number, y = 0): V3 => [f.x + sa * a - ca * b, f.y + y, f.z + ca * a + sa * b];
+    const { M, Q, V, S, up, D } = this;
+    const UP: V3 = [0, 1, 0], on = this.toolOn[k] === 1, lift = this.toolLift[k];
+    /** 第 i 段骨頭：A → B 的六角柱（r = 半徑） */
+    const seg = (i: number, A: V3, B: V3, r: number) => {
+      const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2], len = Math.hypot(dx, dy, dz);
+      if (len < 1e-4) { M.makeScale(0, 0, 0); this.bone.setMatrixAt(i, M); return; }
+      Q.setFromUnitVectors(up, D.set(dx / len, dy / len, dz / len));
+      M.compose(V.set(A[0], A[1], A[2]), Q, S.set(r, len, r));
+      this.bone.setMatrixAt(i, M);
+    };
+    const hide = (i: number) => { M.makeScale(0, 0, 0); this.bone.setMatrixAt(i, M); }; // 縮成零：不用丟到地底下（那裡的座標是任意的）
+    // ---- 1. 每個人的骨架基準：髖、面向、軀幹方向、肩（蹲得越低、走得越快，身體越前傾）
+    const ps: Body[] = [];
     for (let m = 0; m < CREW_N; m++) {
-      const o = (k * CREW_N + m) * 3, [x, z] = W(this.pose[o], this.pose[o + 1]), crouch = this.pose[o + 2];
-      const face = m < 12 ? f.h + (WHEELS[Math.floor(m / 3)][1] > 0 ? Math.PI / 2 : -Math.PI / 2) : m === 14 ? f.h + Math.PI : f.h;
-      Q.setFromAxisAngle(up, face);
-      M.compose(V.set(x, f.y, z), Q, S.set(1, 1 - crouch * 0.4, 1));
-      this.body.setMatrixAt(k * CREW_N + m, M);
-      this.head.setMatrixAt(k * CREW_N + m, M);
+      const idx = k * CREW_N + m, o = idx * 3, c = this.pose[o + 2], yaw = this.yaw[idx], sp = this.spd[idx], hp = W(this.pose[o], this.pose[o + 1]);
+      const fw: V3 = [Math.sin(yaw), 0, Math.cos(yaw)], lf: V3 = [Math.cos(yaw), 0, -Math.sin(yaw)];
+      const hip: V3 = [hp[0], f.y + 0.88 - c * 0.4, hp[2]], lean = c * 0.7 + Math.min(1, sp / 3) * 0.14, sl = Math.sin(lean);
+      const td: V3 = [fw[0] * sl, Math.cos(lean), fw[2] * sl];
+      ps.push({ hip, fw, lf, td, sc: addV(hip, td, 0.5), ph: this.gait[idx], sp, c });
     }
-    for (let q = 0; q < 8; q++) {
-      const o = (k * 8 + q) * 3, [x, z] = W(this.tyres[o], this.tyres[o + 1]), y = this.tyres[o + 2];
-      Q.setFromAxisAngle(up, f.h);
-      M.compose(V.set(x, y < -5 ? -50 : f.y + y, z), Q, S.set(1, 1, 1));
-      this.tyre.setMatrixAt(k * 8 + q, M);
-      this.band.setMatrixAt(k * 8 + q, M);
-    }
-    const o = (k * CREW_N + 14) * 3, [x, z] = W(this.pose[o] + 0.35, this.pose[o + 1]);
-    Q.setFromAxisAngle(up, f.h + Math.PI / 2);
-    M.compose(V.set(x, f.y + 0.6, z), Q, S.set(1, 1, 1));
-    this.sign.setMatrixAt(k, M);
-    // 工具：4 支氣動扳手（槍手手上，從輪子外側水平頂著輪子中心）＋前後 2 支千斤頂（長柄從車頭、車尾伸進車底，跟著千斤頂的人）
-    const on = this.toolOn[k] === 1, lift = this.toolLift[k];
+    const hands: [V3 | null, V3 | null][] = ps.map(() => [null, null]);
+    // ---- 2. 工具與輪胎：位置由輪子、千斤頂決定，手去抓
+    const tb = k * SEG_PER_TEAM + CREW_N * SEG_PER;
     for (let w = 0; w < 4; w++) {
-      const g = (k * CREW_N + w * 3) * 3, sb = Math.sign(WHEELS[w][1]);
-      // 扳手從槍手的位置往輪子中心伸 0.45 m：槍身 0.12×0.12、長 0.45，中心在槍手與輪子之間
-      const [gx, gz] = W(this.pose[g], this.pose[g + 1] - sb * 0.3);
-      Q.setFromAxisAngle(up, f.h + Math.PI / 2);
-      M.compose(V.set(gx, on ? f.y + 0.38 + lift : -50, gz), Q, S.set(0.45, 0.12, 0.12));
-      this.tool.setMatrixAt(k * 6 + w, M);
+      const [ha, hb, hr] = HUB[w], sb = Math.sign(WHEELS[w][1]), i0 = tb + w * 5, e = this.gunEng[k * 4 + w], gm = w * 3;
+      // 軸頭：輪子拆掉的時候露出來
+      if (this.axle[k * 4 + w]) seg(tb + 26 + w, W(ha, sb * (hb - 0.1), hr + lift), W(ha, sb * (hb + 0.22), hr + lift), 0.05); else hide(tb + 26 + w);
+      // 氣動扳手：套筒＋槍身＋握把＋氣管（兩段，垂到地上再拉回車庫）；套在螺帽上（e = 1）頂著輪子中心，沒在鎖的時候端在車旁
+      if (!on) { for (let j = 0; j < 5; j++) hide(i0 + j); continue; }
+      const ob: V3 = [-ca * sb, 0, sa * sb], tip = lerpV(W(ha, sb * (hb + 0.32), 0.58), W(ha, sb * (hb + 0.18), hr + lift), e), rear = addV(tip, ob, 0.46);
+      const fl = W(ha - 0.7, sb * 3.3, 0.03), mid = lerpV(rear, fl, 0.5); mid[1] = f.y + 0.1;
+      seg(i0, tip, addV(tip, ob, 0.08), 0.034);
+      seg(i0 + 1, addV(tip, ob, 0.08), rear, 0.056);
+      seg(i0 + 2, addV(addV(tip, ob, 0.3), UP, -0.03), addV(addV(tip, ob, 0.34), UP, -0.15), 0.028);
+      seg(i0 + 3, rear, mid, 0.015); seg(i0 + 4, mid, fl, 0.015);
+      hands[gm] = [addV(addV(tip, ob, 0.18), UP, 0.07), addV(addV(tip, ob, 0.34), UP, -0.13)];
     }
-    for (const [j, m, dir] of [[4, 12, 1], [5, 13, -1]] as const) {
-      // 千斤頂：一支 1.6 m 的長柄，從千斤頂的人手上斜斜伸到車頭（車尾）底下
-      const p = (k * CREW_N + m) * 3, [jx, jz] = W(this.pose[p] - dir * 0.8, this.pose[p + 1]);
-      Q.setFromAxisAngle(up, f.h);
-      M.compose(V.set(jx, on ? f.y + 0.25 + lift * 0.5 : -50, jz), Q, S.set(0.1, 0.1, 1.6));
-      this.tool.setMatrixAt(k * 6 + j, M);
+    for (let w = 0; w < 4; w++) { // 輪胎：舊胎從輪軸被拔下來抱走、新胎被抱過來推上輪軸（tyres[o] = 時間方向的進度；高度 < −5 = 看不到）
+      const [ha, hb, hr] = HUB[w], sb = Math.sign(WHEELS[w][1]), ax = W(ha, sb * hb, hr + lift);
+      for (const [q, role] of [[w, 1], [4 + w, 2]] as const) {
+        const o = (k * 8 + q) * 3, qi = k * 8 + q;
+        if (this.tyres[o + 2] < -5) { M.makeScale(0, 0, 0); this.tyre.setMatrixAt(qi, M); this.band.setMatrixAt(qi, M); continue; }
+        const m = w * 3 + role, p = ps[m], held = addV(addV(p.hip, p.fw, 0.42), UP, -0.1);
+        const atAxle = role === 1 ? 1 - this.tyres[o] : this.tyres[o], pos = lerpV(held, ax, atAxle);
+        // 抱著的時候輪軸朝著人的面向（轉到一半的時候跟著轉）、在輪軸上時朝著車旁
+        const d = this.yaw[k * CREW_N + m] - Math.PI / 2 - f.h, ang = f.h + (d - Math.PI * Math.round(d / Math.PI)) * (1 - atAxle);
+        Q.setFromAxisAngle(up, ang);
+        M.compose(V.set(pos[0], pos[1], pos[2]), Q, S.set(1, 1, 1));
+        this.tyre.setMatrixAt(qi, M); this.band.setMatrixAt(qi, M);
+        // 兩手扶在朝著人的那面胎壁上、左右兩側（輪軸在 xt、胎面所在平面的水平方向在 pr）
+        const xt: V3 = [Math.cos(ang), 0, -Math.sin(ang)], pr: V3 = [Math.sin(ang), 0, Math.cos(ang)], sg = Math.sign(dot(p.lf, pr)) || 1;
+        const gripC = addV(pos, xt, (Math.sign(dot(xt, addV(p.hip, pos, -1))) || 1) * 0.17);
+        hands[m] = [addV(gripC, pr, 0.27 * sg), addV(gripC, pr, -0.27 * sg)];
+      }
+    }
+    for (let j = 0; j < 2; j++) { // 前、後千斤頂：墊頭頂在車頭（車尾）底下，長柄伸到千斤頂的人手上
+      const m = 12 + j, i0 = tb + 20 + j * 3, p = ps[m];
+      if (!on) { for (let q = 0; q < 3; q++) hide(i0 + q); continue; }
+      const ac = j === 0 ? 1.95 : -2.1, top = W(ac, 0, (j === 0 ? 0.2 : 0.3) + lift);
+      const grip = addV(addV(p.hip, p.fw, 0.42), UP, 0.14), dir = unitV(addV(grip, top, -1));
+      seg(i0, top, addV(grip, dir, 0.25), 0.022);
+      seg(i0 + 1, W(ac, 0, 0.02), top, 0.035);
+      seg(i0 + 2, addV(top, UP, -0.03), top, 0.09);
+      hands[m] = [grip, addV(grip, dir, -0.3)];
+    }
+    { // 放行牌：舉在放行的人身前
+      const p = ps[14], base = addV(p.hip, p.fw, 0.3);
+      Q.setFromAxisAngle(up, f.h + Math.PI / 2);
+      M.compose(V.set(base[0], f.y + 0.5, base[2]), Q, S.set(1, 1, 1));
+      this.sign.setMatrixAt(k, M);
+      hands[14] = [[base[0], f.y + 1.3, base[2]], [base[0], f.y + 1.02, base[2]]];
+    }
+    // ---- 3. 身體、頭、四肢
+    for (let m = 0; m < CREW_N; m++) {
+      const p = ps[m], idx = k * CREW_N + m, hd = hands[m], walk = Math.min(1, p.sp / 2);
+      // 軀幹與頭盔：以軀幹方向為 y、面向為 z
+      const dz = dot(p.fw, p.td), z = unitV([p.fw[0] - p.td[0] * dz, p.fw[1] - p.td[1] * dz, p.fw[2] - p.td[2] * dz]);
+      const x: V3 = [p.td[1] * z[2] - p.td[2] * z[1], p.td[2] * z[0] - p.td[0] * z[2], p.td[0] * z[1] - p.td[1] * z[0]];
+      const basis = (at: V3) => M.set(x[0], p.td[0], z[0], at[0], x[1], p.td[1], z[1], at[1], x[2], p.td[2], z[2], at[2], 0, 0, 0, 1);
+      basis(p.hip); this.body.setMatrixAt(idx, M);
+      basis(addV(p.sc, p.td, 0.24)); this.head.setMatrixAt(idx, M);
+      for (const s of [1, -1]) {
+        const j = s > 0 ? 0 : 1;
+        // 腿：走路時前後擺、蹲的時候一腳在前一腳在後；膝蓋往前彎
+        const ph = p.ph + (s > 0 ? 0 : Math.PI), fwd = walk * 0.3 * Math.sin(ph) + p.c * 0.2 * (s > 0 ? 1 : -0.8), fl = walk * 0.12 * Math.max(0, Math.cos(ph));
+        const hj = addV(p.hip, p.lf, s * 0.09), an: V3 = [hj[0] + p.fw[0] * fwd, f.y + 0.08 + fl, hj[2] + p.fw[2] * fwd];
+        const [kn, en] = ik2(hj, an, 0.41, 0.41, p.fw); // 腿 0.82 m：站直的時候髖到腳踝 0.81 m，膝蓋只微微彎
+        seg(boneAt(k, m, 4 + j * 2), hj, kn, 0.075);
+        seg(boneAt(k, m, 5 + j * 2), kn, en, 0.055);
+        seg(boneAt(k, m, 10 + j), addV(addV(en, p.fw, -0.05), UP, -0.03), addV(addV(en, p.fw, 0.2), UP, -0.03), 0.055);
+        // 手：有東西要抓就抓；沒有就自然垂著、走路時跟腿反相擺
+        const sh = addV(p.sc, p.lf, s * 0.22);
+        let tg = hd[j];
+        if (!tg) { const sw = walk * 0.35 * Math.sin(p.ph + (s > 0 ? Math.PI : 0)); tg = [sh[0] + p.fw[0] * (sw + 0.04) + p.lf[0] * s * 0.05, sh[1] - 0.52, sh[2] + p.fw[2] * (sw + 0.04) + p.lf[2] * s * 0.05]; }
+        const [el, wr] = ik2(sh, tg, 0.3, 0.28, [p.lf[0] * s * 0.5 - p.fw[0] * 0.4, -0.8, p.lf[2] * s * 0.5 - p.fw[2] * 0.4]);
+        seg(boneAt(k, m, j * 2), sh, el, 0.045);
+        seg(boneAt(k, m, j * 2 + 1), el, wr, 0.04);
+        seg(boneAt(k, m, 8 + j), wr, addV(wr, unitV(addV(wr, el, -1)), 0.1), 0.05);
+      }
     }
   }
 }
