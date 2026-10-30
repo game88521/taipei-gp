@@ -104,27 +104,40 @@ class Rain {
   }
 }
 
+/**
+ * 頭燈光斑的貼圖（所有車共用一張）：平面 12 m 寬 × 32 m 長，第 0 列在近端（車鼻）、最後一列在最遠。
+ * 逐像素算 alpha，用半精度浮點存（8 位元 alpha 在暗部一格就差 6 個顯示色階，尾巴會看到一圈一圈的等高線）：
+ *   縱向：從車鼻 2.5 m 內淡入（以前在車鼻直接截斷成一條亮邊），之後 (1−u)^1.2 平順收到 0（尾端斜率 0，看不到終點）
+ *   橫向：平頂軟肩 exp(−(|x|/w)³)，w 從近處 2.6 m 隨距離變寬到 4.6 m（照亮一整片路面，不是一條線，邊緣也不會是硬邊）
+ */
+let beamTex: THREE.DataTexture | null = null;
+function beamTexture(): THREE.DataTexture {
+  if (beamTex) return beamTex;
+  const W = 64, H = 128, data = new Uint16Array(W * H * 4), toH = THREE.DataUtils.toHalfFloat;
+  const ss = (e1: number, v: number) => { const t = Math.max(0, Math.min(1, v / e1)); return t * t * (3 - 2 * t); };
+  for (let r = 0; r < H; r++) {
+    const u = (r + 0.5) / H; // 0 = 車鼻、1 = 最遠
+    const along = 0.46 * Math.pow(1 - u, 1.2) * ss(0.08, u), w = 2.6 + 2 * u;
+    for (let c = 0; c < W; c++) {
+      const xm = ((c + 0.5) / W * 2 - 1) * 6; // 離中線的橫向距離（m）
+      const o = (r * W + c) * 4;
+      data[o] = toH(1); data[o + 1] = toH(0.87); data[o + 2] = toH(0.64); // 暖白（線性色）
+      data[o + 3] = toH(along * Math.exp(-Math.pow(Math.abs(xm) / w, 3)));
+    }
+  }
+  beamTex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.HalfFloatType);
+  beamTex.magFilter = beamTex.minFilter = THREE.LinearFilter;
+  beamTex.generateMipmaps = false;
+  beamTex.needsUpdate = true;
+  return beamTex;
+}
+
 /** 車頭燈：地上一片往前延伸的光（加法混色）＋兩顆發亮的燈；掛在車子模型上，晚上才打開 */
 export function headlightRig(front = 2.35, y = 0.72, half = 0.62): THREE.Group {
   const g = new THREE.Group();
-  const c = document.createElement('canvas');
-  c.width = 64; c.height = 128;
-  const x = c.getContext('2d')!;
-  // 畫布下緣＝車頭（窄）、上緣＝遠方（寬）；往前漸淡、兩側柔邊
-  const grd = x.createLinearGradient(0, 128, 0, 0);
-  grd.addColorStop(0, 'rgba(255,242,214,0.42)');
-  grd.addColorStop(0.45, 'rgba(255,238,206,0.2)');
-  grd.addColorStop(1, 'rgba(255,232,196,0)');
-  x.filter = 'blur(5px)';
-  x.fillStyle = grd;
-  x.beginPath();
-  x.moveTo(24, 128); x.lineTo(40, 128); x.lineTo(62, 0); x.lineTo(2, 0);
-  x.closePath();
-  x.fill();
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const beam = new THREE.Mesh(new THREE.PlaneGeometry(7, 16).rotateX(-Math.PI / 2).rotateY(Math.PI), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 }));
-  beam.position.set(0, 0.06, front + 7.6);
+  // 長 32 m、寬 12 m（以前 16 m × 7 m，而且不到 12 m 就淡光了）：夜間賽車大燈看得到前方約 30 m 的路面
+  const beam = new THREE.Mesh(new THREE.PlaneGeometry(12, 32).rotateX(-Math.PI / 2).rotateY(Math.PI), new THREE.MeshBasicMaterial({ map: beamTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -40 }));
+  beam.position.set(0, 0.06, front + 15.6);
   g.add(beam);
   g.userData.beam = beam.material;
   const lens = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.8, 2.4), toneMapped: false });
@@ -149,6 +162,7 @@ export class Weather {
   private shadowMats: THREE.MeshBasicMaterial[] = [];
   private nightGlow: THREE.MeshBasicMaterial[] = []; // 晚上變亮的招牌、燈圈（userData.nightScale）
   private nightEmis: THREE.MeshLambertMaterial[] = []; // 晚上換發光色的（101 塔身）
+  private nightFade: { mat: THREE.Material & { opacity: number }; meshes: THREE.Object3D[] }[] = []; // 晚上才浮現、隨夜晚程度漸變不透明度的（賽道夜間邊線；userData.nightFade = 最亮時的不透明度）
   private tickers: THREE.Texture[] = []; // 會捲動的跑馬燈
   headlights: THREE.Object3D[] = [];
   constructor(private scene: THREE.Scene, private world: World, rainDrops: number) {
@@ -157,10 +171,16 @@ export class Weather {
 
   /** 城市載入後掃一遍：有標記的材質（窗戶、路燈、道路、只在晚上出現的東西） */
   collect() {
-    this.windows = []; this.lamps = []; this.nightOnly = []; this.rainOnly = []; this.roads = []; this.shadowMats = []; this.nightGlow = []; this.nightEmis = []; this.tickers = [];
+    this.windows = []; this.lamps = []; this.nightOnly = []; this.rainOnly = []; this.roads = []; this.shadowMats = []; this.nightGlow = []; this.nightEmis = []; this.nightFade = []; this.tickers = [];
     const seen = new Set<THREE.Material>();
     this.scene.traverse((o) => {
       if (o.userData.nightOnly) this.nightOnly.push(o);
+      const fm = (o as THREE.Mesh).material as (THREE.Material & { opacity: number }) | undefined;
+      if (fm && !Array.isArray(fm) && fm.userData.nightFade !== undefined) {
+        let e = this.nightFade.find((x) => x.mat === fm);
+        if (!e) this.nightFade.push(e = { mat: fm, meshes: [] });
+        e.meshes.push(o);
+      }
       if (o.userData.rainOnly) this.rainOnly.push(o);
       if (o.userData.ticker && !this.tickers.includes(o.userData.ticker)) this.tickers.push(o.userData.ticker);
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
@@ -235,6 +255,9 @@ export class Weather {
     const nightness = Math.max(0, Math.min(1, (p.windows - 0.12) / (1.25 - 0.12)));
     for (const m of this.nightGlow) m.color.setScalar(0.85 + ((m.userData.nightScale as number) - 0.85) * nightness);
     for (const m of this.nightEmis) { const [d, n] = m.userData.nightEmissive as [string, string]; m.emissive.set(d).lerp(new THREE.Color(n), nightness); }
+    // 深夜程度：夜晚程度 0.75 以下是 0（黃昏約 0.69，不能受影響）、1.0 時全開；夜間邊線這類「只有真的夜裡才需要」的東西看這個
+    const deep = Math.max(0, Math.min(1, (nightness - 0.75) / 0.25)), deepS = deep * deep * (3 - 2 * deep);
+    for (const f of this.nightFade) { f.mat.opacity = (f.mat.userData.nightFade as number) * deepS; for (const o of f.meshes) o.visible = deepS > 0.005; }
     if (bloom) bloom.strength = p.bloom;
     if (grade) (grade.uniforms.tint.value as THREE.Vector3).set(...p.tint);
     // 雨絲：強度越大越密（小雨稀稀落落）

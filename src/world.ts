@@ -279,6 +279,20 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   const trackMat = new THREE.MeshLambertMaterial({ map: asphalt, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
   trackMat.userData.road = true; // 下雨時換成會反光的濕路面（weather.ts）
   race.add(new THREE.Mesh(ribbon(t, { a: -HALF_WIDTH, b: HALF_WIDTH, ya: 0, yb: 0, along: 12 }), trackMat));
+  // 夜間的邊線：柏油貼圖上的白線是烤進去的，晚上只剩一條灰灰的細線（量過：比旁邊的路面亮不了多少），
+  // 所以夜裡另外疊一條貼地的發光細帶（只有晚上才顯示，weather.ts 的 nightOnly），邊界才分得出來。
+  // 白線在離中心線 6.34~6.73 m（貼圖 5~12 px / 256 × 14 m 路寬）；細帶蓋在上面，略寬一點
+  {
+    // 雙面：ribbon 的三角形繞序跟著 a→b 的方向，左右兩側一邊會背對鏡頭（單面時左邊那條被剔除、看不到）
+    const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 0.58, 0.66), transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -70 });
+    glow.userData.nightFade = 0.9; // 不透明度跟著夜晚程度漸變（weather.ts），黃昏→夜晚不會「啪」地出現
+    glow.opacity = 0;
+    for (const s of [-1, 1]) {
+      const edge = new THREE.Mesh(ribbon(t, { a: s * 6.3, b: s * 6.75, ya: 0.006, yb: 0.006, along: 12 }), glow);
+      edge.visible = false; // 夜晚程度 > 0 才顯示（weather.ts 的 nightFade）
+      race.add(edge);
+    }
+  }
   // 路肩（路緣外到護牆外 3 m，路燈立在上面）
   const shoulder = new THREE.MeshLambertMaterial({ color: '#4b4d52', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -60 });
   shoulder.userData.road = true;
@@ -316,6 +330,10 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
     g.fillStyle = '#f2f2f2'; g.fillRect(0, 32, 16, 32);
   });
   const kerbMat = new THREE.MeshLambertMaterial({ map: kerbTex, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -70 });
+  // 夜裡紅白條紋要看得出來（彎道的邊界）：自發光用同一張貼圖，白天 0、晚上約五成亮（weather.ts 照夜晚程度漸變）
+  kerbMat.emissiveMap = kerbTex;
+  kerbMat.emissive.set('#000000');
+  kerbMat.userData.nightEmissive = ['#000000', '#7c7c7c'];
   const inCorner = (i: number) => Math.abs(t.curv[i]) > 1 / 200;
   for (const s of [-1, 1]) {
     race.add(new THREE.Mesh(ribbon(t, { a: s * (HALF_WIDTH - 0.6), b: s * (HALF_WIDTH + 1.2), ya: 0.02, yb: 0.02, along: 4, mask: inCorner }), kerbMat));
