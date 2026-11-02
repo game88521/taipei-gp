@@ -686,6 +686,19 @@ export class RaceField {
       for (const w of m.spin) w.rotation.x += (c.v / 0.36) * dt;
     }
     this.pitlane?.update(dt, this.stopInfo());
+    this.pitlane?.exitLight(this.pitExitBusy());
+  }
+  /**
+   * 出站燈要不要亮紅（純畫面，不影響任何車的行為）：賽道上有車正從出站口後方開過來（出站口前 40 m 到後 8 m、
+   * 不在維修區裡）＝ 現在匯出去會撞到。真的 F1 出站燈是看賽道上有沒有車隊過來；這裡只是燈號，車子的匯入邏輯沒改
+   */
+  private pitExitBusy() {
+    for (const r of this.racers) {
+      if (r.pit || r.finish != null) continue;
+      const d = signedS(this.t, r.car.pos.s) - PIT.OUT; // 正 = 已經過了出站口
+      if (d > -40 && d < 8) return true;
+    }
+    return false;
   }
 }
 

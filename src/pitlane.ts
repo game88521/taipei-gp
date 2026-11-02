@@ -169,6 +169,9 @@ export class PitLane {
   /** 每隊 4 支扳手頂在輪子上的程度（0 端在身邊 ~ 1 套在螺帽上）、4 個輪子是不是拆掉了（露出軸頭） */
   private gunEng: Float32Array; private axle: Uint8Array;
   private D = new THREE.Vector3();
+  /** 出站燈（綠／紅）；exitRed = 目前是紅燈 */
+  private exitLamp: THREE.Mesh | null = null;
+  private exitRed = false;
   private active = new Set<number>();
   private linger = new Float32Array(TEAMS.length);
   private frames: { x: number; y: number; z: number; h: number }[] = [];
@@ -269,11 +272,21 @@ export class PitLane {
       g.fillStyle = '#999'; g.font = 'bold 110px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(kmh), 128, 136);
       g.strokeStyle = '#111'; g.lineWidth = 18; g.beginPath(); g.moveTo(40, 216); g.lineTo(216, 40); g.stroke(); // 解除限速
     });
+    // 出站燈：燈箱是看板（燈的位置留成暗色的圓），上面疊一顆會換色的燈（綠 = 可以匯出、紅 = 賽道上有車正要過來，exitLight 每格設）
     board(PIT.OUT - 60, outer(PIT.OUT - 60) + 0.8, 1.0, 1.6, 2.4, (g) => {
       g.fillStyle = '#111'; g.fillRect(0, 0, 256, 410);
-      g.fillStyle = '#22ff66'; g.beginPath(); g.arc(128, 120, 80, 0, 7); g.fill();
+      g.fillStyle = '#1c1f24'; g.beginPath(); g.arc(128, 120, 80, 0, 7); g.fill();
       g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.fillText('PIT', 128, 290); g.fillText('EXIT', 128, 350);
     });
+    {
+      const sd = PIT.OUT - 60, [x, y, z] = P(sd, outer(sd) + 0.8, 2.4), i = iOf(sd), ang = Math.atan2(t.tx[i], t.tz[i]) + Math.PI;
+      // 燈在看板中心往上 1.6 × (0.5 − 120/410) = 0.33 m（貼圖畫燈的那一列）、往看板正面推 2 cm（不跟看板打架）。
+      // 看板正面的法線是 (sin ang, cos ang)：要加，不是減——減的話燈跑到不透明的看板後面，紅綠都看不到
+      this.exitLamp = new THREE.Mesh(new THREE.CircleGeometry(0.31, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color('#22ff66').multiplyScalar(1.6), toneMapped: false }));
+      this.exitLamp.position.set(x + Math.sin(ang) * 0.02, y + 1.6 * (0.5 - 120 / 410), z + Math.cos(ang) * 0.02);
+      this.exitLamp.rotation.y = ang;
+      parent.add(this.exitLamp);
+    }
 
     // 台北街道賽：沒有常設的維修區建築，搭一排臨時車庫（各國賽道 circuitenv.ts 已經蓋好了）
     if (garages && PIT.BUILD) this.buildGarages(parent, P);
@@ -436,6 +449,15 @@ export class PitLane {
     const dy = wrapA(ty - this.yaw[idx]) * Math.min(1, dt * 8), turn = 10 * dt; // 轉身最快 10 rad/s（轉 180° 至少 0.3 秒），不會一格就轉過去
     this.yaw[idx] += Math.max(-turn, Math.min(turn, dy));
   }
+
+  /** 出站燈：red = 賽道上有車正從出站口後方開過來（rivals 每格給）；只有狀態變了才改顏色 */
+  exitLight(red: boolean) {
+    if (!this.exitLamp || red === this.exitRed) return;
+    this.exitRed = red;
+    (this.exitLamp.material as THREE.MeshBasicMaterial).color.set(red ? '#ff2a1f' : '#22ff66').multiplyScalar(1.6);
+  }
+  /** 測試用：出站燈現在是不是紅的 */
+  get exitIsRed() { return this.exitRed; }
 
   /** 每格：stops = 正在進站的隊伍 → 那一隊的停站狀態 */
   update(dt: number, stops: Map<number, StopInfo>) {
