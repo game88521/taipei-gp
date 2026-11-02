@@ -49,7 +49,7 @@ import { physicsTest } from './physicstest';
 import { initLeaderboard, submitLap } from './leaderboard-ui';
 
 
-import { save, writeSave, KEY, bestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, type Ghost, type SteerMode } from './save';
+import { save, writeSave, KEY, bestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, exportSave, parseSaveFile, writeImported, askPersist, type Ghost, type SteerMode, type Save } from './save';
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -572,6 +572,7 @@ function completeLap() {
     $('best').textContent = fmt(t);
     toast(first ? `完成第一圈！${fmt(t)}` : `最快圈！${fmt(t)}`, 'purple');
     if (!BOT && !CIRCUIT) void submitLap(t); // 新的最快圈：上傳線上排行榜（只收台北信義街道賽）
+    if (first && !BOT) void askPersist(); // 第一次有成績：請瀏覽器別在空間不夠時自動清掉存檔（不一定會給）
   } else {
     toast(`${fmt(t)}（${fmtDelta(t - save.best)}）`, '');
   }
@@ -2197,6 +2198,61 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 // 手機的聲音被系統停掉（切 App、鎖螢幕、來電）之後，下一次碰螢幕或按鍵就叫醒
 for (const ev of ['pointerdown', 'touchend', 'keydown'] as const) addEventListener(ev, () => sound.unlock(), { capture: true, passive: true });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
+// ---- 備份存檔：複製／下載／貼上還原（紀錄頁）。還原是整份覆蓋，所以先顯示差異、玩家確認才套用，套用前還會把目前的存檔留一份在另一個鍵
+{
+  const bkText = $<HTMLTextAreaElement>('bk-text'), bkConfirm = $('bk-confirm'), bkMsg = $('bk-msg');
+  let pending: Save | null = null;
+  const money = (s: Pick<Save, 'taxi'>) => `NT$ ${(s.taxi?.money ?? 0).toLocaleString()}`;
+  const brief = (s: Save) => `最快圈 ${s.best != null ? fmt(s.best) : '--'}、${money(s)}、成就 ${(s.ach ?? []).length} 個、車庫 ${(s.owned ?? []).length} 台`;
+  const resetUi = () => { pending = null; bkConfirm.hidden = true; bkText.hidden = true; bkText.value = ''; };
+  const stage = (text: string) => {
+    const r = parseSaveFile(text);
+    if (!r.ok) { toast(`❌ 還原不了：${r.why}`, 'bad'); return; }
+    pending = r.save;
+    const now = JSON.parse(exportSave()).save as Save;
+    bkMsg.textContent = `備份裡：${brief(r.save)}。\n目前：${brief(now)}。\n還原會用備份蓋掉目前的存檔${r.dropped.length ? `（${r.dropped.join('、')} 不在備份範圍內，會保留目前的）` : ''}。`;
+    bkMsg.style.whiteSpace = 'pre-line';
+    bkConfirm.hidden = false;
+  };
+  $('bk-copy').addEventListener('click', async () => {
+    const text = exportSave();
+    try { await navigator.clipboard.writeText(text); toast(`✅ 已複製備份（${Math.ceil(text.length / 1024)} KB），貼到記事本或訊息裡存起來`, 'purple'); }
+    catch { bkText.hidden = false; bkText.value = text; bkText.focus(); bkText.select(); toast('已把備份放在下面的文字框，請手動全選複製', ''); } // 剪貼簿被擋：改成顯示文字讓玩家自己複製
+  });
+  $('bk-save').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([exportSave()], { type: 'application/json' }));
+    a.download = `taipei-gp-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('已下載備份檔；如果沒有反應，請改用「複製備份」', '');
+  });
+  $('bk-load').addEventListener('click', () => { resetUi(); bkText.hidden = false; bkText.placeholder = '把備份的文字貼在這裡，貼完會自動檢查；或按下面選檔案'; $('bk-file').click(); });
+  $('bk-file').addEventListener('change', async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    (e.target as HTMLInputElement).value = '';
+    if (!f) return;
+    if (f.size > 8_000_000) { toast('❌ 檔案太大，不像是存檔', 'bad'); return; }
+    stage(await f.text());
+  });
+  bkText.addEventListener('input', () => { if (bkText.value.trim().length > 20) stage(bkText.value.trim()); else { bkConfirm.hidden = true; pending = null; } });
+  $('bk-cancel').addEventListener('click', resetUi);
+  $('bk-apply').addEventListener('click', () => {
+    if (!pending) return;
+    try { localStorage.setItem(KEY + '-before-restore', localStorage.getItem(KEY) ?? ''); } catch { /* 空間不夠就算了，還是照還原 */ }
+    if (!writeImported(pending)) { toast('❌ 寫不進去（瀏覽器儲存空間滿了或被封鎖）', 'bad'); return; }
+    toast('✅ 已還原，重新載入…', 'purple');
+    setTimeout(() => location.reload(), 600);
+  });
+  // 持久儲存的狀態（紀錄頁顯示一行說明）
+  void (async () => {
+    const el = $('bk-persist');
+    try {
+      if (!navigator.storage?.persisted) { el.textContent = ''; return; }
+      el.textContent = (await navigator.storage.persisted()) ? '🔒 瀏覽器已承諾保留這份存檔（不會在空間不夠時被自動清掉）。' : '⚠️ 瀏覽器沒有承諾保留這份存檔：空間不夠時可能被清掉，建議定期「複製備份」。';
+    } catch { el.textContent = ''; }
+  })();
+}
 $('btn-reset-best').addEventListener('click', () => {
   if (!confirm('確定要清除最快圈和影子車？')) return;
   save.best = null;

@@ -311,6 +311,23 @@
               <div><b>街道賽</b><span>油門自動；地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS</span></div>
               <div><b>電腦</b><span>↑ 油門、↓ 煞車／倒車、← → 轉向、Shift 甩尾、Ctrl 或 E 開 DRS、B 進站、Esc 暫停</span></div>
             </div>
+            <div class="m-backup">
+              <h3>備份存檔</h3>
+              <p class="sub">最快圈、影子車、錢、車庫、成就都存在這支手機的瀏覽器裡。清掉瀏覽器資料、換手機、或加到主畫面後和 Safari 各自獨立，都會讓它消失。先備份一份，之後可以還原。</p>
+              <div class="m-backup-btns">
+                <button id="bk-copy" class="ghost-btn" type="button">複製備份</button>
+                <button id="bk-save" class="ghost-btn" type="button">下載備份檔</button>
+                <button id="bk-load" class="ghost-btn" type="button">還原備份…</button>
+                <input id="bk-file" type="file" accept=".json,application/json,text/plain" hidden />
+              </div>
+              <textarea id="bk-text" class="m-backup-text" rows="3" placeholder="把備份的文字貼在這裡，再按「還原」" spellcheck="false" hidden></textarea>
+              <div id="bk-confirm" class="m-backup-confirm" hidden>
+                <p id="bk-msg" class="sub"></p>
+                <button id="bk-apply" class="primary" type="button">還原並重新載入</button>
+                <button id="bk-cancel" class="ghost-btn" type="button">取消</button>
+              </div>
+              <p id="bk-persist" class="sub"></p>
+            </div>
             <button id="btn-reset-best" class="link">清除最快圈紀錄</button>
           </section>
 

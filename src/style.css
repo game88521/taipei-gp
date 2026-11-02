@@ -1226,6 +1226,17 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 /* 畫面中斷：蓋過選單、HUD 與載入畫面以外的一切（載入畫面 z-index 40，這個要在它上面，載入中途畫面中斷也看得到） */
 #ctx-lost { z-index: 60; background: rgba(4, 5, 9, 0.86); }
 
+/* 紀錄頁：備份存檔 */
+#menu .m-backup { margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 14px; background: rgba(255, 255, 255, 0.025); display: grid; gap: 8px; }
+#menu .m-backup h3 { margin: 0; font-size: 15px; letter-spacing: 1px; }
+#menu .m-backup .sub { margin: 0; font-size: 12.5px; line-height: 1.55; opacity: 0.78; }
+#menu .m-backup-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+#menu .m-backup-btns .ghost-btn { flex: 1 1 120px; padding: 9px 10px; font-size: 14px; }
+#menu .m-backup-text { width: 100%; box-sizing: border-box; min-height: 64px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.35); color: inherit; font: 12px/1.4 var(--mono); resize: vertical; }
+#menu .m-backup-confirm { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(225, 6, 0, 0.1); border: 1px solid rgba(225, 6, 0, 0.35); }
+#menu .m-backup-confirm[hidden], #menu .m-backup-text[hidden] { display: none; }
+#menu .m-backup-confirm .primary { padding: 10px; font-size: 16px; letter-spacing: 2px; }
+
 /* ================= 載入畫面 ================= */
 #boot {
   position: fixed;
