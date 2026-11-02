@@ -394,6 +394,15 @@
       </div>
     </div>
 
+    <!-- 畫面中斷（WebGL context lost）：手機切 App、記憶體吃緊時會發生。城市資料已經釋放，原地還原不了，只能重新載入 -->
+    <div id="ctx-lost" class="overlay hidden" role="alertdialog" aria-live="assertive">
+      <div class="card">
+        <h1>畫面中斷了</h1>
+        <p class="sub">可能是切走又切回來，或手機記憶體不夠。重新載入就好，最快圈與存檔都還在。</p>
+        <button id="ctx-reload" class="primary" type="button">重新載入</button>
+      </div>
+    </div>
+
     <div id="sr-result" class="overlay hidden">
       <div class="card">
         <h1 id="sr-res-title"></h1>

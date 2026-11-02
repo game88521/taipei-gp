@@ -75,6 +75,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 $('app').appendChild(renderer.domElement);
+// 畫面中斷（手機切 App、記憶體吃緊）：一定要 preventDefault，瀏覽器才會嘗試還原；但城市資料的 CPU 陣列已經釋放，還原後會全部失敗，
+// 所以不嘗試原地還原，改成顯示覆蓋層讓玩家重新載入（真正的處理在下面 pause 之後綁定，這裡只先攔住事件）
+let ctxLostNow = false, onCtxLost: (() => void) | null = null;
+renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ctxLostNow = true; onCtxLost?.(); });
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 5000);
@@ -2146,11 +2150,49 @@ function pause() {
   showMenu(true);
 }
 $('btn-pause').addEventListener('click', pause);
+// 畫面中斷：先暫停（自由駕駛會順便存位置、聲音全關），再蓋上覆蓋層；點了重新載入（網址參數保留，回到同一條賽道）
+onCtxLost = () => {
+  pause();
+  sound.engine(0, 0, false);
+  $('ctx-lost').classList.remove('hidden');
+};
+$('ctx-reload').addEventListener('click', () => location.reload());
 $('btn-reset').addEventListener('click', () => {
   if (state === 'race') car.placeAt(track, car.pos.i);
   if (state === 'free') unstick();
 });
-addEventListener('keydown', (e) => { if (e.code === 'Escape' || e.code === 'KeyP') pause(); });
+/**
+ * 「返回」：關掉最上面那一層。回傳有沒有處理到（沒處理到 = 沒有東西可以關，交給呼叫的人決定）。
+ * 順序由上到下：教學卡 → 排行榜／成就／賽季頁 → 大地圖 → 選賽道子頁 → 遊戲中就暫停。
+ * 只關「純瀏覽」的覆蓋層；有按鈕要玩家做決定的（結算、排位結果、開始賽季確認）不亂關，免得跳過該有的步驟
+ */
+const BACK_LAYERS = ['tut', 'lb-page', 'ach-page', 'season-page', 'duel-pick'] as const;
+function goBack(): boolean {
+  if (!$('ctx-lost').classList.contains('hidden')) return true; // 畫面中斷：唯一的出路是重新載入，返回鍵什麼都不做
+  for (const id of BACK_LAYERS) {
+    const el = $(id);
+    if (el.classList.contains('hidden')) continue;
+    if (id === 'tut') closeTut(); else if (id === 'duel-pick') { el.classList.add('hidden'); showMenu(false); } else el.classList.add('hidden');
+    return true;
+  }
+  if (mapOpen) { closeMap(); return true; }
+  if (!menu.classList.contains('hidden') && document.querySelector('.m-pane.on[data-pane="circuits"]')) { menuTab('play'); return true; }
+  if (state === 'race' || state === 'countdown' || state === 'free') { pause(); return true; }
+  return false;
+}
+addEventListener('keydown', (e) => { if (e.code === 'KeyP') pause(); else if (e.code === 'Escape' && !goBack()) pause(); });
+// Android 返回鍵／手勢返回：瀏覽器會「退一步歷史」，單頁遊戲沒有上一頁，整個遊戲就被關掉了。
+// 先放一筆佔位的歷史，返回鍵就變成退到這一筆（觸發 popstate）：有東西可以關／在遊戲中就處理掉，並且馬上補回佔位；
+// 什麼都沒得關（在主選單、沒有覆蓋層）才真的放行，玩家按兩次返回才會離開——不會被困住。
+// 加到主畫面（standalone）的 App 返回鍵也是同一套機制
+if (!BOT && history.state === null) {
+  history.replaceState({ gp: 0 }, '');
+  history.pushState({ gp: 1 }, '');
+  addEventListener('popstate', () => {
+    if (goBack()) history.pushState({ gp: 1 }, ''); // 處理掉了：補回佔位，下一次返回還能再處理
+    else history.back(); // 沒東西可處理：放行（再退一步就是離開遊戲）
+  });
+}
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else sound.unlock(); });
 // 手機的聲音被系統停掉（切 App、鎖螢幕、來電）之後，下一次碰螢幕或按鍵就叫醒
 for (const ev of ['pointerdown', 'touchend', 'keydown'] as const) addEventListener(ev, () => sound.unlock(), { capture: true, passive: true });
@@ -2915,6 +2957,7 @@ function runSim() {
   } else if (!/^(BOT|GP)/.test(document.title)) document.title = `BOT no lap; s=${car.pos.s.toFixed(0)} v=${car.v.toFixed(1)} hits=${botHits}`;
 }
 renderer.setAnimationLoop(() => {
+  if (ctxLostNow) { clock.getDelta(); return; } // 畫面中斷：不推物理、不畫（畫了每格都丟例外），等玩家按重新載入
   const dt = Math.min(clock.getDelta(), 0.1);
   // 大地圖：有點導航就畫導航；開計程車（沒點導航）就畫乘客／目的地的路線
   if (mapOpen && bigmap) { const tx = !nav && taxiOn() ? taxi?.target ?? null : null; bigmap.draw(fcar.x, fcar.z, fcar.h, nav ?? tx, nav?.path ?? (tx ? taxi!.route : null)); }
