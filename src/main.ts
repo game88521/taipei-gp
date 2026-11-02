@@ -1023,6 +1023,12 @@ function updateVisuals(dt: number) {
   for (const w of [...model.steer, ...model.spin]) w.visible = !inCar;
   model.root.traverse((o) => { if (o.userData.lens) o.visible = !inCar; });
   if (mode === 'free' && state === 'free') damage.update(dt, model, f1Look ? '#d40000' : save.paint?.[chosen.id] ?? pv.baseColor, vc.x, fcar.y, vc.z, vc.h);
+  // 甩尾胎煙：跟輪胎嘯叫同一個強度（側滑角過了約 10°、而且夠快）；只有自由駕駛在地面上才冒（高架、隧道裡一樣冒，車在哪煙就在哪）
+  if (mode === 'free') {
+    const sp = Math.hypot(fcar.vx, fcar.vz), sl = fcar.slip;
+    const k = state === 'free' && sp > 8 && sl > 0.18 && sl < 1.45 ? Math.min(1, ((sl - 0.18) / 0.5) * Math.min(1, (sp - 8) / 14)) : 0;
+    damage.smoke(dt, k, vc.x, fcar.y, vc.z, vc.h, fcar.vx, fcar.vz);
+  }
   if (inCar) {
     const [ex, ey, ez] = EYE[f1Look ? 'f1' : chosen.id] ?? EYE.sedan;
     const hx = Math.sin(vc.h), hz = Math.cos(vc.h), lx = Math.cos(vc.h), lz = -Math.sin(vc.h); // 前、左
@@ -2655,6 +2661,11 @@ function freeStep(dt: number) {
   }
   // 貼著牆刮（接觸中、沒有大力撞擊）：持續的摩擦聲，音量跟車速
   sound.scrape(fcar.touch && Math.abs(fcar.v) > 3 && grounded ? Math.min(1, Math.abs(fcar.v) / 22) : 0);
+  // 輪胎嘯叫：側滑角過了甩尾計分的門檻（約 12°）、而且夠快才叫；角度越大、越快越大聲（只是聲音，不影響物理與計分）
+  {
+    const sp = Math.hypot(fcar.vx, fcar.vz), sl = fcar.slip;
+    sound.squeal(grounded && sp > 8 && sl > 0.18 && sl < 1.45 ? Math.min(1, ((sl - 0.18) / 0.5) * Math.min(1, (sp - 8) / 14)) : 0, sl);
+  }
   // 甩尾計分：入帳時換成一點錢（每 100 分 NT$1）
   {
     const r = drift.update(dt, fcar, impact);

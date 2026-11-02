@@ -26,6 +26,9 @@ export class Damage {
   value = 0;
   private puffs: Puff[] = [];
   private sparks: Puff[] = [];
+  /** 甩尾胎煙：後輪冒出來、往後飄、慢慢變大變淡（跟引擎煙分開一池，甩尾時不會把引擎煙擠掉） */
+  private tyreSmoke: Puff[] = [];
+  private smokeAcc = 0;
   private emitAcc = 0;
   private lastPaint = -1;
   private lastModel: CarModel | null = null;
@@ -44,6 +47,48 @@ export class Damage {
       s.scale.setScalar(0.25);
       scene.add(s);
       this.sparks.push({ s, life: 0, max: 0.4, vx: 0, vy: 0, vz: 0, grow: 0 });
+    }
+    // 胎煙 36 顆：每顆一個 Sprite（看得到的才畫，甩尾時同時大約 15~25 顆在空中）
+    for (let k = 0; k < 36; k++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: '#d9d9de' }));
+      s.visible = false;
+      scene.add(s);
+      this.tyreSmoke.push({ s, life: 0, max: 1, vx: 0, vy: 0, vz: 0, grow: 1 });
+    }
+  }
+
+  /**
+   * 甩尾胎煙（每格呼叫）：k = 0~1 強度（0 不冒）；(x, y, z) 車子位置、h 車頭方向；vx, vz 車速（煙一開始帶一點車速、很快停下來）。
+   * 從兩個後輪的位置冒出來（車子座標：左右 ±0.84 m、往後 1.65 m），只是畫面，不影響物理
+   */
+  smoke(dt: number, k: number, x: number, y: number, z: number, h: number, vx: number, vz: number) {
+    if (k > 0.02) {
+      this.smokeAcc += dt * (6 + k * 22);
+      const fx = Math.sin(h), fz = Math.cos(h), lx = Math.cos(h), lz = -Math.sin(h);
+      while (this.smokeAcc >= 1) {
+        this.smokeAcc -= 1;
+        const p = this.tyreSmoke.find((q) => q.life <= 0);
+        if (!p) break;
+        const side = Math.random() < 0.5 ? -1 : 1;
+        p.life = p.max = 0.9 + Math.random() * 0.7 + k * 0.6;
+        p.s.position.set(x - fx * 1.65 + lx * side * 0.84 + (Math.random() - 0.5) * 0.3, y + 0.25, z - fz * 1.65 + lz * side * 0.84 + (Math.random() - 0.5) * 0.3);
+        p.vx = vx * 0.15 + (Math.random() - 0.5) * 1.2; p.vz = vz * 0.15 + (Math.random() - 0.5) * 1.2; p.vy = 0.5 + Math.random() * 0.7;
+        p.grow = 1.4 + Math.random() * 0.8;
+        p.s.scale.setScalar(0.9 + k * 0.7);
+        (p.s.material as THREE.SpriteMaterial).opacity = 0;
+        p.s.visible = true;
+      }
+    } else this.smokeAcc = 0;
+    for (const p of this.tyreSmoke) {
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      if (p.life <= 0) { p.s.visible = false; continue; }
+      const drag = Math.max(0, 1 - dt * 2.2); // 很快停下來，留在原地慢慢散開
+      p.vx *= drag; p.vz *= drag; p.vy *= Math.max(0, 1 - dt * 0.6);
+      p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
+      p.s.scale.multiplyScalar(1 + p.grow * dt);
+      const age = 1 - p.life / p.max; // 0 剛冒出來 ~ 1 散掉
+      (p.s.material as THREE.SpriteMaterial).opacity = 0.62 * Math.min(1, age * 6) * (1 - age) ** 0.7; // 先淡入一點、再慢慢淡出（0.42 時在柏油上幾乎看不出來）
     }
   }
 

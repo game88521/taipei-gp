@@ -275,6 +275,7 @@ export class Sound {
       o.key = ''; o.idleAt = t;
     }
     this.scrapeG?.gain.setTargetAtTime(0, t, 0.05);
+    this.squealG?.gain.setTargetAtTime(0, t, 0.05);
     this.city?.g.gain.setTargetAtTime(0, t, 0.3);
     this.crowd?.g.gain.setTargetAtTime(0, t, 0.3);
     this.rain?.g.gain.setTargetAtTime(0, t, 0.3);
@@ -394,6 +395,45 @@ export class Sound {
       src.start();
     }
     this.scrapeG.gain.setTargetAtTime(this.enabled ? Math.min(1, v) * 0.35 : 0, t, v > 0 ? 0.02 : 0.12);
+  }
+
+  /**
+   * 輪胎嘯叫（甩尾、側滑）：持續的聲音，v = 0~1 強度、slip = 側滑角（弧度；角度越大音調越低、抖得越慢）。
+   * 做法跟刮護欄一樣：循環白噪音 → 窄帶通主音（1.1~1.5 kHz）＋ 2 倍泛音 → 被 11~17 Hz 的慢 LFO 輕輕調幅
+   * （真的輪胎嘯叫會一抖一抖，不是平平的噪音）。第一次 v > 0 才建立節點；每格呼叫
+   */
+  private squealG: GainNode | null = null;
+  private squealBp: BiquadFilterNode | null = null;
+  private squealBp2: BiquadFilterNode | null = null;
+  private squealLfo: OscillatorNode | null = null;
+  squeal(v: number, slip = 0.4) {
+    if (!this.ctx || this.hushed) return;
+    if (!this.squealG && v <= 0) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.squealG) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.loopNoise();
+      src.loop = true;
+      const bp = (this.squealBp = ctx.createBiquadFilter()); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 9;
+      const bp2 = (this.squealBp2 = ctx.createBiquadFilter()); bp2.type = 'bandpass'; bp2.frequency.value = 2600; bp2.Q.value = 7;
+      const g2 = ctx.createGain(); g2.gain.value = 0.35;
+      const am = ctx.createGain(); am.gain.value = 0.8; // 0.8 ± 0.2：一抖一抖
+      const lfo = (this.squealLfo = ctx.createOscillator()); lfo.type = 'sine'; lfo.frequency.value = 14;
+      const lg = ctx.createGain(); lg.gain.value = 0.2;
+      lfo.connect(lg).connect(am.gain);
+      this.squealG = ctx.createGain(); this.squealG.gain.value = 0;
+      src.connect(bp).connect(am); src.connect(bp2).connect(g2).connect(am);
+      am.connect(this.squealG).connect(this.fx);
+      src.start(); lfo.start();
+    }
+    // 角度大 → 音調往下（1.5 kHz → 1.1 kHz）。增益 1.1：窄帶通（Q 9）只留下白噪音很小一部分能量，
+    // 實測 0.22 時嘯叫最大聲 RMS 只有 0.007（刮護欄的 1/5、引擎高轉的 1/8，疊上引擎總音量完全沒變＝聽不到）；
+    // 1.1 → 約 0.035，跟刮護欄同一級、比引擎小一截（甩尾會一直響，不能蓋過引擎）
+    const k = Math.max(0, Math.min(1, (slip - 0.22) / 0.8)), f = 1500 - 400 * k;
+    this.squealBp!.frequency.setTargetAtTime(f, t, 0.08);
+    this.squealBp2!.frequency.setTargetAtTime(f * 2, t, 0.08);
+    this.squealLfo!.frequency.setTargetAtTime(17 - 6 * k, t, 0.1);
+    this.squealG.gain.setTargetAtTime(this.enabled ? Math.min(1, v) * 1.1 : 0, t, v > 0 ? 0.05 : 0.15);
   }
 
   /** 3 秒、可以無縫循環的白噪音（環境音、刮擦共用） */
