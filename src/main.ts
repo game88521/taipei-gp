@@ -720,7 +720,9 @@ function raceAudio(dt: number) {
   cars.sort((a, b) => a.d - b.d);
   sound.otherEngines(cars, car.x, car.z, Math.sin(car.h) * car.v, Math.cos(car.h) * car.v, car.h);
   // 觀眾：在看台附近才大聲；歡呼（起跑、超車、完賽）時整個拉高；雨賽時有雨聲
-  sound.ambience({ crowd: circuitEnv ? Math.max(0.2, circuitEnv.crowd.near(car.x, car.z)) : 0, excite: circuitEnv?.crowd.excite ?? 0, city: circuitEnv ? 0 : 0.5, rain: raceKind === 'gp' ? Math.max(0, (weather.rain01 - 0.3) / 0.7) : 0 }); // 雨聲跟畫面的雨一起：預兆期（強度 < 0.3）還沒有聲音
+  // 風：預兆期（強度 0 → 0.3，天色變暗的那段）慢慢起風，下雨之後風小一點、雨聲接手；強度 0 的晴天沒有風
+  const rl = raceKind === 'gp' ? weather.rain01 : 0;
+  sound.ambience({ crowd: circuitEnv ? Math.max(0.2, circuitEnv.crowd.near(car.x, car.z)) : 0, excite: circuitEnv?.crowd.excite ?? 0, city: circuitEnv ? 0 : 0.5, rain: Math.max(0, (rl - 0.3) / 0.7), wind: rl < 0.3 ? rl / 0.3 : 1 - 0.5 * Math.min(1, (rl - 0.3) / 0.7) }); // 雨聲跟畫面的雨一起：預兆期（強度 < 0.3）還沒有聲音
 }
 
 const GEARS = [0, 17, 28, 38, 48, 57, 66, 75];
@@ -2730,7 +2732,8 @@ function freeAudio(dt: number) {
   cars.sort((a, b) => a.d - b.d);
   sound.otherEngines(cars.filter((c) => c.d < 180), fcar.x, fcar.z, fcar.vx, fcar.vz, fcar.h);
   const inTunnel = fcar.deck?.way.e === 2 && !!surface && surface.groundY(fcar.x, fcar.z) - fcar.y > CEIL;
-  sound.ambience({ city: CIRCUIT ? 0 : inTunnel ? 0.3 : 1, rain: inTunnel ? 0 : Math.max(0, (weather.rain01 - 0.3) / 0.7), tunnel: inTunnel ? 1 : 0 });
+  const rl = weather.rain01; // 風：跟大獎賽同一條曲線（預兆期起風、下雨後剩一半）；隧道裡沒有風
+  sound.ambience({ city: CIRCUIT ? 0 : inTunnel ? 0.3 : 1, rain: inTunnel ? 0 : Math.max(0, (rl - 0.3) / 0.7), wind: inTunnel ? 0 : rl < 0.3 ? rl / 0.3 : 1 - 0.5 * Math.min(1, (rl - 0.3) / 0.7), tunnel: inTunnel ? 1 : 0 });
 }
 function updateFreeHud(dt: number) {
   const v = fcar.v;

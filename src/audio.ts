@@ -51,6 +51,8 @@ export class Sound {
   private city: { src: AudioBufferSourceNode; g: GainNode } | null = null;
   private crowd: { src: AudioBufferSourceNode; g: GainNode; bp: BiquadFilterNode } | null = null;
   private rain: { src: AudioBufferSourceNode; g: GainNode } | null = null;
+  /** 風（下雨前的預兆、雨中）：低頻帶通噪音，被兩個很慢的 LFO 調幅、調頻，一陣一陣地起伏 */
+  private wind: { src: AudioBufferSourceNode; g: GainNode; bp: BiquadFilterNode } | null = null;
   private verb!: ConvolverNode; // 隧道殘響
   private verbSend!: GainNode;
   private scrapeG: GainNode | null = null; // 刮護欄（持續的）
@@ -279,6 +281,7 @@ export class Sound {
     this.city?.g.gain.setTargetAtTime(0, t, 0.3);
     this.crowd?.g.gain.setTargetAtTime(0, t, 0.3);
     this.rain?.g.gain.setTargetAtTime(0, t, 0.3);
+    this.wind?.g.gain.setTargetAtTime(0, t, 0.3);
     this.verbSend.gain.setTargetAtTime(0, t, 0.2);
     // 主引擎也關：遊戲停止步進（選單、成績表、分頁被丟到背景）時不要卡在最後的轉速上一直響
     if (this.worklet && this.eng) (this.eng.parameters as unknown as Map<string, AudioParam>).get('gain')!.setTargetAtTime(0, t, 0.05);
@@ -456,9 +459,9 @@ export class Sound {
 
   /**
    * 環境音（每格呼叫）：city 0..1 城市車流的遠處嗡嗡、crowd 0..1 看台觀眾（excite 0..1 歡呼程度）、
-   * rain 0..1 雨聲、tunnel 0..1 隧道殘響（引擎、其他車的聲音送進去多少）
+   * rain 0..1 雨聲、wind 0..1 風（下雨前的預兆：天色變暗時先起風）、tunnel 0..1 隧道殘響（引擎、其他車的聲音送進去多少）
    */
-  ambience(a: { city?: number; crowd?: number; excite?: number; rain?: number; tunnel?: number }, alive = false) {
+  ambience(a: { city?: number; crowd?: number; excite?: number; rain?: number; wind?: number; tunnel?: number }, alive = false) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime, on = this.enabled ? 1 : 0;
     if (alive) { this.hushed = false; this.lastFeed = t; } else if (this.hushed) return; // alive = 這一格沒有引擎在跑（頒獎台），靠環境音自己維持
@@ -481,6 +484,19 @@ export class Sound {
       this.crowd.bp.frequency.setTargetAtTime(600 + 900 * ex, t, 0.2); // 歡呼時人聲變亮
     }
     this.rain?.g.gain.setTargetAtTime(on * (a.rain ?? 0) * 0.16, t, 0.8);
+    if ((a.wind ?? 0) > 0 && !this.wind) {
+      // 帶通 300~700 Hz（低沉的呼呼聲）；兩個很慢的 LFO：0.13 Hz 調音量（一陣一陣）、0.07 Hz 調中心頻率（風聲的音高會飄）
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 450; bp.Q.value = 1.1;
+      const src = ctx.createBufferSource(); src.buffer = this.loopNoise(); src.loop = true; src.playbackRate.value = 0.85;
+      const gust = ctx.createGain(); gust.gain.value = 0.65; // 0.65 ± 0.35
+      const g = ctx.createGain(); g.gain.value = 0;
+      const l1 = ctx.createOscillator(); l1.frequency.value = 0.13; const l1g = ctx.createGain(); l1g.gain.value = 0.35; l1.connect(l1g).connect(gust.gain);
+      const l2 = ctx.createOscillator(); l2.frequency.value = 0.07; const l2g = ctx.createGain(); l2g.gain.value = 180; l2.connect(l2g).connect(bp.frequency);
+      src.connect(bp).connect(gust).connect(g).connect(this.amb);
+      src.start(); l1.start(); l2.start();
+      this.wind = { src, g, bp };
+    }
+    this.wind?.g.gain.setTargetAtTime(on * (a.wind ?? 0) * 0.5, t, 1.2); // 時間常數 1.2 秒：風是慢慢起來的
     this.verbSend.gain.setTargetAtTime(on * (a.tunnel ?? 0) * 0.9, t, 0.3);
   }
 
