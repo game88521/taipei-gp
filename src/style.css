@@ -1317,8 +1317,8 @@ html:not(.touch) #radio { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 
 #podium-names { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 #podium-names li { padding: 8px 6px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border-top: 3px solid var(--c, #fff); }
 #podium-names b { display: block; font: 900 22px var(--mono); color: #f2c14e; }
-#podium-names li:nth-child(2) b { color: #d8dbe4; }
-#podium-names li:nth-child(3) b { color: #d09060; }
+#podium-names li[data-pos='2'] b { color: #d8dbe4; }
+#podium-names li[data-pos='3'] b { color: #d09060; }
 #podium-names span { display: block; font-weight: 800; }
 #podium-names small { color: var(--muted); font-size: 11px; }
 #podium-names li.me { box-shadow: inset 0 0 0 2px rgba(225, 6, 0, 0.8); }

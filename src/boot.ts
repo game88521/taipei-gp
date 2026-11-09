@@ -56,12 +56,12 @@ function skyline(): string {
 }
 
 const el = document.getElementById('boot');
-let tipT = 0;
+let tipT = 0, tipSwap = 0; // tipSwap：「淡出 250 ms 後換字」那個還沒執行的計時器；失敗時要一起取消，不然會把失敗訊息蓋回小提示
 if (el) {
   el.insertAdjacentHTML('afterbegin', skyline());
   const tip = document.getElementById('boot-tip')!;
   let k = Math.floor(Math.random() * TIPS.length);
-  const next = () => { tip.classList.remove('show'); setTimeout(() => { tip.textContent = '💡 ' + TIPS[k++ % TIPS.length]; tip.classList.add('show'); }, 250); };
+  const next = () => { tip.classList.remove('show'); tipSwap = window.setTimeout(() => { tip.textContent = '💡 ' + TIPS[k++ % TIPS.length]; tip.classList.add('show'); }, 250); };
   next();
   tipT = window.setInterval(next, 4200);
 }
@@ -72,6 +72,39 @@ export function bootProgress(label: string, f: number) {
   document.getElementById('boot-label')!.textContent = label;
   document.getElementById('boot-pct')!.textContent = `${Math.round(f * 100)}%`;
   document.getElementById('boot-bar')!.style.width = `${Math.round(f * 100)}%`;
+}
+
+/**
+ * 載入失敗（網路斷了、伺服器錯誤）：載入畫面不能就這樣停在「準備中 0%」。顯示原因與兩個出路——
+ * 「重試」（重新載入同一個網址）與「回台北」（去掉 ?circuit=，台北的資料通常已經在快取裡）。
+ * 進度條改紅色停住，輪播的小提示停掉
+ */
+export function bootFail(message: string, canGoHome: boolean) {
+  if (!el) return;
+  clearInterval(tipT);
+  clearTimeout(tipSwap);
+  document.getElementById('boot-label')!.textContent = '載入失敗';
+  document.getElementById('boot-bar')!.style.background = '#e10600';
+  const tip = document.getElementById('boot-tip')!;
+  tip.classList.add('show');
+  tip.textContent = message;
+  if (document.getElementById('boot-error')) return; // 只建一次
+  const box = document.createElement('div');
+  box.id = 'boot-error';
+  box.setAttribute('role', 'alert');
+  box.style.cssText = 'display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap';
+  const btn = (text: string, primary: boolean, go: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.className = primary ? 'primary' : 'ghost-btn';
+    b.style.cssText = 'min-width:120px;padding:10px 18px';
+    b.addEventListener('click', go);
+    box.appendChild(b);
+  };
+  btn('重試', true, () => location.reload());
+  if (canGoHome) btn('回台北', false, () => { location.search = ''; });
+  document.querySelector('#boot .b-load')?.appendChild(box);
 }
 
 /** 載完：淡出 */

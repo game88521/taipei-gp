@@ -14,7 +14,7 @@ import { buildCircuitEnv } from './circuitenv';
 import { PitLane, PIT } from './pitlane';
 import { setupInstall } from './install';
 import { PedZones } from './pedzone';
-import { bootProgress, bootDone } from './boot';
+import { bootProgress, bootDone, bootFail } from './boot';
 import { buildEnvMap, makeComposer, applyShadowFlags as applyShadowFlagsIn } from './graphics';
 import { loadCity } from './city';
 import { makeF1, TEAMS } from './f1model';
@@ -85,7 +85,13 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.5, 50
 // 調到 AI 排位圈速跟真實竿位差 ±5%（蒙札 +3%、鈴鹿 +5%、摩納哥 -2%）：極速 342 km/h、煞車約 5g、高速彎約 6.7g
 const REAL_PERF = { vmax: 95, engine: 16, brake: 50, g0: 23, gk: 0.0068, gmax: 66 };
 // 各國賽道（?circuit=suzuka）：先讀中心線再建賽道；不載入台北街景，改成通用的賽道場景（circuitenv.ts）
-const circuitData = await loadCircuitData();
+// 下載失敗（沒網路、伺服器錯誤）時，載入畫面要說明並給出路——以前這個 await 一拋例外，後面整支程式都不會執行，
+// 載入畫面永遠停在「準備中 0%」。失敗後用一個永遠不會 resolve 的 Promise 停在這裡（頁面的出路是載入畫面上的按鈕）
+const circuitData = await loadCircuitData().catch((e) => {
+  console.error(e);
+  bootFail(`賽道資料下載失敗（${e instanceof Error ? e.message : String(e)}）。請檢查網路後重試；也可以先回台北街道賽。`, true);
+  return new Promise<never>(() => {});
+});
 // 各國賽道用接近真實 F1 的性能（台北街道賽維持原本的手感、線上排行榜才比得下去）；?perf=v,e,b,g0,gk,gmax 測試用
 // 海拔：空氣稀薄 → 空氣阻力小、下壓力小（墨西哥城 2,235 m 的空氣密度只有海平面的 77%）。
 // 車隊會換最大下壓力的翼片、渦輪也會補回大部分馬力，所以只算一部分：極速多 1/4 的阻力減少量、高速下壓力少一半的密度減少量、煞車稍微變長
@@ -1869,22 +1875,26 @@ function startPodium() {
   radio.hide();
   scBanner('');
   hud.classList.add('hidden');
-  podium ??= new Podium(scene, track);
+  podium ??= CIRCUIT ? new Podium(scene, track, CIRCUIT.gp, `${CIRCUIT.banner[0] ?? CIRCUIT.name} GP`) : new Podium(scene, track);
   field.hide(); // 頒獎台搭在賽道上：賽車先收起來
   const st = field.standings().slice(0, 3);
   const helmetOf = (r: Racer) => (r.isPlayer ? PLAYER_LIVERY.helmet : TEAMS.find((t) => t.team === r.team)?.livery.helmet ?? '#ffffff');
   podium.show(st.map((r) => ({ suit: r.color, helmet: helmetOf(r) })));
   const ol = $('podium-names');
   ol.innerHTML = '';
-  st.forEach((r, k) => {
-    const li = document.createElement('li');
+  // 名牌的順序要跟台子一樣：從正面看亞軍在左、冠軍在中間、季軍在右（以前照 P1 P2 P3 排，最左邊寫冠軍、台子上站的卻是亞軍）。
+  // 名牌上的色條與 CSS 的第 2、3 個金銀銅顏色是照「第幾個 li」上的，所以 b 的顏色要改成跟名次綁定（data-pos）
+  const order = [1, 0, 2].filter((k) => k < st.length);
+  for (const k of order) {
+    const r = st[k], li = document.createElement('li');
     if (r.isPlayer) li.className = 'me';
+    li.dataset.pos = String(k + 1);
     li.style.setProperty('--c', r.color);
     const b = document.createElement('b'), n = document.createElement('span'), t = document.createElement('small');
     b.textContent = `P${k + 1}`; n.textContent = r.name; t.textContent = r.team;
     li.append(b, n, t);
     ol.appendChild(li);
-  });
+  }
   $('podium-ui').classList.remove('hidden');
   [523, 659, 784, 1047].forEach((f, k) => setTimeout(() => sound.beep(f, 0.18), k * 160)); // 小小的勝利號角
 }

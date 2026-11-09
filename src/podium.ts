@@ -30,7 +30,8 @@ export class Podium {
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
 
-  constructor(scene: THREE.Scene, t: Track) {
+  /** title／sub：背板上的大獎賽名稱（中文、英文）；以前寫死「台北街道賽」，各國賽道的頒獎台也寫台北 */
+  constructor(scene: THREE.Scene, t: Track, title = '台北街道賽', sub = 'TAIPEI STREET GP') {
     // 位置：直接搭在起跑線前方 80 m 的賽道上（賽道上一定沒有建築擋住，兩側有護牆），正面朝起跑線
     // （頒獎時賽車都先藏起來）
     const i = Math.round(80 / t.ds) % t.N;
@@ -58,8 +59,11 @@ export class Podium {
       c.fillStyle = grd; c.fillRect(0, 0, 1024, 384);
       c.fillStyle = '#e10600'; c.fillRect(0, 318, 1024, 14);
       c.fillStyle = '#ffffff'; c.textAlign = 'center';
-      c.font = '900 110px sans-serif'; c.fillText('台北街道賽', 512, 160);
-      c.font = '700 44px sans-serif'; c.fillStyle = '#f2c14e'; c.fillText('TAIPEI STREET GP · 頒獎典禮', 512, 250);
+      // 字多就縮（「阿布達比大獎賽」、「拉斯維加斯大獎賽」比「台北街道賽」長，110 px 會超出 1024 的畫布）
+      c.font = '900 110px sans-serif';
+      const w = c.measureText(title).width, fit = Math.min(1, 940 / Math.max(1, w));
+      c.font = `900 ${Math.round(110 * fit)}px sans-serif`; c.fillText(title, 512, 160, 960);
+      c.font = '700 44px sans-serif'; c.fillStyle = '#f2c14e'; c.fillText(`${sub} · 頒獎典禮`, 512, 250, 960);
     });
     const back = new THREE.Mesh(new THREE.PlaneGeometry(12, 4.5), new THREE.MeshBasicMaterial({ map: board }));
     back.position.set(0, 4.2, -2.2);
