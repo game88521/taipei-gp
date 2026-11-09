@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Car } from './car';
 import type { CarModel } from './carModel';
-import { makeF1, setTyre, TEAMS } from './f1model';
+import { makeF1, setLod, setTyre, TEAMS } from './f1model';
 import { CIRCUIT } from './circuits';
 import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, type Track } from './track';
 import { PIT, boxS, laneLat, signedS, mountedAt, type PitLane, type StopInfo } from './pitlane';
@@ -679,6 +679,8 @@ export class RaceField {
       const m = r.model; // 玩家的車由 main 擺位置，這裡只擺 AI
       if (!m) continue;
       const c = r.car;
+      const dx = c.x - this.me.car.x, dz = c.z - this.me.car.z, d2 = dx * dx + dz * dz;
+      setLod(m, !r.pit && (m.root.userData.far ? d2 > 90 * 90 : d2 > 120 * 120)); // 遠處簡化（滯後 90／120 m 避免邊界閃爍）；停站中一律完整
       m.root.position.set(c.x, surfaceY(this.t, c.pos.i, c.pos.lat) + r.lift, c.z); // 換胎時千斤頂把車抬起來
       m.root.rotation.set(-Math.atan(this.t.grade[c.pos.i]), c.h, bankRoll(this.t, c.pos.i, c.pos.lat), 'YXZ');
       m.body.rotation.z = c.steer * Math.min(1, c.v / 40) * 0.04;

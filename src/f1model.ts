@@ -337,6 +337,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     P('carbon', rod([s * 0.2, 0.4, 1.92], [s * 0.68, 0.38, 1.9], 0.012)); // 轉向拉桿
   }
 
+  const fine: THREE.Object3D[] = [];
   // ---- 車號與隊名：鼻頭、引擎蓋兩側、側箱兩側（一張小貼圖、一次繪製）
   if (!ghost) {
     const team = TEAMS.find((t) => t.livery === l)?.team.split(' ')[0] ?? '';
@@ -354,6 +355,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     }
     const badge = new THREE.Mesh(mergeGeometries(quads), new THREE.MeshBasicMaterial({ map: badgeTexture(l, team), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
     body.add(badge);
+    fine.push(badge);
   }
 
   // ---- 依材質合併成少數幾個網格
@@ -376,6 +378,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     if (!list.length) continue;
     const m = new THREE.Mesh(mergeGeometries(list.map(strip)), mats[k]);
     if (k === 'light') m.userData.rainOnly = true; // 雨燈：下雨才亮（weather.ts）
+    if (FINE.has(k)) fine.push(m); // 遠處看不出來的小零件（setLod 會藏起來）
     body.add(m);
   }
 
@@ -410,11 +413,33 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     // 煞車導管（輪子內側的碳纖維鼓）
     const duct = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.55, 0.12, 14).rotateZ(Math.PI / 2).translate(-s * (w / 2 + 0.05), 0, 0), ductMat);
     g.add(duct);
+    fine.push(duct);
     root.add(g);
     spin.push(tyre);
     if (z > 0) steer.push(g);
   }
+  root.userData.fine = fine;
   return { root, body, steer, spin };
+}
+
+const FINE = new Set(['decal', 'accent2', 'chrome', 'mirror', 'helmet', 'visor']); // 雨燈（light）不放：它的顯示由 weather.ts 管
+
+/**
+ * 遠近細節：遠處的車（螢幕上只剩幾個像素）藏起貼花、隊名、車手頭盔、後視鏡、雨燈、煞車導管，
+ * 並且不再投射即時陰影；一台車從約 20 次繪製（陰影再算一次）降到一半左右。純畫面，不影響物理。
+ * 狀態沒變就不動（每格呼叫沒成本）
+ */
+export function setLod(m: CarModel, far: boolean) {
+  const u = m.root.userData;
+  if (u.far === far) return;
+  u.far = far;
+  for (const o of (u.fine ?? []) as THREE.Object3D[]) o.visible = !far;
+  m.root.traverse((o) => {
+    const me = o as THREE.Mesh;
+    if (!me.isMesh) return;
+    if (far) { me.userData.cast = me.castShadow; me.castShadow = false; } // 變遠時記下原本的值，變近時還原（陰影開關由 applyShadowFlags 管）
+    else if (me.userData.cast !== undefined) me.castShadow = me.userData.cast;
+  });
 }
 
 // 虛構車隊：配色致敬經典車隊，但不使用任何真實車隊名稱或標誌（那些是註冊商標）
