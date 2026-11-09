@@ -1115,6 +1115,7 @@ function updateCountdown(dt: number) {
 
 function beginCountdown() {
   resetRace();
+  qualiRun = false; // 新的一輪開始：上一次放棄的排位不能留著，不然計時賽／正賽的第一圈跑完會跳出排位結果（startQuali 會在呼叫完這個之後再設回 true）
   world.setStartLights(0); // 倒數到一半離開的話燈還亮著
   // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
   // AI 難度（設定頁；測試可用 ?diff=easy|normal|hard）
@@ -1495,8 +1496,20 @@ $('sn-go').addEventListener('click', () => {
   writeSave();
   goSeasonRound();
 });
+/**
+ * 賽季這一站：開始。暫停中的賽季站（排位或正賽進行到一半）按下去是「回到那場比賽」，不是重開——
+ * 以前一律 startGp()：從排位重來，而且 beginCountdown 會用新的 pending 蓋掉舊的，原本那場連棄賽都不算。
+ * 反過來也等於撞車了就暫停、按賽季模式重比，可以無限重來，跟「賽季中同一站不能重比」互相矛盾
+ */
+const resumeSeasonRound = () => {
+  if (state !== 'paused' || mode !== 'race' || (pausedFrom !== 'race' && pausedFrom !== 'countdown')) return false;
+  if (!inSeasonRound() || !(raceKind === 'gp' || qualiRun)) return false; // 暫停前真的在這一站的排位／正賽裡
+  $('btn-resume').click();
+  return true;
+};
 $('btn-season').addEventListener('click', () => {
   if (!save.season || seasonDone()) { openNewSeason(); return; }
+  if (resumeSeasonRound()) return;
   if (inSeasonRound()) void startGp(); else goSeasonRound();
 });
 // ---- 賽季總覽頁
@@ -1586,7 +1599,7 @@ document.querySelectorAll<HTMLButtonElement>('#season-tabs button').forEach((b) 
 }));
 $('btn-season-table').addEventListener('click', showSeasonPage);
 $('season-close').addEventListener('click', () => $('season-page').classList.add('hidden'));
-$('season-continue').addEventListener('click', () => { $('season-page').classList.add('hidden'); if (inSeasonRound()) void startGp(); else goSeasonRound(); });
+$('season-continue').addEventListener('click', () => { $('season-page').classList.add('hidden'); if (resumeSeasonRound()) return; if (inSeasonRound()) void startGp(); else goSeasonRound(); });
 $('season-reset').addEventListener('click', () => { if (!confirm('重新開始賽季？目前的積分會清掉')) return; $('season-page').classList.add('hidden'); openNewSeason(); });
 $('btn-next-round').addEventListener('click', () => { if (seasonDone()) location.search = '?showseason=1'; else goSeasonRound(); });
 if (new URLSearchParams(location.search).has('showseason')) setTimeout(showSeasonPage, 300);
@@ -1698,12 +1711,12 @@ const scLights = [new THREE.MeshBasicMaterial({ color: '#ffb000', toneMapped: fa
 let podium: Podium | null = null, podiumT = 0;
 
 function startQuali() {
-  qualiRun = true;
   // 賽季：排位賽就吃本站的車手狀態（狀態好的排位快、發車位置也前面）
   if (inSeasonRound() && save.season) { field.form = save.season.form ?? {}; field.setDifficulty(save.season.diff as Difficulty); field.applyDifficulty(); }
   raceKind = 'tt';
   hideMenu();
   beginCountdown();
+  qualiRun = true; // 要在 beginCountdown 之後：它一開頭會把 qualiRun 清掉
   setRaceRain(false);
   toast('🏁 排位賽：跑一圈，圈速決定發車位置', 'purple');
 }
@@ -1834,6 +1847,7 @@ function radioTick(dt: number) {
 }
 /** 頒獎典禮：前三名站上台、噴香檳；12 秒後（或按「查看成績」）看成績表 */
 function startPodium() {
+  settleRace(); // 衝線這一刻就結算（發獎金、記賽季、存檔）：頒獎典禮這 12 秒內離開也不會被判棄賽
   state = 'podium';
   podiumT = 0;
   sound.engine(0, 0, false);
@@ -1917,18 +1931,45 @@ function updateGpHud() {
     ol.appendChild(li);
   });
 }
+/**
+ * 結算＋成績頁。分兩個階段：
+ *   settle（衝線那一刻）：算名次、發獎金、記賽季（finishRound 會清掉 pending 並存檔）。頒獎典禮播的這 12 秒內玩家把頁面關掉、
+ *     返回、被系統回收，賽季那一站都已經結算完了，不會下次打開被判棄賽、獎金也不會憑空消失
+ *   show（頒獎典禮結束或按「查看成績」）：把表格畫出來、顯示成績頁
+ * 測試用的 bot 沒有頒獎典禮，兩個階段一次做完
+ */
+let settled: { st: Racer[]; winner: number; me: number } | null = null;
+function settleRace() {
+  if (settled) return settled; // 只結算一次（重複呼叫不會重複發獎金、重複記賽季）
+  const st = field.standings();
+  const me = st.findIndex((r) => r.isPlayer) + 1;
+  if (raceKind === 'gp') {
+    const prize = ([1500, 1000, 700, 400, 300, 250, 200, 150][me - 1] ?? 100) * (field.laps >= 6 ? 2 : 1); // 6 圈加倍
+    prizeNote = `　💰 +${fmtNT(prize)}`;
+    earn(prize, `正賽第 ${me} 名`);
+    if (me === 1) stats.gpWins++;
+  }
+  recordSeason(st);
+  writeSave();
+  return (settled = { st, winner: st[0].finish ?? field.raceTime, me });
+}
+let prizeNote = '';
 function showResults() {
+  const { st, winner, me } = settleRace();
+  settled = null; // 下一場比賽重新結算
   state = 'results';
   sound.engine(0, 0, false);
   sound.sirenAt(0, 0);
-  const st = field.standings();
-  const winner = st[0].finish ?? field.raceTime;
   const tb = $('res-table');
   tb.innerHTML = '<tr><th>名次</th><th>車手</th><th>車隊</th><th>成績</th><th>最快圈</th><th>進站</th></tr>';
+  const lead = field.progress(st[0]);
   st.forEach((r, k) => {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
-    const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : `差 ${Math.max(1, field.laps + 1 - r.laps)} 圈內`;
+    // 沒完賽的車（玩家一衝線比賽就結束，其他車還在路上）：用距離換算成大約的秒數，跟比賽中的名次表同一套（60 m/s 估）；
+    // 落後一整圈以上才寫「+N 圈」。以前一律寫「差 1 圈內」，玩家贏 0.5 秒也這樣寫，看起來像把全場套圈
+    const behind = lead - field.progress(r), laps = Math.floor(behind / track.length);
+    const time = r.finish != null ? (k === 0 ? fmt(r.finish) : `+${(r.finish - winner).toFixed(3)}`) : laps >= 1 ? `+${laps} 圈` : `約 +${(behind / 60).toFixed(1)}（估）`;
     for (const v of [String(k + 1), withPersona(r), r.team, time, fmt(r.bestLap), `${r.pits} 次`]) {
       const td = document.createElement('td');
       td.textContent = v;
@@ -1936,15 +1977,7 @@ function showResults() {
     }
     tb.appendChild(tr);
   });
-  const me = st.findIndex((r) => r.isPlayer) + 1;
-  $('res-title').textContent = me === 1 ? '🏆 冠軍！' : me <= 3 ? `第 ${me} 名，上頒獎台！` : `第 ${me} 名`;
-  if (raceKind === 'gp') {
-    const prize = ([1500, 1000, 700, 400, 300, 250, 200, 150][me - 1] ?? 100) * (field.laps >= 6 ? 2 : 1); // 6 圈加倍
-    $('res-title').textContent += `　💰 +${fmtNT(prize)}`;
-    earn(prize, `正賽第 ${me} 名`);
-    if (me === 1) stats.gpWins++;
-  }
-  recordSeason(st);
+  $('res-title').textContent = (me === 1 ? '🏆 冠軍！' : me <= 3 ? `第 ${me} 名，上頒獎台！` : `第 ${me} 名`) + (raceKind === 'gp' ? prizeNote : '');
   $('results').classList.remove('hidden');
   if (BOT) document.title = `GP P${me} ${st.map((r) => r.name + ':' + (r.finish?.toFixed(1) ?? '-') + (r.pits ? `(進${r.pits} ${r.lastStop.toFixed(1)}s)` : '')).join(' ')} DRS區${field.drsZones.length} 回放${field.replayLength.toFixed(0)}s 安全車${field.sc.used ? `有（第 ${field.scAt.toFixed(0)} 秒）` : '無'} 濕${field.wet.toFixed(2)} 雨胎${field.racers.filter((r) => r.compound === RAIN).length}台 無線電${radio.count}則（${radio.log.join('／')}）${QUALI_POS != null ? ` 排位P${QUALI_POS}` : ''}${save.season ? ` 賽季已比${save.season.round}站 你${driverStandings(save.season, teamOf).find((r) => r.name === '你')?.pts ?? 0}分 領先${driverStandings(save.season, teamOf)[0]?.name}${driverStandings(save.season, teamOf)[0]?.pts}分` : ''}`;
 }
@@ -2172,8 +2205,10 @@ $('btn-reset').addEventListener('click', () => {
 });
 /**
  * 「返回」：關掉最上面那一層。回傳有沒有處理到（沒處理到 = 沒有東西可以關，交給呼叫的人決定）。
- * 順序由上到下：教學卡 → 排行榜／成就／賽季頁 → 大地圖 → 選賽道子頁 → 遊戲中就暫停。
- * 只關「純瀏覽」的覆蓋層；有按鈕要玩家做決定的（結算、排位結果、開始賽季確認）不亂關，免得跳過該有的步驟
+ * 順序由上到下：教學卡 → 排行榜／成就／賽季頁 → 大地圖 → 選賽道子頁 → 回放／頒獎台 → 成績頁 → 遊戲中就暫停。
+ * 只關「純瀏覽」的覆蓋層；有按鈕要玩家做決定的（結算、排位結果、開始賽季確認）不亂關，免得跳過該有的步驟——
+ * 但也不能放行：成績頁／排位結果按返回如果回傳 false，popstate 會 history.back() 把整個遊戲關掉（以前就是這樣）。
+ * 所以那兩頁回傳 true（吃掉這一次返回，什麼都不做）。回放按返回 = 結束回放；頒獎台按返回 = 跳過頒獎典禮
  */
 const BACK_LAYERS = ['tut', 'lb-page', 'ach-page', 'season-page', 'duel-pick'] as const;
 function goBack(): boolean {
@@ -2186,6 +2221,9 @@ function goBack(): boolean {
   }
   if (mapOpen) { closeMap(); return true; }
   if (!menu.classList.contains('hidden') && document.querySelector('.m-pane.on[data-pane="circuits"]')) { menuTab('play'); return true; }
+  if (state === 'replay') { endReplay(); return true; }
+  if (state === 'podium') { endPodium(); return true; }
+  if (state === 'results') return true; // 成績頁、排位結果：有該由玩家決定的按鈕（下一站、再比一次、開始正賽），返回鍵不替他選，但也不能讓遊戲退出
   if (state === 'race' || state === 'countdown' || state === 'free') { pause(); return true; }
   return false;
 }
@@ -2504,6 +2542,7 @@ function srBot() {
 // ---------------------------------------------------------------- 自由駕駛
 let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
 function beginFree() {
+  qualiRun = false; // 排位跑到一半放棄、改去自由駕駛：之後再開計時賽，第一圈不能被當成排位
   // 從上次停的地方出發（沒有就從 101 前的信義路）；測試一律從起點，結果才可重現
   const p = !BOT && validFreePos(save.freePos) ? save.freePos! : null;
   if (p) fcar.place(p.x, p.z, p.h, p.y); else fcar.place(track.px[1], track.pz[1], Math.atan2(track.tx[1], track.tz[1]));
@@ -3107,4 +3146,4 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 }
 
 // 讓 Chrome 截圖測試或除錯時可以從外部看狀態
-(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get weather() { return weather; }, applyWeather: () => applyWeather(), field, get composer() { return composer; }, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; }, get traffic() { return traffic; }, get police() { return police; }, get sr() { return sr; }, get nav() { return nav; }, setNav: (x: number, z: number, nm?: string) => setNav(x, z, nm), get router() { return router; } };
+(window as unknown as { __gp: unknown }).__gp = { car, track, renderer, scene, input, damage, fcar, get trains() { return trains; }, get peds() { return peds; }, get stream() { return cityStream; }, sound, get weather() { return weather; }, applyWeather: () => applyWeather(), field, get composer() { return composer; }, get pedzones() { return pedzones; }, camera, get breakables() { return breakables; }, get collider() { return collider; }, drift, step: (dt: number) => step(dt), get state() { return state; }, get qualiRun() { return qualiRun; }, get surface() { return surface; }, get deckPath() { return deckPath; }, get cityData() { return cityDataRef; }, get traffic() { return traffic; }, get police() { return police; }, get sr() { return sr; }, get nav() { return nav; }, setNav: (x: number, z: number, nm?: string) => setNav(x, z, nm), get router() { return router; } };
