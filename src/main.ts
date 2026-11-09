@@ -21,7 +21,7 @@ import { makeF1, TEAMS } from './f1model';
 import { TeamRadio } from './radio';
 import { Podium } from './podium';
 import { FreeCar, CAR_VMAX, DEFAULT_SPEC } from './freecar';
-import { stage, marks, onProgress } from './loading';
+import { stage, marks, onProgress, prefetch } from './loading';
 import { Weather, headlightRig, TIME_NAME, cycleAt, CYCLE_LEN, type TimeKind } from './weather';
 import { Cockpit } from './cockpit';
 import { Damage } from './damage';
@@ -52,6 +52,7 @@ import { initLeaderboard, submitLap } from './leaderboard-ui';
 import { save, writeSave, KEY, bestLapOf, gpBestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, exportSave, parseSaveFile, writeImported, askPersist, type Ghost, type SteerMode, type Save } from './save';
 
 // ---------------------------------------------------------------- 場景
+if (!CIRCUIT) prefetch('/data/city.json'); // 台北街景 3.7 MB：模組一跑起來就開始下載，不等後面建 WebGL、賽道、天空那段同步工作（實測約 2 秒）（各國賽道不載入街景）
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 // 觸控裝置（手機、平板）：有些手機／瀏覽器（例如「電腦版網站」模式）會回報 pointer: fine，
 // 所以也看觸控點數；真的被手指點到也算。觸控按鈕的顯示看 html.touch（style.css）

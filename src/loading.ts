@@ -21,9 +21,23 @@ export async function stage(label: string, frac: number) {
 /** 只回報進度、不讓出（下載中途用） */
 export function report(label: string, frac: number) { handler(label, frac); }
 
+/**
+ * 提前發出下載：主程式一開始就叫（台北街景），不用等後面約 2 秒的同步工作（建賽道、天空、環境反射）做完才開始下載。
+ * fetchJson 同一個網址會直接接手這個請求；失敗的話丟掉，fetchJson 照舊重新請求並自己報錯
+ */
+const early = new Map<string, Promise<Response>>();
+export function prefetch(url: string) {
+  if (early.has(url)) return;
+  const p = fetch(url);
+  p.catch(() => { if (early.get(url) === p) early.delete(url); });
+  early.set(url, p);
+}
+
 /** 下載並回報進度；expected 是解壓縮後的大約位元組數（伺服器壓縮傳輸時 Content-Length 不準） */
 export async function fetchJson<T>(url: string, expected: number, label: string, from: number, to: number): Promise<T> {
-  const res = await fetch(url);
+  const pre = early.get(url);
+  early.delete(url);
+  const res = await (pre ?? fetch(url)).catch(() => fetch(url)); // 提前的請求失敗就重來一次
   if (!res.ok) throw new Error(`${url} HTTP ${res.status}`);
   if (!res.body) return res.json() as Promise<T>;
   const reader = res.body.getReader(), chunks: Uint8Array[] = [];
