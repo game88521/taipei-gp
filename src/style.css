@@ -337,10 +337,12 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 #road.show { opacity: 1; }
 #road b { display: block; font-size: 22px; letter-spacing: 2px; }
 #road small { display: block; font: 700 12px Arial, sans-serif; }
+/* 小地圖在左上角（時鐘的下面）：以前在右上角、跟右邊那一整排按鈕（油門、喇叭、甩尾、煞車）疊在同一條直線上，
+   手機橫向 360~390 px 高時小地圖會蓋住油門 32~62 px。左上角在自由駕駛時只有自動日夜循環的時鐘，剛好放得下 */
 #minimap {
   position: absolute;
-  top: calc(max(10px, env(safe-area-inset-top)) + 54px);
-  right: max(10px, env(safe-area-inset-right));
+  top: calc(max(10px, env(safe-area-inset-top)) + 40px);
+  left: max(10px, env(safe-area-inset-left));
   width: 150px;
   height: 150px;
 }
@@ -352,7 +354,7 @@ html:not(.touch) #gas { display: none; }
 @media (max-height: 480px) {
   #gas { width: 96px; height: 96px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 108px); }
   #hud[data-mode='free'] #brake { width: 92px; height: 92px; }
-  #minimap { width: 120px; height: 120px; top: calc(max(10px, env(safe-area-inset-top)) + 50px); }
+  #minimap { width: 120px; height: 120px; top: calc(max(10px, env(safe-area-inset-top)) + 40px); }
   #road b { font-size: 18px; }
 }
 

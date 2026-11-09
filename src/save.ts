@@ -7,8 +7,8 @@ import type { SeasonSave, SeasonRecord } from './season';
 export interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
 export type SteerMode = 'buttons' | 'drag' | 'tilt';
 /** 一條賽道的紀錄；v = 跑出這些紀錄時的賽道指紋（trackStamp）：賽道形狀改過之後，舊的影子車會穿牆、舊的最快圈不能比 */
-export interface TrackRec { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; v?: string }
-export interface Save { trackV?: string; freePos?: { x: number; z: number; h: number; y?: number }; season?: SeasonSave; seasonHistory?: SeasonRecord[]; circuits?: Record<string, TrackRec>; best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; sens?: number; tc?: { size: number; op: number; pos: 'std' | 'swap' | 'lift' | 'swap-lift' }; tilt?: { inv: boolean; zero: number; dead: number }; vol?: { master: number; engine: number; fx: number }; tutDone?: boolean; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+export interface TrackRec { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; v?: string; gpBest?: number | null }
+export interface Save { trackV?: string; gpBest?: number | null; freePos?: { x: number; z: number; h: number; y?: number }; season?: SeasonSave; seasonHistory?: SeasonRecord[]; circuits?: Record<string, TrackRec>; best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; sens?: number; tc?: { size: number; op: number; pos: 'std' | 'swap' | 'lift' | 'swap-lift' }; tilt?: { inv: boolean; zero: number; dead: number }; vol?: { master: number; engine: number; fx: number }; tutDone?: boolean; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 export const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -24,7 +24,7 @@ export let onSaveFail: (() => void) | null = null;
 export function setOnSaveFail(f: () => void) { onSaveFail = f; }
 export function writeSave() {
   let out: Save = save;
-  if (CIRCUIT_ID && taipei) out = { ...save, ...taipei, trackV: taipei.v, circuits: { ...save.circuits, [CIRCUIT_ID]: { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV } } };
+  if (CIRCUIT_ID && taipei) out = { ...save, ...taipei, trackV: taipei.v, circuits: { ...save.circuits, [CIRCUIT_ID]: { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV, gpBest: save.gpBest ?? null } } };
   try { localStorage.setItem(KEY, JSON.stringify(out)); } catch {
     // 無痕模式（每次都會失敗）就算了；其他情況（容量滿）提醒一次
     if (!warnedFull) { warnedFull = true; onSaveFail?.(); }
@@ -45,8 +45,8 @@ export function checkTrackStamp(stamp: string): boolean {
   save.trackV = stamp;
   if (old === stamp) return false;
   if (old == null) return false; // 舊存檔第一次遇到指紋：當作是現在的賽道（不知道是不是同一條，不要誤刪紀錄），只補上指紋
-  const had = save.best != null || save.ghost != null;
-  save.best = null; save.sectors = [null, null, null]; save.ghost = null;
+  const had = save.best != null || save.ghost != null || save.gpBest != null;
+  save.best = null; save.sectors = [null, null, null]; save.ghost = null; save.gpBest = null; // 賽道形狀改了：正賽最快圈也不能比
   return had;
 }
 /**
@@ -55,7 +55,7 @@ export function checkTrackStamp(stamp: string): boolean {
  */
 export function exportSave(): string {
   let out: Save = save;
-  if (CIRCUIT_ID && taipei) out = { ...save, ...taipei, trackV: taipei.v, circuits: { ...save.circuits, [CIRCUIT_ID]: { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV } } };
+  if (CIRCUIT_ID && taipei) out = { ...save, ...taipei, trackV: taipei.v, circuits: { ...save.circuits, [CIRCUIT_ID]: { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV, gpBest: save.gpBest ?? null } } };
   return JSON.stringify({ app: 'taipei-gp', key: KEY, at: new Date().toISOString(), save: out });
 }
 
@@ -78,6 +78,7 @@ function cleanRec(r: unknown): TrackRec | null {
     best: isNum(o.best, 10, 3600) ? o.best : null,
     sectors: Array.isArray(o.sectors) && o.sectors.length === 3 ? o.sectors.map((s) => (isNum(s, 1, 3600) ? s : null)) : [null, null, null],
     ghost: cleanGhost(o.ghost),
+    gpBest: isNum(o.gpBest, 10, 3600) ? o.gpBest : null,
   };
   if (isStr(o.v, 120)) rec.v = o.v;
   return rec;
@@ -100,7 +101,7 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
   const dropped: string[] = [];
   const take = <K extends keyof Save>(k: K, v: Save[K] | undefined | null) => { if (v === undefined || v === null) { if (k in src && src[k as string] !== null && src[k as string] !== undefined) dropped.push(String(k)); } else out[k] = v; };
   const rec = cleanRec(src);
-  if (rec) { out.best = rec.best; out.sectors = rec.sectors; out.ghost = rec.ghost; if (rec.v) out.trackV = rec.v; }
+  if (rec) { out.best = rec.best; out.sectors = rec.sectors; out.ghost = rec.ghost; out.gpBest = rec.gpBest ?? null; if (rec.v) out.trackV = rec.v; }
   const opts: Record<string, boolean> = {};
   if (src.opts && typeof src.opts === 'object') for (const [k, v] of Object.entries(src.opts as Record<string, unknown>)) if (typeof v === 'boolean' && k.length <= 40 && Object.keys(opts).length < 80) opts[k] = v;
   out.opts = opts;
@@ -154,9 +155,9 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
 }
 export const save = loadSave();
 if (CIRCUIT_ID) {
-  taipei = { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV };
-  const c = save.circuits?.[CIRCUIT_ID] ?? { best: null, sectors: [null, null, null], ghost: null };
-  Object.assign(save, { best: c.best, sectors: c.sectors, ghost: c.ghost, trackV: c.v });
+  taipei = { best: save.best, sectors: save.sectors, ghost: save.ghost, v: save.trackV, gpBest: save.gpBest ?? null };
+  const c: TrackRec = save.circuits?.[CIRCUIT_ID] ?? { best: null, sectors: [null, null, null], ghost: null };
+  Object.assign(save, { best: c.best, sectors: c.sectors, ghost: c.ghost, trackV: c.v, gpBest: c.gpBest ?? null });
 }
 /**
  * 套用匯入的存檔：直接寫進 localStorage 再讓 main 重新載入頁面（所有模組都從頭讀存檔，最不容易漏掉哪個狀態）。
@@ -181,4 +182,10 @@ export function bestLapOf(id: string): number | null {
   if (id === (CIRCUIT_ID ?? '')) return save.best;
   if (!id) return taipei?.best ?? null;
   return save.circuits?.[id]?.best ?? null;
+}
+/** 某條賽道的「正賽最快圈」（大獎賽裡跑出來的最快一圈；吃尾流、車陣裡鑽出來的，不跟計時賽的最快圈混在一起） */
+export function gpBestLapOf(id: string): number | null {
+  if (id === (CIRCUIT_ID ?? '')) return save.gpBest ?? null;
+  if (!id) return taipei?.gpBest ?? null;
+  return save.circuits?.[id]?.gpBest ?? null;
 }

@@ -49,7 +49,7 @@ import { physicsTest } from './physicstest';
 import { initLeaderboard, submitLap } from './leaderboard-ui';
 
 
-import { save, writeSave, KEY, bestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, exportSave, parseSaveFile, writeImported, askPersist, type Ghost, type SteerMode, type Save } from './save';
+import { save, writeSave, KEY, bestLapOf, gpBestLapOf, trackStamp, checkTrackStamp, setOnSaveFail, exportSave, parseSaveFile, writeImported, askPersist, type Ghost, type SteerMode, type Save } from './save';
 
 // ---------------------------------------------------------------- 場景
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -531,7 +531,7 @@ function resetRace() {
   startLap();
   lastLap = null;
   $('last').textContent = '--';
-  $('best').textContent = fmt(save.best);
+  $('best').textContent = fmt(raceKind === 'gp' ? save.gpBest ?? null : save.best); // 大獎賽顯示正賽最快圈，不是計時賽的
   $('lap').textContent = '1';
   camSnap = true;
 }
@@ -547,6 +547,8 @@ function startLap() {
 }
 
 function sectorDone(k: number, time: number) {
+  // 大獎賽的分段不記：吃尾流、在車陣裡鑽出來的分段時間，不能拿去跟計時賽乾淨的分段最佳比（理論最佳圈也是用這個算的）
+  if (raceKind === 'gp') return;
   const best = save.sectors[k];
   const el = $('s' + k);
   el.className = best == null || time < best ? 'purple' : 'yellow';
@@ -565,6 +567,17 @@ function completeLap() {
   sectorDone(2, t - sectorStart);
   lastLap = t;
   $('last').textContent = fmt(t);
+  // 大獎賽的圈速：吃尾流（前車 25 m 內引擎 +5%）、跟車 DRS，又是在車陣裡鑽出來的，
+  // 不能寫進「你的最快圈」、影子車，更不能上傳計時賽排行榜（以前會）。另外記一個「正賽最快圈」，選賽道頁分開顯示
+  if (raceKind === 'gp') {
+    if (save.gpBest == null || t < save.gpBest) { save.gpBest = t; toast(`正賽最快圈！${fmt(t)}`, 'purple'); } else toast(`${fmt(t)}（正賽最快 ${fmt(save.gpBest)}）`, '');
+    writeSave();
+    if (BOT) document.title = `BOT lap${lap} ${t.toFixed(3)} hits=${botHits}`;
+    lap++;
+    $('lap').textContent = String(lap);
+    startLap();
+    return;
+  }
   if (save.best == null || t < save.best) {
     const first = save.best == null;
     save.best = t;
@@ -1312,8 +1325,10 @@ function renderPicker() {
     fact('長度', `${(track.length / 1000).toFixed(3)} km`);
     fact('特色', '真實街道、高樓夾道');
   }
-  const best = bestLapOf(cur);
-  fact('你的最快圈', best != null ? fmt(best) : '還沒跑過');
+  const best = bestLapOf(cur), gpBest = gpBestLapOf(cur);
+  // 計時賽的最快圈（乾淨的一圈）與大獎賽的最快圈（吃尾流、車陣裡）分開顯示；選的是大獎賽時兩個都列出來
+  fact(pickMode === 'gp' ? '計時賽最快圈' : '你的最快圈', best != null ? fmt(best) : '還沒跑過');
+  if (pickMode === 'gp') fact('正賽最快圈', gpBest != null ? fmt(gpBest) : '還沒跑過');
   // 理論最佳：三個分段各自的最佳加起來（同一圈不一定全部跑出來，但代表你已經證明過做得到）
   const secs = save.sectors;
   if (pickMode === 'tt' && best != null && secs.every((s) => s != null)) {
@@ -2304,6 +2319,7 @@ $('btn-reset-best').addEventListener('click', () => {
   save.best = null;
   save.sectors = [null, null, null];
   save.ghost = null;
+  save.gpBest = null;
   writeSave();
   showMenu(state === 'paused');
 });
