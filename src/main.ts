@@ -1132,13 +1132,13 @@ function updateCountdown(dt: number) {
   }
 }
 
-function beginCountdown() {
+function beginCountdown(quali = false) {
   resetRace();
   qualiRun = false; // 新的一輪開始：上一次放棄的排位不能留著，不然計時賽／正賽的第一圈跑完會跳出排位結果（startQuali 會在呼叫完這個之後再設回 true）
   world.setStartLights(0); // 倒數到一半離開的話燈還亮著
   // 比賽規則（設定頁）：經典＝DRS；2026＝主動空力＋電池＋超車模式
   // AI 難度（設定頁；測試可用 ?diff=easy|normal|hard）
-  const ssn = inSeasonRound() && raceKind === 'gp' ? save.season! : null; // 賽季這一站：圈數、難度、規則整季固定
+  const ssn = inSeasonRound() && (raceKind === 'gp' || quali) ? save.season! : null; // 排位也要吃本站狀態（不然 startQuali 設好的 form 會在這裡被清成空的） // 賽季這一站：圈數、難度、規則整季固定
   field.form = ssn?.form ?? {};
   field.setDifficulty(((ssn?.diff ?? new URLSearchParams(location.search).get('diff')) ?? $<HTMLSelectElement>('opt-diff').value) as Difficulty);
   field.applyDifficulty(); // 狀態每站不同，難度沒變也要重算
@@ -1736,14 +1736,14 @@ function startQuali() {
   if (inSeasonRound() && save.season) { field.form = save.season.form ?? {}; field.setDifficulty(save.season.diff as Difficulty); field.applyDifficulty(); }
   raceKind = 'tt';
   hideMenu();
-  beginCountdown();
+  beginCountdown(true);
   qualiRun = true; // 要在 beginCountdown 之後：它一開頭會把 qualiRun 清掉
   setRaceRain(false);
   toast('🏁 排位賽：跑一圈，圈速決定發車位置', 'purple');
 }
 /** 車手名字後面加個性圖示（🔥 激進、🛡️ 防守…；均衡的不加） */
-const withPersona = (r: Racer) => {
-  const f = inSeasonRound() && raceKind !== 'tt' ? formTag(save.season?.form?.[r.name] ?? 0) : ''; // 賽季：狀態好 ↑、差 ↓
+const withPersona = (r: Racer, quali = false) => {
+  const f = inSeasonRound() && (raceKind !== 'tt' || quali) ? formTag(save.season?.form?.[r.name] ?? 0) : ''; // 賽季：狀態好 ↑、差 ↓
   return `${r.name}${r.persona.icon ? ' ' + r.persona.icon : ''}${f ? ' ' + f : ''}`;
 };
 /** 排位賽跑完：AI 用同一套物理各跑一圈，大家照圈速排發車格 */
@@ -1763,7 +1763,7 @@ function finishQuali(t: number) {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
     if (k === 0) tr.className += ' pole';
-    for (const v of [String(k + 1), withPersona(r), r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
+    for (const v of [String(k + 1), withPersona(r, true), r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
