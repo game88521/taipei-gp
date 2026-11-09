@@ -1940,20 +1940,28 @@ function updateGpHud() {
   $('pit').textContent = mine.pitReq ? '進站 ✓' : '進站';
   const lead = field.progress(st[0]);
   const ol = $('board');
-  ol.innerHTML = '';
+  // 排行榜的 <li> 重用：台數沒變就只改文字、顏色和 class（原本每 6 格清空重建約 66 個節點）
+  if (ol.children.length !== st.length) {
+    ol.innerHTML = '';
+    for (let k = 0; k < st.length; k++) {
+      const li = document.createElement('li');
+      li.append(document.createElement('i'), document.createElement('span'), document.createElement('em'));
+      ol.appendChild(li);
+    }
+  }
   st.forEach((r, k) => {
-    const li = document.createElement('li');
-    if (r.isPlayer) li.className = 'me';
-    else if (k !== 0 && Math.abs(k - me) > 1) li.className = k > 2 && Math.abs(k - me) > 2 ? 'far hide' : 'far'; // 矮螢幕只列領先者、前後一名；22 台時大螢幕也只列前三名＋前後兩名（style.css）
-    const sw = document.createElement('i');
-    sw.style.background = r.color;
-    const nm = document.createElement('span');
-    nm.textContent = `${k + 1} ${r.name}`;
-    const gap = document.createElement('em');
+    const li = ol.children[k] as HTMLElement;
+    let cls = '';
+    if (r.isPlayer) cls = 'me';
+    else if (k !== 0 && Math.abs(k - me) > 1) cls = k > 2 && Math.abs(k - me) > 2 ? 'far hide' : 'far'; // 矮螢幕只列領先者、前後一名；22 台時大螢幕也只列前三名＋前後兩名（style.css）
+    if (li.className !== cls) li.className = cls;
+    const [sw, nm, gap] = li.children as unknown as HTMLElement[];
+    if (sw.dataset.c !== r.color) { sw.style.background = r.color; sw.dataset.c = r.color; }
+    const name = `${k + 1} ${r.name}`;
+    if (nm.textContent !== name) nm.textContent = name;
     // 差距：用距離換算成大約的秒數（以 60 m/s 估）
-    gap.textContent = k === 0 ? (r.finish != null ? '完賽' : '領先') : `+${((lead - field.progress(r)) / 60).toFixed(1)}`;
-    li.append(sw, nm, gap);
-    ol.appendChild(li);
+    const g = k === 0 ? (r.finish != null ? '完賽' : '領先') : `+${((lead - field.progress(r)) / 60).toFixed(1)}`;
+    if (gap.textContent !== g) gap.textContent = g;
   });
 }
 /**
