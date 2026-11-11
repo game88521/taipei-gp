@@ -73,11 +73,18 @@
       <div id="road"></div>
       <!-- 畫面上方的提示：載客、街頭比賽、通緝、導航，有幾個就由上往下排，不會疊在一起 -->
       <div id="top-stack">
-        <div id="taxi-hud" class="hidden"></div>
+        <div id="taxi-hud" class="hidden">
+          <span id="taxi-title">計程車</span>
+          <span id="taxi-distance"></span>
+          <span id="taxi-time"></span>
+          <span id="taxi-wallet" class="money"></span>
+          <details id="taxi-details"><summary>行程明細</summary><p id="taxi-trip-text"></p></details>
+        </div>
         <div id="sr-hud" class="hidden"></div>
         <button id="sr-quit" style="display: none" aria-label="放棄這場比賽">放棄比賽</button>
         <div id="wanted"></div>
         <div id="nav-hud" style="display: none"></div>
+        <details id="drift-coach" class="hidden"><summary>甩尾練習提示</summary><p id="coach-status"></p><button id="coach-exit" type="button">結束練習提示</button></details>
       </div>
       <div id="clock" style="display: none"></div>
       <button id="btn-pursuit" style="display: none">🚨 追緝</button>
@@ -91,6 +98,7 @@
       <div id="sr-offer" class="hidden">
         <b id="sr-offer-title"></b>
         <small id="sr-offer-sub"></small>
+        <div id="sr-offer-route"></div>
         <button id="sr-accept">接受挑戰</button>
       </div>
     </div>
@@ -149,6 +157,7 @@
                 <span class="m-txt"><b>賽季模式</b><small id="season-sub">2026 賽曆 23 站 · 累積車手與車隊積分</small></span>
               </button>
             </div>
+            <button id="btn-drift-practice" class="ghost-btn" type="button">🌀 甩尾練習提示：速度、角度與入帳</button>
             <div id="m-install" class="m-install" hidden>
               <span class="m-ico"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4" /></svg></span>
               <span class="m-inst-txt"><b>加到主畫面</b><small>像 App 一樣全螢幕開啟，沒網路也能玩</small></span>
@@ -187,6 +196,9 @@
                 <button id="car-use" class="primary">使用這台車</button>
                 <button id="car-buy" class="ghost-btn" style="display: none"></button>
                 <div id="paint-list"></div>
+                <p id="paint-preview-note" aria-live="polite">點選烤漆可先試色，確認後才購買並套用。</p>
+                <button id="paint-apply" class="primary" type="button">購買並套用烤漆</button>
+                <button id="paint-cancel" class="ghost-btn" type="button">取消試色</button>
               </div>
             </div>
           </section>
@@ -319,6 +331,9 @@
               <div><b>街道賽</b><span>油門自動；地上的線綠＝全油門、紅＝該煞車；DRS 區按 DRS</span></div>
               <div><b>電腦</b><span>↑ 油門、↓ 煞車／倒車、← → 轉向、Shift 甩尾、Ctrl 或 E 開 DRS、B 進站、Esc 暫停</span></div>
             </div>
+            <p id="legacy-record-note" class="sub"></p>
+            <p id="taxi-last-trip" class="sub"></p>
+            <details id="economy-history"><summary>收支明細與任務收益</summary><p class="sub">顯示本版開始記錄的最近 100 筆；各類平均為每次入帳金額，不代表每分鐘效率。</p><div id="economy-summary"></div><ol id="economy-list"></ol></details>
             <div class="m-backup">
               <h3>備份存檔</h3>
               <p class="sub">最快圈、影子車、錢、車庫、成就都存在這支手機的瀏覽器裡。清掉瀏覽器資料、換手機、或加到主畫面後和 Safari 各自獨立，都會讓它消失。先備份一份，之後可以還原。</p>
@@ -326,6 +341,7 @@
                 <button id="bk-copy" class="ghost-btn" type="button">複製備份</button>
                 <button id="bk-save" class="ghost-btn" type="button">下載備份檔</button>
                 <button id="bk-load" class="ghost-btn" type="button">還原備份…</button>
+                <button id="bk-undo" class="ghost-btn" type="button">還原前一份存檔…</button>
                 <input id="bk-file" type="file" accept=".json,application/json,text/plain" hidden />
               </div>
               <textarea id="bk-text" class="m-backup-text" rows="3" placeholder="把備份的文字貼在這裡，再按「還原」" spellcheck="false" hidden></textarea>
@@ -357,6 +373,15 @@
       </div>
     </div>
 
+    <div id="gp-settling" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gp-settle-title">
+      <div class="card">
+        <h1 id="gp-settle-title">正在完成比賽</h1>
+        <p id="gp-settle-progress" class="sub" role="status" aria-live="polite">正在計算後方車手的完賽結果…</p>
+        <button id="gp-settle-retry" class="primary" type="button" hidden>重試結算</button>
+        <button id="gp-settle-exit" class="ghost-btn" type="button">回選單並保留進度</button>
+      </div>
+    </div>
+
     <div id="podium-ui" class="hidden">
       <h2>🏆 頒獎典禮</h2>
       <ol id="podium-names"></ol>
@@ -376,7 +401,7 @@
         <label class="q sn">比賽規則
           <select id="sn-rules"><option value="classic" selected>經典（DRS）</option><option value="2026">2026（主動空力＋超車模式）</option></select>
         </label>
-        <p class="sub">每一站都要先跑排位賽決定發車位置；中途離開正在比的那一站，算棄賽（0 分）。最快圈（前十名）加 1 分。</p>
+        <p class="sub">每一站都要先跑排位賽決定發車位置；若已保存檢查點，中途離開可續賽。選擇放棄本站算棄賽（0 分）。最快圈（前十名）加 1 分。</p>
         <button id="sn-go" class="primary">開始：第 1 站 澳洲</button>
         <button id="sn-cancel" class="ghost-btn">取消</button>
       </div>
@@ -399,10 +424,12 @@
           <table id="season-drivers" class="season-table"></table>
           <h3>車隊積分</h3>
           <table id="season-teams" class="season-table"></table>
+          <p class="sub season-countback">同分時依冠軍、亞軍、季軍等名次次數排序；車隊合計旗下車手的各名次次數。完全相同時保留原順序。</p>
         </div>
         <div class="stab" data-tab="rounds"><table id="season-rounds" class="season-table"></table></div>
         <div class="stab" data-tab="hist"><table id="season-hist" class="season-table"></table></div>
         <button id="season-continue" class="primary">繼續賽季</button>
+        <button id="season-abandon" class="ghost-btn" type="button" hidden>放棄本站（棄賽）</button>
         <button id="season-reset" class="ghost-btn">重新開始賽季</button>
         <button id="season-close" class="ghost-btn">關閉</button>
       </div>
@@ -464,6 +491,7 @@
         <h1>線上排行榜<small>TIME TRIAL · 3.1 KM</small></h1>
         <label class="lb-name">車手名稱 <input id="lb-name" maxlength="12" /></label>
         <p class="sub" id="lb-status"></p>
+        <p class="sub lb-fairness">休閒榜：軌跡合理性檢查，非權威防作弊</p>
         <ol id="lb-list"></ol>
         <button id="lb-submit" class="ghost-btn">上傳我的最快圈</button>
         <button id="lb-close" class="primary">返回</button>

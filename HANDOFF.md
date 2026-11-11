@@ -1,4 +1,16 @@
-> 上版執行紀錄：2026-11-11 09:41:33（本機時間）。整合補丁已套用原專案；正式產物與已驗證副本一致，三項固定回歸通過。下方「尚未套用／未提交」文字為先前交接的歷史狀態。commit、push 與平台部署結果請見 DCISI/taipei-gp-release-result.json。
+<!-- priority-current-start -->
+# 2026-11-11 全模式優先改善（上版交接）
+
+本輪已套用原專案並通過建置；61個交付檔案、223個dist產物與已測試版本完全一致，build `99f984fced89`。Rex 已明確授權本輪提交並推送 main 觸發部署。提交／推送／部署的最終狀態以 DCISI/taipei-gp-priority-publish-result.json 及 GitHub 對該提交的 Vercel 狀態為準。不要重跑舊補丁、舊 release 或套用腳本。
+
+基準 feaa6ff；本輪完成規則分榜／有效圈、GP結算／計時點、賽季續賽／同分比較、歷史回放、街頭同層互動與任務互斥、街賽PB／路線圖、甩尾練習、載客明細、各車車況、烤漆試色、收支／完整備份、排行榜與下載／離線／GPU穩定性。完整項目與限制見 [PRIORITY_VALIDATION.md](./PRIORITY_VALIDATION.md)。
+
+驗證：正式build、12組自動測試、固定回歸3/3、手機尺寸UI9/9、非BOT GP瀏覽器3/3。三項基準54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5。手機實機與正式Redis Lua仍未驗證；排行榜為軌跡合理性檢查，非權威防作弊。本輪未使用線上遊戲測試。
+
+上版必須包含 api/leaderboard.js、shared/lap-proof.js、shared/taipei-track.json。沿用既有KV／Upstash環境變數，不需新增套件。作者一律 Rex <game88521@gmail.com>。上版結果不能由下方歷史紀錄推定；先前『未套用』及403為已處理歷史。
+<!-- priority-current-end -->
+
+以下為先前交接／上版歷史，狀態以最上方本輪說明為準。
 
 > 最新更新：2026-11-10。四輪優化已在 DCISI 工作副本完成；本輪六項體驗與三項回歸通過。原專案未套用、沒有 commit／push。最新詳情見文末「Codex 工作副本整合交接」；下方原始交接保留作為歷史與規則。
 

@@ -27,12 +27,14 @@ function serviceWorker(): Plugin {
       walk(outDir);
       files.sort();
       const hash = createHash('sha256');
+      const template = readFileSync(resolve(__dirname, 'src/sw-template.js'), 'utf8');
+      hash.update(template);
       for (const f of files) hash.update(readFileSync(f));
       const version = hash.digest('hex').slice(0, 12);
       // 城市區塊與車庫預覽按需下載；首次開過後由 fetch handler 快取，後續可離線使用。
       // 版本號仍然算進它們的內容，地圖一改就換新快取
       const urls = files.map((f) => '/' + relative(outDir, f).split('\\').join('/')).filter((u) => !u.startsWith('/data/tiles/') && !/^\/assets\/garage3d-.*\.js$/.test(u)).map((u) => (u === '/index.html' ? '/' : u));
-      const sw = readFileSync(resolve(__dirname, 'src/sw-template.js'), 'utf8')
+      const sw = template
         .replace('__VERSION__', version)
         .replace('__PRECACHE__', JSON.stringify(urls));
       writeFileSync(join(outDir, 'sw.js'), sw);

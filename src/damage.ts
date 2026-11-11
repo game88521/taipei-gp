@@ -24,6 +24,29 @@ interface Puff { s: THREE.Sprite; life: number; max: number; vx: number; vy: num
 
 export class Damage {
   value = 0;
+  private vehicle = 'sedan';
+  private values: Record<string, number> = {};
+  /** 街頭賽使用獨立暫態 key，避免賽車的撞擊轉移到自由駕駛車款。 */
+  useVehicle(id: string) {
+    if (id === this.vehicle) return;
+    this.values[this.vehicle] = this.value;
+    this.vehicle = id;
+    this.value = this.values[id] ?? 0;
+    this.lastPaint = -1;
+  }
+  valueFor(id: string) { return id === this.vehicle ? this.value : this.values[id] ?? 0; }
+  resetVehicle(id: string) { delete this.values[id]; if (id === this.vehicle) this.repair(); }
+  snapshot() {
+    const values = { ...this.values, [this.vehicle]: this.value };
+    delete values.__street__;
+    return values;
+  }
+  restore(values: Record<string, number>) {
+    this.values = {};
+    for (const [id, n] of Object.entries(values)) if (id !== '__street__' && Number.isFinite(n)) this.values[id] = Math.max(0, Math.min(1, n));
+    this.value = this.values[this.vehicle] ?? 0;
+    this.lastPaint = -1;
+  }
   private puffs: Puff[] = [];
   private sparks: Puff[] = [];
   /** 甩尾胎煙：後輪冒出來、往後飄、慢慢變大變淡（跟引擎煙分開一池，甩尾時不會把引擎煙擠掉） */

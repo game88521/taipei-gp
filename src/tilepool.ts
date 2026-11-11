@@ -1,5 +1,6 @@
 import { decodeTile } from './citydata';
 import { genTile, makeCtx, type GenCtx, type GenInit, type GenOut } from './tilegen';
+import { fetchJsonWithRetry } from './network';
 
 // 幾個背景執行緒輪流算城市區塊（tileworker.ts）；開不了 Worker（很舊的瀏覽器）或 Worker 掛掉，就改在主執行緒算（結果一樣，只是比較會頓）
 
@@ -53,8 +54,7 @@ export class TilePool {
 
   private async runLocal(url: string, tag: number): Promise<GenOut> {
     this.local ??= makeCtx(this.init);
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return genTile(decodeTile(await r.json()), tag, this.local);
+    const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(url, { label: '城市區塊' });
+    return genTile(decodeTile(data), tag, this.local);
   }
 }

@@ -2,6 +2,13 @@ import { VMAX, ENGINE, BRAKE, WALL_OFF, gripAt, locate, type Track, type Locate 
 
 const LIMIT = WALL_OFF - 1.0; // 車寬一半，撞牆判定線
 
+/** 純資料；Infinity 的限速以 null 保存，JSON 往返不會改變物理狀態。 */
+export interface CarState {
+  x: number; z: number; h: number; v: number; steer: number; power: number;
+  boost: number; drs: boolean; gripMul: number; r26: boolean; aeroZone: boolean;
+  ovt: boolean; energy: number; speedCap: number | null; pos: Locate; touch: boolean; hitCool: number;
+}
+
 /**
  * 街機式車輛：不用物理引擎。
  * - 轉向角速度受抓地力限制：越快能轉的越少，所以進彎前一定要煞車
@@ -27,6 +34,31 @@ export class Car {
   /** 這一步車身貼著護牆（音效的「刮牆」聲看這個；撞擊力道在冷卻期間會回報 0） */
   touch = false;
   private hitCool = 0;
+
+  /** 只有新賽事入口呼叫；扶正仍保留胎況、電量與安全車限速。 */
+  resetTransient(r26 = false) {
+    this.boost = 0;
+    this.drs = false;
+    this.gripMul = 1;
+    this.r26 = r26;
+    this.aeroZone = false;
+    this.ovt = false;
+    this.energy = 1;
+    this.speedCap = Infinity;
+    this.touch = false;
+    this.hitCool = 0;
+  }
+
+  snapshot(): CarState {
+    return { x: this.x, z: this.z, h: this.h, v: this.v, steer: this.steer, power: this.power,
+      boost: this.boost, drs: this.drs, gripMul: this.gripMul, r26: this.r26, aeroZone: this.aeroZone,
+      ovt: this.ovt, energy: this.energy, speedCap: Number.isFinite(this.speedCap) ? this.speedCap : null,
+      pos: { ...this.pos }, touch: this.touch, hitCool: this.hitCool };
+  }
+
+  restore(s: CarState) {
+    Object.assign(this, s, { pos: { ...s.pos }, speedCap: s.speedCap ?? Infinity });
+  }
 
   placeAt(t: Track, i: number) {
     this.x = t.px[i];

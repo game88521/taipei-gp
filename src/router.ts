@@ -9,16 +9,21 @@ export class Router {
   private adj = new Map<number, [number, number][]>();
   private grid = new Grid<number>(40);
   private tmp: number[] = [];
+  private junctionNodes = new Set<number>();
 
   constructor(d: CityData) {
     this.N = d.net.nodes;
     this.Y = d.net.y ?? [];
     const N = this.N;
     const snap = new Set<number>();
+    const neighbors = new Map<number, Set<number>>();
     for (const w of [...d.net.ways, ...(d.net.decks ?? [])]) {
       if (w.c > 3) continue;
       for (let k = 0; k + 1 < w.n.length; k++) {
         const a = w.n[k], b = w.n[k + 1], l = Math.hypot(N[b * 2] - N[a * 2], N[b * 2 + 1] - N[a * 2 + 1]);
+        if (!w.e) for (const [u, v] of [[a, b], [b, a]]) {
+          let ns = neighbors.get(u); if (!ns) neighbors.set(u, (ns = new Set())); ns.add(v);
+        }
         // 巷弄成本加重：導航偏好大馬路；高架、隧道（沒有紅綠燈）再便宜一點
         const cost = l * (w.e ? 0.75 : w.c >= 3 ? 1.6 : 1);
         const add = (u: number, v: number) => { let list = this.adj.get(u); if (!list) this.adj.set(u, (list = [])); list.push([v, cost]); };
@@ -27,6 +32,7 @@ export class Router {
         if (w.c <= 2) { snap.add(a); snap.add(b); }
       }
     }
+    for (const [n, ns] of neighbors) if (ns.size >= 3) this.junctionNodes.add(n);
     // 只吸附到「主路網」上：從市中心開得到、也開得回市中心的節點（單行道算進去）。
     // 地圖邊緣被切斷的路段、單向進不去的死巷不收，否則起點或終點落在那裡就找不到路線
     const reach = (start: number, back: boolean) => {
@@ -61,7 +67,7 @@ export class Router {
   }
 
   /** 從 (x0, z0) 到 (x1, z1) 的路線（平滑後的點列、每點的路面高度）與長度；找不到回傳 null。y0、y1 = 起訖的高度（沒給 = 地面） */
-  route(x0: number, z0: number, x1: number, z1: number, y0?: number, y1?: number): { path: [number, number][]; ys: number[]; length: number } | null {
+  route(x0: number, z0: number, x1: number, z1: number, y0?: number, y1?: number): { path: [number, number][]; ys: number[]; length: number; junctions: number } | null {
     const from = this.nearest(x0, z0, y0), to = this.nearest(x1, z1, y1);
     if (from < 0 || to < 0) return null;
     // Dijkstra（二元堆積）
@@ -118,6 +124,7 @@ export class Router {
     }
     let length = 0;
     for (let i = 1; i < path.length; i++) length += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
-    return { path, ys, length };
+    const junctions = ids.slice(1, -1).filter((n) => this.junctionNodes.has(n)).length;
+    return { path, ys, length, junctions };
   }
 }

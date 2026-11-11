@@ -2,6 +2,7 @@
 // 主執行緒開車時只做建網格、登記碰撞這些輕的事，不會因為蓋房子而頓一下
 import { decodeTile } from './citydata';
 import { genTile, makeCtx, transferables, type GenCtx, type GenInit } from './tilegen';
+import { fetchJsonWithRetry } from './network';
 
 let ctx: GenCtx | null = null;
 
@@ -9,9 +10,8 @@ self.onmessage = async (e: MessageEvent) => {
   const m = e.data as { type: 'init'; init: GenInit } | { type: 'tile'; id: number; url: string; tag: number };
   if (m.type === 'init') { ctx = makeCtx(m.init); return; }
   try {
-    const res = await fetch(m.url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const out = genTile(decodeTile(await res.json()), m.tag, ctx!);
+    const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(m.url, { label: '城市區塊' });
+    const out = genTile(decodeTile(data), m.tag, ctx!);
     (self as unknown as Worker).postMessage({ id: m.id, out }, transferables(out));
   } catch (err) {
     (self as unknown as Worker).postMessage({ id: m.id, error: String(err) });

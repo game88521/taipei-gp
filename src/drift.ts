@@ -12,6 +12,17 @@ export class DriftScore {
   mult = 1;
   private chainT = 0;
   private idleT = 0;
+  qualifying = false;
+
+  get bankIn() { return this.active ? Math.max(0, BANK_AFTER - this.idleT) : 0; }
+  get multProgress() { return this.mult >= 5 ? 1 : (this.chainT % 1.5) / 1.5; }
+  reset() { this.active = false; this.points = 0; this.mult = 1; this.chainT = 0; this.idleT = 0; this.qualifying = false; }
+  /** 正常換玩法可先結算；扶正／傳送必須取消，不能保留連擊。 */
+  finish(action: 'bank' | 'cancel' = 'cancel'): { banked?: number } {
+    const banked = action === 'bank' && this.active && this.total >= 100 ? this.total : 0;
+    this.reset();
+    return banked ? { banked } : {};
+  }
 
   /** 目前這段的分數（含倍率） */
   get total() { return Math.round(this.points * this.mult); }
@@ -19,8 +30,9 @@ export class DriftScore {
   /** 每步更新；回傳入帳或歸零的事件 */
   update(dt: number, car: FreeCar, impact: number): { banked?: number; lost?: boolean } {
     const sp = Math.hypot(car.vx, car.vz), slip = car.slip;
-    if (this.active && impact > 5) { this.active = false; return { lost: true }; }
-    if (slip > MIN_SLIP && sp > 9 && slip < 1.4) {
+    this.qualifying = slip > MIN_SLIP && sp > 9 && slip < 1.4;
+    if (this.active && impact > 5) { this.reset(); return { lost: true }; }
+    if (this.qualifying) {
       if (!this.active) { this.active = true; this.points = 0; this.mult = 1; this.chainT = 0; }
       const deg = (slip * 180) / Math.PI;
       this.points += dt * sp * (deg - 10) * 0.6;

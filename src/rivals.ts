@@ -5,6 +5,8 @@ import { makeF1, setLod, setTyre, TEAMS } from './f1model';
 import { CIRCUIT } from './circuits';
 import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, type Track } from './track';
 import { PIT, boxS, laneLat, signedS, mountedAt, type PitLane, type StopInfo } from './pitlane';
+import { RaceTiming } from './race-timing';
+import { parseRaceSnapshot, type RaceSnapshot, type ReplayState, type CompletionOptions, type CompletionProgress } from './race-state';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
 // 被慢車擋住就挑比較空的一側超車、尾流加速、車與車照動量交換互相撞開
@@ -59,6 +61,7 @@ export interface Racer {
   isPlayer: boolean;
   laps: number; // 已經通過起跑線幾次（發車格在線後，第一次通過＝開始第 1 圈）
   finish: number | null; // 完賽時間
+  dnf: boolean; // 背景結算達時限仍未完成；與有效完賽明確分開
   lapStart: number;
   bestLap: number | null;
   profile: Float32Array | null; // 這台 AI 的速度曲線（m/s）
@@ -126,6 +129,11 @@ export class RaceField {
   private solo = false; // 排位賽模擬：只算自己，不看別台車
   drsZones: DrsZone[] = [];
   private recAcc = 0;
+  private timing = new RaceTiming();
+  private completing = false;
+  private completionJob: object | null = null;
+  private replayStates: ReplayState[] = [];
+  replayStartTime = 0; // 續賽後從檢查點重新錄影，顯示用的原比賽時間
   private line: Float32Array; // 每個取樣點的賽車線橫向位置（右正）
   private base: [number, number, number][] = []; // 每位 AI 普通難度的 [抓地力, 煞車, 引擎力]
 
@@ -217,6 +225,10 @@ export class RaceField {
   setup(playerSlot: number, playerCompound = 1, laps = LAPS, grid?: Racer[], weather: GpWeather = 'dry') {
     this.laps = laps;
     this.recAcc = 0;
+    this.timing.clear();
+    this.replayStates = [];
+    this.replayStartTime = 0;
+    this.completing = false;
     this.events = [];
     this.sc = { phase: 'off', t: 0, lapAt: 0, used: false, s: 0 };
     this.scAt = -1;
@@ -227,6 +239,7 @@ export class RaceField {
     let seed = 7;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (const r of this.racers) {
+      r.car.resetTransient(this.rules === '2026');
       Object.assign(r, { wear: 0, pitReq: false, pit: null, pitTyre: -1, lift: 0, lastStop: 0, pits: 0, drsOk: false, rec: [] });
       r.compound = r.isPlayer ? playerCompound : laps <= 3 ? (rnd() < 0.7 ? 0 : 1) : rnd() < 0.5 ? 1 : rnd() < 0.5 ? 0 : 2;
       r.car.drs = false;
@@ -255,9 +268,12 @@ export class RaceField {
       r.lat = lat - this.line[i];
       r.laps = 0;
       r.finish = null;
+      r.dnf = false;
       r.bestLap = null;
       r.lapStart = 0;
       r.stuck = 0;
+      r.crashAt = -99; r.slowT = 0; r.defT = 0;
+      this.timing.observe(r.name, this.progress(r), 0);
     });
     this.raceTime = 0;
     for (const r of this.racers) if (r.model) r.model.root.visible = true;
@@ -277,6 +293,136 @@ export class RaceField {
     });
   }
 
+  /** 最近共同計時點的秒差；尚無共同通過點則回傳 null。 */
+  timingGap(ahead: Racer, behind: Racer): number | null {
+    if (ahead.finish != null && behind.finish != null) return Math.max(0, behind.finish - ahead.finish);
+    return this.timing.gap(ahead.name, behind.name);
+  }
+
+  /** 每圈保存純物理狀態，不把車模、GPU 資源或整場回放塞入 localStorage。 */
+  snapshot(): RaceSnapshot {
+    return { version: 1, trackLength: this.t.length, trackN: this.t.N, raceTime: this.raceTime, laps: this.laps,
+      rules: this.rules, difficulty: this.difficulty, form: { ...this.form }, look: this.look, wet: this.wet,
+      rainAt: Number.isFinite(this.rainAt) ? this.rainAt : null, sc: { ...this.sc }, scChance: this.scChance,
+      scAt: this.scAt, pitSeed: this.pitSeed, recAcc: this.recAcc, aiHits: this.aiHits, timing: this.timing.snapshot(),
+      racers: this.racers.map((r) => ({ name: r.name, car: r.car.snapshot(), compound: r.compound, wear: r.wear,
+        pitReq: r.pitReq, pit: r.pit ? { ...r.pit } : null, pitTyre: r.pitTyre, lift: r.lift, lastStop: r.lastStop,
+        pits: r.pits, drsOk: r.drsOk, laps: r.laps, finish: r.finish, lapStart: r.lapStart, bestLap: r.bestLap,
+        lat: r.lat, stuck: r.stuck, crashAt: r.crashAt, slowT: r.slowT, defT: r.defT, dnf: r.dnf })) };
+  }
+
+  /** 驗證整份快照與賽道／車手身分後才變更場上狀態；失敗不會半套用。 */
+  restore(value: RaceSnapshot): boolean {
+    if (this.completionJob || this.solo) return false;
+    const s = parseRaceSnapshot(value);
+    if (!s || s.trackN !== this.t.N || Math.abs(s.trackLength - this.t.length) > 0.01
+      || s.racers.some((r, k) => r.name !== this.racers[k]?.name)) return false;
+    this.rules = s.rules; this.difficulty = s.difficulty; this.form = { ...s.form }; this.look = s.look;
+    this.applyDifficulty();
+    this.raceTime = s.raceTime; this.laps = s.laps; this.wet = s.wet; this.rainAt = s.rainAt ?? Infinity;
+    this.sc = { ...s.sc }; this.scChance = s.scChance; this.scAt = s.scAt;
+    this.pitSeed = s.pitSeed; this.recAcc = s.recAcc; this.aiHits = s.aiHits;
+    this.events = []; this.stops.clear(); this.completing = false;
+    this.timing.restore(s.timing);
+    this.racers.forEach((r, k) => {
+      const { name: _name, car, ...data } = s.racers[k];
+      Object.assign(r, data); r.car.restore(car); r.rec = [];
+      if (r.model) r.model.root.visible = true;
+    });
+    this.replayStartTime = s.raceTime;
+    this.replayStates = [];
+    return true;
+  }
+
+  private completionProgress(start: number): CompletionProgress {
+    const others = this.racers.filter((r) => !r.isPlayer);
+    return { completed: others.filter((r) => r.finish != null || r.dnf).length, total: others.length, elapsed: this.raceTime - start };
+  }
+  private *completionSteps(maxSeconds = 180): Generator<CompletionProgress, Racer[]> {
+    if (this.completionJob || this.solo || this.me.finish == null) throw new Error('只能在玩家完賽後結算其餘車手');
+    const job = {}, start = this.raceTime, dt = 1 / 120;
+    const limit = Number.isFinite(maxSeconds) ? Math.max(0, Math.min(3600, maxSeconds)) : 180;
+    this.completionJob = job; this.completing = true;
+    try {
+      while (this.racers.some((r) => !r.isPlayer && r.finish == null && !r.dnf) && this.raceTime - start < limit) {
+        for (let k = 0; k < 120 && this.raceTime - start < limit; k++) {
+          if (!this.racers.some((r) => !r.isPlayer && r.finish == null && !r.dnf)) break;
+          this.update(dt, true);
+          // 背景結算不播放車隊無線電，也不讓事件佇列無限成長。
+          this.events.length = 0;
+        }
+        yield this.completionProgress(start);
+      }
+      for (const r of this.racers) if (!r.isPlayer && r.finish == null) r.dnf = true;
+      return this.standings();
+    } finally {
+      if (this.completionJob === job) { this.completionJob = null; this.completing = false; }
+    }
+  }
+
+  /** 同步版本只供隔離驗證；既有 BOT 三項基準維持原本衝線結算流程。 */
+  finishRemainder(maxSeconds = 180): Racer[] {
+    const job = this.completionSteps(maxSeconds);
+    for (;;) { const next = job.next(); if (next.done) return next.value; }
+  }
+  /** 每批約 8 ms 讓出主執行緒；取消只停止計算，不把尚未完成者誤標為 DNF。 */
+  async finishRemainderAsync(options: CompletionOptions = {}): Promise<Racer[]> {
+    options.signal?.throwIfAborted();
+    const job = this.completionSteps(options.maxSeconds), close = () => { job.return(this.standings()); };
+    options.signal?.addEventListener('abort', close, { once: true });
+    try {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      for (;;) {
+        options.signal?.throwIfAborted();
+        const start = performance.now();
+        let next = job.next();
+        while (!next.done && performance.now() - start < 8) next = job.next();
+        if (next.done) { options.signal?.throwIfAborted(); return next.value; }
+        options.onProgress?.(next.value);
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    } finally { options.signal?.removeEventListener('abort', close); close(); }
+  }
+
+  private captureReplayState(time: number): ReplayState {
+    return { time, raceTime: this.raceTime, wet: this.wet, rainAt: Number.isFinite(this.rainAt) ? this.rainAt : null,
+      cars: this.racers.map((r) => ({ name: r.name, compound: r.compound, wear: r.wear,
+        pit: r.pit ? { ...r.pit } : null, lift: r.lift, energy: r.car.energy })) };
+  }
+  replayStateAt(time: number): ReplayState | null {
+    const i = Math.max(0, Math.min(this.replayStates.length - 1, Math.floor(time / 0.05)));
+    const state = this.replayStates[i];
+    if (!state) return null;
+    return { ...state, cars: state.cars.map((r) => ({ ...r, pit: r.pit ? { ...r.pit } : null })) };
+  }
+
+  /** 用回放那一刻的進站資料驅動維修人員；不讀寫車手最後的物理狀態。 */
+  replayStopsAt(time: number): Map<number, StopInfo> {
+    const stops = new Map<number, StopInfo>();
+    if (!Number.isFinite(time)) return stops;
+    const t = Math.max(0, time), state = this.replayStateAt(t);
+    if (!state) return stops;
+    const positions = new Map<string, { x: number; z: number }>();
+    this.replayAt(t, (r, x, z) => positions.set(r.name, { x, z }));
+    for (const c of state.cars) {
+      const p = c.pit;
+      if (!p || !(p.ph === 'box' || (p.ph === 'in' && p.box - p.sd < 140) || (p.ph === 'out' && p.sd - p.box < 6))) continue;
+      if (stops.get(p.team)?.phase === 'service') continue;
+      const r = this.racers.find((r) => r.name === c.name), pos = positions.get(c.name);
+      if (!r || !pos) continue;
+      const clear = !state.cars.some((o) => o.name !== c.name && o.pit && o.pit.ph === 'in' && o.pit.team !== p.team
+        && o.pit.sd > p.box - 12 && o.pit.sd < p.box + 2 && o.pit.box - o.pit.sd > 18);
+      const hold = p.ph === 'box' && p.t >= p.T;
+      const phase: StopInfo['phase'] = p.ph === 'in' ? 'approach' : p.ph === 'box' && p.t < p.T ? 'service' : 'release';
+      const go = p.ph === 'out' || (p.ph === 'box' && p.t >= p.T - 0.25 && clear);
+      stops.set(p.team, { phase: hold ? 'service' : phase, t: p.t, T: p.T, slow: p.slow,
+        newColor: TYRES[p.next].color, oldColor: TYRES[c.compound].color,
+        model: p.ph === 'box' ? (r.isPlayer ? this.playerModel : r.model) : null,
+        hold, go, lift: c.lift, x: pos.x, z: pos.z });
+    }
+    return stops;
+  }
+
   /** 每一步：AI 開車、尾流、碰撞、計圈。回傳玩家撞到別車的力道 */
   update(dt: number, racing: boolean): number {
     const t = this.t;
@@ -289,9 +435,10 @@ export class RaceField {
     if (racing) this.safetyCar(dt);
     // 尾流：前方 25 m 內、橫向 2.5 m 內有車 → 引擎多 5% 力
     for (const r of this.racers) {
+      if (this.completing && r.finish != null) continue;
       r.car.boost = 0;
       for (const o of this.racers) {
-        if (o === r) continue;
+        if (o === r || (this.completing && o.finish != null)) continue;
         let d = o.car.pos.s - r.car.pos.s;
         if (d < -t.length / 2) d += t.length;
         if (d > 3 && d < 25 && Math.abs(o.car.pos.lat - r.car.pos.lat) < 2.5) { r.car.boost = 0.05; break; }
@@ -299,6 +446,7 @@ export class RaceField {
     }
     // 輪胎磨耗 → 抓地力；DRS 偵測與開關；進站中的車停住
     for (const r of this.racers) {
+      if (this.completing && r.finish != null) continue;
       const c = r.car, ty = TYRES[r.compound];
       const onRain = r.compound === RAIN;
       if (racing && !r.pit) r.wear = Math.min(1, r.wear + ((c.v * dt) / t.length) * ty.wear * r.persona.tyre * (1 + Math.abs(c.steer) * 0.6) * (onRain ? 1 + 2 * (1 - this.wet) : 1));
@@ -330,11 +478,11 @@ export class RaceField {
       if (sd >= PIT.IN && sd < PIT.IN + 45) this.startPit(r);
     }
     for (const r of this.racers) {
-      if (r.isPlayer) continue;
+      if (r.isPlayer || (this.completing && r.finish != null)) continue;
       const c = r.car;
       if (!racing || r.pit) { if (!racing) c.update(dt, t, 0, true); continue; } // 起跑前停在格位；進站中的車上面處理過了
       const prevS = c.pos.s;
-      const { steer, brake } = this.drive(r, r.finish != null);
+      const { steer, brake } = this.drive(r, r.finish != null, dt);
       // AI：可以開 DRS 就開（2026：超車模式，電還夠才開）；輪胎磨太多、還有兩圈以上就準備進站
       if (r.drsOk && this.drsZoneAt(c.pos.s) >= 0 && !brake) { if (this.rules === '2026') { if (c.energy > 0.25) c.ovt = true; } else c.drs = true; }
       if (!r.pitReq && r.wear > 0.7 && this.laps - r.laps >= 1 && r.finish == null) r.pitReq = true;
@@ -356,11 +504,13 @@ export class RaceField {
       if (this.recAcc >= 0.05) {
         this.recAcc -= 0.05;
         for (const r of this.racers) r.rec.push(r.car.x, r.car.z, r.car.h, r.car.steer, r.car.v);
+        this.replayStates.push(this.captureReplayState(this.replayStates.length * 0.05));
       }
     }
     // ---- 車與車碰撞：前後兩個圓，同質量的動量交換（被撞的那台會被推開、車頭被撞歪）
     let playerHit = 0;
     for (let a = 0; a < this.racers.length; a++) for (let b = a + 1; b < this.racers.length; b++) {
+      if (this.completing && (this.racers[a].finish != null || this.racers[b].finish != null)) continue;
       const A = this.racers[a].car, B = this.racers[b].car;
       if (this.racers[a].pit || this.racers[b].pit) continue; // 在維修區裡的車不跟賽道上的車碰撞
       if (Math.abs(A.x - B.x) > 8 || Math.abs(A.z - B.z) > 8) continue;
@@ -387,7 +537,10 @@ export class RaceField {
   /** 領先者（還沒完賽、跑最遠的） */
   leader(): Racer {
     let best = this.racers[0], bp = -Infinity;
-    for (const r of this.racers) { const p = r.finish != null ? Infinity : this.progress(r); if (p > bp) { bp = p; best = r; } }
+    for (const r of this.racers) {
+      if (this.completing && (r.finish != null || r.dnf)) continue;
+      const p = r.finish != null ? Infinity : this.progress(r); if (p > bp) { bp = p; best = r; }
+    }
     return best;
   }
 
@@ -427,12 +580,13 @@ export class RaceField {
       for (const r of this.racers) {
         if (r.isPlayer) continue;
         const c = r.car;
+        c.resetTransient(this.rules === '2026');
         c.placeAt(t, 1);
         Object.assign(c, { gripMul: 1, boost: 0, drs: false, ovt: false, energy: 1, r26: this.rules === '2026', speedCap: Infinity });
-        r.lat = 0; r.stuck = 0;
+        r.lat = 0; r.stuck = 0; r.defT = 0;
         let time = 0, prevS = c.pos.s, finished = false;
         for (let n = 0; n < 150 / dt; n++) {
-          const { steer, brake } = this.drive(r, false);
+          const { steer, brake } = this.drive(r, false, dt);
           const zi = this.drsZoneAt(c.pos.s);
           c.aeroZone = zi >= 0;
           if (zi < 0) { c.drs = false; c.ovt = false; } else if (!brake) { if (c.r26) { if (c.energy > 0.1) c.ovt = true; } else c.drs = true; }
@@ -490,6 +644,8 @@ export class RaceField {
 
   private lapCheck(r: Racer, prevS: number) {
     const L = this.t.length, s = r.car.pos.s;
+    // 玩家每一步是在 field.update 之後才計圈，因此計時要與這裡一起記，避免過線瞬間差一圈。
+    this.observeTiming(r);
     if (!(prevS > L - 40 && s < 40)) return;
     if (r.laps >= 1 && this.raceTime - r.lapStart < 20) return; // 在起跑線附近被撞得前後來回：不重複計圈
     if (r.laps >= 1) {
@@ -499,6 +655,14 @@ export class RaceField {
     r.laps++;
     r.lapStart = this.raceTime;
     if (r.laps > this.laps && r.finish == null) r.finish = this.raceTime;
+    this.observeTiming(r);
+  }
+
+  private observeTiming(r: Racer) {
+    // 過線前 laps 尚未 +1，先保留前一取樣；過線後會再記正確的總距離。
+    const progress = this.progress(r), old = this.timing.progressOf(r.name);
+    if (old !== undefined && progress < old - this.t.length / 2) return;
+    this.timing.observe(r.name, progress, this.raceTime);
   }
 
   /** 車隊建議的下一套胎：濕地換雨胎、剩兩圈以內換軟胎、不然中性／硬胎輪著用 */
@@ -617,7 +781,7 @@ export class RaceField {
     if (this.solo) return Infinity;
     let best = Infinity;
     for (const o of this.racers) {
-      if (o === r || (o.pit && !r.pit)) continue; // 維修區裡的車不算前車
+      if (o === r || (o.pit && !r.pit) || (this.completing && o.finish != null)) continue; // 維修區裡的車不算前車
       let d = o.car.pos.s - r.car.pos.s;
       if (d < 0) d += this.t.length;
       if (d < best) best = d;
@@ -657,13 +821,13 @@ export class RaceField {
   }
   get replayLength() { return (this.me.rec.length / 5) * 0.05; }
 
-  private drive(r: Racer, cooldown: boolean) {
+  private drive(r: Racer, cooldown: boolean, dt: number) {
     const t = this.t, c = r.car, i = c.pos.i, N = t.N, P = r.persona;
     // 前方擋路的車：同一條線上、前面一段距離內（激進的看得遠、早一點開始找空檔）
     const range = 18 + 14 * P.aggr;
     let blocker: Racer | null = null, gap = Infinity, attacker: Racer | null = null, agap = Infinity;
     for (const o of this.racers) {
-      if (o === r || this.solo || o.pit) continue; // 維修區裡的車不會擋路
+      if (o === r || this.solo || o.pit || (this.completing && o.finish != null)) continue; // 維修區裡的車不會擋路
       let d = o.car.pos.s - c.pos.s;
       if (d < -t.length / 2) d += t.length;
       if (d > t.length / 2) d -= t.length;
@@ -677,11 +841,11 @@ export class RaceField {
     let want = cooldown ? Math.min(25, r.profile![ahead]) : r.profile![ahead] * Math.min(1.02, tyreK);
     // 激進型：跟前車並排纏鬥時晚煞車（多帶一點速度進彎，可能跑寬）
     if (blocker && P.aggr > 0.6 && gap < 10 && Math.abs(blocker.car.pos.lat - c.pos.lat) > 1.2) want += (P.aggr - 0.6) * 4;
-    r.defT = Math.max(0, r.defT - 1 / 120);
+    r.defT = Math.max(0, r.defT - dt);
     if (blocker && blocker.car.v < want + 1 + P.aggr * 2.3 && this.sc.phase === 'off') { // 安全車期間不超車
       // 換到比較空的一側超車（相對賽車線，不超出路面）
       const crowd = (side: number) => this.racers.reduce((n, o) => {
-        if (o === r || o === blocker) return n;
+        if (o === r || o === blocker || (this.completing && o.finish != null)) return n;
         let d = o.car.pos.s - c.pos.s;
         if (d < -t.length / 2) d += t.length;
         return n + (Math.abs(d) < 15 && Math.abs(o.car.pos.lat - side) < 2.2 ? 1 : 0);
@@ -694,7 +858,7 @@ export class RaceField {
       const side = attacker.car.pos.lat - this.line[i];
       if (Math.abs(side - r.lat) > 1.2) { r.lat = Math.max(-2.6, Math.min(2.6, side)) * P.defend; r.defT = 3; }
     } else if (!blocker && r.defT <= 0) {
-      r.lat += (0 - r.lat) * Math.min(1, 0.8 / 120); // 沒人擋：慢慢回到賽車線
+      r.lat += (0 - r.lat) * Math.min(1, dt === 1 / 120 ? 0.8 / 120 : 0.8 * dt); // 固定回歸保留原算式
     }
     const j = (i + Math.round((8 + c.v * this.look) / t.ds)) % N;
     const off = Math.max(-(HALF_WIDTH - 1.3), Math.min(HALF_WIDTH - 1.3, this.line[j] + r.lat));
@@ -706,7 +870,7 @@ export class RaceField {
     // 跟車距離：激進的貼得近、穩健的留多一點
     if (blocker && gap < 7.29 - 3 * P.aggr + c.v * (0.1415 - 0.05 * P.aggr) && Math.abs(blocker.car.pos.lat - c.pos.lat) < 1.8 && c.v > blocker.car.v - 1) brake = true;
     // 卡住太久（撞牆停住）就自動扶正
-    r.stuck = c.v < 2 ? r.stuck + 1 / 120 : 0;
+    r.stuck = c.v < 2 ? r.stuck + dt : 0;
     if (r.stuck > 3) { c.placeAt(t, i); r.stuck = 0; }
     const steer = -err * 2.6;
     return { steer: Math.max(-1, Math.min(1, steer)), brake };
@@ -747,7 +911,7 @@ export class RaceField {
 
 /** 每台車比賽開始時的狀態 */
 function fresh() {
-  return { laps: 0, finish: null, lapStart: 0, bestLap: null, lat: 0, stuck: 0, crashAt: -99, slowT: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pit: null as PitState | null, pitTyre: -1, lift: 0, lastStop: 0, pits: 0, drsOk: false, rec: [] as number[] };
+  return { laps: 0, finish: null, dnf: false, lapStart: 0, bestLap: null, lat: 0, stuck: 0, crashAt: -99, slowT: 0, defT: 0, compound: 1, wear: 0, pitReq: false, pit: null as PitState | null, pitTyre: -1, lift: 0, lastStop: 0, pits: 0, drsOk: false, rec: [] as number[] };
 }
 
 /**

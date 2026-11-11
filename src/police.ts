@@ -4,6 +4,7 @@ import { groundH, type Collider, type RoadNet } from './citydata';
 import type { Router } from './router';
 import type { Traffic } from './traffic';
 import { buildPlayerVehicle, vehicleById, type PlayerVehicle } from './vehicles';
+import { sameRoadLevel } from './mission';
 
 // 警察追逐（GTA 風）：撞車、撞人、闖紅燈、撞警車會累積通緝（最多 5 星），星數越多警車越多越快；
 // 警車照路網追過來，近了直接衝撞；停在警車旁邊 3 秒＝被逮捕（罰款）；離所有警車夠遠撐 7 秒＝甩掉（LOSE_DIST／LOSE_TIME）。
@@ -88,6 +89,12 @@ export class Police {
   suspect: Unit | null = null;
   suspectHp = 0;
   pursuitT = 0; // 追緝剩幾秒
+  suspectDistance = Infinity;
+  nearestGroundCop = Infinity;
+  seenByHeli = false;
+  lastPursuitReason: 'arrested' | 'distance' | 'timeout' | 'cancelled' | null = null;
+  get arrestProgress() { return this.suspect ? Math.max(0, Math.min(1, this.arrestT)) : 0; }
+  get escapeIn() { return this.suspect ? Math.max(0, 8 - this.escapeT) : 0; }
   suspectBumps = 0; suspectOverlap = 0; // 測試統計
   private arrestT = 0;
   private escapeT = 0;
@@ -157,6 +164,7 @@ export class Police {
     this.blocks = [];
     this.heli.on = false;
     this.heliVol = 0;
+    this.nearestGroundCop = Infinity; this.seenByHeli = false;
   }
 
   private removeBlock(b: Roadblock) {
@@ -204,6 +212,8 @@ export class Police {
     this.suspect = { car, pv: this.suspectPv, path: null, repath: 0, stuck: 0, reverse: 0 };
     this.suspectHp = 100;
     this.pursuitT = 180; this.arrestT = 0; this.escapeT = 0;
+    this.suspectDistance = Math.hypot(car.x - p.x, car.z - p.z);
+    this.lastPursuitReason = null;
     this.pickGoal(this.suspect, p);
     return '🎯 嫌犯出現！撞到它停下來';
   }
@@ -283,7 +293,7 @@ export class Police {
     let msg: string | null = null, money = 0;
     this.crashCool = Math.max(0, this.crashCool - dt);
     // 闖紅燈：開進號誌路口那一刻是紅燈、速度夠快
-    const copNear = this.units.some((u) => Math.hypot(u.car.x - p.x, u.car.z - p.z) < 15); // 被警車撞進路口不算闖紅燈
+    const copNear = this.units.some((u) => sameRoadLevel(u.car, p) && Math.hypot(u.car.x - p.x, u.car.z - p.z) < 15); // 被警車撞進路口不算闖紅燈
     if (crimesOn && traffic && !this.suspect) {
       const s = traffic.signalAt(p.x, p.z, Math.sin(p.h), Math.cos(p.h), p.y); // 在高架上不受底下路口的燈號管
       if (s && s.id !== this.lastSignal && s.red && p.v > 8 && !copNear) msg = this.crime(0.6, '闖紅燈') ?? msg;
@@ -310,13 +320,16 @@ export class Police {
       }
       const vmax = 22 + this.stars * 2; // 1 星約 86 km/h、5 星約 115 km/h
       let nearest = Infinity;
+      let arrestNearest = Infinity;
+      this.seenByHeli = false;
       for (const u of this.units) {
         const d = Math.hypot(u.car.x - p.x, u.car.z - p.z);
-        nearest = Math.min(nearest, d + Math.abs(u.car.y - p.y) * 4); // 橋下的警車抓不到橋上的人
+        const sameLevel = sameRoadLevel(u.car, p);
+        if (sameLevel) { nearest = Math.min(nearest, d); arrestNearest = Math.min(arrestNearest, d); }
         // 近了直接衝撞（往玩家前面一點的位置）
         const lead = Math.min(0.6, d / 40);
         // 遠的時候全速追、35 m 內直接衝過來、12 m 內放慢貼著你（逼停，不要一直把人撞飛）
-        this.drive(u, p.x + p.vx * lead, p.z + p.vz * lead, vmax, dt, col, d < 35, d < 12 ? Math.abs(p.v) + 3 : Infinity, traffic, p.y); // 玩家在高架上：路線從匝道追上去
+        this.drive(u, p.x + p.vx * lead, p.z + p.vz * lead, vmax, dt, col, sameLevel && d < 35, sameLevel && d < 12 ? Math.abs(p.v) + 3 : Infinity, traffic, p.y); // 不同路層必須沿路線經匝道抵達
         if (traffic) traffic.collidePlayer(u.car); // 警車也會把車流撞開
         // 撞警車：只算玩家主動撞過去（朝著警車、而且比它快）
         const tx = u.car.x - p.x, tz = u.car.z - p.z, tl = Math.hypot(tx, tz) || 1;
@@ -333,12 +346,15 @@ export class Police {
         for (const c of b.cops) {
           c.car.update(dt, 0, false, true, col); // 停著（被撞會被推動）
           bumpCars(p, c.car);
-          nearest = Math.min(nearest, Math.hypot(c.car.x - p.x, c.car.z - p.z));
+          if (sameRoadLevel(c.car, p)) {
+            const d = Math.hypot(c.car.x - p.x, c.car.z - p.z);
+            nearest = Math.min(nearest, d); arrestNearest = Math.min(arrestNearest, d);
+          }
         }
         for (const r of b.bars) {
           if (!r.hit) {
             const d = Math.hypot(r.x - p.x, r.z - p.z);
-            if (d < 2.2 && Math.abs(p.v) > 1) {
+            if (d < 2.2 && sameRoadLevel(p, r) && Math.abs(p.v) > 1) {
               // 撞到拒馬：飛出去翻滾，車子被擋一下
               r.hit = true;
               r.vx = p.vx * 0.9 + (r.x - p.x) * 2; r.vz = p.vz * 0.9 + (r.z - p.z) * 2; r.vy = 4 + Math.abs(p.v) * 0.25; r.spin = (Math.random() - 0.5) * 12;
@@ -365,7 +381,8 @@ export class Police {
         H.x += H.vx * dt; H.z += H.vz * dt;
         if (Math.hypot(H.vx, H.vz) > 2) H.h = Math.atan2(H.vx, H.vz);
         const hd = Math.hypot(H.x - p.x, H.z - p.z);
-        if (hd < 70) nearest = Math.min(nearest, 0); // 被直升機照到＝被看到
+        this.seenByHeli = hd < 70 && p.deck?.way.e !== 2;
+        if (this.seenByHeli) nearest = 0; // 目視只影響搜索，不可作為地面逮捕距離
         this.heliVol = Math.max(0, 1 - hd / 400);
       }
       // 太遠的警車收掉（之後會在附近重新出現）
@@ -374,7 +391,8 @@ export class Police {
       if ((this.units.length || this.blocks.length || this.heli.on) && nearest > LOSE_DIST) this.lostT += dt; else this.lostT = 0; // 警車還沒出現時不算甩開
       if (this.lostT > LOSE_TIME) { this.clear(); msg = '😎 甩掉警察了！'; }
       // 被逮捕：警車在旁邊、自己停住
-      if (nearest < 9 && Math.hypot(p.vx, p.vz) < 4) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt * 2);
+      this.nearestGroundCop = arrestNearest;
+      if (arrestNearest < 9 && Math.hypot(p.vx, p.vz) < 4) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt * 2);
       if (this.bustT > BUST_TIME) {
         const fine = 200 * this.stars;
         this.clear();
@@ -388,6 +406,7 @@ export class Police {
     if (s) {
       this.pursuitT -= dt;
       const d = Math.hypot(s.car.x - p.x, s.car.z - p.z);
+      this.suspectDistance = d;
       if (this.suspectHp > 0) {
         if (!s.goal || Math.hypot(s.goal[0] - s.car.x, s.goal[1] - s.car.z) < 40) this.pickGoal(s, p);
         const hurt = this.suspectHp < 50 ? 0.5 + this.suspectHp / 100 : 1; // 耐久剩一半以下：越來越慢
@@ -402,24 +421,26 @@ export class Police {
       const hit = bumpCars(p, s.car);
       if (hit > 2) this.suspectHp = Math.max(0, this.suspectHp - hit * 9); // 玩家撞它
       // 逮捕：嫌犯停下來（撞壞或被逼停）、警車貼在旁邊
-      if (d < 12 && Math.abs(s.car.v) < 3) this.arrestT += dt; else this.arrestT = Math.max(0, this.arrestT - dt);
+      if (d < 12 && sameRoadLevel(s.car, p) && Math.abs(s.car.v) < 3) this.arrestT += dt; else this.arrestT = Math.max(0, this.arrestT - dt);
       if (d > 450) this.escapeT += dt; else this.escapeT = 0;
       if (this.arrestT > 1) {
         const reward = 400 + Math.round(Math.max(0, this.pursuitT) * 2);
         money = reward;
         msg = `✅ 逮捕嫌犯！獎金 NT$ ${reward}`;
-        this.endPursuit();
+        this.endPursuit('arrested');
       } else if (this.escapeT > 8 || this.pursuitT <= 0) {
-        msg = '💨 嫌犯跑掉了…';
-        this.endPursuit();
+        msg = this.pursuitT <= 0 ? '💨 追緝超時，嫌犯逃脫（180 秒內未完成逮捕）' : '💨 跟丟嫌犯（距離超過 450 m 持續 8 秒）';
+        this.endPursuit(this.pursuitT <= 0 ? 'timeout' : 'distance');
       }
     }
     return { msg, money };
   }
 
-  endPursuit() {
+  endPursuit(reason: 'arrested' | 'distance' | 'timeout' | 'cancelled' = 'cancelled') {
+    if (this.suspect) this.lastPursuitReason = reason;
     if (this.suspect) this.suspect.pv.model.root.visible = false;
     this.suspect = null;
+    this.suspectDistance = Infinity; this.arrestT = 0; this.escapeT = 0;
   }
 
   /** 畫面：警車與嫌犯車的位置、車輪、警示燈 */

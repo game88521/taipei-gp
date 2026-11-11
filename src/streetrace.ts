@@ -9,6 +9,8 @@ const RIVAL_TEAM: Record<string, number> = { 阿翔: 1, 小美: 5, 黑豹: 7, �
 import type { Traffic } from './traffic';
 import { FreeCar } from './freecar';
 import { TOWER_101 } from './track';
+import { ROAD_Y } from './surface';
+import { sameRoadLevel, streetRecordKey } from './mission';
 
 // 開放街道上的比賽：照真實道路規劃路線，沿路要依序穿過檢查點，路上照樣有車流和紅綠燈
 // - 自由駕駛的「挑戰」：開到光柱停下來接受，跟 1 位對手單挑
@@ -81,7 +83,7 @@ export interface Rival {
   blockedFor: number;
   stunned: number;
   done: number | null;
-  pos: { x: number; z: number; h: number; v: number };
+  pos: { x: number; z: number; y: number; h: number; v: number };
   model: CarModel;
   // 被撞開：偏離路線的位移與速度、車頭偏轉與轉速（輪胎摩擦會讓它停下，之後慢慢開回路線）
   ox: number; oz: number; ovx: number; ovz: number; oh: number; ow: number;
@@ -239,11 +241,13 @@ export class StreetRace {
   // 舊介面（單挑時只有一位對手）
   get rivalDone() { return this.rivals[0]?.done ?? null; }
   get rivalS() { return this.rivals[0]?.s ?? 0; }
+  get recordKey() { return this.active ? streetRecordKey(this.active.def.id, this.duel) : null; }
+  get validFinish() { return this.playerDone != null && Number.isFinite(this.playerDone); }
 
   /** 玩家在挑戰點停下來 → 提出挑戰 */
-  checkOffer(px: number, pz: number, v: number): Challenge | null {
+  checkOffer(px: number, pz: number, v: number, py?: number): Challenge | null {
     if (this.phase !== 'idle' && this.phase !== 'offer') return null;
-    const c = this.challenges.find((q) => Math.hypot(q.start.x - px, q.start.z - pz) < 9) ?? null;
+    const c = this.challenges.find((q) => Math.hypot(q.start.x - px, q.start.z - pz) < 9 && sameRoadLevel({ x: px, z: pz, y: py }, q.start)) ?? null;
     this.offered = c && Math.abs(v) < 4 ? c : null;
     this.phase = this.offered ? 'offer' : 'idle';
     return this.offered;
@@ -271,7 +275,7 @@ export class StreetRace {
       const model = this.modelFor(name);
       const color = TEAMS[RIVAL_TEAM[name] ?? 1].livery.main;
       model.root.visible = true;
-      const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
+      const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, y: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
       this.placeRival(r);
       return r;
     });
@@ -310,6 +314,7 @@ export class StreetRace {
     const [x, z, h] = this.at(r.s);
     r.pos.x = x - Math.cos(h) * r.lat + r.ox;
     r.pos.z = z + Math.sin(h) * r.lat + r.oz;
+    r.pos.y = groundH(r.pos.x, r.pos.z) + ROAD_Y;
     r.pos.h = h + r.oh;
     r.pos.v = r.v;
   }
@@ -332,7 +337,7 @@ export class StreetRace {
   }
 
   /** 每一步；回傳要顯示的事件文字（倒數、檢查點、勝負），沒有就回傳 null */
-  update(dt: number, player: { x: number; z: number; h: number; v: number }, traffic: Traffic | null): string | null {
+  update(dt: number, player: { x: number; z: number; y?: number; h: number; v: number }, traffic: Traffic | null): string | null {
     const c = this.active;
     if (!c) return null;
     if (this.phase === 'count') {
@@ -357,7 +362,7 @@ export class StreetRace {
     // ---- 玩家過檢查點（名次用的進度不能超過下一個檢查點，抄近路不算領先）
     if (this.playerDone == null) {
       const cp = c.path[c.checkpoints[this.next]];
-      if (Math.hypot(player.x - cp[0], player.z - cp[1]) < 11) {
+      if (Math.hypot(player.x - cp[0], player.z - cp[1]) < 11 && sameRoadLevel(player, { x: cp[0], z: cp[1] })) {
         this.next++;
         if (this.next >= c.checkpoints.length) {
           this.playerDone = this.time;
@@ -376,7 +381,7 @@ export class StreetRace {
   }
 
   /** 對手：沿路線開，前面有車（車流、玩家、其他對手）就換車道或減速，不理紅綠燈 */
-  private driveRival(r: Rival, dt: number, player: { x: number; z: number; v: number }, traffic: Traffic | null) {
+  private driveRival(r: Rival, dt: number, player: { x: number; z: number; y?: number; v: number }, traffic: Traffic | null) {
     const c = this.active!;
     const fi = c.cum.findIndex((q) => q >= r.s + r.v * 1.2);
     let want = Math.min(r.top, c.vmax[fi < 0 ? c.vmax.length - 1 : fi] * r.corner);
@@ -390,8 +395,8 @@ export class StreetRace {
         const side = -dx * fz + dz * fx; // 右正
         if (ahead > 0 && ahead < look && Math.abs(side - (lat - r.lat)) < 1.6 && ahead < gap) { gap = ahead; v = ov; }
       };
-      for (const o of others) check(o.x, o.z, o.v);
-      check(player.x, player.z, player.v);
+      for (const o of others) if (sameRoadLevel(r.pos, o)) check(o.x, o.z, o.v);
+      if (sameRoadLevel(r.pos, player)) check(player.x, player.z, player.v);
       for (const q of this.rivals) if (q !== r && q.done == null) check(q.pos.x, q.pos.z, q.v);
       return { gap, v };
     };
@@ -418,7 +423,7 @@ export class StreetRace {
     if (!this.active || this.phase !== 'race') return 0;
     let hit = 0;
     for (const r of this.rivals) {
-      if (r.done != null || Math.abs(p.x - r.pos.x) > 8 || Math.abs(p.z - r.pos.z) > 8) continue;
+      if (r.done != null || Math.abs(p.x - r.pos.x) > 8 || Math.abs(p.z - r.pos.z) > 8 || !sameRoadLevel(p, r.pos)) continue;
       const fx = Math.sin(r.pos.h), fz = Math.cos(r.pos.h);
       // 兩台車各用三個圓：玩家照剛體彈開，對手被推往旁邊、掉速
       for (const [px, pz] of p.circles()) for (const o of [1.45, 0, -1.45]) {
@@ -462,6 +467,13 @@ export class StreetRace {
       if (fa) return -1;
       if (fb) return 1;
       return b.prog - a.prog;
+    }).map((row) => {
+      const finished = row.done != null && Number.isFinite(row.done);
+      const status: 'finished' | 'estimated' | 'racing' | 'dnf' = finished ? 'finished' : row.isPlayer && row.done === Infinity ? 'dnf' : this.phase === 'done' ? 'estimated' : 'racing';
+      const rival = this.rivals.find((r) => r.name === row.name);
+      const estimatedTime = status === 'estimated' && rival && this.active
+        ? this.time + Math.max(0, this.active.length - rival.s) / Math.max(8, rival.v) : null;
+      return { ...row, status, estimatedTime };
     });
   }
 
@@ -471,7 +483,7 @@ export class StreetRace {
     for (const r of this.rivals) {
       const m = r.model;
       m.root.visible = show && (r.done == null || this.duel);
-      m.root.position.set(r.pos.x, groundH(r.pos.x, r.pos.z) - 0.25, r.pos.z);
+      m.root.position.set(r.pos.x, r.pos.y, r.pos.z);
       m.root.rotation.y = r.pos.h;
       for (const w of m.spin) w.rotation.x += (r.v / 0.33) * dt;
     }
@@ -488,7 +500,7 @@ export class StreetRace {
   }
   private orient(r: THREE.Mesh, c: Challenge, i: number) {
     const a = c.path[Math.max(0, i - 1)], b = c.path[Math.min(c.path.length - 1, i + 1)];
-    r.position.set(c.path[i][0], 5.5, c.path[i][1]);
+    r.position.set(c.path[i][0], groundH(c.path[i][0], c.path[i][1]) + 5.5, c.path[i][1]);
     r.rotation.set(0, Math.atan2(b[0] - a[0], b[1] - a[1]), 0);
   }
 

@@ -3,6 +3,8 @@
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 
 export class Input {
+  /** main 接上駕駛狀態；選單、地圖或教學覆蓋層不攔截鍵盤。 */
+  isDriving: () => boolean = () => true;
   tilt = false;
   /** 傾斜轉向：反過來（有些手機方向相反）、中立角度（按「校正」時記下的角度，握著不轉 = 這個角度）、死區（角度小於這個不轉） */
   tiltInvert = false;
@@ -98,7 +100,12 @@ export class Input {
     gasBtn.addEventListener('pointercancel', gasEnd);
     gasBtn.addEventListener('lostpointercapture', gasEnd);
 
-    addEventListener('keydown', (e) => { this.keys.add(e.code); if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); });
+    addEventListener('keydown', (e) => {
+      const target = e.target;
+      if (!this.isDriving() || e.defaultPrevented || e.isComposing || isInteractiveTarget(target)) { this.keys.clear(); return; }
+      this.keys.add(e.code);
+      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+    });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     const reset = () => {
       this.keys.clear();
@@ -139,6 +146,7 @@ export class Input {
   }
 
   read() {
+    if (!this.isDriving()) this.keys.clear();
     const k = this.keys;
     let steer = 0;
     if (k.has('ArrowLeft') || k.has('KeyA')) steer -= 1;
@@ -153,4 +161,9 @@ export class Input {
     const handbrake = this.driftIds.size > 0 || k.has('ShiftLeft') || k.has('ShiftRight'); // 甩尾
     return { steer, brake, throttle, handbrake };
   }
+}
+
+/** 包含自訂互動元件與其子元素；不把正在操作選單的按鍵當成油門。 */
+export function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && !!target.closest('input,select,textarea,button,summary,a[href],[contenteditable]:not([contenteditable="false"]),[role="button"],[role="slider"],[role="combobox"],[role="textbox"]');
 }

@@ -1,0 +1,1070 @@
+{
+  "baseline": "feaa6ff0b2e2cd44ca1eae85a46c04e8126607aa",
+  "verifiedAt": "2026-11-11T03:35:38.913Z",
+  "build": "99f984fced89",
+  "productSourceHash": "5f969a4489ac3605540799d4186c5bdcd8523e2f304928abdf3d18b457f48a6f",
+  "buildPassed": true,
+  "nodeSuites": {
+    "startedAt": "2026-11-11T03:27:07.007Z",
+    "completedAt": "2026-11-11T03:27:36.180Z",
+    "sourceHash": "5f969a4489ac3605540799d4186c5bdcd8523e2f304928abdf3d18b457f48a6f",
+    "sourceUnchangedDuringTests": true,
+    "baseline": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-priority-before-20261111",
+    "results": [
+      {
+        "name": "mission-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-platform-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "racing-state-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-racing-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "identity-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "economy-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "leaderboard-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "static-ui-contract",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-economy-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "route-preview-audit",
+        "code": 0,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "limitations": [
+      "隔離程式與本機HTTP測試，不代表手機實機或正式Redis",
+      "瀏覽器與固定三回歸另行執行"
+    ]
+  },
+  "fixedRegressions": {
+    "status": "PASS",
+    "count": 3,
+    "log": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n"
+  },
+  "browserUI": {
+    "url": "http://127.0.0.1:4317/?q=low&notraffic",
+    "realPhone": false,
+    "browser": "使用者啟動的 Chrome，CDP 獨立 context",
+    "cases": [
+      {
+        "name": "烤漆試色／取消不扣款，確認套用才扣款並保存",
+        "status": "PASS",
+        "details": {
+          "beforeMoney": 10000,
+          "afterMoney": 9700,
+          "paint": "#1b1c20"
+        }
+      },
+      {
+        "name": "備份有效→無效預覽不會誤寫；undo僅預覽",
+        "status": "PASS"
+      },
+      {
+        "name": "烤漆購買後直接切紀錄立即顯示300支出",
+        "status": "PASS",
+        "details": {
+          "summary": "最近 1 筆：收入 NT$ 0、支出 NT$ 300、淨額 NT$ -300烤漆購買：1 次，收入 0／支出 300，平均每次淨額 NT$ -300"
+        }
+      },
+      {
+        "name": "手機直向與橫向車庫／備份無水平溢出，新增按鈕至少44px",
+        "status": "PASS"
+      },
+      {
+        "name": "設定select的方向鍵不被駕駛攔截",
+        "status": "PASS",
+        "details": [
+          {
+            "code": "ArrowDown",
+            "prevented": false
+          }
+        ]
+      },
+      {
+        "name": "計程車行程明細可用空白鍵展開，HUD更新不重建details",
+        "status": "PASS",
+        "details": {
+          "sameNode": true,
+          "open": true,
+          "summaryHeight": 44,
+          "hud": {
+            "left": 211,
+            "right": 633,
+            "bottom": 191.59375
+          },
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "結算面板短螢幕可捲動，離開與重試控制可達",
+        "status": "PASS",
+        "details": {
+          "card": {
+            "top": 101.296875,
+            "bottom": 288.6875
+          },
+          "height": 390,
+          "overflow": "auto",
+          "buttons": [
+            {
+              "id": "gp-settle-retry",
+              "height": 44,
+              "width": 406,
+              "top": 179.6875,
+              "bottom": 223.6875
+            },
+            {
+              "id": "gp-settle-exit",
+              "height": 44,
+              "width": 406,
+              "top": 231.6875,
+              "bottom": 275.6875
+            }
+          ]
+        }
+      },
+      {
+        "name": "甩尾練習提示在直向／橫向不覆蓋駕駛控制，可收合及結束",
+        "status": "PASS",
+        "details": [
+          {
+            "width": 844,
+            "height": 390,
+            "coach": {
+              "id": "drift-coach",
+              "left": 211,
+              "right": 633,
+              "top": 195.59375,
+              "bottom": 380.15625,
+              "width": 422,
+              "height": 184.5625
+            },
+            "controls": [
+              {
+                "id": "steer-btns",
+                "left": 14,
+                "right": 200,
+                "top": 288,
+                "bottom": 376,
+                "width": 186,
+                "height": 88
+              },
+              {
+                "id": "gas",
+                "left": 734,
+                "right": 830,
+                "top": 148,
+                "bottom": 244,
+                "width": 96,
+                "height": 96
+              },
+              {
+                "id": "brake",
+                "left": 738,
+                "right": 830,
+                "top": 284,
+                "bottom": 376,
+                "width": 92,
+                "height": 92
+              },
+              {
+                "id": "btn-drift",
+                "left": 644,
+                "right": 698,
+                "top": 250,
+                "bottom": 304,
+                "width": 54,
+                "height": 54
+              },
+              {
+                "id": "btn-horn",
+                "left": 644,
+                "right": 698,
+                "top": 172,
+                "bottom": 226,
+                "width": 54,
+                "height": 54
+              }
+            ],
+            "text": "○ 速度 0 km/h（需超過 33）\n○ 側滑角 0°（需約 13–80°）\n按住 🌀／Shift 配合轉彎；達標累積後放開，維持 2 秒不撞擊即可入帳。"
+          },
+          {
+            "width": 390,
+            "height": 844,
+            "coach": {
+              "id": "drift-coach",
+              "left": 97.5,
+              "right": 292.5,
+              "top": 281.390625,
+              "bottom": 506.234375,
+              "width": 195,
+              "height": 224.84375
+            },
+            "controls": [
+              {
+                "id": "steer-btns",
+                "left": 14,
+                "right": 213.79998779296875,
+                "top": 736.4000244140625,
+                "bottom": 830,
+                "width": 199.79998779296875,
+                "height": 93.5999755859375
+              },
+              {
+                "id": "gas",
+                "left": 268,
+                "right": 376,
+                "top": 603.203125,
+                "bottom": 711.203125,
+                "width": 108,
+                "height": 108
+              },
+              {
+                "id": "brake",
+                "left": 282.3999938964844,
+                "right": 376,
+                "top": 736.4000244140625,
+                "bottom": 830,
+                "width": 93.60000610351562,
+                "height": 93.5999755859375
+              },
+              {
+                "id": "btn-drift",
+                "left": 201.4031219482422,
+                "right": 257.203125,
+                "top": 655.4031372070312,
+                "bottom": 711.203125,
+                "width": 55.80000305175781,
+                "height": 55.79998779296875
+              },
+              {
+                "id": "btn-horn",
+                "left": 201.4031219482422,
+                "right": 257.203125,
+                "top": 585.2000122070312,
+                "bottom": 641,
+                "width": 55.80000305175781,
+                "height": 55.79998779296875
+              }
+            ],
+            "text": "○ 速度 0 km/h（需超過 33）\n○ 側滑角 0°（需約 13–80°）\n按住 🌀／Shift 配合轉彎；達標累積後放開，維持 2 秒不撞擊即可入帳。"
+          }
+        ]
+      },
+      {
+        "name": "街頭單挑邀請與多人對決路線圖在手機尺寸不溢出",
+        "status": "PASS",
+        "details": {
+          "single": {
+            "left": 58.5,
+            "right": 331.5,
+            "width": 390,
+            "svgWidth": 160,
+            "role": "img",
+            "label": "市府衝 101 路線預覽，2 處急彎；綠點起跑、紅點終點"
+          },
+          "multi": {
+            "count": 8,
+            "challenges": 8,
+            "left": 39,
+            "right": 351,
+            "width": 390,
+            "client": 312,
+            "scroll": 312
+          }
+        }
+      }
+    ],
+    "exceptions": [],
+    "layouts": [
+      {
+        "width": 390,
+        "height": 844,
+        "tab": "garage",
+        "documentWidth": 390,
+        "client": 390,
+        "scroll": 390,
+        "buttons": [
+          {
+            "id": "car-use",
+            "width": 320,
+            "height": 52
+          },
+          {
+            "id": "原廠色：已擁有，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "曜石黑：已擁有，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "銀灰：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "緋紅：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "橘：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "金黃：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "萊姆綠：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "海藍：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "紫：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "粉紅：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          }
+        ]
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "tab": "records",
+        "documentWidth": 390,
+        "client": 390,
+        "scroll": 390,
+        "buttons": [
+          {
+            "id": "bk-copy",
+            "width": 160,
+            "height": 44
+          },
+          {
+            "id": "bk-save",
+            "width": 160,
+            "height": 44
+          },
+          {
+            "id": "bk-undo",
+            "width": 160,
+            "height": 44
+          }
+        ]
+      },
+      {
+        "width": 844,
+        "height": 390,
+        "tab": "garage",
+        "documentWidth": 844,
+        "client": 686,
+        "scroll": 686,
+        "buttons": [
+          {
+            "id": "car-use",
+            "width": 307.34375,
+            "height": 44
+          },
+          {
+            "id": "原廠色：已擁有，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "曜石黑：已擁有，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "銀灰：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "緋紅：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "橘：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "金黃：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "萊姆綠：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "海藍：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "紫：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          },
+          {
+            "id": "粉紅：NT$ 300，點選試色",
+            "width": 44,
+            "height": 44
+          }
+        ]
+      },
+      {
+        "width": 844,
+        "height": 390,
+        "tab": "records",
+        "documentWidth": 844,
+        "client": 686,
+        "scroll": 686,
+        "buttons": [
+          {
+            "id": "bk-copy",
+            "width": 150,
+            "height": 44
+          },
+          {
+            "id": "bk-save",
+            "width": 150,
+            "height": 44
+          },
+          {
+            "id": "bk-undo",
+            "width": 150,
+            "height": 44
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "passed": 9,
+      "failed": 0
+    }
+  },
+  "browserHumanGP": {
+    "url": "http://127.0.0.1:4317/?q=low&notraffic",
+    "cases": [
+      {
+        "name": "UI關排位啟動非BOT GP，正常倒數進入race",
+        "status": "PASS",
+        "details": {
+          "state": "race",
+          "quali": false,
+          "query": "?q=low&notraffic",
+          "kind": "gp",
+          "tyres": 22
+        }
+      },
+      {
+        "name": "真step衝線走human背景結算；後方車手真完賽，僅發一次獎金",
+        "status": "PASS",
+        "details": {
+          "prepared": {
+            "state": "settling",
+            "steps": 11,
+            "before": [
+              {
+                "name": "陳冠宇",
+                "finish": null,
+                "s": 3048.689208984375
+              },
+              {
+                "name": "林志豪",
+                "finish": null,
+                "s": 3040.687255859375
+              },
+              {
+                "name": "王柏翰",
+                "finish": null,
+                "s": 3032.685546875
+              },
+              {
+                "name": "張家瑋",
+                "finish": null,
+                "s": 3024.68359375
+              },
+              {
+                "name": "李承恩",
+                "finish": null,
+                "s": 3016.681884765625
+              },
+              {
+                "name": "黃子軒",
+                "finish": null,
+                "s": 3008.68017578125
+              },
+              {
+                "name": "吳俊傑",
+                "finish": null,
+                "s": 3000.67822265625
+              },
+              {
+                "name": "劉宇翔",
+                "finish": null,
+                "s": 2992.676513671875
+              },
+              {
+                "name": "蔡明哲",
+                "finish": null,
+                "s": 2984.674560546875
+              },
+              {
+                "name": "楊凱文",
+                "finish": null,
+                "s": 2976.6728515625
+              },
+              {
+                "name": "許書豪",
+                "finish": null,
+                "s": 2968.671142578125
+              },
+              {
+                "name": "鄭宇辰",
+                "finish": null,
+                "s": 2960.669189453125
+              },
+              {
+                "name": "謝承翰",
+                "finish": null,
+                "s": 2952.66748046875
+              },
+              {
+                "name": "郭彥廷",
+                "finish": null,
+                "s": 2944.66552734375
+              },
+              {
+                "name": "洪志明",
+                "finish": null,
+                "s": 2936.663818359375
+              },
+              {
+                "name": "曾柏宇",
+                "finish": null,
+                "s": 2928.661865234375
+              },
+              {
+                "name": "邱冠廷",
+                "finish": null,
+                "s": 2920.66015625
+              },
+              {
+                "name": "廖哲瑋",
+                "finish": null,
+                "s": 2912.658447265625
+              },
+              {
+                "name": "賴俊宏",
+                "finish": null,
+                "s": 2904.656494140625
+              },
+              {
+                "name": "周家豪",
+                "finish": null,
+                "s": 2896.65478515625
+              },
+              {
+                "name": "葉子豪",
+                "finish": null,
+                "s": 2888.65283203125
+              }
+            ],
+            "playerFinish": 150.09166666666658,
+            "money": 2500
+          },
+          "state": "podium",
+          "settlement": {
+            "calls": 1,
+            "progress": [
+              {
+                "completed": 0,
+                "total": 21,
+                "elapsed": 0.9999999999990905
+              },
+              {
+                "completed": 2,
+                "total": 21,
+                "elapsed": 1.999999999998181
+              },
+              {
+                "completed": 7,
+                "total": 21,
+                "elapsed": 2.9999999999972715
+              },
+              {
+                "completed": 12,
+                "total": 21,
+                "elapsed": 3.999999999996362
+              },
+              {
+                "completed": 19,
+                "total": 21,
+                "elapsed": 5.999999999994543
+              }
+            ],
+            "done": true
+          },
+          "completed": [
+            {
+              "name": "陳冠宇",
+              "finish": 151.83333333333167,
+              "dnf": false
+            },
+            {
+              "name": "林志豪",
+              "finish": 151.98333333333153,
+              "dnf": false
+            },
+            {
+              "name": "王柏翰",
+              "finish": 152.1333333333314,
+              "dnf": false
+            },
+            {
+              "name": "張家瑋",
+              "finish": 152.3333333333312,
+              "dnf": false
+            },
+            {
+              "name": "李承恩",
+              "finish": 152.54999999999768,
+              "dnf": false
+            },
+            {
+              "name": "黃子軒",
+              "finish": 152.76666666666415,
+              "dnf": false
+            },
+            {
+              "name": "吳俊傑",
+              "finish": 152.92499999999734,
+              "dnf": false
+            },
+            {
+              "name": "劉宇翔",
+              "finish": 153.12499999999716,
+              "dnf": false
+            },
+            {
+              "name": "蔡明哲",
+              "finish": 153.34166666666363,
+              "dnf": false
+            },
+            {
+              "name": "楊凱文",
+              "finish": 153.5583333333301,
+              "dnf": false
+            },
+            {
+              "name": "許書豪",
+              "finish": 153.77499999999657,
+              "dnf": false
+            },
+            {
+              "name": "鄭宇辰",
+              "finish": 153.9833333333297,
+              "dnf": false
+            },
+            {
+              "name": "謝承翰",
+              "finish": 154.1749999999962,
+              "dnf": false
+            },
+            {
+              "name": "郭彥廷",
+              "finish": 154.34999999999604,
+              "dnf": false
+            },
+            {
+              "name": "洪志明",
+              "finish": 154.30833333332941,
+              "dnf": false
+            },
+            {
+              "name": "曾柏宇",
+              "finish": 155.54166666666163,
+              "dnf": false
+            },
+            {
+              "name": "邱冠廷",
+              "finish": 156.07499999999447,
+              "dnf": false
+            },
+            {
+              "name": "廖哲瑋",
+              "finish": 155.70833333332814,
+              "dnf": false
+            },
+            {
+              "name": "賴俊宏",
+              "finish": 155.87499999999466,
+              "dnf": false
+            },
+            {
+              "name": "周家豪",
+              "finish": 157.2166666666601,
+              "dnf": false
+            },
+            {
+              "name": "葉子豪",
+              "finish": 157.45833333332655,
+              "dnf": false
+            },
+            {
+              "name": "你",
+              "finish": 150.09166666666658,
+              "dnf": false
+            }
+          ],
+          "money": 2500,
+          "ledger": [
+            {
+              "at": 1794367888579,
+              "amount": 1500,
+              "balance": 2500,
+              "reason": "正賽第 1 名"
+            }
+          ],
+          "stats": {
+            "dist": 0,
+            "nightDist": 0,
+            "topSpeed": 0,
+            "trips": 0,
+            "earned": 1500,
+            "knocked": 0,
+            "escapes": 0,
+            "maxEscaped": 0,
+            "busted": 0,
+            "arrests": 0,
+            "gpWins": 1,
+            "streetWins": 0,
+            "honks": 0,
+            "playTime": 0.1,
+            "bestDrift": 0,
+            "totalDrift": 0,
+            "seasonsDone": 0,
+            "seasonTitles": 0,
+            "teamTitles": 0,
+            "seasonWins": 0,
+            "perfectSeason": 0
+          },
+          "podiumNames": "P2陳冠宇銀箭 Silver ArrowsP1你躍馬紅 Rosso CorsaP3林志豪藍牛 Blue Bull",
+          "replayLength": 8.05
+        }
+      },
+      {
+        "name": "頒獎跳至結果；真回放幀還原乾地／濕地胎與停站，不改最終物理",
+        "status": "PASS",
+        "details": {
+          "samples": [
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.100 / 0:08.050",
+              "rain": 0,
+              "tyre": "#ffd400",
+              "wheelScale": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.200 / 0:08.050",
+              "rain": 0,
+              "tyre": "#ffd400",
+              "wheelScale": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.300 / 0:08.050",
+              "rain": 0.7910208333333334,
+              "tyre": "#ffd400",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.400 / 0:08.050",
+              "rain": 0.7910208333333334,
+              "tyre": "#ffd400",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.500 / 0:08.050",
+              "rain": 0.7910208333333334,
+              "tyre": "#ffd400",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.600 / 0:08.050",
+              "rain": 0.7953958333333341,
+              "tyre": "#f2f2f2",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.700 / 0:08.050",
+              "rain": 0.7953958333333341,
+              "tyre": "#f2f2f2",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            },
+            {
+              "state": "replay",
+              "time": "▶ 回放 0:00.800 / 0:08.050",
+              "rain": 0.7953958333333341,
+              "tyre": "#f2f2f2",
+              "wheelScale": [
+                0.0001,
+                0.0001,
+                0.0001,
+                0.0001
+              ],
+              "unchanged": true
+            }
+          ],
+          "state": "results",
+          "money": 2500,
+          "ledger": [
+            {
+              "at": 1794367888579,
+              "amount": 1500,
+              "balance": 2500,
+              "reason": "正賽第 1 名"
+            }
+          ],
+          "unchanged": true,
+          "wheelScale": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "rows": 23
+        }
+      }
+    ],
+    "exceptions": [],
+    "limitations": [
+      "測試準備末圈車位、圈數與天氣／停站樣本，不代表完整實際駕駛",
+      "隔離CDP context；使用真main動畫／WebGL但canvas降解析度，不量FPS或視覺品質",
+      "未涵蓋賽季重載；該流程另有真main AST整合測試"
+    ],
+    "build": "99f984fced89",
+    "ok": true
+  },
+  "originalApplication": {
+    "applied": true,
+    "built": true,
+    "committed": false,
+    "pushed": false,
+    "application": {
+      "applied": true,
+      "files": 61,
+      "head": "feaa6ff0b2e2cd44ca1eae85a46c04e8126607aa",
+      "backup": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-priority-delivery\\backup-20261111-114731-74491342",
+      "completedAt": "2026-11-11T11:47:33.4665992+08:00",
+      "built": true,
+      "committed": false,
+      "pushed": false
+    },
+    "verification": {
+      "verifiedAt": "2026-11-11T11:48:47.1204301+08:00",
+      "files": 61,
+      "sourceMismatches": [],
+      "testedArtifacts": 223,
+      "originalArtifacts": 223,
+      "artifactMismatches": [],
+      "pass": true
+    }
+  },
+  "committed": false,
+  "pushed": false,
+  "unverified": [
+    "手機實機 FPS、觸控手感與人耳音效",
+    "正式 Redis / Upstash Lua 原子腳本與正式部署",
+    "所有23個國際賽道逐一完整駕駛；賽季重載目前以真main AST及全場物理快照對照驗證"
+  ],
+  "leaderboardBoundary": "檢查軌跡合理性；匿名 UUID 非登入驗證，軌跡可偽造，非權威防作弊排名",
+  "deliveryScriptValidation": {
+    "scriptPath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\Apply-TaipeiPriority.ps1",
+    "scriptSha256": "f19968d0aa362032cbcd58b4265cde5499983a3cc3afb23f3abe6d8a907f8e75",
+    "fixtureRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\apply-script-fixtures-1794368330163-51dbb4e8",
+    "realOriginalApplied": false,
+    "fixtureGitCommitsOnly": true,
+    "cases": [
+      {
+        "name": "preflight不改任何檔案或建立備份／結果（含-Build也不會執行build）",
+        "status": "PASS",
+        "details": {
+          "preflightOnly": true,
+          "completeFixtureUnchanged": true
+        }
+      },
+      {
+        "name": "payload第二個檔案雜湊不符：整批拒絕，第一個有效項目也不複製",
+        "status": "PASS"
+      },
+      {
+        "name": "目標檔案有未提交修改：整批拒絕並保留使用者修改",
+        "status": "PASS"
+      },
+      {
+        "name": "新檔案遇到外部同名檔：不覆蓋，也不套用前面有效項目",
+        "status": "PASS"
+      },
+      {
+        "name": "正確copy＋原檔backup；未提交無關內容、Git HEAD均保留",
+        "status": "PASS",
+        "details": {
+          "copied": 2,
+          "existingBackedUp": 1,
+          "newFileNotPretendedAsExistingBackup": true,
+          "unrelatedLocalFilesPreserved": true,
+          "headUnchanged": true
+        }
+      },
+      {
+        "name": "重跑不重寫已套用檔案、原backup或result，也不新增備份目錄",
+        "status": "PASS"
+      },
+      {
+        "name": "HEAD變動會先拒絕，原專案路徑不符也會先拒絕",
+        "status": "PASS"
+      },
+      {
+        "name": "manifest的目錄跳脫與絕對路徑會在任何寫入前拒絕",
+        "status": "PASS"
+      },
+      {
+        "name": "目標子目錄是junction：應拒絕改寫專案之外的檔案",
+        "status": "PASS"
+      },
+      {
+        "name": "payload子目錄是junction：應先拒絕外部來源，目標完全不變",
+        "status": "PASS"
+      }
+    ],
+    "summary": {
+      "passed": 10,
+      "failed": 0
+    }
+  },
+  "previousApprovalFailure": {
+    "executed": false,
+    "reason": "Automatic approval service 403: codex-auto-review model unavailable",
+    "originalChanged": false,
+    "userCommand": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File Apply-TaipeiPriority.ps1 -Apply -Build"
+  },
+  "release": {
+    "authorized": true,
+    "requestedAt": "2026-11-11T04:00:41.741Z",
+    "baseline": "feaa6ff0b2e2cd44ca1eae85a46c04e8126607aa",
+    "resultFile": "DCISI/taipei-gp-priority-publish-result.json",
+    "deploymentVerifiedBy": "GitHub Vercel commit status only; no production game/API tests"
+  }
+}

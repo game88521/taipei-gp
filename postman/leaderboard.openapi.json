@@ -1,0 +1,37 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "台北計時排行榜", "version": "3.0.0", "description": "台北經典／2026及版本分榜。UUID僅識別；軌跡合理性檢查不是權威防作弊。" },
+  "servers": [{ "url": "http://127.0.0.1:4329" }],
+  "paths": { "/api/leaderboard": {
+    "get": {
+      "operationId": "readLeaderboard", "summary": "讀取指定榜或唯讀舊榜",
+      "parameters": [
+        { "name": "rules", "in": "query", "schema": { "enum": ["classic", "2026"], "default": "classic" } },
+        { "name": "version", "in": "query", "schema": { "type": "integer", "const": 1, "default": 1 } },
+        { "name": "playerId", "in": "query", "schema": { "$ref": "#/components/schemas/UuidV4" } },
+        { "name": "board", "in": "query", "schema": { "type": "string", "const": "legacy" } },
+        { "name": "name", "in": "query", "description": "只供舊榜識別", "schema": { "type": "string", "maxLength": 12 } }
+      ],
+      "responses": { "200": { "$ref": "#/components/responses/Leaderboard" }, "400": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" }, "504": { "$ref": "#/components/responses/Error" } }
+    },
+    "post": {
+      "operationId": "submitLap", "summary": "保存玩家最快有效軌跡",
+      "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "$ref": "#/components/schemas/UuidV4" } }],
+      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Submission" } } } },
+      "responses": { "200": { "$ref": "#/components/responses/Leaderboard" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "413": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" }, "504": { "$ref": "#/components/responses/Error" } }
+    }
+  } },
+  "components": {
+    "schemas": {
+      "UuidV4": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$" },
+      "Board": { "type": "object", "required": ["track", "rules", "version"], "properties": { "track": { "const": "taipei" }, "rules": { "enum": ["classic", "2026"] }, "version": { "type": "integer", "const": 1 } }, "additionalProperties": false },
+      "Proof": { "type": "object", "required": ["v", "trackStamp", "samples"], "properties": { "v": { "const": 1 }, "trackStamp": { "type": "string", "maxLength": 120 }, "samples": { "type": "array", "minItems": 201, "maxItems": 6500, "items": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number" }], "minItems": 4, "maxItems": 4 } } }, "additionalProperties": false },
+      "Submission": { "type": "object", "required": ["playerId", "name", "time", "board", "proof"], "properties": { "playerId": { "$ref": "#/components/schemas/UuidV4" }, "name": { "type": "string", "minLength": 1, "maxLength": 12 }, "time": { "type": "number", "minimum": 40, "maximum": 300 }, "board": { "$ref": "#/components/schemas/Board" }, "proof": { "$ref": "#/components/schemas/Proof" } }, "additionalProperties": false },
+      "Leaderboard": { "type": "object", "required": ["board", "validation", "top"], "properties": { "board": { "type": "object" }, "validation": { "enum": ["trajectory-plausibility", "legacy-unverified"] }, "rank": { "type": "integer", "minimum": 1 }, "top": { "type": "array", "maxItems": 20, "items": { "type": "object", "required": ["name", "time"], "properties": { "playerId": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "time": { "type": "number" } } } }, "me": { "type": "object", "required": ["rank", "time"], "properties": { "rank": { "type": "integer" }, "time": { "type": "number" } } } } }
+    },
+    "responses": {
+      "Leaderboard": { "description": "前20名；POST另有rank。estimated/legacy不混入新榜。", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Leaderboard" } } } },
+      "Error": { "description": "固定錯誤碼，不包含上游內部資訊。", "content": { "application/json": { "schema": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } }, "additionalProperties": false } } } }
+    }
+  }
+}

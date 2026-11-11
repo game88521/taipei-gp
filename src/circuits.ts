@@ -4,6 +4,7 @@
 
 import type { TimeKind } from './weather';
 import type { Bank } from './track';
+import { fetchJsonWithRetry, type DownloadOptions } from './network';
 
 export type Biome = 'grass' | 'desert' | 'tropical' | 'street';
 export interface CircuitMeta {
@@ -58,9 +59,7 @@ export interface CircuitData {
   info: { lengthKm: number | null; turns: number | null; firstGp: number | null; lapRecord: { time: string; driver: string; year: number } | null; corners: string[] | null; fact: string | null; source: string };
 }
 
-export async function loadCircuitData(): Promise<CircuitData | null> {
+export async function loadCircuitData(options: DownloadOptions = {}): Promise<CircuitData | null> {
   if (!CIRCUIT) return null;
-  const r = await fetch(`/data/circuits/${CIRCUIT.id}.json`);
-  if (!r.ok) throw new Error(`賽道資料 HTTP ${r.status}`);
-  return r.json();
+  return fetchJsonWithRetry<CircuitData>(`/data/circuits/${CIRCUIT.id}.json`, { label: '賽道資料', ...options });
 }

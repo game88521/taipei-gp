@@ -7,6 +7,17 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import type { World } from './world';
 
+const environmentTargets = new WeakMap<THREE.Scene, THREE.WebGLRenderTarget>();
+
+/** 反射貼圖的 framebuffer 也要釋放，不能只 dispose texture。 */
+export function disposeEnvMap(scene: THREE.Scene) {
+  const target = environmentTargets.get(scene);
+  if (!target) return;
+  if (scene.environment === target.texture) scene.environment = null;
+  target.dispose();
+  environmentTargets.delete(scene);
+}
+
 // 環境反射：用天空漸層＋夕陽做一張反射貼圖，車漆、玻璃帷幕會映出晚霞（換時段天氣時重做）
 export function buildEnvMap(renderer: THREE.WebGLRenderer, scene: THREE.Scene, world: World, sunColor = new THREE.Color(6, 4.2, 2.6)) {
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -19,10 +30,19 @@ export function buildEnvMap(renderer: THREE.WebGLRenderer, scene: THREE.Scene, w
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -20;
   env.add(floor);
-  const old = scene.environment;
-  scene.environment = pmrem.fromScene(env, 0.03, 0.1, 6000).texture;
-  old?.dispose();
-  pmrem.dispose();
+  try {
+    const target = pmrem.fromScene(env, 0.03, 0.1, 6000);
+    const old = scene.environment;
+    const previous = environmentTargets.get(scene);
+    scene.environment = target.texture;
+    environmentTargets.set(scene, target);
+    if (previous) previous.dispose(); else old?.dispose();
+  } finally {
+    // 天空與主場景共用；只回收這次臨時建立的物件。
+    sunBall.geometry.dispose(); sunBall.material.dispose();
+    floor.geometry.dispose(); floor.material.dispose();
+    pmrem.dispose();
+  }
 }
 
 // 光暈（Bloom）：霓虹招牌、亮燈的窗戶、路燈、車燈、紅綠燈會暈開；最後加一點暗角與暖色調
@@ -41,12 +61,44 @@ export const GradeShader = {
     }`,
 };
 
+/** Composer 會再次呼叫 setSize；縮放必須套在真正的 render targets。 */
+class ScaledBloomPass extends UnrealBloomPass {
+  private scaleFactor = 1;
+  private inputWidth = 1;
+  private inputHeight = 1;
+  setScale(scale: number) {
+    this.scaleFactor = Number.isFinite(scale) ? Math.max(0.1, Math.min(1, scale)) : 1;
+    this.setSize(this.inputWidth, this.inputHeight);
+  }
+  override setSize(width: number, height: number) {
+    this.inputWidth = width; this.inputHeight = height;
+    const w = Math.max(1, Math.round(width * this.scaleFactor));
+    const h = Math.max(1, Math.round(height * this.scaleFactor));
+    this.resolution.set(w, h);
+    super.setSize(w, h);
+  }
+}
+
+export function setBloomScale(bloom: UnrealBloomPass | null, scale: number) {
+  if (bloom instanceof ScaledBloomPass) bloom.setScale(scale);
+}
+
+/** Composer.dispose 不會釋放各 pass；關閉後製時兩者都要做。 */
+export function disposeComposer(composer: EffectComposer | null) {
+  if (!composer) return;
+  for (const pass of composer.passes) pass.dispose();
+  composer.dispose();
+}
+
 export function makeComposer(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, bloomScale: number) {
   // 自己給後製畫布：要有 stencil（預先算好的影子靠它避免重疊處更黑）
   const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: true });
   const composer = new EffectComposer(renderer, rt);
+  // 自訂 RT 用實體像素，composer 內部的 width/height 卻必須是邏輯像素。
+  composer.setSize(innerWidth, innerHeight);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * bloomScale, innerHeight * bloomScale), 0.55, 0.45, 0.82);
+  const bloom = new ScaledBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.45, 0.82);
+  bloom.setScale(bloomScale);
   composer.addPass(bloom);
   const gradePass = new ShaderPass(GradeShader);
   composer.addPass(gradePass);

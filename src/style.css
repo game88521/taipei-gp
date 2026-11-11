@@ -159,6 +159,8 @@ html:not([data-steer='buttons']) #steer-btns, html[data-steer='buttons'] #pad { 
   opacity: 0;
 }
 #warn.show { opacity: 1; animation: blink 0.35s steps(2) infinite; }
+.invalid-lap { color: #ffb36a; font-size: 20px !important; }
+#hud[data-mode='race'] #drift-coach { display: none !important; }
 @keyframes blink { 50% { opacity: 0.35; } }
 
 .speedo {
@@ -649,11 +651,11 @@ html:not(.touch) #btn-horn { display: none; }
 #ach-body .stats b { font: 800 15px var(--mono); }
 #ach-body h3 { margin: 10px 0 6px; font-size: 15px; }
 #ach-body .achs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-bottom: 10px; }
-#ach-body .ach { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); opacity: 0.55; }
+#ach-body .ach { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); opacity: 1; }
 #ach-body .ach.done { opacity: 1; background: rgba(255, 212, 0, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 212, 0, 0.45); }
 #ach-body .ach i { font-style: normal; font-size: 24px; }
 #ach-body .ach span { flex: 1; display: flex; flex-direction: column; }
-#ach-body .ach small { color: var(--muted); font-size: 11px; }
+#ach-body .ach small { color: #bdc1cd; font-size: 13px; line-height: 1.5; }
 #ach-body .ach em { height: 4px; border-radius: 2px; margin-top: 4px; background: linear-gradient(90deg, #ffd400 var(--f), rgba(255, 255, 255, 0.12) var(--f)); }
 
 /* ---------------- 載入進度條 */
@@ -835,8 +837,25 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #taxi-hud .good { color: var(--green); }
 #taxi-hud .bad { color: #ff5a5a; animation: blink 0.6s steps(2) infinite; }
 #taxi-hud .money { color: #f5c518; }
+.street-preview { display: block; width: 160px; height: 80px; max-width: 100%; margin: 6px auto; }
+.street-preview polyline { fill: none; stroke: #74c6ff; stroke-width: 3; stroke-linejoin: round; }
+#drift-coach { pointer-events: auto; max-width: min(440px, calc(100vw - 24px)); padding: 4px 12px; border-radius: 10px; background: #111b29ed; font-size: 13px; text-align: left; }
+#drift-coach summary, #coach-exit, #btn-drift-practice, #economy-history summary { min-height: 44px; align-content: center; cursor: pointer; }
+#drift-coach p { white-space: pre-line; line-height: 1.55; margin: 4px 0; }
+#economy-history { margin: 18px 0; }
+#economy-summary p, #economy-list li { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#economy-list { max-height: 260px; overflow-y: auto; padding-left: 24px; }
 #hud[data-mode='race'] #taxi-hud { display: none; }
 @media (max-height: 480px) { #taxi-hud { font-size: 12px; gap: 8px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); } }
+/* 任務文字節點保留；明細只有展開後才加入內容高度。 */
+#taxi-hud { max-width: calc(100vw - 24px); flex-wrap: wrap; align-items: center; gap: 4px 12px; white-space: normal; }
+#taxi-title { min-width: 0; overflow-wrap: anywhere; }
+#taxi-distance, #taxi-time, #taxi-wallet { white-space: nowrap; }
+#taxi-details { max-width: 100%; pointer-events: auto; font-size: 13px; }
+#taxi-details summary { min-width: 44px; min-height: 44px; padding: 12px 2px; cursor: pointer; touch-action: manipulation; }
+#taxi-details[open] { flex-basis: 100%; }
+#taxi-trip-text { margin: 0 0 6px; max-height: min(150px, 24dvh); overflow-y: auto; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.6; touch-action: pan-y; }
+#taxi-details:not([open]) #taxi-trip-text { display: none; }
 #fps { position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: max(4px, env(safe-area-inset-bottom)); z-index: 9; font: 700 11px var(--mono); color: #9f9; background: rgba(0, 0, 0, 0.55); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
 
 /* 上方提示的直向排列（放在最後：蓋過各自原本的 position: absolute 與 top） */
@@ -1022,7 +1041,7 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu #car-buy { margin-top: 14px; padding: 10px; border-radius: 12px; border-color: rgba(242, 193, 78, 0.55); color: var(--m-gold); font-weight: 800; font-size: 14px; background: rgba(242, 193, 78, 0.06); }
 #menu #paint-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--m-line); gap: 8px; }
 #menu #paint-list span { width: 100%; font-size: 11px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.5); }
-#menu #paint-list button { width: 28px; height: 28px; border: 2px solid rgba(0, 0, 0, 0.35); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); transition: transform 0.15s; }
+#menu #paint-list button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; border: 2px solid rgba(0, 0, 0, 0.35); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); transition: transform 0.15s; }
 #menu #paint-list button.on { box-shadow: 0 0 0 2px #0d0f15, 0 0 0 4px var(--m-gold); }
 #menu #paint-list small { margin-top: 2px; }
 
@@ -1045,7 +1064,7 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
   font: 600 13px var(--font);
 }
 #menu .opts select { min-width: 132px; }
-#menu .opts label.q small { width: 100%; margin-top: -2px; color: rgba(255, 255, 255, 0.4); font-size: 11px; }
+#menu .opts label.q small { width: 100%; margin-top: -2px; color: #bdc1cd; font-size: 13px; line-height: 1.55; }
 /* 滑桿：標題固定寬度，每一條從同一個位置開始 */
 #menu .opts label.rng { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; }
 #menu .opts label.rng input { width: 100%; min-width: 0; height: 18px; margin: 0; accent-color: #ff3b30; }
@@ -1148,7 +1167,7 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .m-inst-txt small { color: var(--muted); font-size: 12px; }
 #menu .m-inst-go { padding: 7px 16px; border: 0; border-radius: 10px; background: #2fbf6c; color: #04140a; font-weight: 800; letter-spacing: 2px; }
 #menu .m-inst-go[hidden] { display: none; }
-#menu .m-inst-x { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: rgba(255, 255, 255, 0.45); font-size: 18px; }
+#menu .m-inst-x { width: 44px; height: 44px; min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: #bdc1cd; font-size: 20px; }
 
 /* 滑鼠移過去的效果：只給有滑鼠的裝置（觸控螢幕點過之後 hover 會一直卡著） */
 @media (hover: hover) {
@@ -1403,6 +1422,17 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
 #car-use { width: 100%; margin-top: 12px; min-height: 44px; }
 #car-preview-status:empty { display: none; }
 #car-preview-status { width: 100%; min-height: 44px; }
+/* 先試色再購買、結算及復原入口：長文字換行，觸控目標至少 44px。 */
+#paint-preview-note, #legacy-record-note, #taxi-last-trip { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.6; font-size: 13px; color: #bdc1cd; }
+#legacy-record-note:empty, #taxi-last-trip:empty { display: none; }
+#paint-apply, #paint-cancel, #bk-undo, #season-abandon, #gp-settle-retry, #gp-settle-exit { min-width: 44px; min-height: 44px; white-space: normal; overflow-wrap: anywhere; font-size: 15px; letter-spacing: 1px; }
+#menu .m-backup button { min-width: 44px; min-height: 44px; }
+#gp-settle-retry[hidden], #season-abandon[hidden] { display: none; }
+#gp-settling { z-index: 8; }
+#gp-settling .card { max-height: calc(100dvh - 32px); overflow-y: auto; }
+#gp-settle-progress, .season-countback, .lb-fairness { line-height: 1.6; overflow-wrap: anywhere; }
+#season-abandon { color: #ffb6ae; border-color: #c2746c; }
+#lb-board { min-height: 44px; max-width: 100%; padding: 8px 10px; border: 1px solid #636d84; border-radius: 8px; background: #151924; color: #f4f4f6; font: inherit; color-scheme: dark; }
 #menu .m-stat { grid-template-columns: 52px 1fr 72px; }
 @media (max-height: 480px) {
   :root { --tc-scale: min(var(--tc-request-scale, 1), 1); }
