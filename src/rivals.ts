@@ -415,33 +415,74 @@ export class RaceField {
 
   /**
    * 排位賽：每台 AI 自己跑一圈（跟玩家一樣從起跑線後原地起步、中性胎、DRS／超車模式在直線區隨便開），
-   * 用一樣的物理同步算，回傳圈速（加一點點隨機，每次排位結果不完全一樣）
+   * 物理步長與正賽相同；超過 150 秒仍未完成者沒有有效圈（null）。
+   * 同步測試與畫面分批計算使用同一個迭代器，保留每位 AI 的物理與亂數順序。
    */
-  qualify(): Map<Racer, number> {
-    const t = this.t, out = new Map<Racer, number>(), dt = 1 / 120;
+  private *qualifyingSteps(): Generator<number, Map<Racer, number | null>> {
+    if (this.solo) throw new Error('排位計算已在進行中');
+    const t = this.t, out = new Map<Racer, number | null>(), dt = 1 / 120;
     this.solo = true;
-    for (const r of this.racers) {
-      if (r.isPlayer) continue;
-      const c = r.car;
-      c.placeAt(t, 1);
-      Object.assign(c, { gripMul: 1, boost: 0, drs: false, ovt: false, energy: 1, r26: this.rules === '2026', speedCap: Infinity });
-      r.lat = 0; r.stuck = 0;
-      let time = 0, prevS = c.pos.s;
-      for (let n = 0; n < 150 / dt; n++) {
-        const { steer, brake } = this.drive(r, false);
-        const zi = this.drsZoneAt(c.pos.s);
-        c.aeroZone = zi >= 0;
-        if (zi < 0) { c.drs = false; c.ovt = false; } else if (!brake) { if (c.r26) { if (c.energy > 0.1) c.ovt = true; } else c.drs = true; }
-        c.update(dt, t, steer, brake);
-        time += dt;
-        const sNow = c.pos.s;
-        if (prevS > t.length - 40 && sNow < 40) break;
-        prevS = sNow;
+    let completed = 0;
+    try {
+      for (const r of this.racers) {
+        if (r.isPlayer) continue;
+        const c = r.car;
+        c.placeAt(t, 1);
+        Object.assign(c, { gripMul: 1, boost: 0, drs: false, ovt: false, energy: 1, r26: this.rules === '2026', speedCap: Infinity });
+        r.lat = 0; r.stuck = 0;
+        let time = 0, prevS = c.pos.s, finished = false;
+        for (let n = 0; n < 150 / dt; n++) {
+          const { steer, brake } = this.drive(r, false);
+          const zi = this.drsZoneAt(c.pos.s);
+          c.aeroZone = zi >= 0;
+          if (zi < 0) { c.drs = false; c.ovt = false; } else if (!brake) { if (c.r26) { if (c.energy > 0.1) c.ovt = true; } else c.drs = true; }
+          c.update(dt, t, steer, brake);
+          time += dt;
+          const sNow = c.pos.s;
+          if (prevS > t.length - 40 && sNow < 40) { finished = true; break; }
+          prevS = sNow;
+          if (n % 240 === 239) yield completed;
+        }
+        // 超時仍消耗原有的那一次亂數，後面車手的擾動順序保持一致。
+        const timeWithJitter = time * (1 + (Math.random() - 0.5) * 0.006);
+        out.set(r, finished ? timeWithJitter : null);
+        yield ++completed;
       }
-      out.set(r, time * (1 + (Math.random() - 0.5) * 0.006));
+      return out;
+    } finally { this.solo = false; }
+  }
+
+  /** 同步模擬用；與畫面分批計算得到相同結果。 */
+  qualify(): Map<Racer, number | null> {
+    const job = this.qualifyingSteps();
+    let next = job.next();
+    while (!next.done) next = job.next();
+    return next.value;
+  }
+
+  /** 每批約 8 ms 就交還主執行緒，讓進度與返回操作能被處理。 */
+  async qualifyAsync(onProgress?: (completed: number, total: number) => void, signal?: AbortSignal): Promise<Map<Racer, number | null>> {
+    signal?.throwIfAborted();
+    const total = this.racers.filter((r) => !r.isPlayer).length, job = this.qualifyingSteps();
+    const close = () => { job.return(new Map()); };
+    signal?.addEventListener('abort', close, { once: true });
+    try {
+      onProgress?.(0, total);
+      // 先交還事件迴圈，顯示計算中的介面；實際計算期間也持續讓出執行權。
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      for (;;) {
+        signal?.throwIfAborted();
+        const start = performance.now();
+        let next = job.next();
+        while (!next.done && performance.now() - start < 8) next = job.next();
+        if (next.done) { onProgress?.(total, total); signal?.throwIfAborted(); return next.value; }
+        onProgress?.(next.value, total);
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    } finally {
+      signal?.removeEventListener('abort', close);
+      close();
     }
-    this.solo = false;
-    return out;
   }
 
   /** 玩家的計圈（main 在玩家的物理之後呼叫） */

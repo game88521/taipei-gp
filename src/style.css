@@ -9,6 +9,7 @@
   --green: #2fe07a;
   --font: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
   --mono: 'Bahnschrift', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow', var(--font);
+  --tc-scale: var(--tc-request-scale, 1);
 }
 
 * { box-sizing: border-box; }
@@ -135,7 +136,12 @@ html:not([data-steer='buttons']) #steer-btns, html[data-steer='buttons'] #pad { 
   font: 700 22px var(--mono);
   opacity: 0;
   transition: opacity 0.25s, transform 0.25s;
-  white-space: nowrap;
+  width: max-content;
+  max-width: calc(100% - 32px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  pointer-events: none;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.purple { background: rgba(120, 30, 200, 0.85); }
@@ -1383,3 +1389,42 @@ html.touch.tc-swap #btn-drift, html.touch.tc-swap #btn-horn { right: auto; left:
 }
 /* 按鈕放大或換位置後，左下角放不下無線電框：改到畫面上方中央（translate 跟淡入動畫的 transform 分開） */
 html.touch.tc-radio-top #radio { left: 50%; right: auto; top: calc(max(10px, env(safe-area-inset-top)) + 28px); bottom: auto; translate: -50% 0; }
+
+/* 策略預設收起；展開時以小面板呈現，不佔用駕駛按鈕。 */
+#gp-strategy { display: none; position: absolute; left: calc(max(10px, env(safe-area-inset-left)) + 180px); top: calc(max(10px, env(safe-area-inset-top)) + 188px); width: min(300px, calc(100vw - 210px)); border: 1px solid #ffffff30; border-radius: 10px; background: rgba(10, 12, 20, .94); font-size: 12px; pointer-events: auto; z-index: 5; }
+#hud[data-mode='race'][data-kind='gp'] #gp-strategy { display: block; }
+#gp-strategy summary { min-height: 44px; padding: 10px; cursor: pointer; }
+#strategy-advice { color: #ffd23a; }
+#strategy-detail { margin: 0; padding: 0 10px 10px; line-height: 1.6; max-height: min(180px, calc(100dvh - 250px)); overflow-y: auto; touch-action: pan-y; }
+html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { min-width: calc(44px / var(--tc-scale, 1)); min-height: calc(44px / var(--tc-scale, 1)); }
+#pit-tyre button { width: 44px; height: 44px; }
+#hud:has(#pit-tyre.on) #radio { visibility: hidden; }
+#car-compare { font-size: 13px; line-height: 1.6; color: #ffd98a; }
+#car-use { width: 100%; margin-top: 12px; min-height: 44px; }
+#car-preview-status:empty { display: none; }
+#car-preview-status { width: 100%; min-height: 44px; }
+#menu .m-stat { grid-template-columns: 52px 1fr 72px; }
+@media (max-height: 480px) {
+  :root { --tc-scale: min(var(--tc-request-scale, 1), 1); }
+  html.touch #pad { width: min(200px, 30vw); }
+  #toast { font-size: 16px; max-width: min(440px, calc(100% - 32px)); top: 35%; }
+  #gp-strategy { left: 170px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); width: calc(100vw - 400px); }
+  /* 展開後改讀面板中的胎況、電量，替換同位置的小膠囊。 */
+  #hud:has(#gp-strategy[open]) #tyre, #hud:has(#gp-strategy[open]) #batt { visibility: hidden; }
+  #strategy-detail { max-height: min(110px, calc(100dvh - 265px)); }
+  html.touch #hud[data-mode='race'][data-kind='gp'] #radio { left: 220px; right: auto; top: 240px; bottom: auto; translate: none; max-width: calc(100vw - 440px); max-height: 70px; overflow-y: auto; pointer-events: auto; touch-action: pan-y; font-size: 12px; }
+}
+@media (max-width: 640px) and (orientation: portrait) {
+  :root { --tc-scale: min(var(--tc-request-scale, 1), .9); }
+  #toast { font-size: 17px; }
+  #hud[data-mode='race'] .tc { top: calc(max(10px, env(safe-area-inset-top)) + 58px); left: 170px; transform: none; }
+  .gp-panel { width: 150px; }
+  #tyre { left: 170px; }
+  #batt { left: 170px; }
+  #gp-strategy { left: 170px; width: calc(100vw - 180px); }
+  html.touch #btn-drift { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 132px * var(--tc-scale, 1)); }
+  html.touch #btn-horn { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 210px * var(--tc-scale, 1)); }
+  html.touch .speedo { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 200px * var(--tc-scale, 1) + 90px); }
+  html.touch #hud[data-mode='race'][data-kind='gp'] #radio { left: 50%; right: auto; top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 200px * var(--tc-scale, 1)); translate: -50% 0; max-width: calc(100vw - 28px); max-height: 70px; overflow-y: auto; pointer-events: auto; touch-action: pan-y; }
+  #rotate { top: 50%; font-size: 11px; }
+}

@@ -199,6 +199,25 @@ export function setTyre(m: CarModel, color: string) {
   }
 }
 
+// 沒有彩色貼圖的飾件共用材質：顏色放在頂點，粗糙度／金屬度放在 7×1 浮點貼圖。
+// 浮點值保留原材質參數，NearestFilter 不依賴浮點線性過濾擴充；不使用自訂 shader。
+const SURFACES = [
+  ['accent', 0.3, 0.4], ['accent2', 0.3, 0.4], ['dark', 0.9, 0],
+  ['helmet', 0.22, 0.3], ['visor', 0.08, 0.85], ['chrome', 0.22, 1], ['mirror', 0.05, 1],
+] as const;
+const surfaceIndex = new Map<string, number>(SURFACES.map(([key], i) => [key, i]));
+// 各車隊只改顏色；飾件的位置、法線與材質取樣座標共用，避免每台重複上傳同樣的資料。
+const surfaceShapes = new Map<boolean, THREE.BufferGeometry>();
+let surfaceMap: THREE.DataTexture | null = null;
+function surfaceTexture() {
+  if (!surfaceMap) {
+    surfaceMap = new THREE.DataTexture(new Float32Array(SURFACES.flatMap(([, rough, metal]) => [1, rough, metal, 1])), SURFACES.length, 1, THREE.RGBAFormat, THREE.FloatType);
+    surfaceMap.minFilter = surfaceMap.magFilter = THREE.NearestFilter;
+    surfaceMap.needsUpdate = true;
+  }
+  return surfaceMap;
+}
+
 export function makeF1(l: F1Livery, ghost = false): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -368,18 +387,39 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
     mats = {
       main: std(l.main, 0.45, 0.28, { envMapIntensity: 1.25 }),
       decal: std('#ffffff', 0.4, 0.3, { map: decalTexture(l), transparent: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4, envMapIntensity: 1.25 }),
-      accent: std(l.accent, 0.4, 0.3), accent2: std(l.accent2, 0.4, 0.3),
-      carbon: std('#ffffff', 0.35, 0.45, { map: carbon() }), dark: std('#050506', 0, 0.9), helmet: std(l.helmet, 0.3, 0.22), visor: std('#0d1014', 0.85, 0.08),
-      chrome: std('#b9bec6', 1, 0.22), mirror: std('#c8d2dc', 1, 0.05), light,
+      carbon: std('#ffffff', 0.35, 0.45, { map: carbon() }), light,
     };
   }
   if (!ghost) root.userData.paint = mats.main; // 換烤漆用（vehicles.ts）
+  const surfaceColors: Record<string, string> = { accent: l.accent, accent2: l.accent2, dark: '#050506', helmet: l.helmet, visor: '#0d1014', chrome: '#b9bec6', mirror: '#c8d2dc' };
+  const coarseParts: THREE.BufferGeometry[] = [], fineParts: THREE.BufferGeometry[] = [];
   for (const [k, list] of Object.entries(parts)) {
     if (!list.length) continue;
+    const index = surfaceIndex.get(k);
+    if (!ghost && index !== undefined) {
+      const g = tint(mergeGeometries(list.map(strip)), surfaceColors[k]), uv = g.attributes.uv as THREE.BufferAttribute;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (index + 0.5) / SURFACES.length, 0.5);
+      (FINE.has(k) ? fineParts : coarseParts).push(g);
+      continue;
+    }
     const m = new THREE.Mesh(mergeGeometries(list.map(strip)), mats[k]);
     if (k === 'light') m.userData.rainOnly = true; // 雨燈：下雨才亮（weather.ts）
     if (FINE.has(k)) fine.push(m); // 遠處看不出來的小零件（setLod 會藏起來）
     body.add(m);
+  }
+  if (!ghost) {
+    const map = surfaceTexture(), material = std('#ffffff', 1, 1, { vertexColors: true, roughnessMap: map, metalnessMap: map });
+    // 遠近細節分開合併：不改原有 LOD 顯示範圍、車輪轉向或雨燈的顯示規則。
+    for (const [list, detail] of [[coarseParts, false], [fineParts, true]] as const) {
+      if (!list.length) continue;
+      const geometry = mergeGeometries(list), shared = surfaceShapes.get(detail);
+      if (shared) for (const key of ['position', 'normal', 'uv']) geometry.setAttribute(key, shared.getAttribute(key));
+      else surfaceShapes.set(detail, geometry);
+      const m = new THREE.Mesh(geometry, material);
+      m.name = detail ? 'f1-detail' : 'f1-trim';
+      if (detail) fine.push(m);
+      body.add(m);
+    }
   }
 
   // ---- 車輪：圓肩輪胎＋胎色圈＋輪框罩（2022 起的平面罩，上面三條標記看得出在轉）＋中心鎖；
@@ -425,7 +465,7 @@ export function makeF1(l: F1Livery, ghost = false): CarModel {
 const FINE = new Set(['decal', 'accent2', 'chrome', 'mirror', 'helmet', 'visor']); // 雨燈（light）不放：它的顯示由 weather.ts 管
 
 /**
- * 遠近細節：遠處的車（螢幕上只剩幾個像素）藏起貼花、隊名、車手頭盔、後視鏡、雨燈、煞車導管，
+ * 遠近細節：遠處的車（螢幕上只剩幾個像素）藏起貼花、隊名、車手頭盔、後視鏡、煞車導管，
  * 並且不再投射即時陰影；一台車從約 20 次繪製（陰影再算一次）降到一半左右。純畫面，不影響物理。
  * 狀態沒變就不動（每格呼叫沒成本）
  */

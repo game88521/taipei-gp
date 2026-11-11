@@ -8,7 +8,7 @@ export interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: 
 export type SteerMode = 'buttons' | 'drag' | 'tilt';
 /** 一條賽道的紀錄；v = 跑出這些紀錄時的賽道指紋（trackStamp）：賽道形狀改過之後，舊的影子車會穿牆、舊的最快圈不能比 */
 export interface TrackRec { best: number | null; sectors: (number | null)[]; ghost: Ghost | null; v?: string; gpBest?: number | null }
-export interface Save { trackV?: string; gpBest?: number | null; freePos?: { x: number; z: number; h: number; y?: number }; season?: SeasonSave; seasonHistory?: SeasonRecord[]; circuits?: Record<string, TrackRec>; best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; sens?: number; tc?: { size: number; op: number; pos: 'std' | 'swap' | 'lift' | 'swap-lift' }; tilt?: { inv: boolean; zero: number; dead: number }; vol?: { master: number; engine: number; fx: number }; tutDone?: boolean; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
+export interface Save { trackV?: string; gpBest?: number | null; freePos?: { x: number; z: number; h: number; y?: number }; season?: SeasonSave; seasonHistory?: SeasonRecord[]; circuits?: Record<string, TrackRec>; best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; sens?: number; curve?: 'linear' | 'gentle'; tc?: { size: number; op: number; pos: 'std' | 'swap' | 'lift' | 'swap-lift' }; tilt?: { inv: boolean; zero: number; dead: number }; vol?: { master: number; engine: number; fx: number; others?: number; ambient?: number }; tutDone?: boolean; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 export const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 function loadSave(): Save {
   const empty: Save = { best: null, sectors: [null, null, null], ghost: null, opts: {} };
@@ -112,11 +112,12 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
   take('car', isStr(src.car, 30) ? src.car : undefined);
   take('name', isStr(src.name, 12) ? src.name.replace(/[<>"'`\\]/g, '') : undefined);
   take('sens', isNum(src.sens, 0.3, 2) ? src.sens : undefined);
+  take('curve', src.curve === 'linear' || src.curve === 'gentle' ? src.curve : undefined);
   take('tutDone', typeof src.tutDone === 'boolean' ? src.tutDone : undefined);
   const t = src.tilt as Record<string, unknown> | undefined;
   take('tilt', t && typeof t.inv === 'boolean' && isNum(t.zero, -90, 90) && isNum(t.dead, 0, 20) ? { inv: t.inv, zero: t.zero, dead: t.dead } : undefined);
   const v = src.vol as Record<string, unknown> | undefined;
-  take('vol', v && isNum(v.master, 0, 1) && isNum(v.engine, 0, 1) && isNum(v.fx, 0, 1) ? { master: v.master, engine: v.engine, fx: v.fx } : undefined);
+  take('vol', v && isNum(v.master, 0, 1) && isNum(v.engine, 0, 1) && isNum(v.fx, 0, 1) ? { master: v.master, engine: v.engine, fx: v.fx, ...(isNum(v.others, 0, 1) ? { others: v.others } : {}), ...(isNum(v.ambient, 0, 1) ? { ambient: v.ambient } : {}) } : undefined);
   const tc = src.tc as Record<string, unknown> | undefined;
   take('tc', tc && isNum(tc.size, 0.3, 3) && isNum(tc.op, 0, 1) && (tc.pos === 'std' || tc.pos === 'swap' || tc.pos === 'lift' || tc.pos === 'swap-lift') ? { size: tc.size, op: tc.op, pos: tc.pos } : undefined);
   const tx = src.taxi as Record<string, unknown> | undefined;

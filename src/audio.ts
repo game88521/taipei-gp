@@ -37,6 +37,7 @@ export class Sound {
   private prof: EngineProfile = ENGINES.sedan;
   private profKey = 'sedan';
   private engBus!: GainNode;
+  private otherBus!: GainNode;
   private fx!: GainNode;
   // ---- 新版引擎（AudioWorklet）
   private worklet = false; // 載入成功才用
@@ -58,13 +59,16 @@ export class Sound {
   private scrapeG: GainNode | null = null; // 刮護欄（持續的）
   private ambBuf: AudioBuffer | null = null;
   /** 音量 0~1：主音量、引擎聲、音效 */
-  vol = { master: 1, engine: 1, fx: 1 };
-  setVolume(v: Partial<{ master: number; engine: number; fx: number }>) { Object.assign(this.vol, v); this.applyVolume(); }
+  vol = { master: 1, engine: 1, fx: 1, others: 1, ambient: 1 };
+  setVolume(v: Partial<{ master: number; engine: number; fx: number; others: number; ambient: number }>) { Object.assign(this.vol, v); this.applyVolume(); }
   private applyVolume() {
     if (!this.ctx) return;
-    this.master.gain.value = 0.6 * this.vol.master;
-    this.engBus.gain.value = this.vol.engine;
-    this.fx.gain.value = this.vol.fx;
+    const now = this.ctx.currentTime;
+    for (const [bus, value] of [[this.master, 0.6 * this.vol.master], [this.engBus, this.vol.engine], [this.otherBus, this.vol.others], [this.fx, this.vol.fx], [this.amb, this.vol.ambient]] as const) {
+      if (!bus) continue;
+      bus.gain.cancelScheduledValues(now);
+      bus.gain.setTargetAtTime(Math.max(0, Math.min(1, value)), now, 0.03);
+    }
   }
 
   /** 一定要在點擊事件裡呼叫（iOS 規定） */
@@ -97,6 +101,8 @@ export class Sound {
     // 引擎與其他音效分開兩個通道，選單可以各自調音量
     this.engBus = ctx.createGain();
     this.engBus.connect(this.master);
+    this.otherBus = ctx.createGain();
+    this.otherBus.connect(this.master);
     this.fx = ctx.createGain();
     this.fx.connect(this.master);
     this.applyVolume();
@@ -145,11 +151,14 @@ export class Sound {
     verbLp.frequency.value = 3200;
     this.verbSend.connect(this.verb).connect(verbLp).connect(this.master);
     this.engBus.connect(this.verbSend);
+    this.otherBus.connect(this.verbSend);
     this.fx.connect(this.verbSend); // 撞擊、喇叭、警笛在隧道裡也有回音
     // 環境音
     this.amb = ctx.createGain();
     this.amb.gain.value = 1;
-    this.amb.connect(this.fx);
+    this.amb.connect(this.master);
+    this.amb.connect(this.verbSend);
+    this.applyVolume();
     // 引擎合成器（AudioWorklet）：載入成功之後才切過去，載入中仍用舊的振盪器
     void this.loadWorklet();
     // 看門狗：音訊時鐘 0.6 秒沒人餵引擎（遊戲不再步進）就把持續的聲音全部關掉；暫停（suspend）時時鐘不走，不會誤關
@@ -183,7 +192,7 @@ export class Sound {
       pan.refDistance = 6;
       pan.maxDistance = 400;
       pan.rolloffFactor = 1.1;
-      node.connect(lp).connect(g).connect(pan).connect(this.engBus);
+      node.connect(lp).connect(g).connect(pan).connect(this.otherBus);
       this.others.push({ node, pan, lp, g, key: '', voice: 'traffic', idleAt: -10 });
     }
   }

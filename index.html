@@ -66,6 +66,7 @@
       <button id="pit" class="small-btn">進站</button>
       <div id="pit-tyre"></div>
       <div id="tyre"></div>
+      <details id="gp-strategy"><summary>策略 <span id="strategy-advice"></span></summary><p id="strategy-detail"></p></details>
       <div id="batt"></div>
       <div id="radio"><b>📻 工程師</b><span></span></div>
       <button id="gas">油門</button>
@@ -173,13 +174,17 @@
           <section class="m-pane" data-pane="garage">
             <header class="m-head">
               <div><small class="m-eyebrow">GARAGE</small><h2>車庫</h2></div>
-              <small class="m-hint">點車子就換上 · 烤漆每色買一次</small>
+              <small class="m-hint">點車款預覽，再按使用 · 所有車輛免費</small>
             </header>
             <div id="car-pick">
               <div id="car-list"></div>
               <div class="m-car">
                 <div class="m-stage"><canvas id="car-3d"></canvas></div>
+                <button id="car-preview-status" class="ghost-btn" aria-live="polite"></button>
                 <div id="car-note"></div>
+                <p id="car-compare" aria-live="polite"></p>
+                <small>性能依車輛設定比較；速度上限非實測極速。重量越低越輕巧，越高越耐撞。車輛免費，烤漆另計價。</small>
+                <button id="car-use" class="primary">使用這台車</button>
                 <button id="car-buy" class="ghost-btn" style="display: none"></button>
                 <div id="paint-list"></div>
               </div>
@@ -235,6 +240,7 @@
                     <option value="off">不顯示（電腦用）</option>
                   </select>
                 </label>
+                <label class="q">轉向曲線<select id="opt-curve"><option value="linear">標準（原本手感）</option><option value="gentle">柔和（拖曳／傾斜小幅修正較細緻）</option></select></label>
                 <label class="q rng">轉向靈敏度<input type="range" id="opt-sens" min="0.5" max="1.5" step="0.1" /><small id="sens-val"></small></label>
                 <label class="q rng">按鈕大小<input type="range" id="opt-tc-size" min="0.7" max="1.4" step="0.05" /><small id="tc-size-val"></small></label>
                 <label class="q rng">按鈕透明度<input type="range" id="opt-tc-op" min="0.3" max="1" step="0.05" /><small id="tc-op-val"></small></label>
@@ -252,7 +258,9 @@
                 <legend>音效</legend>
                 <label class="sw">音效<input type="checkbox" id="opt-sound" /></label>
                 <label class="q rng">主音量<input type="range" id="opt-vol-master" min="0" max="1" step="0.05" /></label>
-                <label class="q rng">引擎<input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" /></label>
+                <label class="q rng">自己的引擎<input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" /></label>
+                <label class="q rng">其他車輛引擎<input type="range" id="opt-vol-others" min="0" max="1" step="0.05" /></label>
+                <label class="q rng">環境聲（雨／風／觀眾）<input type="range" id="opt-vol-ambient" min="0" max="1" step="0.05" /></label>
                 <label class="q rng">音效<input type="range" id="opt-vol-fx" min="0" max="1" step="0.05" /></label>
               </fieldset>
               <fieldset>
@@ -339,7 +347,8 @@
     <div id="quali-res" class="overlay hidden">
       <div class="card wide">
         <h1 id="quali-title">排位賽結果</h1>
-        <p class="sub" id="quali-sub"></p>
+        <p class="sub" id="quali-sub" role="status" aria-live="polite"></p>
+        <progress id="quali-progress" max="21" value="0" hidden aria-label="排位計算進度"></progress>
         <table id="quali-table"></table>
         <p class="legend" id="quali-legend"></p>
         <button id="quali-go" class="primary">開始正賽</button>

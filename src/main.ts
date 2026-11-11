@@ -7,7 +7,8 @@ import { qualityFor, defaultLevel, LOWER, LEVEL_NAME, type Level } from './quali
 import { buildTrack, spreadLegs, VMAX, setRealPerf, heightAt, locate, surfaceY, bankRoll, type Locate } from './track';
 import { buildWorld } from './world';
 import { CEIL, holeAware } from './tunnel';
-import { GaragePreview } from './garage3d';
+import type { GaragePreview } from './garage3d';
+import { pitBaselineLoss, wetTrend } from './strategy';
 import { CIRCUIT, CIRCUITS, loadCircuitData } from './circuits';
 import { driverStandings, teamStandings, standingsHtml, roundName, roundPoints, pointsAfterEachRound, titleFight, nextForm, formTag, seasonPrize, defaultSeason, POINTS, FASTEST_LAP_POINT, type SeasonSave, type RoundResult } from './season';
 import { buildCircuitEnv } from './circuitenv';
@@ -401,6 +402,9 @@ timeSel.addEventListener('change', () => {
   const sens = $<HTMLInputElement>('opt-sens');
   sens.value = String(save.sens ?? 1);
   input.sens = save.sens ?? 1;
+  const curve = $<HTMLSelectElement>('opt-curve');
+  curve.value = input.curve = save.curve ?? 'linear';
+  curve.addEventListener('change', () => { input.curve = save.curve = curve.value === 'gentle' ? 'gentle' : 'linear'; writeSave(); });
   const showSens = () => { $('sens-val').textContent = `${(+sens.value).toFixed(1)}×`; };
   showSens();
   sens.addEventListener('input', () => { input.sens = save.sens = +sens.value; showSens(); writeSave(); });
@@ -409,7 +413,7 @@ timeSel.addEventListener('change', () => {
   const tcSize = $<HTMLInputElement>('opt-tc-size'), tcOp = $<HTMLInputElement>('opt-tc-op'), tcPos = $<HTMLSelectElement>('opt-tc-pos');
   const applyTc = () => {
     const st = document.documentElement.style;
-    st.setProperty('--tc-scale', String(tc.size));
+    st.setProperty('--tc-request-scale', String(tc.size));
     st.setProperty('--tc-op', String(tc.op));
     st.setProperty('--tc-lift', tc.pos.endsWith('lift') ? '46px' : '0px');
     document.documentElement.classList.toggle('tc-swap', tc.pos.startsWith('swap'));
@@ -437,9 +441,9 @@ timeSel.addEventListener('change', () => {
   tDead.addEventListener('input', () => { tl.dead = +tDead.value; saveTilt(); });
   $('opt-tilt-zero').addEventListener('click', () => { tl.zero = Math.round(input.tiltRaw); saveTilt(); });
   applyTilt();
-  const vol = save.vol ?? { master: 1, engine: 1, fx: 1 };
+  const vol = { master: 1, engine: 1, fx: 1, ...save.vol, others: save.vol?.others ?? save.vol?.engine ?? 1, ambient: save.vol?.ambient ?? save.vol?.fx ?? 1 };
   sound.setVolume(vol);
-  for (const k of ['master', 'engine', 'fx'] as const) {
+  for (const k of ['master', 'engine', 'others', 'fx', 'ambient'] as const) {
     const el = $<HTMLInputElement>(`opt-vol-${k}`);
     el.value = String(vol[k]);
     el.addEventListener('input', () => { vol[k] = +el.value; save.vol = vol; sound.setVolume(vol); writeSave(); });
@@ -514,7 +518,7 @@ for (const id of ['opt-laps', 'opt-tyre', 'opt-rules', 'opt-gpwx', 'opt-diff', '
 }
 
 // ---------------------------------------------------------------- 比賽狀態
-type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'results' | 'replay' | 'podium';
+type State = 'menu' | 'countdown' | 'race' | 'free' | 'paused' | 'qualifying' | 'results' | 'replay' | 'podium';
 let state: State = 'menu';
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
@@ -1153,6 +1157,7 @@ function beginCountdown(quali = false) {
     qualiGrid = null;
     const wx = (BOT ? new URLSearchParams(location.search).get('gpwx') ?? 'dry' : $<HTMLSelectElement>('opt-gpwx').value) as GpWeather;
     field.setup(9, +$<HTMLSelectElement>('opt-tyre').value, ssn?.laps ?? +$<HTMLSelectElement>('opt-laps').value, grid ?? undefined, wx);
+    strategyWet = field.wet;
     if (ssn) { seasonGrid = (grid ?? field.racers).map((r) => r.name); ssn.pending = { id: CIRCUIT!.id, grid: seasonGrid, at: Date.now() }; writeSave(); } // 開跑了：中途離開就算棄賽
     // 安全車（設定 → 比賽）：正常＝有車撞停六成機率出、少見＝兩成五、關閉；測試 ?sc 一定出
     field.scChance = ({ normal: 0.6, rare: 0.25, off: 0 } as Record<string, number>)[$<HTMLSelectElement>('opt-sc').value] ?? 0.6;
@@ -1194,14 +1199,27 @@ function earn(n: number, why: string) {
   setMoney(money() + n);
   toast(`💰 ${why} 獎金 NT$ ${n.toLocaleString()}`, '');
 }
-// 選車：點車子看介紹；已經有的直接換上，沒有的顯示購買按鈕
+// 點車款先預覽；使用按鈕才寫入選車。
 let preview: Vehicle = chosen;
-const garage3d = new GaragePreview($<HTMLCanvasElement>('car-3d')); // 車庫分頁的 3D 預覽
+let garage3d: GaragePreview | null = null;
+let garageLoading: Promise<void> | null = null;
+function loadGaragePreview() {
+  if (garage3d || garageLoading) return;
+  const status = $('car-preview-status');
+  status.textContent = '載入 3D 預覽…';
+  garageLoading = import('./garage3d').then(({ GaragePreview }) => {
+    garage3d = new GaragePreview($<HTMLCanvasElement>('car-3d'));
+    garage3d?.show(preview);
+    status.textContent = '';
+  }).catch(() => { status.textContent = '預覽載入失敗，點此重試；仍可比較及選用車款。'; })
+    .finally(() => { garageLoading = null; });
+}
+$('car-preview-status').addEventListener('click', loadGaragePreview);
 const fmtNT = (n: number) => `NT$ ${n.toLocaleString()}`;
 function refreshGarage() {
   const list = $('car-list'), have = ownedCars(), m = money();
   $('wallet').textContent = fmtNT(m);
-  garage3d.show(preview);
+  garage3d?.show(preview);
   for (const b of list.children) {
     const id = (b as HTMLElement).dataset.id!, v = vehicleById(id);
     b.classList.toggle('on', id === preview.id);
@@ -1210,13 +1228,20 @@ function refreshGarage() {
     b.querySelector('small')!.textContent = have.has(id) ? '' : `🔒 ${v.price.toLocaleString()}`;
   }
   // 車子介紹：名稱、說明、四項性能長條（0~100 分）
-  const s = preview.spec, kmh = Math.round(s.vmax * 3.6 * 0.9);
+  const s = preview.spec, kmh = Math.round(s.vmax * 3.6);
   const f01 = (x: number, lo: number, hi: number) => Math.max(0.06, Math.min(1, (x - lo) / (hi - lo)));
   const bar = (label: string, f: number, txt: string) => `<div class="m-stat"><span>${label}</span><i style="--f:${(f * 100).toFixed(0)}%"></i><em>${txt}</em></div>`;
   const score = (f: number) => String(Math.round(f * 100));
   const fa = f01(s.engine, 5, 15), fg = f01(s.grip, 10, 24), fm = f01(s.mass, 0.4, 1.6);
   $('car-note').innerHTML = `<b class="m-cn">${preview.name}</b><span class="m-cd">${preview.note}</span>`
-    + bar('極速', f01(kmh, 100, 340), `${kmh} km/h`) + bar('加速', fa, score(fa)) + bar('操控', fg, score(fg)) + bar('重量', fm, score(fm));
+    + bar('速度上限', f01(kmh, 100, 340), `${kmh} km/h`) + bar('加速', fa, score(fa)) + bar('操控', fg, score(fg)) + bar('重量', fm, score(fm));
+  const current = chosen.spec;
+  const delta = (n: number, digits = 1) => `${n > 0 ? '+' : ''}${n.toFixed(digits)}`;
+  $('car-compare').textContent = preview.id === chosen.id ? '這是目前使用的車輛。' :
+    `相較目前使用的「${chosen.name}」：速度上限 ${delta((s.vmax - current.vmax) * 3.6, 0)} km/h、引擎 ${delta(s.engine - current.engine)}、抓地 ${delta(s.grip - current.grip)}、重量 ${delta(s.mass - current.mass, 2)}。`;
+  const use = $<HTMLButtonElement>('car-use');
+  use.textContent = preview.id === chosen.id ? '使用中' : '使用這台車';
+  use.disabled = preview.id === chosen.id || !have.has(preview.id);
   const buy = $<HTMLButtonElement>('car-buy');
   const owned = have.has(preview.id);
   buy.style.display = owned ? 'none' : '';
@@ -1266,11 +1291,14 @@ function refreshGarage() {
     b.innerHTML = `<i style="background:${v.color}"></i>${v.name}<small></small>`;
     b.addEventListener('click', () => {
       preview = v;
-      if (ownedCars().has(v.id)) { chosen = v; save.car = v.id; writeSave(); }
       refreshGarage();
     });
     list.appendChild(b);
   }
+  $('car-use').addEventListener('click', () => {
+    if (!ownedCars().has(preview.id)) return;
+    chosen = preview; save.car = preview.id; writeSave(); refreshGarage();
+  });
   $('car-buy').addEventListener('click', () => {
     if (ownedCars().has(preview.id) || money() < preview.price) return;
     save.owned = [...(save.owned ?? []), preview.id];
@@ -1283,6 +1311,7 @@ function refreshGarage() {
 }
 // 選單分頁：開始／車庫／設定／紀錄
 function menuTab(t: string) {
+  if (t === 'garage') loadGaragePreview();
   for (const b of document.querySelectorAll<HTMLElement>('.m-tabs button')) b.classList.toggle('on', b.dataset.tab === t);
   for (const p of document.querySelectorAll<HTMLElement>('.m-pane')) p.classList.toggle('on', p.dataset.pane === t);
   document.querySelector('.m-main')?.scrollTo(0, 0);
@@ -1715,6 +1744,7 @@ $('btn-menu').addEventListener('click', () => {
 const QUALI_TEST = new URLSearchParams(location.search).has('quali');
 const SC_AT = new URLSearchParams(location.search).get('scat') != null ? +new URLSearchParams(location.search).get('scat')! : null;
 let qualiRun = false, qualiGrid: Racer[] | null = null, lastGrid: Racer[] | null = null, QUALI_POS: number | null = null;
+let qualiJob: AbortController | null = null;
 const radio = new TeamRadio($('radio'));
 radio.onSay = () => sound.beep(1500, 0.05);
 let lastPos = -1, radioAcc = 0;
@@ -1733,6 +1763,8 @@ const scLights = [new THREE.MeshBasicMaterial({ color: '#ffb000', toneMapped: fa
 let podium: Podium | null = null, podiumT = 0;
 
 function startQuali() {
+  qualiJob?.abort();
+  qualiJob = null;
   // 賽季：排位賽就吃本站的車手狀態（狀態好的排位快、發車位置也前面）
   if (inSeasonRound() && save.season) { field.form = save.season.form ?? {}; field.setDifficulty(save.season.diff as Difficulty); field.applyDifficulty(); }
   raceKind = 'tt';
@@ -1750,11 +1782,52 @@ const withPersona = (r: Racer, quali = false) => {
 /** 排位賽跑完：AI 用同一套物理各跑一圈，大家照圈速排發車格 */
 function finishQuali(t: number) {
   qualiRun = false;
-  state = 'results';
   sound.engine(0, 0, false);
-  const times = field.qualify();
+  if (BOT) { state = 'results'; showQualiResults(t, field.qualify()); return; } // 同步回歸不等待事件迴圈
+  state = 'qualifying';
+  qualiGrid = null;
+  const job = new AbortController();
+  qualiJob = job;
+  $('quali-title').textContent = '排位計算中';
+  $('quali-table').replaceChildren();
+  $('quali-legend').textContent = '';
+  $('quali-go').style.display = 'none';
+  $('quali-again').style.display = 'none';
+  $('quali-res').setAttribute('aria-busy', 'true');
+  $('quali-res').classList.remove('hidden');
+  const progress = $<HTMLProgressElement>('quali-progress');
+  progress.hidden = false;
+  void field.qualifyAsync((completed, total) => {
+    progress.max = total;
+    progress.value = completed;
+    $('quali-sub').textContent = `正在計算對手圈速 ${completed}/${total}，可按「回選單」取消。`;
+  }, job.signal).then((times) => {
+    if (qualiJob !== job || job.signal.aborted) return;
+    qualiJob = null;
+    state = 'results';
+    showQualiResults(t, times);
+  }).catch((error: unknown) => {
+    if (qualiJob !== job || job.signal.aborted) return;
+    qualiJob = null;
+    state = 'results';
+    progress.hidden = true;
+    $('quali-res').removeAttribute('aria-busy');
+    $('quali-title').textContent = '排位計算未完成';
+    $('quali-sub').textContent = '請重跑排位，或返回選單。';
+    $('quali-again').style.display = '';
+    console.error(error);
+  });
+}
+function showQualiResults(t: number, times: Map<Racer, number | null>) {
+  $('quali-progress').hidden = true;
+  $('quali-res').removeAttribute('aria-busy');
+  $('quali-go').style.display = '';
+  $('quali-again').style.display = '';
   times.set(field.me, t);
-  const grid = [...field.racers].sort((a, b) => times.get(a)! - times.get(b)!);
+  const grid = [...field.racers].sort((a, b) => {
+    const ta = times.get(a) ?? Infinity, tb = times.get(b) ?? Infinity;
+    return ta === tb ? 0 : ta - tb; // 無有效圈排最後，同圈速／同為無有效圈保留原順序
+  });
   qualiGrid = grid;
   const pos = grid.indexOf(field.me) + 1, pole = times.get(grid[0])!;
   QUALI_POS = pos;
@@ -1764,7 +1837,8 @@ function finishQuali(t: number) {
     const tr = document.createElement('tr');
     if (r.isPlayer) tr.className = 'me';
     if (k === 0) tr.className += ' pole';
-    for (const v of [String(k + 1), withPersona(r, true), r.team, fmt(times.get(r)!), k ? `+${(times.get(r)! - pole).toFixed(3)}` : '']) {
+    const time = times.get(r);
+    for (const v of [String(k + 1), withPersona(r, true), r.team, time == null ? '無有效圈' : fmt(time), k && time != null ? `+${(time - pole).toFixed(3)}` : '']) {
       const td = document.createElement('td');
       td.textContent = v;
       tr.appendChild(td);
@@ -1773,6 +1847,8 @@ function finishQuali(t: number) {
   });
   $('quali-title').textContent = pos === 1 ? '🏁 竿位！' : `排位賽：第 ${pos} 位發車`;
   $('quali-legend').textContent = Object.values(PERSONAS).filter((p) => p.icon).map((p) => `${p.icon} ${p.tag}`).join('　');
+  const invalid = grid.filter((r) => times.get(r) == null).length;
+  if (invalid) $('quali-legend').textContent += `　${invalid} 位對手未在 150 秒內完成有效圈，依原順序排在有效成績之後。`;
   $('quali-sub').textContent = `你的圈速 ${fmt(t)}${pos > 1 ? `，落後竿位 ${(t - pole).toFixed(3)} 秒` : ''}${field.difficulty !== 'normal' ? `（AI 難度：${DIFFICULTY[field.difficulty].name}）` : ''}`;
   if (BOT && !new URLSearchParams(location.search).has('qualistop')) { startGpAfterQuali(); return; } // 測試：&qualistop 停在排位成績表（截圖用）
   $('quali-res').classList.remove('hidden');
@@ -1786,7 +1862,16 @@ function startGpAfterQuali() {
 }
 $('quali-go').addEventListener('click', async () => { await userStart(); startGpAfterQuali(); });
 $('quali-again').addEventListener('click', async () => { await userStart(); $('quali-res').classList.add('hidden'); startQuali(); });
-$('quali-menu').addEventListener('click', () => { $('quali-res').classList.add('hidden'); qualiGrid = null; state = 'menu'; showMenu(false); });
+function leaveQuali() {
+  qualiJob?.abort();
+  qualiJob = null;
+  $('quali-res').classList.add('hidden');
+  $('quali-res').removeAttribute('aria-busy');
+  qualiGrid = null;
+  state = 'menu';
+  showMenu(false);
+}
+$('quali-menu').addEventListener('click', leaveQuali);
 
 /**
  * 正賽的雨強度 0~1，只看 raceTime／rainAt／wet（純函式，同步模擬、截圖測試也一樣）：
@@ -1919,9 +2004,31 @@ $('podium-skip').addEventListener('click', endPodium);
 
 // ---------------------------------------------------------------- 正賽：名次、排行榜、成績表
 let boardAcc = 0;
+let strategyWet = 0;
+let strategyLoss: number | null | undefined;
+function updateStrategy() {
+  const wet = field.wet, trend = wetTrend(strategyWet, wet);
+  strategyWet = wet;
+  const me = field.me, left = Math.max(0, field.laps - Math.max(1, me.laps));
+  const advice = left < 1 ? '最後一圈，避免不必要的進站' : wet > 0.3 && me.compound !== RAIN ? '路面濕滑，建議換雨胎' : me.wear > 0.6 ? '輪胎磨耗偏高，考慮進站' : '胎況可用，依交通與天氣決定';
+  $('strategy-advice').textContent = advice;
+  if (!$<HTMLDetailsElement>('gp-strategy').open) return;
+  if (strategyLoss === undefined) {
+    let racingTime = 0;
+    for (let sd = PIT.LIM_IN; sd < PIT.LIM_OUT; sd += 2) {
+      const i = ((Math.round(sd / track.ds) % track.N) + track.N) % track.N;
+      racingTime += Math.min(2, PIT.LIM_OUT - sd) / Math.max(1, track.vTarget[i]);
+    }
+    strategyLoss = pitBaselineLoss(PIT.LIM_OUT - PIT.LIM_IN, field.pitlane?.speed ?? 80 / 3.6, racingTime);
+  }
+  const suggested = TYRES[field.suggestTyre(me)].short;
+  const queue = field.racers.some(r => !r.isPlayer && r.team === me.team && r.pit?.ph === 'box');
+  $('strategy-detail').textContent = `目前${TYRES[me.compound].short}胎 ${Math.round((1 - me.wear) * 100)}%${car.r26 ? `、電量 ${Math.round(car.energy * 100)}%` : ''}。濕度 ${Math.round(wet * 100)}%・${trend}。含本圈尚餘 ${left + 1} 圈，建議${suggested}胎。${queue ? '隊友正在停站，留意排隊。' : ''}限速段基礎損失約 ${strategyLoss?.toFixed(1) ?? '—'} 秒（含標準停站 2.5 秒，依賽道建議速度估算；未含進出減速、煞停與排隊）。`;
+}
 function updateGpHud() {
   boardAcc += 1;
   if (boardAcc % 6) return; // 每 6 幀更新一次就夠了
+  updateStrategy();
   const st = field.standings();
   const me = st.findIndex((r) => r.isPlayer);
   const mine = st[me];
@@ -2112,8 +2219,11 @@ function updatePitTyre(me: typeof field.me) {
   if (!show) return;
   // 擺在進站按鈕正上方（按鈕位置會隨觸控設定縮放、左右對調，照它實際的位置放）
   const pr = $('pit').getBoundingClientRect();
-  pitTyreEl.style.left = `${pr.left + pr.width / 2}px`;
-  pitTyreEl.style.top = `${pr.top - 44}px`;
+  const margin = 8, width = pitTyreEl.getBoundingClientRect().width;
+  const aligned = document.documentElement.classList.contains('tc-swap') ? pr.left : pr.right;
+  const center = Math.max(margin + width / 2, Math.min(innerWidth - margin - width / 2, aligned));
+  pitTyreEl.style.left = `${center}px`;
+  pitTyreEl.style.top = `${Math.max(margin, pr.top - 54)}px`;
   const pick = me.pitTyre >= 0 ? me.pitTyre : field.suggestTyre(me);
   [...pitTyreEl.children].forEach((b, k) => b.classList.toggle('sel', k === pick));
 }
@@ -2257,6 +2367,7 @@ function goBack(): boolean {
   if (!menu.classList.contains('hidden') && document.querySelector('.m-pane.on[data-pane="circuits"]')) { menuTab('play'); return true; }
   if (state === 'replay') { endReplay(); return true; }
   if (state === 'podium') { endPodium(); return true; }
+  if (state === 'qualifying') { leaveQuali(); return true; }
   if (state === 'results') return true; // 成績頁、排位結果：有該由玩家決定的按鈕（下一站、再比一次、開始正賽），返回鍵不替他選，但也不能讓遊戲退出
   if (state === 'race' || state === 'countdown' || state === 'free') { pause(); return true; }
   return false;
@@ -3121,7 +3232,7 @@ renderer.setAnimationLoop(() => {
   if (state === 'race' && raceKind === 'gp' && !SIM) { radioTick(dt); radio.update(dt); }
   cityStream?.tick(dt); // 新載入的城市區塊長起來
   // 車庫分頁看得到時才畫 3D 預覽；烤漆照遊戲裡那台
-  garage3d.frame(dt, !menu.classList.contains('hidden') && !!document.querySelector('.m-pane.on[data-pane="garage"]'), (playerCars.get(preview.id as VehicleId)?.model.root.userData.paint as THREE.MeshStandardMaterial | undefined)?.color ?? null);
+  garage3d?.frame(dt, !menu.classList.contains('hidden') && !!document.querySelector('.m-pane.on[data-pane="garage"]'), (playerCars.get(preview.id as VehicleId)?.model.root.userData.paint as THREE.MeshStandardMaterial | undefined)?.color ?? null);
   // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
   fpsN2++; fpsT2 += dt;
   cullAcc += dt;
@@ -3165,7 +3276,7 @@ renderer.setAnimationLoop(() => {
 //   新的 Service Worker 會 skipWaiting＋clients.claim 立刻接手（sw-template.js）→ 這邊收到 controllerchange，
 //   就在選單顯示「有新版本」，玩家自己點了才重新載入（比賽、開車中不會被打斷）
 if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
-  addEventListener('load', () => {
+  const setupOffline = () => {
     const hadController = !!navigator.serviceWorker.controller; // 第一次安裝（原本沒有）接手不算「新版本」
     navigator.serviceWorker.register('/sw.js').then((reg) => {
       document.addEventListener('visibilitychange', () => { if (!document.hidden) void reg.update().catch(() => {}); });
@@ -3176,7 +3287,10 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
       b.hidden = false;
       if (state === 'menu') toast('🔄 有新版本，在選單點「有新版本」更新', '');
     });
-  });
+  };
+  // top-level await 讀資料時，load 可能已經發生。
+  if (document.readyState === 'complete') setupOffline();
+  else addEventListener('load', setupOffline, { once: true });
   $('m-update').addEventListener('click', () => location.reload());
 }
 

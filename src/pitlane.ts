@@ -158,7 +158,7 @@ export class PitLane {
   private tyre: THREE.InstancedMesh;
   private band: THREE.InstancedMesh;
   private sign: THREE.InstancedMesh;
-  /** 四肢、手套、靴子、扳手、千斤頂、軸頭：全部是「骨頭」（六角柱，一段一個實例，place 每格用兩端點排出來） */
+  /** 四肢、手套、靴子、扳手、千斤頂、軸頭：全部是「骨頭」（五角柱，一段一個實例，place 每格用兩端點排出來） */
   private bone: THREE.InstancedMesh;
   /** 每隊每人目前的 [a, b, 蹲（0 站 ~ 1 蹲）] */
   private pose: Float32Array;
@@ -293,13 +293,14 @@ export class PitLane {
 
     // ---- 維修人員、輪胎、放行牌（全部隊伍共用幾個 InstancedMesh）
     const n = TEAMS.length * CREW_N;
-    // 人形：骨盆＋軀幹是一個實例，頭（安全帽＋深色面罩）一個，四肢／手套／靴子／工具全是「骨頭」（六角柱，一段一個實例）
+    // 人形：骨盆＋軀幹是一個實例，頭（安全帽＋深色面罩）一個，四肢／手套／靴子／工具全是「骨頭」（五角柱，一段一個實例）
     const tint = (g: THREE.BufferGeometry, c: string) => { const col = new THREE.Color(c), a = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = col.r; a[i + 1] = col.g; a[i + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
     const pelvis = new THREE.BoxGeometry(0.34, 0.2, 0.22).translate(0, 0.04, 0), chest = new THREE.BoxGeometry(0.44, 0.5, 0.25).translate(0, 0.38, 0);
     this.body = new THREE.InstancedMesh(mergeGeometries([pelvis, chest]), new THREE.MeshLambertMaterial(), n);
-    const dome = tint(new THREE.SphereGeometry(0.15, 8, 6).scale(1, 1.08, 1.1), '#ffffff'), visor = tint(new THREE.BoxGeometry(0.2, 0.07, 0.1).translate(0, 0.02, 0.12), '#0c0e12');
+    // 頭盔保留水平 8 分段，只減少縱向分段：165 人省 5,280 個三角形，外框與面罩不變。
+    const dome = tint(new THREE.SphereGeometry(0.15, 8, 4).scale(1, 1.08, 1.1), '#ffffff'), visor = tint(new THREE.BoxGeometry(0.2, 0.07, 0.1).translate(0, 0.02, 0.12), '#0c0e12');
     this.head = new THREE.InstancedMesh(mergeGeometries([dome, visor]), new THREE.MeshLambertMaterial({ vertexColors: true }), n);
-    this.bone = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0), new THREE.MeshLambertMaterial(), TEAMS.length * SEG_PER_TEAM); // 不封口：關節處被別段蓋住，省一半三角形
+    this.bone = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 5, 1, true).translate(0, 0.5, 0), new THREE.MeshLambertMaterial(), TEAMS.length * SEG_PER_TEAM); // 不封口：關節處被別段蓋住；五角柱讓 2,310 段再省 4,620 個三角形
     const tyreGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.36, 14).rotateZ(Math.PI / 2);
     this.tyre = new THREE.InstancedMesh(tyreGeo, new THREE.MeshLambertMaterial({ color: '#1b1b1d' }), TEAMS.length * 8);
     this.band = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.38, 14, 1, true).rotateZ(Math.PI / 2), new THREE.MeshBasicMaterial({ side: D }), TEAMS.length * 8);

@@ -12,6 +12,7 @@ export class Input {
   tiltRaw = 0;
   /** 轉向靈敏度（0.5~1.5）：手機按鈕、拖曳、傾斜、鍵盤都乘上這個 */
   sens = 1;
+  curve: 'linear' | 'gentle' = 'linear';
   private padSteer = 0;
   private padId = -1;
   private brakeIds = new Set<number>();
@@ -37,6 +38,7 @@ export class Input {
       };
       btn.addEventListener('pointerup', end);
       btn.addEventListener('pointercancel', end);
+      btn.addEventListener('lostpointercapture', end);
       addEventListener('blur', () => { ids.clear(); btn.classList.remove('on'); });
     };
     hold(leftBtn, this.leftIds);
@@ -58,6 +60,7 @@ export class Input {
     };
     pad.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      if (this.padId >= 0) return;
       this.padId = e.pointerId;
       pad.setPointerCapture(e.pointerId);
       padMove(e);
@@ -65,6 +68,7 @@ export class Input {
     pad.addEventListener('pointermove', (e) => { if (e.pointerId === this.padId) padMove(e); });
     pad.addEventListener('pointerup', padEnd);
     pad.addEventListener('pointercancel', padEnd);
+    pad.addEventListener('lostpointercapture', padEnd);
 
     brakeBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -78,6 +82,7 @@ export class Input {
     };
     brakeBtn.addEventListener('pointerup', brakeEnd);
     brakeBtn.addEventListener('pointercancel', brakeEnd);
+    brakeBtn.addEventListener('lostpointercapture', brakeEnd);
     // 油門（只有自由駕駛會顯示；街道賽油門自動）
     gasBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -91,9 +96,20 @@ export class Input {
     };
     gasBtn.addEventListener('pointerup', gasEnd);
     gasBtn.addEventListener('pointercancel', gasEnd);
+    gasBtn.addEventListener('lostpointercapture', gasEnd);
 
     addEventListener('keydown', (e) => { this.keys.add(e.code); if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
+    const reset = () => {
+      this.keys.clear();
+      for (const ids of [this.brakeIds, this.gasIds, this.leftIds, this.rightIds, this.driftIds]) ids.clear();
+      this.padId = -1; this.padSteer = 0; this.tiltSteer = 0;
+      dot.style.transform = '';
+      for (const btn of [brakeBtn, gasBtn, leftBtn, rightBtn, driftBtn]) btn?.classList.remove('on');
+    };
+    addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
+    screen.orientation?.addEventListener('change', reset);
     addEventListener('blur', () => { this.keys.clear(); this.brakeIds.clear(); this.gasIds.clear(); brakeBtn.classList.remove('on'); gasBtn.classList.remove('on'); });
 
     // 橫向握手機像握方向盤：左右轉動手機就是 beta 的變化。
@@ -114,6 +130,7 @@ export class Input {
 
   /** iOS 要在使用者點擊時才能要求陀螺儀權限 */
   async enableTilt(): Promise<boolean> {
+    if (!('DeviceOrientationEvent' in window)) return false;
     const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
     if (typeof DOE.requestPermission === 'function') {
       try { return (await DOE.requestPermission()) === 'granted'; } catch { return false; }
@@ -131,6 +148,7 @@ export class Input {
     else if (this.tilt && steer === 0) steer = this.tiltSteer;
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
     const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
+    if (this.curve === 'gentle') steer = Math.sign(steer) * Math.abs(steer) ** 1.6;
     steer = clamp(steer * this.sens);
     const handbrake = this.driftIds.size > 0 || k.has('ShiftLeft') || k.has('ShiftRight'); // 甩尾
     return { steer, brake, throttle, handbrake };

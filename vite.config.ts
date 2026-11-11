@@ -29,9 +29,9 @@ function serviceWorker(): Plugin {
       const hash = createHash('sha256');
       for (const f of files) hash.update(readFileSync(f));
       const version = hash.digest('hex').slice(0, 12);
-      // 城市區塊檔（/data/tiles/）不預先快取：地圖很大時一次全抓太浪費，開到附近才抓、抓過的存進快取（離線也能開去過的地方）。
+      // 城市區塊與車庫預覽按需下載；首次開過後由 fetch handler 快取，後續可離線使用。
       // 版本號仍然算進它們的內容，地圖一改就換新快取
-      const urls = files.map((f) => '/' + relative(outDir, f).split('\\').join('/')).filter((u) => !u.startsWith('/data/tiles/')).map((u) => (u === '/index.html' ? '/' : u));
+      const urls = files.map((f) => '/' + relative(outDir, f).split('\\').join('/')).filter((u) => !u.startsWith('/data/tiles/') && !/^\/assets\/garage3d-.*\.js$/.test(u)).map((u) => (u === '/index.html' ? '/' : u));
       const sw = readFileSync(resolve(__dirname, 'src/sw-template.js'), 'utf8')
         .replace('__VERSION__', version)
         .replace('__PRECACHE__', JSON.stringify(urls));

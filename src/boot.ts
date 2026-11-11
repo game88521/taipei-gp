@@ -56,6 +56,7 @@ function skyline(): string {
 }
 
 const el = document.getElementById('boot');
+let progress = 0, finished = false;
 let tipT = 0, tipSwap = 0; // tipSwap：「淡出 250 ms 後換字」那個還沒執行的計時器；失敗時要一起取消，不然會把失敗訊息蓋回小提示
 if (el) {
   el.insertAdjacentHTML('afterbegin', skyline());
@@ -68,7 +69,15 @@ if (el) {
 
 /** 載入進度（label：現在在做什麼、f：0~1） */
 export function bootProgress(label: string, f: number) {
-  if (!el) return;
+  if (!el || finished) return;
+  progress = Math.max(progress, Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : progress);
+  f = progress;
+  const track = el.querySelector('.b-track');
+  track?.setAttribute('role', 'progressbar');
+  track?.setAttribute('aria-label', '遊戲載入進度');
+  track?.setAttribute('aria-valuemin', '0');
+  track?.setAttribute('aria-valuemax', '100');
+  track?.setAttribute('aria-valuenow', String(Math.round(f * 100)));
   document.getElementById('boot-label')!.textContent = label;
   document.getElementById('boot-pct')!.textContent = `${Math.round(f * 100)}%`;
   document.getElementById('boot-bar')!.style.width = `${Math.round(f * 100)}%`;
@@ -81,6 +90,7 @@ export function bootProgress(label: string, f: number) {
  */
 export function bootFail(message: string, canGoHome: boolean) {
   if (!el) return;
+  finished = true;
   clearInterval(tipT);
   clearTimeout(tipSwap);
   document.getElementById('boot-label')!.textContent = '載入失敗';
@@ -110,7 +120,10 @@ export function bootFail(message: string, canGoHome: boolean) {
 /** 載完：淡出 */
 export function bootDone() {
   if (!el || el.classList.contains('done')) return;
+  bootProgress('準備完成', 1);
+  finished = true;
   clearInterval(tipT);
+  clearTimeout(tipSwap);
   el.classList.add('done');
   setTimeout(() => el.remove(), 900);
 }

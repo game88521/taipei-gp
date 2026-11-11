@@ -5,3 +5,7 @@ tools/plan.svg
 tools/osm-cache/
 tools/osm-rail.json
 tools/circuits-cache/
+
+tools/dev-tests/gpw-prof*
+tools/dev-tests/chain-stab-out.txt
+tools/dev-tests/shots-*
