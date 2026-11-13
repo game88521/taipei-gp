@@ -1,6 +1,6 @@
 # 私人房連線競速
 
-提供台北及全部 23 條大獎賽賽道、2～4 人、1／3／5 圈、房間碼加入、全員準備、三秒同步倒數、即時順位、成績與再戰。房主可在建房時選圖，也能在大廳換圖；換圖後全員重新載入並準備。沿用原本多人 classic 自動油門、方向／煞車與車輛物理，保留 GP 高低差、傾斜彎與日夜場景。玩家車輛互不碰撞，撞牆照常減速。
+提供台北及全部 23 條大獎賽賽道、2～4 人、1／3／5 圈、房間碼加入、全員準備、三秒同步倒數、即時順位、成績與再戰。房主可在建房時選圖，也能在大廳換圖；換圖後全員重新載入並準備。沿用原本多人 classic 自動油門、方向／煞車與車輛物理，保留 GP 高低差、傾斜彎與日夜場景。比賽中玩家車輛會互相碰撞：追撞傳遞速度、側擦推開，高架橋上下不互撞，撞牆照常減速。
 
 伺服器以 60Hz 推進真實車輛、依序判定分段／終點與完賽時間，再以 20Hz 傳送快照。玩家只送方向和煞車；車輛位置、圈數和成績不接受客戶端上報。前端預測自車、平滑校正及插值其他車輛。這是朋友私人房，沒有公開配對、帳號或語音功能；不發錢或修改單人 PB、賽季及排行榜。
 
@@ -33,14 +33,14 @@ npx.cmd vite preview --port 4317 --strictPort
 
 ## 公開讓朋友加入
 
-Rex 已建立 Render Free 服務 `https://taipei-gp.onrender.com`，並回報 v1 已成功與朋友連線；這是使用者回報，不是本輪自動外網驗證。多人選圖是 **v2，尚未部署**，必須一起更新對戰服務及 Vercel 測試前端。設定見 [MULTIPLAYER_DEPLOYMENT.md](./MULTIPLAYER_DEPLOYMENT.md)。服務維持單實例、Node 24、WebSocket 長連線，不能改成一般 `api/` request／response 函式。
+Rex 已建立 Render Free 服務 `https://taipei-gp.onrender.com`。24 圖版已於提交 `f586ca9` 部署，並由 Rex 回報「看得到地圖，且已雙人起跑」。本輪碰撞功能尚未部署，必須一起更新對戰服務及 Vercel 測試前端。設定見 [MULTIPLAYER_DEPLOYMENT.md](./MULTIPLAYER_DEPLOYMENT.md)。服務維持單實例、Node 24、WebSocket 長連線，不能改成一般 `api/` request／response 函式。
 
 1. 依 [server/README.md](./server/README.md) 部署服務並提供 TLS，取得 `wss://自己的服務/ws`；Docker 檔已備妥，Docker build 尚未實測。
 2. 在服務設定 `ALLOWED_ORIGINS` 為實際遊戲前端的 HTTPS origin。
 3. 在前端建置環境設定公開 `VITE_MULTIPLAYER_URL=wss://自己的服務/ws`，重新建置並部署前端。
 4. 先在測試部署驗證兩位玩家與行動網路，再決定正式上版。
 
-沒有設定公開端點的頁面會顯示「連線服務尚未開放」。v1 與 v2 不相容；把同一個 Render 服務升為 v2 後，舊 v1 前端無法再連它。要保留兩版多人連線，須分開服務及端點。單人模式不依賴對戰服務。這輪尚未 commit／push；v2 外網與手機實機尚未驗證。
+沒有設定公開端點的頁面會顯示「連線服務尚未開放」。碰撞版使用 `classic-multitrack-collisions-v3`；舊 v1 及 24 圖 `classic-multitrack-v2` 前端無法加入新後端。兩端必須配套更新；要保留舊版多人連線，須分開服務及端點。單人模式不依賴對戰服務。本輪尚未 commit／push；碰撞版外網與手機實機尚未驗證。
 
 ## 架構與重跑
 
@@ -50,6 +50,8 @@ Rex 已建立 Render Free 服務 `https://taipei-gp.onrender.com`，並回報 v1
 - `shared/multiplayer-track-recipe.ts`／`src/multiplayer-track-loader.ts`：GP 幾何配方、按需下載及每房獨立賽道。
 - `shared/multiplayer-protocol.ts`／[協定說明](./shared/multiplayer-protocol.md)：訊息、版本與賽道身分。
 - `server/room-service.mjs`／`index.mjs`：權威物理、房間、Origin 及資源限制。
+- `shared/multiplayer-collisions.ts`：多人車身碰撞、掃掠防穿車及高度分層；全車更新後解碰撞，再以最終位置計進度及成績。
+- `src/multiplayer-collision-feedback.ts`：碰撞權威修正及附近車輛的畫面同步。
 - `tools/build-multiplayer-physics.mjs`：直接將現有 `Car`／`buildTrack` 打包成 `server/physics.mjs`，不維護另一套物理參數；每次 `npm run build` 自動生成。
 
-測試入口見 [測試計畫](./tools/dev-tests/MULTIPLAYER_TEST_PLAN.md)，選圖版本實際結果見 [MULTIPLAYER_MAPS_VALIDATION.md](./MULTIPLAYER_MAPS_VALIDATION.md)。v1 歷史結果保留在 `MULTIPLAYER_VALIDATION.md`。若修改物理、賽道或協定，必須同步更新身分並重建前後端，版本不一致會拒絕加入。
+測試入口見 [測試計畫](./tools/dev-tests/MULTIPLAYER_TEST_PLAN.md)，本輪設計及結果見 [MULTIPLAYER_COLLISIONS.md](./MULTIPLAYER_COLLISIONS.md) 與 [MULTIPLAYER_COLLISIONS_VALIDATION.md](./MULTIPLAYER_COLLISIONS_VALIDATION.md)；選圖歷史結果見 [MULTIPLAYER_MAPS_VALIDATION.md](./MULTIPLAYER_MAPS_VALIDATION.md)。v1 歷史結果保留在 `MULTIPLAYER_VALIDATION.md`。若修改物理、賽道或協定，必須同步更新身分並重建前後端，版本不一致會拒絕加入。

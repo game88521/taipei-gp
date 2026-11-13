@@ -3,7 +3,9 @@ import type { CarState } from '../src/car';
 
 export type { CarState };
 export const PROTOCOL_VERSION = 2;
-export const PHYSICS_VERSION = 'classic-multitrack-v2';
+// Collision response changes authority and prediction even though the wire
+// schema remains v2. Both peers must use the same physical rules.
+export const PHYSICS_VERSION = 'classic-multitrack-collisions-v3';
 export const CATALOG_STAMP: string = catalog.catalogStamp;
 /** Legacy test import only; v2 entry messages require catalogStamp. */
 export const TRACK_STAMP: string = catalog.tracks[0].trackStamp;

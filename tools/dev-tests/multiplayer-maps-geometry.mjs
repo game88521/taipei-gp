@@ -63,7 +63,11 @@ function compareTrack(actual, expected, label) {
 try {
   const baselineMain = await readFile(join(baseline, 'src/main.ts'), 'utf8');
   const baselineCircuits = await readFile(join(baseline, 'src/circuits.ts'), 'utf8');
-  const circuitScript = stripTypeScriptTypes(baselineCircuits, { mode: 'transform' })
+  // Older baselines declare metadata in circuits.ts; v2 re-exports a pure catalog.
+  // Read the independent baseline's catalog, never the candidate implementation.
+  const metadataSource = /from\s*['"]\.\.\/shared\/circuit-catalog['"]/.test(baselineCircuits)
+    ? await readFile(join(baseline, 'shared/circuit-catalog.ts'), 'utf8') : baselineCircuits;
+  const circuitScript = stripTypeScriptTypes(metadataSource, { mode: 'transform' })
     .replace(/^import\s.+;\s*$/gm, '').replace(/^export\s+/gm, '');
   const originalMetadata = JSON.parse(JSON.stringify(vm.runInNewContext(`${circuitScript}\nCIRCUITS;`, {
     location: { search: '' }, URLSearchParams, fetchJsonWithRetry() { throw new Error('此測試不下載資料'); },

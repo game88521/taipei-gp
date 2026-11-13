@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Car } from './car';
-import { buildTrack, surfaceY, bankRoll, heightAt, type Track } from './track';
+import { buildTrack, surfaceY, bankRoll, heightAt, locate, type Track } from './track';
 import { buildWorld, type World } from './world';
 import { buildCircuitEnv } from './circuitenv';
 import { buildEnvMap } from './graphics';
@@ -11,8 +11,13 @@ import { onProgress } from './loading';
 import { loadMultiplayerTrack } from './multiplayer-track-loader';
 import { disposeMultiplayerObjects, disposeMultiplayerScene } from './multiplayer-scene-resources';
 import { DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../shared/multiplayer-tracks';
+import {
+  authoritativeCollisionChanged, nearMultiplayerOpponent, nearMultiplayerOpponents, collisionVisualTarget,
+  MULTIPLAYER_COLLISION_FEEDBACK_MS, MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS, type AuthoritativeCarSample,
+} from './multiplayer-collision-feedback';
 import type { CarModel } from './carModel';
 import type { CarState, RoomSnapshot } from '../shared/multiplayer-protocol';
+import { multiplayerCarsOverlap, resolveMultiplayerCollisions } from '../shared/multiplayer-collisions';
 
 type Sample = { at: number; car: CarState };
 type VisualCar = { model: CarModel; name: THREE.Sprite; samples: Sample[] };
@@ -41,6 +46,12 @@ export class MultiplayerScene {
   private selfId: string | null = null;
   private matchId: string | null = null;
   private correction = new THREE.Vector3();
+  private authoritativeSelf: AuthoritativeCarSample | null = null;
+  private collisionRecoveryUntil = -Infinity;
+  private collisionVisualUntil = new Map<string, number>();
+  private predictionAt = 0;
+  private predictedPeers = new Map<string, CarState>();
+  private predictionContact = false;
   private camH = 0;
   private cameraReady = false;
   private closeCamera = false;
@@ -194,6 +205,9 @@ export class MultiplayerScene {
 
   private resetPrediction() {
     this.room = null; this.selfId = null; this.matchId = null;
+    this.authoritativeSelf = null; this.collisionRecoveryUntil = -Infinity;
+    this.collisionVisualUntil.clear();
+    this.predictedPeers.clear(); this.predictionAt = 0; this.predictionContact = false;
     this.inputHistory = []; this.lastSteer = 0; this.lastBrake = true;
     this.accumulator = 0; this.correction.set(0, 0, 0); this.cameraReady = false; this.cullAt = 0;
     for (const visual of this.cars.values()) visual.samples = [];
@@ -234,11 +248,21 @@ export class MultiplayerScene {
     if (!this.matchesMap(room) || room.players.some(player => !Number.isInteger(player.car.pos.i) || player.car.pos.i < 0 || player.car.pos.i >= this.track.N)) return;
     const newMatch = room.matchId !== this.matchId;
     this.room = room; this.selfId = selfId;
-    if (newMatch) { this.matchId = room.matchId; this.inputHistory = []; this.accumulator = 0; this.correction.set(0, 0, 0); }
+    // 暫態 peer 與自車從同一份權威時間起步；絕不更動 room 快照或回傳位置。
+    this.predictionAt = room.serverTime;
+    this.predictionContact = false;
+    this.predictedPeers = new Map(room.players.filter(p => p.id !== selfId && p.connected && p.loaded && !p.dnf && p.finishMs === null)
+      .map(p => [p.id, { ...p.car, pos: { ...p.car.pos } }]));
+    if (newMatch) {
+      this.matchId = room.matchId; this.inputHistory = []; this.accumulator = 0; this.correction.set(0, 0, 0);
+      this.authoritativeSelf = null; this.collisionRecoveryUntil = -Infinity;
+      this.collisionVisualUntil.clear();
+    }
     const liveIds = new Set(room.players.map(p => p.id));
     for (const [id, visual] of this.cars) if (!liveIds.has(id)) {
       this.removeVisual(visual);
       this.cars.delete(id);
+      this.collisionVisualUntil.delete(id);
     }
     for (const player of room.players) {
       let visual = this.cars.get(player.id);
@@ -256,20 +280,28 @@ export class MultiplayerScene {
       visual.samples = visual.samples.filter(s => s.at >= room.serverTime - 1000).slice(-24);
       if (player.id === selfId) {
         const oldX = this.car.x + this.correction.x, oldZ = this.car.z + this.correction.z;
+        const racing = room.phase === 'racing' && player.loaded && player.connected && player.finishMs === null && !player.dnf;
+        if (racing && authoritativeCollisionChanged(this.track, this.authoritativeSelf, room.serverTime, player, room.players)) {
+          this.collisionRecoveryUntil = now + MULTIPLAYER_COLLISION_FEEDBACK_MS;
+          for (const peer of nearMultiplayerOpponents(this.track, player, room.players)) this.collisionVisualUntil.set(peer.id, this.collisionRecoveryUntil);
+        }
+        const collisionCorrection = racing && now < this.collisionRecoveryUntil && nearMultiplayerOpponent(this.track, player, room.players);
         this.car.restore(player.car);
-        if (room.phase === 'racing' && player.loaded && player.finishMs === null && !player.dnf) {
+        if (racing && !collisionCorrection) {
           const from = Math.max(room.serverTime, now - 180);
           const history = this.inputHistory.filter(s => s.at <= now);
           let at = from;
           let control = [...history].reverse().find(s => s.at <= from) ?? { steer: this.lastSteer, brake: this.lastBrake };
           for (const command of history.filter(s => s.at > from)) {
-            this.predict((command.at - at) / 1000, control.steer, control.brake); at = command.at; control = command;
+            this.predict((command.at - at) / 1000, control.steer, control.brake, now); at = command.at; control = command;
           }
-          this.predict(Math.max(0, now - at) / 1000, control.steer, control.brake);
+          this.predict(Math.max(0, now - at) / 1000, control.steer, control.brake, now);
         }
         this.inputHistory = this.inputHistory.filter(s => s.at >= now - 500);
         const distance = Math.hypot(oldX - this.car.x, oldZ - this.car.z);
-        this.correction.set(newMatch || distance > 20 ? 0 : oldX - this.car.x, 0, newMatch || distance > 20 ? 0 : oldZ - this.car.z);
+        const immediate = newMatch || collisionCorrection || this.predictionContact || distance > 20;
+        this.correction.set(immediate ? 0 : oldX - this.car.x, 0, immediate ? 0 : oldZ - this.car.z);
+        this.authoritativeSelf = { at: room.serverTime, car: player.car };
         if (newMatch || !this.cameraReady) { this.resetCamera(); this.cameraReady = true; }
       }
     }
@@ -281,9 +313,26 @@ export class MultiplayerScene {
     this.inputHistory.push({ at, steer, brake });
     this.inputHistory = this.inputHistory.filter(s => s.at >= at - 500);
   }
-  private predict(dt: number, steer: number, brake: boolean) {
+  private predict(dt: number, steer: number, brake: boolean, now: number) {
     let remaining = Math.min(.18, Math.max(0, dt));
-    while (remaining > .000001) { const d = Math.min(1 / 60, remaining); this.car.update(d, this.track, steer, brake); remaining -= d; }
+    while (remaining > .000001) {
+      // 網路暫停時最多外推180ms，避免自車不停前進而對手停在過期的位置。
+      const d = Math.min(1 / 60, remaining, Math.max(0, ((this.room?.serverTime ?? this.predictionAt) + 180 - this.predictionAt) / 1000));
+      if (d < .000001) break;
+      const bodies = [{ id: this.selfId!, car: this.car, previous: { x: this.car.x, z: this.car.z, h: this.car.h } },
+        ...[...this.predictedPeers].map(([id, car]) => ({ id, car, previous: { x: car.x, z: car.z, h: car.h } }))];
+      this.car.update(d, this.track, steer, brake);
+      for (const peer of this.predictedPeers.values()) {
+        peer.x += Math.sin(peer.h) * peer.v * d; peer.z += Math.cos(peer.h) * peer.v * d;
+        locate(this.track, peer.x, peer.z, peer.pos);
+      }
+      for (const contact of resolveMultiplayerCollisions(this.track, bodies, d)) if (contact.a === this.selfId || contact.b === this.selfId) {
+        this.predictionContact = true;
+        this.correction.set(0, 0, 0);
+        this.collisionVisualUntil.set(contact.a === this.selfId ? contact.b : contact.a, now + MULTIPLAYER_COLLISION_FEEDBACK_MS);
+      }
+      this.predictionAt += d * 1000; remaining -= d;
+    }
   }
   toggleCamera() { this.closeCamera = !this.closeCamera; }
 
@@ -294,32 +343,53 @@ export class MultiplayerScene {
     const me = this.room?.players.find(p => p.id === this.selfId);
     if (this.room?.phase === 'racing' && me && me.finishMs === null && !me.dnf && canDrive) {
       this.accumulator += Math.min(dt, .1);
-      while (this.accumulator >= 1 / 60) { this.car.update(1 / 60, this.track, steer, brake); this.accumulator -= 1 / 60; }
+      while (this.accumulator >= 1 / 60) { this.predict(1 / 60, steer, brake, now); this.accumulator -= 1 / 60; }
     } else this.accumulator = 0;
     this.correction.multiplyScalar(Math.exp(-dt * 12));
+    const presented = new Map<string, CarState>();
     for (const [id, visual] of this.cars) {
       let car: CarState = this.car.snapshot();
       let ox = this.correction.x, oz = this.correction.z;
       if (id !== this.selfId) {
-        const samples = visual.samples, target = now - 110;
+        const predicted = this.predictedPeers.get(id);
+        // 貼車時兩車必須使用同個預測時點，不能讓110ms前的對手被自車穿過。
+        const close = predicted && multiplayerCarsOverlap(this.track, this.car, predicted, .4);
+        if (close) this.collisionVisualUntil.set(id, now + MULTIPLAYER_COLLISION_FEEDBACK_MS);
+        const until = this.collisionVisualUntil.get(id);
+        const samples = visual.samples, target = collisionVisualTarget(now, until);
+        if (until !== undefined && now >= until + MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS) this.collisionVisualUntil.delete(id);
         let a = samples[0], b = a;
         for (const sample of samples) { if (sample.at <= target) a = sample; if (sample.at >= target) { b = sample; break; } b = sample; }
         if (!a || !b) continue;
         const f = Math.max(0, Math.min(1, (target - a.at) / (b.at - a.at || 1)));
         car = { ...a.car, x: a.car.x + (b.car.x - a.car.x) * f, z: a.car.z + (b.car.z - a.car.z) * f, h: lerpAngle(a.car.h, b.car.h, f), v: a.car.v + (b.car.v - a.car.v) * f };
+        if (predicted && until !== undefined) {
+          const recovery = Math.max(0, Math.min(1, (now - until) / MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS));
+          car = { ...predicted, pos: { ...predicted.pos }, x: predicted.x + (car.x - predicted.x) * recovery,
+            z: predicted.z + (car.z - predicted.z) * recovery, h: lerpAngle(predicted.h, car.h, recovery),
+            v: predicted.v + (car.v - predicted.v) * recovery };
+        }
         ox = 0; oz = 0;
       }
+      presented.set(id, { ...car, x: car.x + ox, z: car.z + oz, pos: { ...car.pos } });
+    }
+    // 校正偏移與插值也可能跨入車身；僅對呈現副本做最後分離，權威狀態不受影響。
+    const activeIds = new Set(this.room?.players.filter(p => p.connected && p.loaded && !p.dnf && p.finishMs === null).map(p => p.id));
+    resolveMultiplayerCollisions(this.track, [...presented].filter(([id]) => activeIds.has(id)).map(([id, car]) => ({ id, car })), 0);
+    for (const [id, car] of presented) {
+      const visual = this.cars.get(id)!;
       const y = surfaceY(this.track, car.pos.i, car.pos.lat);
-      visual.model.root.position.set(car.x + ox, y, car.z + oz);
+      visual.model.root.position.set(car.x, y, car.z);
       visual.model.root.rotation.set(-Math.atan(this.track.grade[car.pos.i]), car.h, bankRoll(this.track, car.pos.i, car.pos.lat), 'YXZ');
       visual.model.body.rotation.z = car.steer * Math.min(1, car.v / 40) * .04;
       for (const wheel of visual.model.steer) wheel.rotation.y = -car.steer * .45;
       for (const wheel of visual.model.spin) wheel.rotation.x += car.v / .35 * dt;
-      visual.name.position.set(car.x + ox, y + 3, car.z + oz); visual.name.visible = id !== this.selfId;
+      visual.name.position.set(car.x, y + 3, car.z); visual.name.visible = id !== this.selfId;
     }
     this.camH = lerpAngle(this.camH, this.car.h, Math.min(1, dt * 7));
     const back = this.closeCamera ? 4.8 : 9, up = this.closeCamera ? 2.2 : 3.6;
-    const fx = Math.sin(this.camH), fz = Math.cos(this.camH), x = this.car.x + this.correction.x, z = this.car.z + this.correction.z;
+    const displaySelf = presented.get(this.selfId ?? '');
+    const fx = Math.sin(this.camH), fz = Math.cos(this.camH), x = displaySelf?.x ?? this.car.x + this.correction.x, z = displaySelf?.z ?? this.car.z + this.correction.z;
     const base = surfaceY(this.track, this.car.pos.i, this.car.pos.lat);
     const target = new THREE.Vector3(x - fx * back, base + up, z - fz * back);
     this.camera.position.lerp(target, Math.min(1, dt * 10)); this.camera.lookAt(x + fx * 6, heightAt(this.track, this.car.pos.s + 6) + 1, z + fz * 6);

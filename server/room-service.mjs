@@ -1,6 +1,6 @@
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { Car, buildMultiplayerTrackGeometry, getMultiplayerTrack, verifyMultiplayerTrackData, DEFAULT_MULTIPLAYER_TRACK_ID } from './physics.mjs';
+import { Car, buildMultiplayerTrackGeometry, getMultiplayerTrack, verifyMultiplayerTrackData, DEFAULT_MULTIPLAYER_TRACK_ID, resolveMultiplayerCollisions } from './physics.mjs';
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
 
 export const TICK_MS = 1000 / 60;
@@ -205,7 +205,7 @@ export class RoomService {
   newCar(room, slot) {
     const track = room.track;
     const car = new Car(); car.resetTransient(false); car.placeAt(track, 0);
-    // All players start at the same longitudinal point. Cars do not collide.
+    // Same longitudinal start for fairness; 2m spacing leaves a 0.1m gap between collision bodies.
     const lat = [-3, -1, 1, 3][slot];
     car.x += -track.tz[0] * lat; car.z += track.tx[0] * lat; car.pos.lat = lat;
     return car;
@@ -315,13 +315,21 @@ export class RoomService {
 
   simulate(room, at) {
     const track = room.track, length = track.length;
+    const moving = [];
     for (const player of room.players.values()) {
       if (player.dnf || player.finishMs !== null) continue;
-      const previous = player.car.pos.s;
+      const previous = { x: player.car.x, z: player.car.z, h: player.car.h };
+      moving.push({ player, previous, s: player.car.pos.s });
       const stale = !player.connected || at - player.lastInputAt > 700;
       player.car.update(1 / 60, track, stale ? 0 : player.input.steer, stale || player.input.brake);
       player.ackSeq = player.receivedSeq;
-      let delta = player.car.pos.s - previous;
+    }
+    // Every car first advances against the same step. Resolve contacts once for the room,
+    // then use each final pose for progress and finish gates, including cars pushed by others.
+    resolveMultiplayerCollisions(track, moving.filter(({ player }) => player.connected && player.loaded)
+      .map(({ player, previous }) => ({ id: String(player.slot), car: player.car, previous })));
+    for (const { player, s } of moving) {
+      let delta = player.car.pos.s - s;
       if (delta > length / 2) delta -= length;
       if (delta < -length / 2) delta += length;
       const before = player.distance; player.distance += delta;

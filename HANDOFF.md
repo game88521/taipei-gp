@@ -1,3 +1,15 @@
+<!-- multiplayer-collisions-current-start -->
+# 2026-11-13 最新：多人車輛碰撞
+
+Rex要求「我想要讓連線對戰的車會互相撞到」。已完成追撞傳速、側擦推開、高速掃掠、高度分層、權威計圈以及接觸時的前端預測／畫面同步。適用既有台北＋23 GP，保留classic操控。build **8b61f77003ce**；physics **classic-multitrack-collisions-v3**，wire protocol仍2；必須配套更新前後端，舊24圖physics v2會被拒絕。
+
+本機驗證全部通過：碰撞物理14／server9／client16／雙browser5；原server14／maps9／client26／UI8／geometry26／resources4／maps-browser6／單人26／固定3。固定三數值54.425 hits0／162.0 aiHits8／175.7 aiHits5未改，單人核心五檔bytes不變。詳見 [設計](./MULTIPLAYER_COLLISIONS.md)、[驗證](./MULTIPLAYER_COLLISIONS_VALIDATION.md)及JSON。持續frame測試不是實際FPS量測；手機、外網碰撞及全24圖逐圖駕駛未驗。
+
+work=DCISI/taipei-gp-collision-work，before=DCISI/taipei-gp-collision-before-f586ca9，baseline=f586ca96bfe73b0d7e6d38a749b14b4386f6f5bb，inventory包含481檔。只用新的 Apply-TaipeiCollisions.ps1；先備份、驗雜湊及保留檔，再套用／build／核對，不自行commit或push。套回原專案是否成功，以 DCISI/taipei-gp-collision-apply-result.json 與逐檔現況為準，不由本來源文件推定。
+
+上一輪24圖版已於 f586ca9 部署Render及Vercel測試版，Rex確認「看得到地圖，且已雙人起跑」；下方maps的「未部署」是當時歷史。該發布授權已完成，不延伸為本輪碰撞的commit／push授權。本輪尚未公開部署，不測正式站。
+<!-- multiplayer-collisions-current-end -->
+
 <!-- multiplayer-maps-current-start -->
 # 2026-11-13 最新：多人可選台北與全部23條GP地圖
 

@@ -1,16 +1,16 @@
 # 私人賽道競速通訊協定 v2
 
-型別定義以 `multiplayer-protocol.ts` 為準。傳輸是 `/ws` 上的 UTF-8 JSON WebSocket；正式部署使用 WSS。最多四名玩家，沒有公開配對、聊天、玩家碰撞或 AI。賽道為台北加全部 23 張 GP 地圖，所有多人地圖均保留原有經典操控，圈數 1／3／5。伺服器執行真實 `Car.update` 物理，客戶端只送方向與煞車，不能上報位置、圈數、圈速或完賽。
+型別定義以 `multiplayer-protocol.ts` 為準。傳輸是 `/ws` 上的 UTF-8 JSON WebSocket；正式部署使用 WSS。最多四名玩家，支援玩家車輛碰撞，沒有公開配對、聊天或 AI。賽道為台北加全部 23 張 GP 地圖，所有多人地圖均保留原有經典操控，圈數 1／3／5。伺服器執行真實 `Car.update` 物理，客戶端只送方向與煞車，不能上報位置、碰撞結果、圈數、圈速或完賽。
 
 ## 相容性與身分
 
 `create`、`join`、`resume` 都必須有：
 
 ```json
-{"version":2,"physics":"classic-multitrack-v2","catalogStamp":"catalog-v2:<本次建置的SHA256>"}
+{"version":2,"physics":"classic-multitrack-collisions-v3","catalogStamp":"catalog-v2:<本次建置的SHA256>"}
 ```
 
-任一欄不符回覆 `INCOMPATIBLE_VERSION`，v1 不能混場。`catalogStamp` 由建置工具綁定台北／23 份 GP JSON 的完整內容、metadata／傾角、建圖配方及經典物理來源；client 與 server 共用 `multiplayer-catalog.json`。房間另有 `trackId`、`trackStamp`、`trackRevision`，不能再以單一台北 stamp 作全域身分。不能以同一網址或 SW 已接手推定玩家版本相同。
+任一欄不符回覆 `INCOMPATIBLE_VERSION`，v1 及舊 `classic-multitrack-v2` 不能混場。`catalogStamp` 由建置工具綁定台北／23 份 GP JSON 的完整內容、metadata／傾角、建圖配方及經典物理來源；client 與 server 共用 `multiplayer-catalog.json`。房間另有 `trackId`、`trackStamp`、`trackRevision`，不能再以單一台北 stamp 作全域身分。不能以同一網址或 SW 已接手推定玩家版本相同。
 
 名稱長度 1～16 字，拒絕控制字元與 HTML 特殊字元。房間碼是六字 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` 安全亂數。房間碼只協助朋友尋找房間，沒有登入帳號或私密身分驗證功能。
 
@@ -55,7 +55,8 @@ Room 必含 `code`, `hostId`, `phase`, `matchId`, `startAt`, `laps`, `serverTime
 
 ## 比賽生命週期
 
-- 房主 `start` 成功後倒數三秒，車輛同時解鎖。所有玩家在同一縱向起點、不同橫向位置，不互相碰撞。
+- 房主 `start` 成功後倒數三秒，車輛同時解鎖。所有玩家在同一縱向起點、不同橫向位置，起跑車身不重疊；倒數期間不解碰撞。
+- 比賽中全車完成步進後，依固定 slot 順序解車身碰撞、追撞傳速及側擦分離，再依最終位置計進度。只包含同房、已連線且載入完成、未完賽及非 DNF 車；橋上橋下依高度分離。客戶端沒有碰撞回報訊息。
 - 伺服器固定 60Hz 真物理步進，沿賽道依序通過 1/3、2/3、終點才計圈；逆行不會增圈。完賽時間以權威步內過線比例內插，不能藉較快回報搶名次。
 - 超過 700ms 沒收到新 input，方向回正並自動煞車。倒數中斷線會取消本次倒數並清全員準備。
 - 賽中斷線不暫停其他人，最多保留十秒重連；逾期撤銷 token，未完賽者 DNF。房主斷線由仍連線者接任，物理與時間仍由伺服器維持。
