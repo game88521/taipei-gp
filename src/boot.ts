@@ -88,7 +88,7 @@ export function bootProgress(label: string, f: number) {
  * 「重試」（重新載入同一個網址）與「回台北」（去掉 ?circuit=，台北的資料通常已經在快取裡）。
  * 進度條改紅色停住，輪播的小提示停掉
  */
-export function bootFail(message: string, canGoHome: boolean) {
+export function bootFail(message: string, canGoHome: boolean, canLowerQuality = false) {
   if (!el) return;
   finished = true;
   clearInterval(tipT);
@@ -108,11 +108,12 @@ export function bootFail(message: string, canGoHome: boolean) {
     b.type = 'button';
     b.textContent = text;
     b.className = primary ? 'primary' : 'ghost-btn';
-    b.style.cssText = 'min-width:120px;padding:10px 18px';
+    b.style.cssText = 'min-width:120px;min-height:44px;padding:10px 18px';
     b.addEventListener('click', go);
     box.appendChild(b);
   };
   btn('重試', true, () => location.reload());
+  if (canLowerQuality) btn('低畫質重試', false, () => { const url = new URL(location.href); url.searchParams.set('q', 'low'); location.href = url.href; });
   if (canGoHome) btn('回台北', false, () => { location.search = ''; });
   document.querySelector('#boot .b-load')?.appendChild(box);
 }

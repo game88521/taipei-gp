@@ -58,7 +58,7 @@ export function newlyUnlocked(s: Stats, got: string[]): Ach[] {
 }
 
 /** 成就頁的 HTML：統計＋每個成就（沒達成的顯示進度） */
-export function renderAchPage(s: Stats, got: string[]): string {
+export function renderAchPage(s: Stats, got: string[], pinned: string[] = []): string {
   const t = Math.round(s.playTime / 60);
   const rows: [string, string][] = [
     ['駕駛距離', `${(s.dist / 1000).toFixed(1)} km`], ['最高時速', `${Math.round(s.topSpeed)} km/h`], ['遊玩時間', `${t >= 60 ? `${Math.floor(t / 60)} 小時 ` : ''}${t % 60} 分`],
@@ -70,7 +70,7 @@ export function renderAchPage(s: Stats, got: string[]): string {
   const stat = rows.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('');
   const ach = ACHIEVEMENTS.map((a) => {
     const done = got.includes(a.id), f = Math.min(1, a.value(s) / a.goal);
-    return `<div class="ach${done ? ' done' : ''}"><i>${a.icon}</i><span><b>${a.name}</b><small>${a.desc}　${done ? '已領' : '獎金'} NT$ ${a.prize.toLocaleString()}</small>${done ? '' : `<em style="--f:${(f * 100).toFixed(0)}%"></em>`}</span></div>`;
+    return `<div class="ach${done ? ' done' : ''}"><i>${a.icon}</i><span><b>${a.name}</b><small>${a.desc}　${done ? '已領' : '獎金'} NT$ ${a.prize.toLocaleString()}</small>${done ? '' : `<em style="--f:${(f * 100).toFixed(0)}%"></em>`}</span><button type="button" class="ghost-btn pin-ach" data-ach="${a.id}" aria-pressed="${pinned.includes(a.id)}">${pinned.includes(a.id) ? '取消置頂' : '置頂'}</button></div>`;
   }).join('');
   return `<div class="stats">${stat}</div><h3>成就 ${got.length} / ${ACHIEVEMENTS.length}</h3><div class="achs">${ach}</div>`;
 }

@@ -21,6 +21,8 @@ export interface RoundResult {
 export interface SeasonSave {
   round: number;
   results: RoundResult[];
+  /** 實際參賽順序；舊存檔沒有此欄仍為完整 23 站。 */
+  calendar?: string[];
   laps?: number; // 整季固定的圈數（3 或 6）
   diff?: string; // 整季固定的 AI 難度
   rules?: string; // 整季固定的規則（classic／2026）
@@ -36,12 +38,23 @@ export interface SeasonCheckpoint {
   player: { lap: number; lapTime: number; lastLap: number | null; sectorIdx: number; sectorStart: number; lapValid?: boolean };
 }
 /** 歷屆賽季（賽季完成時寫入） */
-export interface SeasonRecord { no: number; rank: number; pts: number; wins: number; champion: string; team: string; teamRank: number; laps: number }
+export interface SeasonRecord { no: number; rank: number; pts: number; wins: number; champion: string; team: string; teamRank: number; laps: number; rounds?: number }
 export interface DriverRow { name: string; team: string; pts: number; wins: number; podiums: number; best: number; fls: number; positions?: number[] }
 
 export const SEASON_LAPS = [3, 6];
-export const defaultSeason = (laps = 3, diff = 'normal', rules = 'classic', no = 1): SeasonSave => ({
+export const SEASON_LENGTHS = [3, 6, 12, 23] as const;
+/** 均勻選取整季賽曆，保留開幕及最終站。 */
+export function makeSeasonCalendar(rounds: number = CIRCUITS.length): string[] {
+  const n = SEASON_LENGTHS.includes(rounds as 3 | 6 | 12 | 23) ? rounds : CIRCUITS.length;
+  return Array.from({ length: n }, (_, i) => CIRCUITS[Math.round(i * (CIRCUITS.length - 1) / (n - 1))].id);
+}
+export function seasonCalendar(s?: Pick<SeasonSave, 'calendar'>): string[] { return [...(s?.calendar ?? CIRCUITS.map((c) => c.id))]; }
+export const seasonLength = (s?: Pick<SeasonSave, 'calendar'>) => s?.calendar?.length ?? CIRCUITS.length;
+export const seasonCircuitId = (s: Pick<SeasonSave, 'calendar' | 'round'>, k = s.round) => seasonCalendar(s)[k];
+export const isFullSeason = (s: Pick<SeasonSave, 'calendar'>) => seasonLength(s) === CIRCUITS.length;
+export const defaultSeason = (laps = 3, diff = 'normal', rules = 'classic', no = 1, calendar?: number | string[]): SeasonSave => ({
   round: 0, results: [], laps, diff, rules, seed: (Date.now() ^ Math.imul(no, 2654435761)) >>> 0, form: {}, no,
+  ...(calendar === undefined ? {} : { calendar: typeof calendar === 'number' ? makeSeasonCalendar(calendar) : [...calendar] }),
 });
 
 /** 簡單可重現的亂數（同一個種子永遠同一串） */
@@ -103,7 +116,7 @@ export function teamStandings(rows: DriverRow[]): { team: string; pts: number; p
   return [...m.values()].sort((a, b) => b.pts - a.pts || comparePositions(a.positions, b.positions));
 }
 
-export const roundName = (k: number) => { const c = CIRCUITS[k]; return c ? `第 ${k + 1} 站 ${c.flag} ${c.gp}` : ''; };
+export const roundName = (k: number, s?: Pick<SeasonSave, 'calendar'>) => { const id = seasonCalendar(s)[k], c = CIRCUITS.find((c) => c.id === id); return c ? `第 ${k + 1} 站 ${c.flag} ${c.gp}` : ''; };
 
 /** 每一站結束後累積到這一站為止的車手積分（走勢圖用）：回傳 name → [第 1 站後, 第 2 站後, …] */
 export function pointsAfterEachRound(s: SeasonSave): Map<string, number[]> {
@@ -129,16 +142,25 @@ export function pointsAfterEachRound(s: SeasonSave): Map<string, number[]> {
 export function titleFight(rows: DriverRow[], me: string, left: number, played = 0) {
   const k = rows.findIndex((r) => r.name === me);
   if (k < 0 || !rows.length) return null;
+  left = Math.max(0, Math.floor(left));
   const max = (POINTS[0] + FASTEST_LAP_POINT) * left;
   const lead = rows[0], you = rows[k];
+  // 最高積分相等時，追分者必須每站冠軍；將這些勝場也加入同分判定。
+  const possible = (challenger: DriverRow, leader: DriverRow) => {
+    const best = challenger.pts + max;
+    if (best !== leader.pts) return best > leader.pts;
+    const positions = [...(challenger.positions ?? [])];
+    positions[0] = (positions[0] ?? challenger.wins) + left;
+    return comparePositions(positions, leader.positions ?? [leader.wins]) <= 0;
+  };
   // 「實際上有可能」的爭冠者：照每個人到目前為止的平均得分速度再放寬 1.6 倍（給翻身空間）往後推，追得上領先者才算；
   // 還沒比過就用理論上限（全部人都算）
   const pace = (r: DriverRow) => (played > 0 ? Math.min(POINTS[0] + FASTEST_LAP_POINT, (r.pts / played) * 1.6) : POINTS[0] + FASTEST_LAP_POINT);
   return {
     rank: k + 1, pts: you.pts, gap: lead.pts - you.pts, max, leader: lead.name,
-    canWin: k === 0 || you.pts + max >= lead.pts, // 數學上還有可能（每站都拿滿）
-    clinched: rows.length > 1 && k === 0 && you.pts - rows[1].pts > max, // 你已經確定冠軍
-    contenders: rows.filter((r) => r.pts + pace(r) * left >= lead.pts).length, // 實際上還在爭冠的車手數
+    canWin: k === 0 || (left > 0 && possible(you, lead)),
+    clinched: rows.length > 1 && k === 0 && (left === 0 || rows.slice(1).every((r) => !possible(r, you))),
+    contenders: rows.filter((r, i) => i === 0 || (left > 0 && possible(r, lead) && r.pts + pace(r) * left >= lead.pts)).length,
   };
 }
 
@@ -155,12 +177,17 @@ export const formFactor = (form: number) => 1 + form * 0.012;
 export const formTag = (form: number) => (form > 0.4 ? '↑' : form < -0.4 ? '↓' : '');
 
 /** 賽季結束時的獎金：完成賽季 1 萬；年度冠軍再 4 萬、前三再 1 萬；車隊冠軍另加 1 萬 */
-export function seasonPrize(rank: number, teamRank: number): { cash: number; parts: string[] } {
+export function seasonPrize(rank: number, teamRank: number, rounds: number = CIRCUITS.length): { cash: number; parts: string[] } {
   const parts: string[] = ['完成賽季 +NT$ 10,000'];
   let cash = 10000;
   if (rank === 1) { cash += 40000; parts.push('年度車手冠軍 +NT$ 40,000'); }
   else if (rank <= 3) { cash += 10000; parts.push('年度前三名 +NT$ 10,000'); }
   if (teamRank === 1) { cash += 10000; parts.push('車隊冠軍 +NT$ 10,000'); }
+  const ratio = SEASON_LENGTHS.includes(rounds as 3 | 6 | 12 | 23) ? rounds / CIRCUITS.length : 0;
+  if (ratio !== 1) {
+    const scaled = Math.floor(cash * ratio);
+    return { cash: scaled, parts: [`${rounds} 站短季獎金按 ${rounds}/${CIRCUITS.length} 計算：NT$ ${scaled.toLocaleString('en-US')}`] };
+  }
   return { cash, parts };
 }
 
@@ -197,16 +224,26 @@ function parseCheckpoint(value: unknown, season: SeasonSave, grid: string[]): Se
 
 /** 備份與本機保存共用驗證；不能只靠 TypeScript 型別信任外部 JSON。 */
 export function parseSeasonSave(value: unknown): SeasonSave | null {
-  if (!isObj(value) || !isInt(value.round, 0, CIRCUITS.length) || !Array.isArray(value.results) || value.results.length !== value.round) return null;
+  if (!isObj(value)) return null;
+  let calendar: string[] | undefined;
+  if (value.calendar !== undefined) {
+    if (!Array.isArray(value.calendar) || !SEASON_LENGTHS.includes(value.calendar.length as 3 | 6 | 12 | 23)
+      || !value.calendar.every((id) => typeof id === 'string' && CIRCUITS.some((c) => c.id === id))
+      || new Set(value.calendar).size !== value.calendar.length) return null;
+    calendar = [...value.calendar] as string[];
+  }
+  const ids = calendar ?? CIRCUITS.map((c) => c.id);
+  if (!isInt(value.round, 0, ids.length) || !Array.isArray(value.results) || value.results.length !== value.round) return null;
   if ((value.laps !== undefined && value.laps !== 3 && value.laps !== 6)
     || (value.diff !== undefined && !['easy', 'normal', 'hard'].includes(String(value.diff)))
     || (value.rules !== undefined && !['classic', '2026'].includes(String(value.rules)))
     || (value.seed !== undefined && !isInt(value.seed, 0, 0xffffffff)) || (value.no !== undefined && !isInt(value.no, 1, 1e7))
     || (value.paid !== undefined && typeof value.paid !== 'boolean')) return null;
   const out: SeasonSave = { round: value.round, results: [] };
+  if (calendar) out.calendar = calendar;
   for (let i = 0; i < value.results.length; i++) {
     const r = value.results[i];
-    if (!isObj(r) || r.id !== CIRCUITS[i].id) return null;
+    if (!isObj(r) || r.id !== ids[i]) return null;
     const order = names(r.order);
     if (!order?.includes('你')) return null;
     const clean: RoundResult = { id: r.id, order };
@@ -232,7 +269,7 @@ export function parseSeasonSave(value: unknown): SeasonSave | null {
   }
   if (value.pending !== undefined && value.pending !== null) {
     const p = value.pending;
-    if (!isObj(p) || p.id !== CIRCUITS[value.round]?.id || !isNum(p.at, 0, 1e14)) return null;
+    if (!isObj(p) || p.id !== ids[value.round] || !isNum(p.at, 0, 1e14)) return null;
     const grid = names(p.grid);
     if (!grid?.includes('你')) return null;
     out.pending = { id: p.id, grid, at: p.at };
@@ -252,8 +289,10 @@ export function parseSeasonHistory(value: unknown): SeasonRecord[] | null {
   const out: SeasonRecord[] = [];
   for (const h of value) {
     if (!isObj(h) || !isInt(h.no, 1, 1e7) || !isInt(h.rank, 1, 22) || !isInt(h.pts, 0, 10000)
-      || !isInt(h.wins, 0, CIRCUITS.length) || !isName(h.champion) || !isName(h.team) || !isInt(h.teamRank, 1, 11) || (h.laps !== 3 && h.laps !== 6)) return null;
-    out.push({ no: h.no, rank: h.rank, pts: h.pts, wins: h.wins, champion: h.champion, team: h.team, teamRank: h.teamRank, laps: h.laps });
+      || (h.rounds !== undefined && !SEASON_LENGTHS.includes(h.rounds as 3 | 6 | 12 | 23))
+      || !isInt(h.wins, 0, (h.rounds as number | undefined) ?? CIRCUITS.length) || !isName(h.champion) || !isName(h.team) || !isInt(h.teamRank, 1, 11) || (h.laps !== 3 && h.laps !== 6)) return null;
+    out.push({ no: h.no, rank: h.rank, pts: h.pts, wins: h.wins, champion: h.champion, team: h.team, teamRank: h.teamRank, laps: h.laps,
+      ...(h.rounds === undefined ? {} : { rounds: h.rounds as number }) });
   }
   return out;
 }

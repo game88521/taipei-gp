@@ -212,7 +212,7 @@ assert.deepEqual(results.offline.after, { installFailed: true, skipWaiting: 0, o
   });
   await w.event('install'); await w.event('activate');
   assert.deepEqual(await storage.keys(), ['taipei-gp-old', 'taipei-gp-complete']);
-  const request = (path, mode = 'cors') => ({ url: `https://game.test${path}`, method: 'GET', mode });
+  const request = (path, mode = 'cors') => ({ url: `https://game.test${path}`, method: 'GET', mode, headers: new Headers() });
   assert.equal(await (await w.event('fetch', request('/', 'navigate'))).text(), navigationText);
   online = false;
   assert.equal(await (await w.event('fetch', request('/', 'navigate'))).text(), 'complete-index');

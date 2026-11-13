@@ -1,0 +1,274 @@
+{
+  "createdAt": "2026-11-12T08:26:40.588Z",
+  "build": "ae3c201679c2",
+  "sourceHash": "181fd12a7acccdee92b302afb8612c70264d417c231d57d420e632700712ba63",
+  "mainSha256": "d61eca515a48c410fa12b936f052bf8a013572dc54738a531e64884ac68988b6",
+  "beforeBuild": "811385b20e05",
+  "baselineInventorySha256": "848f618286890dec909af43e4bd5e4f7f1ed855ffd03025dca00535c840de9a2",
+  "status": "PASS",
+  "node": {
+    "startedAt": "2026-11-12T04:42:22.360Z",
+    "completedAt": "2026-11-12T04:44:17.605Z",
+    "sourceHash": "181fd12a7acccdee92b302afb8612c70264d417c231d57d420e632700712ba63",
+    "sourceUnchangedDuringTests": true,
+    "before": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-all-before-811385b20e05",
+    "results": [
+      {
+        "name": "platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "mission-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "racing-state-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-platform-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "leaderboard-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-racing-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "economy-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "identity-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-economy-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "static-ui-contract",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "route-preview-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-racing-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-radio-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-street-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-racing-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-conflict-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-racing-features",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-street-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-street-main",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-navigation-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "all-progress-regression",
+        "code": 0,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "limitations": [
+      "隔離模組與本機HTTP測試，不代表手機實機或正式Redis",
+      "瀏覽器與固定三回歸另行執行"
+    ]
+  },
+  "browsers": [
+    {
+      "file": "all-platform-browser-results.json",
+      "sha256": "e904dd31da7b64aa77fc9dac4712bd43675a4a70e8634a318bd137cabe7d01b0",
+      "build": "3706620d7568",
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "exceptions": 0
+      },
+      "limitations": [
+        "桌面Chrome真SW/CacheStorage/WebAudio與手機viewport；尚未驗證手機實機權限、傾斜硬體與聲音聽感。",
+        "V使用原生DeviceOrientationEvent注入測試，X注入建構失敗後還原真AudioContext。",
+        "停止測試分頁的3D動畫以降低負載；沒有測量FPS、耗電或完整物理。"
+      ]
+    },
+    {
+      "file": "shots-all-racing-browser.json",
+      "sha256": "0810081cae139f92eda72760a758a7d8a10de35450c4af66be8548e06d6e6741",
+      "build": "3706620d7568",
+      "summary": {
+        "passed": 13,
+        "failed": 0
+      },
+      "limitations": [
+        "本機桌面Chrome模擬390×844／844×390／844×220，沒有手機實機驗證。",
+        "排位玩家以煞車停住並用真step推進150秒超時，驗證1/2/3次與AI進度；未驗證手動排位圈速。",
+        "E/H使用真BOT GP記錄；降低canvas解析度但保留真DOM/WebGL，不量FPS、音質或估算區間涵蓋率。"
+      ]
+    },
+    {
+      "file": "all-street-browser.json",
+      "sha256": "8f1550b041af6894a15d2697630d3cdd3f33e543e733ca636545fbb4aaa7a5a4",
+      "build": "ae3c201679c2",
+      "summary": {
+        "passed": 13,
+        "failed": 0
+      },
+      "limitations": [
+        "桌面Chrome模擬390×844/844×390/844×220，尚未驗證手機實機。",
+        "保留真城市/路由/任務/UI；renderer降解析度並停止自動loop，以真freeStep固定小步進驗證時間，不量測FPS/耗電。",
+        "接客/續接與街賽檢查點由測試準備合法座標；未驗證完整真人駕駛、對手難度平衡或實際逃逸路線。"
+      ]
+    },
+    {
+      "file": "shots-all-city-browser.json",
+      "sha256": "49b95532e45904309ed295826e472e2b338e271a975ecf45c364574d325d4b25",
+      "build": "ae3c201679c2",
+      "summary": {
+        "passed": 7,
+        "failed": 0
+      },
+      "limitations": [
+        "Chrome模擬三種viewport，手機實機/FPS/耗電未驗",
+        "地標到訪以真main.updateFreeHud及指定位置驗證，未宣稱實際駕駛完整路線",
+        "延後載入驗證建立時機，未量測啟動省時"
+      ]
+    },
+    {
+      "file": "shots-abcd-ui-browser.json",
+      "sha256": "95aa516c2dfc7974068a4a0e0b317596865702c6794f212502035a031f35e92a",
+      "build": "ae3c201679c2",
+      "summary": {
+        "passed": 8,
+        "failed": 0
+      },
+      "limitations": [
+        "本機桌面 Chrome 模擬手機 viewport，尚未驗證手機實機",
+        "只驗 UI、真跨分頁鎖定與停止流程，沒有測量硬體 FPS、耗電或音質"
+      ]
+    },
+    {
+      "file": "shots-followup-ui-browser.json",
+      "sha256": "100dd2a0546cc1ee75239cf6927c1c700ad128187d762ff6e951311c365ff581",
+      "build": "ae3c201679c2",
+      "summary": {
+        "passed": 7,
+        "failed": 0
+      },
+      "limitations": [
+        "軟體Chrome只驗UI/流程，未量真機FPS、功耗或音效",
+        "幀率驗證使用真main的人工120Hz動畫回呼與render呼叫計數，render本身替換為計數器"
+      ]
+    },
+    {
+      "file": "shots-abcd-lifecycle-regression.json",
+      "sha256": "c630c877ee8698fe0b6ae56029922dc975abf360893ce99564faa616d7abaf09",
+      "build": "ae3c201679c2",
+      "summary": {
+        "passed": 4,
+        "failed": 0
+      },
+      "limitations": [
+        "真Chrome／WebLocks／localStorage／原生pagehide；未載遊戲場景或WebGL。",
+        "只驗保存與釋放次序，不代表手機BFCache完整行為。"
+      ]
+    }
+  ],
+  "browserChecks": 59,
+  "fixedRegression": {
+    "passed": 3,
+    "failed": 0,
+    "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a",
+    "output": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n"
+  },
+  "applyTool": {
+    "summary": {
+      "passed": 12,
+      "failed": 0
+    },
+    "sha256": "11aa5e80b39d7d864270076538d402989ccc430786381be936df185b3c74c4b5",
+    "scriptSha256": "a888e20de1e8d80f5298fc0d8bc023b3a4988f7daa2c655762745661770fc29d"
+  },
+  "committed": false,
+  "pushed": false,
+  "limitations": [
+    "手機實機、感測硬體、音質、FPS、功耗、正式Redis未驗證",
+    "進站估算區間未校準涵蓋率，街賽難度尚未真人平衡",
+    "R僅證明延後建立系統，未量測啟動省時；T只驗受控空目標邊界",
+    "平台與賽車13項瀏覽器驗證版本另列於每份證據；之後的系列結果正規化、地標容量與觸控CSS另由受影響測試重驗"
+  ]
+}

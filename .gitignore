@@ -10,3 +10,6 @@ tools/dev-tests/gpw-prof*
 tools/dev-tests/chain-stab-out.txt
 tools/dev-tests/shots-*
 tools/dev-tests/*-result.json
+server/physics.mjs
+tools/dev-tests/multiplayer-*-evidence-*/
+tools/dev-tests/multiplayer-*-summary.json

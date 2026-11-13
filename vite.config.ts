@@ -16,6 +16,14 @@ function serviceWorker(): Plugin {
       outDir = resolve(c.root, c.build.outDir);
     },
     closeBundle() {
+      const tileDir = join(outDir, 'data/tiles');
+      const tileFiles: Record<string, { bytes: number; sha256: string }> = {};
+      for (const name of readdirSync(tileDir).sort()) {
+        if (!name.endsWith('.json')) continue;
+        const body = readFileSync(join(tileDir, name));
+        tileFiles[`/data/tiles/${name}`] = { bytes: body.byteLength, sha256: createHash('sha256').update(body).digest('hex') };
+      }
+      writeFileSync(join(outDir, 'data/offline-tiles.json'), JSON.stringify({ files: tileFiles }));
       const files: string[] = [];
       const walk = (dir: string) => {
         for (const f of readdirSync(dir)) {
@@ -45,5 +53,8 @@ function serviceWorker(): Plugin {
 
 export default defineConfig({
   plugins: [serviceWorker()],
-  build: { target: 'es2022' }, // main.ts 用 top-level await 先讀各國賽道的中心線
+  build: {
+    target: 'es2022',
+    rollupOptions: { input: { main: resolve(__dirname, 'index.html'), multiplayer: resolve(__dirname, 'multiplayer.html') } },
+  }, // main.ts 用 top-level await 先讀各國賽道的中心線
 });

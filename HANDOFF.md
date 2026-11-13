@@ -1,3 +1,61 @@
+<!-- multiplayer-current-start -->
+# 2026-11-13 最新交接：私人房連線競速
+
+使用者選定賽道競速 2～4 人私人房，以及無主機的免費測試方案。多人版在 DCISI/taipei-gp-work 完成，build **c27a6eb50a74**；產品來源 SHA256 **79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe**。目前未 commit／push，未建立 Render 服務或公開 WSS。原專案實際套用須以 DCISI/taipei-gp-multiplayer-apply-result.json 與 taipei-gp-multiplayer-original-verification.json 核對，不可由本文件推定。
+
+功能：台北賽道 1／3／5 圈、六碼私人房、全員準備及三秒共同起跑、排名／成績／再戰。伺服器沿用原 Car／track，以 60Hz 權威物理及 20Hz 快照運作；客戶端只送方向／煞車，含自車預測校正、遠車插值、700ms 無輸入煞車、10 秒重連、DNF／房主移交／清房及輸入限制。不寫單人 PB、獎金、賽季或排行榜。玩家互不碰撞。
+
+實測：真 WS／真權威物理 14／14、client 16／16、單瀏覽器＋真 WS peer 11／11、原 26／26 套、固定 3／3、套用工具 16／16。同 Chrome 兩個隔離 browser contexts 同時真實繪圖 9／9 通過，使用正常圖形設定；歷史強制 SwiftShader 失敗仍保留，不宣稱唯一根因。兩台實機／外網尚未驗證。固定基準維持 BOT 54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5。
+
+架構與啟動見 [MULTIPLAYER.md](./MULTIPLAYER.md)，實測與完整限制見 [MULTIPLAYER_VALIDATION.md](./MULTIPLAYER_VALIDATION.md)／JSON。Render Free 原生 Node 部署設定見 [MULTIPLAYER_DEPLOYMENT.md](./MULTIPLAYER_DEPLOYMENT.md) 與 render.yaml；前端沿用 Vercel。免費方案最新條件未核實，控制台若不是 Free／0 費用就停止；帳號由 Rex 登入。仍需發布授權、實際 WSS URL、ALLOWED_ORIGINS 及 VITE_MULTIPLAYER_URL 後重建測試部署。
+
+本輪不可變 before 是 DCISI/taipei-gp-multiplayer-before-ae3c201679c2（503 檔），inventory.source 是原專案，不是 work；HEAD 為 2dee076de30da52fe20b4d33faf659e6acf0aed3，包含既有未提交成果。只用新的 Apply-TaipeiMultiplayer.ps1，不重跑前輪工具，不以 Git HEAD 還原。套用前先備份、核對整批雜湊與保留檔；server 依賴另依 lock 安裝，不複製 node_modules。
+
+本機 preview 4317；WS 4320/ws、health 4320/health；本輪 UI 測試 CDP 9334，固定三回歸使用 9333。使用者啟動 Chrome 的 updater AccessDenied 不影響已確認可用的 CDP。所有新測試使用隔離 context／資料並清理，不碰正式站或玩家存檔。手機實機、外網、真 BFCache、Docker 尚未驗證。歷史 ALL／FOLLOWUP／ABCD／PRIORITY 文件保留，不能視作多人測試結果。
+<!-- multiplayer-current-end -->
+
+<!-- all-current-start -->
+# 2026-11-12 最新交接：全模式優化完成驗證
+
+使用者要求「幫我全部都做」。本輪完成 U／V／W／X／Y、E／F／G／H／I／J／K／L／M／N／O、Q／R／S；P併V，T增加受控邊界防護。完整內容見 [ALL_FIXES.md](./ALL_FIXES.md)，驗證見 [ALL_VALIDATION.md](./ALL_VALIDATION.md)／JSON。最終build **ae3c201679c2**，來源SHA256 **181fd12a7acccdee92b302afb8612c70264d417c231d57d420e632700712ba63**。本輪不commit、不push、不測正式站。
+
+結果：26／26套程式回歸、固定3／3、瀏覽器59項（各實測build見驗證表）、套用工具fixture12／12。固定值54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5未改。城市地標2,466個，progress上限10,000；系列options僅三欄，避免舊results嵌入。手機實機、耗電、音質與真人難度平衡尚未驗證。
+
+本輪before是DCISI/taipei-gp-all-before-811385b20e05（1,097檔，含followup／A～D未提交成果），inventory為taipei-gp-all-baseline.json。不得以Git HEAD或舊包覆蓋。新交付為taipei-gp-all-delivery／Apply-TaipeiAll.ps1，先備份、逐檔雜湊、保留舊成果；不重跑舊priority／followup／ABCD工具。
+
+原專案是否已套用，請讀DCISI/taipei-gp-all-apply-result.json並執行DCISI/verify-taipei-all-original.mjs，以allDeliveryFilesMatch／previousWorkPreserved／immutableBaselineMatches／distMatches為準；最新工作狀態另見DCISI/TAIPEI_GP_CODEX_HANDOFF.md最上方。此文件與測試通過不等於已commit、push或部署。Git若日後明確授權提交仍用Rex <game88521@gmail.com>及繁中訊息。
+<!-- all-current-end -->
+
+以下是歷史交接；舊版待辦或驗證數不代表本輪狀態。
+
+<!-- abcd-current-start -->
+# 2026-11-11 最新交接：A～D 已實作並完成驗證
+
+Rex 選定的 A 正常多分頁存檔保護、B GP完整計圈、C 開地圖停止累計里程、D 導航六秒定期重算已完成。正式build `811385b20e05`；20／20套自動測試、固定回歸3／3、真雙分頁瀏覽器8／8、原救援／啟動瀏覽器7／7與原生離頁保存4／4通過。固定數值仍為54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5，未改基準。
+
+對照基準為 DCISI/taipei-gp-abcd-before-3bdf97336c02，包含上一輪已套用的20個未提交檔案；不可用Git HEAD 2dee076當本輪before。A不支援Web Locks時僅逐次比對，無同時寫入原子性保證；B不追溯清除舊錯誤紀錄。手機實機與正式服務未驗證。
+
+詳見 [ABCD_FIXES.md](./ABCD_FIXES.md)、[ABCD_VALIDATION.md](./ABCD_VALIDATION.md)及JSON。總入口tools/dev-tests/abcd-checks.mjs（20套），對照資料夾環境設定見驗證文件。上一輪followup／priority文件均保留歷史，不可將舊測試結果當本輪結果。
+
+此文件於封裝前更新；原專案實際套用須讀 DCISI/taipei-gp-abcd-apply-result.json、taipei-gp-abcd-original-verification.json及TAIPEI_GP_CODEX_HANDOFF.md最上方。本輪工具 Apply-TaipeiABCD.ps1 無參數為唯讀預檢；-Apply -Build先備份再套用建置，不commit、不push。禁止重跑舊followup／priority套用包；本輪未授權提交／上版。
+<!-- abcd-current-end -->
+
+以下保留先前交接；本輪範圍與狀態以上方及ABCD文件為準。
+
+<!-- followup-current-start -->
+# 2026-11-11 最新交接：六項後續優化已完成驗證
+
+基準與目前已知線上提交為`2dee076`。本輪已完成分析項1～5、17：GP無效圈不拿最快圈積分、損毀存檔救援、重要無線電優先、WebGL啟動失敗重試、罰款應罰／實扣明細、30／60／不限幀率與真實FPS。未新增其他玩法，不追溯舊積分。
+
+工作副本`DCISI/taipei-gp-work`正式build `3bdf97336c02`、16套自動測試、固定回歸3／3、本機隔離瀏覽器7／7通過。固定數值54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5。存檔救援也已防範初始主檔缺失後的跨頁新進度覆寫，以及額外快照提早占滿容量。手機實機效能與耗電尚未量測。
+
+詳情見 [FOLLOWUP_FIXES.md](./FOLLOWUP_FIXES.md)、[FOLLOWUP_VALIDATION.md](./FOLLOWUP_VALIDATION.md)與JSON。`tools/dev-tests/followup-checks.mjs`是16套總入口，對照資料夾設定見驗證文件；不要沿用舊12套摘要推定本輪結果。
+
+本文件於交付封裝時更新；原專案套用結果須核對`DCISI/taipei-gp-followup-apply-result.json`與manifest逐檔雜湊。套用工具`Apply-TaipeiFollowup.ps1 -Apply -Build`會先備份，無參數只做唯讀檢查。本輪未要求commit／push，不可自行上版；前輪2dee076上版已完成，禁止重跑舊套用／發布工具。權限阻擋與使用者後續處理請先讀`DCISI/TAIPEI_GP_CODEX_HANDOFF.md`最上方。
+<!-- followup-current-end -->
+
+以下保留先前交接歷史；最新範圍與測試結果以上方及FOLLOWUP文件為準。
+
 <!-- priority-current-start -->
 # 2026-11-11 全模式優先改善（上版交接）
 

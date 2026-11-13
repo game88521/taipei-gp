@@ -1,0 +1,18 @@
+# 免費測試設定；建立前請在Render控制台確認仍為Free且不含付費資源。
+services:
+  - type: web
+    name: taipei-gp-multiplayer
+    runtime: node
+    region: singapore
+    plan: free
+    autoDeploy: false
+    buildCommand: npm ci --include=dev --ignore-scripts --no-audit --no-fund && npm --prefix server ci --ignore-scripts --no-audit --no-fund && npm run build:multiplayer
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGINS
+        sync: false

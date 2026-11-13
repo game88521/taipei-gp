@@ -11,6 +11,8 @@ import { FreeCar } from './freecar';
 import { TOWER_101 } from './track';
 import { ROAD_Y } from './surface';
 import { sameRoadLevel, streetRecordKey } from './mission';
+import { randomUuid } from './identity';
+import { STREET_DIFFICULTY, streetChallengeKey, streetMedal, type StreetRaceOptions, type StreetRaceResult } from './street-series';
 
 // 開放街道上的比賽：照真實道路規劃路線，沿路要依序穿過檢查點，路上照樣有車流和紅綠燈
 // - 自由駕駛的「挑戰」：開到光柱停下來接受，跟 1 位對手單挑
@@ -93,6 +95,8 @@ type Phase = 'idle' | 'offer' | 'count' | 'race' | 'done';
 const PROFILE_TOP = 42;
 
 export class StreetRace {
+  options: StreetRaceOptions = { difficulty: 'standard', carId: 'sedan', rules: 'traffic' };
+  private runId = '';
   challenges: Challenge[] = [];
   phase: Phase = 'idle';
   active: Challenge | null = null;
@@ -243,6 +247,15 @@ export class StreetRace {
   get rivalS() { return this.rivals[0]?.s ?? 0; }
   get recordKey() { return this.active ? streetRecordKey(this.active.def.id, this.duel) : null; }
   get validFinish() { return this.playerDone != null && Number.isFinite(this.playerDone); }
+  get difficulty() { return this.options.difficulty; }
+  get scopedRecordKey() { return this.active ? streetChallengeKey(this.active.def.id, this.duel, this.options) : null; }
+  get result(): StreetRaceResult | null {
+    if (this.phase !== 'done' || !this.active) return null;
+    const finished = this.validFinish;
+    const place = finished ? 1 + this.rivals.filter((r) => r.done != null && r.done <= this.playerDone!).length : this.rivals.length + 1;
+    return { ...this.options, id: this.runId, key: this.scopedRecordKey!, routeId: this.active.def.id, duel: this.duel,
+      time: finished ? this.playerDone : null, finished, place, medal: streetMedal(place, this.duel, finished) };
+  }
 
   /** 玩家在挑戰點停下來 → 提出挑戰 */
   checkOffer(px: number, pz: number, v: number, py?: number): Challenge | null {
@@ -257,7 +270,10 @@ export class StreetRace {
    * 開始比賽。單挑：玩家與對手並排；對決：4 位對手排在前面兩排，玩家從最後面起跑。
    * 雙向道的路線在雙黃線上，所以車都排右側兩個車道；單行道就左右各一。
    */
-  begin(c: Challenge, place: (x: number, z: number, h: number) => void, duel = false) {
+  begin(c: Challenge, place: (x: number, z: number, h: number) => void, duel = false, options?: StreetRaceOptions) {
+    this.options = options ? { carId: options.carId, rules: options.rules, difficulty: options.difficulty in STREET_DIFFICULTY ? options.difficulty : 'standard' }
+      : { difficulty: 'standard', carId: 'sedan', rules: 'traffic' };
+    this.runId = randomUuid();
     this.active = c;
     this.duel = duel;
     this.phase = 'count';
@@ -275,7 +291,8 @@ export class StreetRace {
       const model = this.modelFor(name);
       const color = TEAMS[RIVAL_TEAM[name] ?? 1].livery.main;
       model.root.visible = true;
-      const r: Rival = { name, color, top, corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, y: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
+      const scale = STREET_DIFFICULTY[this.options.difficulty];
+      const r: Rival = { name, color, top: top * scale.top, corner: corner * scale.corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, y: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
       this.placeRival(r);
       return r;
     });

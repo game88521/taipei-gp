@@ -16,7 +16,9 @@ export interface RaceSnapshot {
   racers: RacerSnapshot[]; timing: TimingEntry[];
 }
 export interface ReplayCarState { name: string; compound: number; wear: number; pit: PitState | null; lift: number; energy: number }
-export interface ReplayState { time: number; raceTime: number; wet: number; rainAt: number | null; cars: ReplayCarState[] }
+export interface ReplayState { time: number; raceTime: number; wet: number; rainAt: number | null; cars: ReplayCarState[]; sc: RaceSnapshot['sc'] }
+export interface ReplayEvent { time: number; raceTime: number; type: string }
+export interface QualifyingOptions { attempts?: 1 | 2 | 3 }
 export interface CompletionProgress { completed: number; total: number; elapsed: number }
 export interface CompletionOptions { signal?: AbortSignal; onProgress?: (p: CompletionProgress) => void; maxSeconds?: number }
 

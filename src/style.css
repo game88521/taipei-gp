@@ -31,6 +31,16 @@ html, body {
 button { font-family: inherit; color: inherit; cursor: pointer; }
 .hidden { display: none !important; }
 
+#save-recovery { z-index: 12000; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); overflow-y: auto; }
+.recovery-card { width: min(100%, 540px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; border-radius: 18px; box-sizing: border-box; background: #131722; border: 1px solid #454d62; color: #f3f5fa; }
+.recovery-card h2 { margin: 0 0 14px; font-size: 24px; }
+.recovery-card p { font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+#save-recovery-status { color: #c9d7ed; }
+.recovery-actions { display: grid; gap: 10px; }
+.recovery-actions button { min-height: 48px; width: 100%; font-size: 16px; letter-spacing: 0; padding: 12px; }
+.recovery-confirm { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-top: 12px; font-size: 15px; line-height: 1.5; }
+.recovery-confirm input { width: 24px; height: 24px; flex-shrink: 0; }
+
 /* ---------------- HUD */
 #hud { position: fixed; inset: 0; pointer-events: none; }
 #hud button, #pad { pointer-events: auto; }
@@ -1432,6 +1442,53 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
 #gp-settling .card { max-height: calc(100dvh - 32px); overflow-y: auto; }
 #gp-settle-progress, .season-countback, .lb-fairness { line-height: 1.6; overflow-wrap: anywhere; }
 #season-abandon { color: #ffb6ae; border-color: #c2746c; }
+#save-conflict { z-index: 1000; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+#save-conflict .card { box-sizing: border-box; width: min(540px, 100%); max-height: calc(100dvh - 32px); overflow: auto; }
+#save-conflict button { min-height: 48px; width: 100%; white-space: normal; }
+#save-conflict p { overflow-wrap: anywhere; }
+.feature-card { margin: 14px 0; padding: 16px; border: 1px solid #ffffff24; border-radius: 14px; background: #121722; color: #e9edf4; line-height: 1.6; overflow-wrap: anywhere; }
+.feature-card summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; color: #f2c14e; }
+.feature-card[hidden], .feature-tools [hidden] { display: none; }
+.feature-tools, .feature-list { display: grid; gap: 10px; }
+.feature-tools button, .feature-card button, .feature-list button, #passport-page button, #taxi-order-page button, #drift-challenge-result button, #duel-pick button, #duel-pick select, #season-new button, #season-new select, #replay-ui button, #replay-ui select { min-height: 48px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.feature-list button { text-align: left; padding: 12px; border: 1px solid #ffffff2c; border-radius: 12px; background: #1a2230; color: #eef2f8; }
+.feature-list button b, .feature-list button small { display: block; }
+.feature-list small { color: #b3bfce; line-height: 1.6; }
+.feature-regions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.feature-regions span { border: 1px solid #f2c14e50; border-radius: 10px; padding: 8px 12px; color: #ffe1a0; }
+.compact-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.compact-actions select, #profile-tools select { min-height: 48px; max-width: 100%; background: #1a2230; color: #eef2f8; border: 1px solid #ffffff40; border-radius: 8px; font: inherit; padding: 8px; }
+#passport-filter { min-height: 48px; max-width: 100%; background: #1a2230; color: #eef2f8; border: 1px solid #ffffff40; border-radius: 8px; font: inherit; padding: 8px; }
+#taxi-order-page label.sw, #duel-pick label.sw { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: pointer; }
+.table-scroll { max-width: 100%; overflow-x: auto; }
+#lap-history-body { min-width: 560px; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pin-ach { margin-left: auto; flex: 0 0 auto; min-height: 44px; font-size: 12px; }
+#profile-tools p { margin: 6px 0; }
+#pinned-targets { pointer-events: auto; max-width: min(330px, 70vw); padding: 8px 12px; border-radius: 10px; background: #101723eb; font-size: 12px; }
+#pinned-targets summary { cursor: pointer; min-height: 44px; }
+#pinned-targets-body p { margin: 4px 0; color: #e7d39b; }
+#drift-challenge-hud { background: #182735ed; color: #ffe09c; border: 1px solid #ffffff30; border-radius: 10px; padding: 10px; font-variant-numeric: tabular-nums; }
+#drift-challenge-cancel { pointer-events: auto; min-height: 44px; }
+#replay-ui { box-sizing: border-box; flex-wrap: wrap; gap: 8px; width: min(1100px, calc(100vw - 24px)); max-height: min(42dvh, 270px); overflow: auto; padding: 10px 14px; border: 1px solid #ffffff30; border-radius: 16px; background: #0b111eee; }
+#replay-seek { flex: 1 1 200px; min-width: 100px; max-width: 100%; min-height: 44px; accent-color: #f2c14e; }
+#replay-events { display: flex; gap: 6px; flex-wrap: wrap; max-height: 70px; overflow: auto; width: 100%; }
+#replay-events button { font-size: 12px; padding: 6px 10px; }
+#replay-ui label { display: inline-flex; align-items: center; gap: 6px; }
+#replay-ui select { min-width: 88px; background: #202c3c; color: #eef2f8; border-radius: 8px; }
+#taxi-order-page .card, #passport-page .card, #drift-challenge-result .card, #duel-pick .card, #season-new .card { box-sizing: border-box; max-height: calc(100dvh - 28px); overflow-y: auto; }
+#street-loading { z-index: 30; }
+#offline-manager progress { width: 100%; accent-color: #f2c14e; }
+#offline-manager label { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+@media (max-height: 480px) {
+  #pinned-targets { display: none; }
+  #replay-ui { max-height: 48dvh; font-size: 12px; }
+  #replay-ui button, #replay-ui select { min-height: 44px; }
+}
+@media (max-width: 480px) {
+  .feature-card { padding: 12px; }
+  .ach { flex-wrap: wrap; }
+  .pin-ach { margin-left: 40px; }
+}
 #lb-board { min-height: 44px; max-width: 100%; padding: 8px 10px; border: 1px solid #636d84; border-radius: 8px; background: #151924; color: #f4f4f6; font: inherit; color-scheme: dark; }
 #menu .m-stat { grid-template-columns: 52px 1fr 72px; }
 @media (max-height: 480px) {

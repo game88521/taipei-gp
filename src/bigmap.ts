@@ -85,6 +85,8 @@ export class BigMap {
   /** 右邊選單蓋住的寬度（px）：「看得到的畫面中心」要往左挪一半 */
   side = 220;
   areas: [string, number, number][] = [];
+  visited = new Set<string>();
+  landmarkKey = (m: Landmark) => `${m.nm}:${Math.round(m.x)}:${Math.round(m.z)}`;
   /** 剛好看得到整張地圖的縮放（西門町、淡水河那頭也在裡面） */
   fitZoom() {
     const W = Math.max(100, this.c.clientWidth - this.side), H = Math.max(100, this.c.clientHeight);
@@ -117,9 +119,10 @@ export class BigMap {
       if (m.r < 50 && this.zoom < 0.6) continue;
       const x = sx(m.x), y = sy(m.z);
       if (x < -50 || y < -20 || x > W + 50 || y > H + 20) continue;
-      g.fillStyle = '#ff8a1a';
+      const done = this.visited.has(this.landmarkKey(m));
+      g.fillStyle = done ? '#4dff9a' : '#ff8a1a';
       g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill();
-      if (this.zoom > 0.5 || (m.r > 90 && this.zoom > 0.1)) { g.fillStyle = '#f0e6d8'; g.fillText(m.nm, x, y - 6); }
+      if (this.zoom > 0.5 || (m.r > 90 && this.zoom > 0.1)) { g.fillStyle = '#f0e6d8'; g.fillText((done ? '✓ ' : '') + m.nm, x, y - 6); }
     }
     // 區域名稱（西門町、台北車站…）：不在地標清單裡，縮小時也要看得到
     g.font = 'bold 14px "Microsoft JhengHei","PingFang TC",sans-serif';
@@ -170,15 +173,20 @@ export class NavArrows {
   update(route: [number, number][] | null, px: number, pz: number, t: number, ys: number[] | null = null) {
     if (!route || route.length < 2) { this.mesh.count = 0; return; }
     // 從離玩家最近的點開始，往前放
-    let bi = 0, bd = Infinity;
-    for (let i = 0; i < route.length; i++) { const d = (route[i][0] - px) ** 2 + (route[i][1] - pz) ** 2; if (d < bd) { bd = d; bi = i; } }
+    let bi = 0, bt = 0, bd = Infinity;
+    for (let i = 0; i + 1 < route.length; i++) {
+      const a = route[i], b = route[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], ll = dx * dx + dz * dz;
+      const f = ll ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / ll)) : 0;
+      const d = (a[0] + dx * f - px) ** 2 + (a[1] + dz * f - pz) ** 2;
+      if (d < bd) { bd = d; bi = i; bt = f; }
+    }
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
     let n = 0, carry = 6 - ((t * 6) % 9); // 箭頭會往前流動
     for (let i = bi; i + 1 < route.length && n < 40; i++) {
       const [ax, az] = route[i], [bx, bz] = route[i + 1], l = Math.hypot(bx - ax, bz - az);
       if (l < 0.1) continue;
       const h = Math.atan2(bx - ax, bz - az);
-      let s = carry;
+      let s = i === bi ? bt * l + Math.max(0, carry) : carry;
       for (; s < l && n < 40; s += 9) {
         q.setFromAxisAngle(up, h);
         { const xx = ax + ((bx - ax) * s) / l, zz = az + ((bz - az) * s) / l, yy = ys ? ys[i] + ((ys[i + 1] - ys[i]) * s) / l : groundH(xx, zz); m.compose(p.set(xx, yy - 0.18, zz), q, sc); } // 路線上高架：箭頭跟著上橋

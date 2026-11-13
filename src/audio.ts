@@ -17,10 +17,16 @@ export const ENGINES: Record<string, EngineProfile> = {
   pickup: { base: 40, range: 150, w1: 'square', w2: 'sawtooth', ratio2: 0.5, mix2: 0.5, fBase: 280, fRange: 1050, gain: 1.05, lope: 0.75, lopeDepth: 0.4 }, // 柴油：低、喀啦喀啦
 };
 ENGINES.taxi = ENGINES.sedan;
+export type SoundPreview = 'master' | 'engine' | 'others' | 'ambient' | 'fx';
+export interface SoundStatus { status: 'idle' | 'disabled' | 'unavailable' | 'running' | 'suspended' | 'error'; message: string; canRetry: boolean }
 
 export class Sound {
   enabled = true;
   private ctx: AudioContext | null = null;
+  private audioError = '';
+  private unavailable = false;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  private previewNodes: { o: OscillatorNode; g: GainNode } | null = null;
   private master!: GainNode;
   private limiterOut!: GainNode; // 軟限幅之後、接到喇叭之前的最後一個節點（測試量真正送出去的聲音用）
   private engGain!: GainNode;
@@ -72,10 +78,34 @@ export class Sound {
   }
 
   /** 一定要在點擊事件裡呼叫（iOS 規定） */
-  start() {
-    playbackSession();
-    if (this.ctx) { this.unlock(); return; }
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  start(): boolean {
+    try {
+      try { playbackSession(); } catch { /* 平台播放模式不支援時仍可嘗試 Web Audio */ }
+      if (this.ctx && this.ctx.state !== 'closed') { this.unlock(); return true; }
+      this.disposeFailedContext();
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) { this.unavailable = true; this.audioError = '此瀏覽器未提供 Web Audio，遊戲可繼續使用。'; return false; }
+      this.unavailable = false; this.audioError = '';
+      this.initializeAudio(AC);
+      this.unlock();
+      return true;
+    } catch (error) {
+      this.audioError = `音效暫時無法啟動：${error instanceof Error ? error.message : String(error)}。遊戲可繼續使用。`;
+      this.disposeFailedContext();
+      return false;
+    }
+  }
+  private disposeFailedContext() {
+    const ctx = this.ctx; this.ctx = null;
+    for (const source of [this.o1, this.o2, this.lfo, this.siren, this.squealLfo]) { try { source?.stop(); source?.disconnect(); } catch { /* 部分節點尚未建立或已停止 */ } }
+    if (this.watchdog !== null) clearInterval(this.watchdog);
+    this.watchdog = null; this.worklet = false; this.eng = null; this.others = [];
+    this.city = null; this.crowd = null; this.rain = null; this.wind = null; this.scrapeG = null; this.ambBuf = null; this.hushed = true;
+    this.squealG = null; this.squealBp = null; this.squealBp2 = null; this.squealLfo = null;
+    this.previewNodes = null; this.lastFeed = 0; this.limiterAt = 0; this.lastRpmFrac = 0;
+    if (ctx && ctx.state !== 'closed') { try { void ctx.close().catch(() => {}); } catch { /* 建構部分失敗時 close 也可能不可用 */ } }
+  }
+  private initializeAudio(AC: typeof AudioContext) {
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
     this.master.gain.value = 0.6;
@@ -105,7 +135,6 @@ export class Sound {
     this.otherBus.connect(this.master);
     this.fx = ctx.createGain();
     this.fx.connect(this.master);
-    this.applyVolume();
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
     this.filter.Q.value = 4;
@@ -162,7 +191,7 @@ export class Sound {
     // 引擎合成器（AudioWorklet）：載入成功之後才切過去，載入中仍用舊的振盪器
     void this.loadWorklet();
     // 看門狗：音訊時鐘 0.6 秒沒人餵引擎（遊戲不再步進）就把持續的聲音全部關掉；暫停（suspend）時時鐘不走，不會誤關
-    setInterval(() => { if (this.ctx && !this.hushed && this.ctx.currentTime - this.lastFeed > 0.6) this.hush(); }, 300);
+    this.watchdog = setInterval(() => { if (this.ctx && !this.hushed && this.ctx.currentTime - this.lastFeed > 0.6) this.hush(); }, 300);
   }
 
   /** 載入 public/engine-worklet.js；成功就建主引擎節點，舊的振盪器靜音 */
@@ -171,7 +200,7 @@ export class Sound {
     if (!ctx.audioWorklet) return;
     try {
       await ctx.audioWorklet.addModule(`${import.meta.env.BASE_URL}engine-worklet.js`);
-    } catch { return; }
+      if (ctx !== this.ctx || ctx.state === 'closed') return;
     this.eng = this.makeEngine(this.voice);
     this.eng.connect(this.engBus);
     this.worklet = true;
@@ -195,6 +224,13 @@ export class Sound {
       node.connect(lp).connect(g).connect(pan).connect(this.otherBus);
       this.others.push({ node, pan, lp, g, key: '', voice: 'traffic', idleAt: -10 });
     }
+    } catch {
+      // addModule 成功之後建立節點也可能失敗；任何階段失敗均恢復振盪器，不留下未處理的 Promise。
+      if (ctx !== this.ctx) return;
+      try { this.eng?.disconnect(); } catch { /* 已失效 */ }
+      for (const other of this.others) { try { other.node.disconnect(); other.pan.disconnect(); } catch { /* 已失效 */ } }
+      this.eng = null; this.others = []; this.worklet = false;
+    }
   }
   private makeEngine(v: EngineVoice): AudioWorkletNode {
     const node = new AudioWorkletNode(this.ctx!, 'engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
@@ -217,7 +253,7 @@ export class Sound {
     return b;
   }
 
-  suspend() { void this.ctx?.suspend(); }
+  suspend() { try { void this.ctx?.suspend().catch(() => {}); } catch { /* 關閉中的 context 不應打斷遊戲 */ } }
 
   /**
    * 手機會在切到別的 App、鎖螢幕、來電時把網頁的聲音停掉（iOS 叫 interrupted），回來以後要在使用者碰螢幕時才能叫醒：
@@ -225,15 +261,47 @@ export class Sound {
    */
   unlock() {
     const ctx = this.ctx;
-    if (!ctx || (ctx.state as string) === 'running') return;
-    void ctx.resume();
+    if (!ctx) return;
+    if ((ctx.state as string) === 'running') { this.audioError = ''; return; }
+    try {
+      void ctx.resume().then(() => { if (this.ctx === ctx && ctx.state === 'running') this.audioError = ''; })
+        .catch(() => { if (this.ctx === ctx) this.audioError = '瀏覽器暫未允許播放，請按「重新啟用音效」。'; });
+    } catch { this.audioError = '瀏覽器暫未允許播放，請按「重新啟用音效」。'; }
     try {
       const b = ctx.createBuffer(1, 1, 22050), src = ctx.createBufferSource();
       src.buffer = b;
       src.connect(ctx.destination);
       src.start();
     } catch { /* 有些瀏覽器還沒 resume 完不給播 */ }
-    playbackSession();
+    try { playbackSession(); } catch { /* 無聲媒體解鎖失敗不影響駕駛 */ }
+  }
+  getStatus(): SoundStatus {
+    if (!this.enabled) return { status: 'disabled', message: '音效已關閉；開啟音效後可試聽各聲道。', canRetry: false };
+    if (this.unavailable) return { status: 'unavailable', message: this.audioError, canRetry: true };
+    if (this.audioError) return { status: 'error', message: this.audioError, canRetry: true };
+    if (!this.ctx) return { status: 'idle', message: '點擊試聽或重新啟用音效，確認裝置播放狀態。', canRetry: true };
+    if (this.ctx.state === 'running') return { status: 'running', message: `音效正常，${this.worklet ? '引擎合成器' : '備援引擎合成'}運作中。`, canRetry: false };
+    return { status: 'suspended', message: '音效目前暫停，請按「重新啟用音效」。', canRetry: true };
+  }
+  retry(): boolean { return this.enabled && this.start(); }
+  /** 使用各聲道的實際音量；短音不改變遊戲引擎／環境的持續狀態。 */
+  preview(kind: SoundPreview): boolean {
+    if (!this.enabled || !this.start() || !this.ctx) return false;
+    try {
+      const ctx = this.ctx, bus = kind === 'engine' ? this.engBus : kind === 'others' ? this.otherBus : kind === 'ambient' ? this.amb : kind === 'fx' ? this.fx : this.master;
+      if (!bus) return false;
+      if (this.previewNodes) { try { this.previewNodes.o.stop(); this.previewNodes.o.disconnect(); this.previewNodes.g.disconnect(); } catch { /* 前一短音已結束 */ } }
+      const o = ctx.createOscillator(), g = ctx.createGain(), at = ctx.currentTime;
+      const preview = { o, g }; this.previewNodes = preview;
+      o.type = kind === 'engine' || kind === 'others' ? 'sawtooth' : 'sine';
+      o.frequency.setValueAtTime(kind === 'engine' ? 120 : kind === 'others' ? 180 : kind === 'ambient' ? 260 : 660, at);
+      o.frequency.exponentialRampToValueAtTime(kind === 'engine' ? 240 : kind === 'others' ? 140 : kind === 'ambient' ? 220 : 880, at + 0.3);
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.12, at + 0.04); g.gain.linearRampToValueAtTime(0, at + 0.55);
+      o.connect(g).connect(bus);
+      o.onended = () => { o.disconnect(); g.disconnect(); if (this.previewNodes === preview) this.previewNodes = null; };
+      o.start(at); o.stop(at + 0.6);
+      return true;
+    } catch { this.audioError = '試聽暫時無法播放，請重新啟用音效後再試。'; return false; }
   }
   get state() { return this.ctx?.state ?? 'none'; }
   /** 音效系統已經啟動（使用者點過畫面）；自動測試時沒有，main 就不用白算其他車的資料 */
@@ -704,6 +772,9 @@ export class Sound {
  */
 let sessionDone = false;
 function playbackSession() {
+  try { preparePlaybackSession(); } catch { sessionDone = false; }
+}
+function preparePlaybackSession() {
   if (sessionDone) return;
   sessionDone = true;
   const nav = navigator as unknown as { audioSession?: { type: string } };

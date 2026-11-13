@@ -1,0 +1,222 @@
+{
+  "completedAt": "2026-11-11T07:44:43.139Z",
+  "scope": [
+    "A 多分頁存檔保護",
+    "B GP完整計圈",
+    "C 地圖停止累計里程",
+    "D 導航定期重算"
+  ],
+  "before": {
+    "swVersion": "3bdf97336c02",
+    "root": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-abcd-before-3bdf97336c02",
+    "includesPriorUncommittedChanges": true,
+    "head": "2dee076de30da52fe20b4d33faf659e6acf0aed3"
+  },
+  "after": {
+    "root": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-work",
+    "sourceHash": "e8b93fc2f3b3348cb7541906f15e30415518319a8a3e308d9f0384418e5907bc",
+    "swVersion": "811385b20e05",
+    "mainSha256": "9545adee1ff8397456917d38b71bad22b3201e35a95246534faf8115e88c5e78"
+  },
+  "build": {
+    "command": "npm.cmd run build",
+    "startedAt": "2026-11-11T07:37:38.148Z",
+    "completedAt": "2026-11-11T07:37:47.326Z",
+    "exitCode": 0,
+    "sourceHash": "e8b93fc2f3b3348cb7541906f15e30415518319a8a3e308d9f0384418e5907bc",
+    "sourceUnchangedDuringBuild": true,
+    "swVersion": "811385b20e05"
+  },
+  "node": {
+    "startedAt": "2026-11-11T07:38:36.479Z",
+    "completedAt": "2026-11-11T07:44:20.800Z",
+    "sourceHash": "e8b93fc2f3b3348cb7541906f15e30415518319a8a3e308d9f0384418e5907bc",
+    "sourceUnchangedDuringTests": true,
+    "baseline": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-priority-before-20261111",
+    "results": [
+      {
+        "name": "save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "mission-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-platform-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "racing-state-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-racing-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "economy-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "identity-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "leaderboard-regression",
+        "code": 0,
+        "status": "PASS",
+        "firstAttemptCode": 1,
+        "firstAttemptStatus": "FAIL",
+        "attempts": 2,
+        "retryOutput": "shots-abcd-leaderboard-regression-retry.txt"
+      },
+      {
+        "name": "static-ui-contract",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-economy-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "route-preview-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-radio-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-racing-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-racing-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-conflict-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "abcd-street-regression",
+        "code": 0,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "limitations": [
+      "隔離程式與本機HTTP測試，不代表手機實機或正式Redis",
+      "瀏覽器與固定三回歸另行執行"
+    ],
+    "retriedSeparately": {
+      "at": "2026-11-11T07:44:20.798Z",
+      "firstAttemptSummary": "shots-abcd-node-summary-first-attempt.json",
+      "reason": "首次本機HTTP讀取逾時；同一來源與斷言單獨重跑一次，保留失敗證據。"
+    },
+    "sourceUnchangedDuringRetry": true
+  },
+  "dedicated": {
+    "save": {
+      "passed": 24,
+      "failed": 0
+    },
+    "racing": {
+      "perVersion": 16,
+      "versions": 2,
+      "passed": 32
+    },
+    "street": {
+      "passed": 8,
+      "failed": 0
+    },
+    "conflictCancellation": {
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "browser": {
+    "conflict": {
+      "passed": 8,
+      "failed": 0
+    },
+    "existingRecovery": {
+      "passed": 7,
+      "failed": 0
+    },
+    "nativeLifecycle": {
+      "passed": 4,
+      "failed": 0
+    },
+    "exceptions": 0,
+    "externalRequests": 0,
+    "realWebLocks": true,
+    "playerStorageTouched": false,
+    "realPhone": false
+  },
+  "fixedRegression": {
+    "passed": 3,
+    "failed": 0,
+    "bot": "54.425 hits=0 aiHits=0",
+    "gp": "陳冠宇162.0 aiHits8",
+    "pit": "陳冠宇175.7 aiHits5"
+  },
+  "application": "文件於封裝前產生；實際套用結果須核對DCISI/taipei-gp-abcd-apply-result.json與original-verification.json。未commit／push。",
+  "limitations": [
+    "無Web Locks時僅逐次原文比對，不能保證同時寫入原子性",
+    "GP小圈與完整圈對照隔離其他車推時計；全車陣另由三固定回歸驗證",
+    "地圖與導航為真main AST隔離測試，未跑手機人手駕駛",
+    "手機實機效能／耗電／觸控／音效及正式服務未驗證",
+    "未追溯清除歷史錯誤GP紀錄"
+  ],
+  "artifacts": {
+    "shots-abcd-build.json": "c132d78c27b6c614ef7e3303bf5866ad27b2e26047fd404183f7c55c9f92e940",
+    "shots-abcd-build.txt": "dba0735a5018dc5bed4eae351f8fbb00e2ea98ce9f49d1eafd95ec2dfea7cf2c",
+    "shots-abcd-node-summary.json": "329858229de5e14877749dd9bb881f6d33d1c7378c033189de03617a7728b2d4",
+    "shots-abcd-save-regression.json": "adc849ed125ac0af34564be4938d20bbc0ebf8b346f2279e08023b6c6ba0783c",
+    "abcd-racing-regression-result.json": "4fae473970e30703b93608ff91d6c4b58744d05948d265ea87d31567776e806c",
+    "shots-abcd-street-regression.json": "7c04a8465a3e3d9b8df978d42c90772104989636c0c94d83f568c6c6eb62a561",
+    "shots-abcd-ui-browser.json": "51b913217bc468d2d6155eeeedb47c1353280b3e6613fa7229065f6ea8effbf3",
+    "shots-abcd-followup-ui-browser.json": "75e77dd00204e4e787b801f3071b62cd22175a28e1232b197f3fdb741a7655c2",
+    "shots-abcd-fixed-regression.txt": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a",
+    "shots-abcd-conflict-integration.json": "e1b3387cd9c15fe71cc4d8b0ea6711d1fbbb2d9dd4c449b67bdc60a94d75cdd1",
+    "shots-abcd-lifecycle-regression.json": "c4767da8624202018c7cb09c2874615222efd1114f7e3bbe3d3c142b9bacf369",
+    "shots-abcd-node-summary-first-attempt.json": "2143433b4cd3beedcac3c14fe2aaaf458334ad81376f610608c2460e570e220c",
+    "shots-abcd-leaderboard-regression-retry.txt": "b1d357035f4e16e24c5b54a8fc4578adac14811fc9965dd8a9679d8677ec31c2"
+  }
+}

@@ -1,0 +1,2735 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-13T02:26:23.653Z",
+  "status": "LOCAL_VERIFIED_WITH_DEPLOYMENT_PENDING",
+  "build": "c27a6eb50a74",
+  "productHash": "79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe",
+  "sourceHashes": {
+    "src/achievements.ts": "2df72a9b905caa28145842a11a0db24de2d47e9d50d44d95a6548edb6cb3c13b",
+    "src/audio.ts": "23c3968548eddd2abeae619dec8a42382b7944030d908c06b50d35549267ada5",
+    "src/bigmap.ts": "5d71165f682903f024de9fdb0768faf59415628bb3b91b47531bf22ffb93ed6b",
+    "src/boot.ts": "03877838d3da0f8770aaeab8bf1b39342a76c74941c273cc787cdb19b8f028bf",
+    "src/breakables.ts": "24f1866d28dbb8b1f365ed7d6eeb01bef8209d0d5ddffb48d2a84f978db67fd5",
+    "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+    "src/carModel.ts": "cdbdb639f1e98642091a801a239d26d062b147f88e387f42afa7f1535cb8d253",
+    "src/circuitenv.ts": "c3d579aee5dbcf2dd0afcd793f9c7204e2235dd1901699f70f4a8b51c1de20eb",
+    "src/circuits.ts": "ed926bc7509428cc884224fc5729fefda2b18e4f943688d20cee48576bc2e35d",
+    "src/city.ts": "535a8246e1a4a5970f8f444d1e69c2cb79e0d8adb77dadefbb84bf6cdf8d1f96",
+    "src/citydata.ts": "711a9faf67038e6f6680d10b858f58eb7982bf38b7e0eb12661a508ebb90fa42",
+    "src/cockpit.ts": "736d8b3c501fd643d0311fc95b194bbb4db894ecfc9b2040b82510422afe58e9",
+    "src/damage.ts": "02db413ae7f86e00d67b05628468a237edc43038ec13a328b8f07caddf9cfb85",
+    "src/data/track.json": "0b05d7ff3338a9e02abfd8b2ab9e34f1bdf939b1058a0a49d9f10dd077ea2297",
+    "src/decor.ts": "89613d0ae0914ec39a20ea5ddecc9b2efb2aef36373a41329908a18567ff1867",
+    "src/drift.ts": "9db782508e3c60256ddd57ba253e8fdf84994b10914353457e1fc894715de9f9",
+    "src/economy.ts": "47186c8773635c1c070179c18b22f259eb46f32afc1b401cb4567f6bd059d44b",
+    "src/elevated.ts": "f7c442d4acbe42639143333ff7442fd66443f2a34a5d2fb717ae5bba040013ca",
+    "src/enginevoice.ts": "cc23a42d32fc71888fab9d13b262bc7024e8c82c6f950c8be575b5aad0ad9c6e",
+    "src/f1model.ts": "5607b3269e4886ffab31583f79bae39bf2f5294cf3f3cbec8274108ee805e8d7",
+    "src/filler.ts": "f437b0d935810dde4da750ae6886f6763daf3c9251756e69cbad037ed1f887a7",
+    "src/frame-pacing.ts": "51fa7e9db183ef48eaf21e55fed08cfca28dc7ca1d20458d677ae4ec8912c46d",
+    "src/freecar.ts": "655a8bbaee7f4cfbe47d4e7477479a709e8a2ef605d210db96c18ecf058d3ded",
+    "src/garage3d.ts": "d698513945bc82280068d1dd02904b6d7f41d7a588ee531ec11bbc4674f8be4f",
+    "src/graphics.ts": "0fb5de4c66338dd3e4b50c86917733b91718da9e69b1db0e21b8897952df071d",
+    "src/identity.ts": "a1c7febc4099429234239f5738768ed2e2db0c0a413f2e22ffd14004e8a76f21",
+    "src/input.ts": "18ac80fc46b446168761803a9fdfffcd59f1e1dbe9629440ef5999ebc39b113b",
+    "src/install.ts": "9f601c71037e72f1d4f85393a541589df9f8e7473bd421ab56980bd74647a471",
+    "src/landmarks3d.ts": "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+    "src/lap-proof.ts": "f7df86a9e18de1b4bf20bb3c006e5cdccab8bc0f084dd32d424c9ed67f7367a7",
+    "src/leaderboard-ui.ts": "0a90d21d293ae6a7ba520190c5b2d5fb5f2984846b69bf4e648b2dcd1a683559",
+    "src/loading.ts": "bf118918c7104cb339fad8165caf5d85e1b38ce1a352e414a341363839798af2",
+    "src/main.ts": "d61eca515a48c410fa12b936f052bf8a013572dc54738a531e64884ac68988b6",
+    "src/minimap.ts": "5d006dc4974532312dc2e040431fb39cff238dcee63e36623c4826797e4f437b",
+    "src/mission.ts": "e3c6b8010114996378f6bea20c4bd99e38d0f59e891ad33587a9eb0023a02d58",
+    "src/models.ts": "f5f792c319ef5b2a442cccd6cac2d1a79059f5038d5203a8c903833312856dc7",
+    "src/multiplayer-client.ts": "3c55713c501d6d96d5ad05bc99f4f6eee4dc1d9ad283eb8d446a53335874d5a8",
+    "src/multiplayer-game.ts": "c0925f71e63491b133977dd8d7ce82f6188b54a7b97449be9c0af341214ba8c1",
+    "src/multiplayer-scene.ts": "aca5cfa2c47223f49e26e2740a215a9502db1168262ae5752ca84dde4c409f09",
+    "src/multiplayer.css": "a2c3de72652097ed90f3eb50217154c89372fd7321baed7369db656b50513531",
+    "src/network.ts": "11714727330fb4f6447ac7e677b98c9fe668b83d9f7565499f89ef4e21386fb2",
+    "src/offline-manager.ts": "f5faef1d0f0c64bcb435b9d88c63f4e481bcd66a63b88cc3451d8a1dc5099255",
+    "src/peds.ts": "c914965a5a024af2bd0c8ceed3755325cd75d0eea1952bb8abdcade72d19a080",
+    "src/pedzone.ts": "dd80d1094efe84b6b06beb72350848cc371327231b27fff41da0371ff9632070",
+    "src/physicstest.ts": "bdd84638483c4eb4329e4736ae219dbd829d1d2c622a5b869ef5f22a97d710fb",
+    "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+    "src/platform-tools.ts": "caee743939e2348c5255536998fbcfc5c1b2fed802e38ff56cac35fd80eca735",
+    "src/player-progress.ts": "93d43f5c6d8f2e727fe2cb00d2165e69a04a74c92519bbc6fc3c9a3cebfb19c2",
+    "src/podium.ts": "0dbc99dd19c310b0e125a9f81282320377826d82e24d588f80936bc7a5d595cb",
+    "src/police.ts": "badae661523374f2065292ae74e6db2d17182863ffd79778368ae0fd29888b86",
+    "src/quality.ts": "dad59f0b33981ec2dcb95345e56cc4cb60109c28ec03fc8d0bf3d98ce030eb4a",
+    "src/race-state.ts": "d336ce00e9bfed4e81ffc7c4c03e5dec7dc177dcbc05d5cb7ea2decb938e4dd8",
+    "src/race-timing.ts": "ed69242243a9b0de843fdfa854030fc0e341e317fff704cb3c6a7ddae5fc2375",
+    "src/racing-laps.ts": "7c306ec3d9e654949205021a54e620ee5e2d1d866f7fc03e03edc8185cd6c116",
+    "src/racing-replay.ts": "21d6a2716d670f0dfd758d377532f3ebba002afe000e679afc831f0a1d4c028c",
+    "src/radio.ts": "15159e15a21ed5ece020578f2441ec550a21e4ab25b60f5d152d3428d62d492f",
+    "src/rainfx.ts": "67317e314d5c9302291cb0b6638ca6f8201f356d7b36eb253231436de447b5cc",
+    "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+    "src/riverside.ts": "d06a7281d1eac06566bb6d274f5f35fa36a1b0ea4c882708a4ae84aa69380d4d",
+    "src/route-preview.ts": "501673dd7824ddd8d7c333d2796df37a4a96afb7e04b7184f87b14f8ad60cc26",
+    "src/router.ts": "b3dfe9dabba261d977c7ed6409b11d25b5596773adc82d63f2d5961ef65c9877",
+    "src/save-recovery-ui.ts": "2e575f1d663e3a60ee9d1bec95cbdf2eb09758594a494bba72d718646a138419",
+    "src/save-writer-ui.ts": "fd52ada06c0ba813a08b52fd22ca8e8ee44a650517093026d60f6e60864c83e3",
+    "src/save.ts": "56621cd6a13823bf6478b33c484e8d43f3cbc81b79635b6aff994620fdc54003",
+    "src/season.ts": "7ab083d989f093414b90373fe8afef30ae7ee7fa3e2bebe5b963795ac2dbbe4b",
+    "src/strategy.ts": "7a28d31845fadcee6b53ff8c0c8be94f769cbda7e24b1de1df8177ef48ed5ebc",
+    "src/street-series.ts": "deadc559bd6da0496d500623079babbfdf5e89ff8d3f20fbc2151323deb1b259",
+    "src/street-taxi-state.ts": "2d482618c6867c4f7a0149beecd0767f95fec58c1ff322e109705e9ac19d82c1",
+    "src/streetrace.ts": "e01acda5632b65629a249abd89c09d662bcae0a4085feb3450fd3bf1d693efee",
+    "src/style.css": "65976672e78f3616be5ce97367f2ef8b5fdebb6f7fc38a10499c58dc493d7cce",
+    "src/surface.ts": "1b98bba6eb7fdcb1e2d2a5fdd0e62de8b533b219214f3b5e543dcff95c96a3bb",
+    "src/sw-template.js": "8ed02bbaa6980fc897b6db39c8a886bd9897ab3d5cdd3703561912b8a4fd64ad",
+    "src/taxi.ts": "d99aa90986821d982a662a5f85f135c335e3f4a8e2d71280c60f5b0c5f1260e1",
+    "src/tilegen.ts": "8ec4523b7d17e3865c5a621de22b7839e9c3638a57a620186905ce6a29f51ad0",
+    "src/tilepool.ts": "1602eaab4b9d8320eb093b4c448e4bb2ca654e37aecf6e1a4abf58e58525ad24",
+    "src/tileworker.ts": "7185c09cfa14913c7976576828efbe7e821630334cc2e237c41efe35574058be",
+    "src/touch-layout.ts": "bd31c36023bdfce61af398a55a23e851ba2bb1d800f9eddba4818cd074a71968",
+    "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+    "src/traffic.ts": "568eaf2a651ff4528e4402e33a77ba32a7d7ba548959dd350298d8eb50f090f1",
+    "src/trains.ts": "f75c82c3406a6bcf3ca50cdfff1ba49be3f6fbb309c26836de7b60f5d1b4bc60",
+    "src/tunnel.ts": "7b735ed633d4597a9cab5424215d0543009a9ea5289386be802fc418635ec9ec",
+    "src/vehicles.ts": "3b436170f2ca39076bf41222a5c3d5c89618ebc97fa024447d2dfe627c9846b7",
+    "src/weather.ts": "b2c01078f6b0a9e83933c969e910ea99e4adeffa2373e5dac88828aaa5235fa0",
+    "src/world.ts": "24ee12a022a7364a81855bc65f03a73e16c05dd7ea4a0aa35dd9f0a8c5ffe2c7",
+    "api/leaderboard.js": "b41f08ffb64f6ea470af24127754c6e6243b3aaf381c7fb84055fba6601c2d7a",
+    "shared/lap-proof.js": "eab0fe24d3109b1ce66d8a76de1acb3a628569d1aee16e3c18bb8586257dced5",
+    "shared/multiplayer-protocol.md": "480af86660a427727d0d848a6861600e5930f9d35b6db2cd791491c246ed0594",
+    "shared/multiplayer-protocol.ts": "aba477b1866cfdff1cc76009e6be8accbcdd43a5dd02a111b7828a855cc365e5",
+    "shared/taipei-track.json": "7c352a1cb7b71872e393bc34d9155fca00d2ff88a7a686d1e2aad32c241be94f",
+    "server/Dockerfile": "0d7f43c3474506d537cd48203f2e27556bd89396dc3cfc75ae3db896fe275377",
+    "server/Dockerfile.dockerignore": "1acc2442baa8273234522d42988ccc34e4784e6bd608095a480223d5b403d974",
+    "server/index.mjs": "0727e347f79a8a98e38f4677675c998abf11e169b59dc2df196cd72d53740ed1",
+    "server/package-lock.json": "ee9da6fe8f75b858973710abcab4833e8f1b2f3507596c634a8b118dd5d317f9",
+    "server/package.json": "69978617dab09520a883d911497aed198bea367ef4b743a7025ccf9852045544",
+    "server/physics-entry.ts": "4c32a872cc55d97f293714b0acfed74c9a1b3eb4d4f187621082b266fc8cec64",
+    "server/physics.mjs": "29aa643523217a84bf25793becfce4ff4bffa75af11636dabece92990f73039b",
+    "server/README.md": "0096fdff82f3561a58d0a6c331f766dd64ffbc6e4b1b317933d293111348e475",
+    "server/room-service.mjs": "0934c2368770c4762c14ffdc98e81d7475277e40421b5bc2268b0a66b0de25e8",
+    "index.html": "35f2e281582792ceb7b245d737539b67b598709964ebf43ad2c7bcb3c5afa783",
+    "multiplayer.html": "5f8103a4f99e1a140324fea1b037388a0412bd82a56bc675c574def1f54cc3df",
+    "vite.config.ts": "57abdda3caf1f0a2c2878b9568e28c5028858c95bdc0c726b7461cc6baa146df",
+    "package.json": "4569fc0f3954ec547caaa77ce6ae6a2241cf3571fe7217e85824561426d72934",
+    "package-lock.json": "91bf530b94633b7da3347839f436e131901ace78eb3a47c2ba3bd295fd8371fa",
+    "tools/build-multiplayer-physics.mjs": "1b045379b275a80044bc2501714af6e23ce8c902b70ac23890a43908ee11a894",
+    ".env.example": "ffc6fff5f57a3ff5babeb6fd98276e22491e360480856df39a5599e4c183f0c3",
+    ".gitignore": "b2c27f3e5a7c7f99a06944ad2e3883a9cb14e44b74c1cb3fd86cdafbe1a12b94",
+    "MULTIPLAYER.md": "14f6926397f97060cb232137bcf5d8ac882ab8510fd3d7374a3f6a275c2b4708",
+    "MULTIPLAYER_DEPLOYMENT.md": "3df23579faf42e3d70ed27ec163de79d869c23ba02d0aa0884f3c029035f368d",
+    "render.yaml": "dd25e3de83cf964ffd4d910f85b597e3e4a42d2fc5ad4fda1c03757175ffe06b",
+    "tools/dev-tests/MULTIPLAYER_TEST_PLAN.md": "9e8665c1c008013298536d032758bed449120b8038925f5569043d07ee86a8a0",
+    "tools/dev-tests/multiplayer-browser-profile.mjs": "fcc3e93c048af81d311eb63fcf0116f8ccd956201133599d240d41c5579785f0",
+    "tools/dev-tests/multiplayer-browser.mjs": "300076649160f37d55cbc7f705361ceddec3f1298850668ad5acf46eec08530c",
+    "tools/dev-tests/multiplayer-checks.mjs": "ae69e0b0ac606658a654987ac37ea309080c0aca04cc989b35afa06a21263a0b",
+    "tools/dev-tests/multiplayer-client-regression.mjs": "283c03129a63fde0ff8465e7b4e7d5b6d5f7d651c2d49cddcdde5fadd0783fb7",
+    "tools/dev-tests/multiplayer-fixed-regression.mjs": "2be089ef748fffb366e300773c7a910b38ea72f1a65118f9ec2a9083ab5b8914",
+    "tools/dev-tests/multiplayer-server-regression.mjs": "24a97626a0bf4c886b67dd1bd39cf0c9a1add3ac4044d43643b9bb821b2db22e",
+    "tools/dev-tests/multiplayer-test-helpers.mjs": "666533db9b58926eb44ed4c32983fc20f14ef2f92691b96af8bb9b658a6f5469",
+    "tools/dev-tests/multiplayer-trace-summary.mjs": "e168f4665675fa05de884f5d1044465f79d8a080310e6b2afcb174ba566bbec9",
+    "tools/dev-tests/multiplayer-ui-browser.mjs": "d567675a2a586943708bf79fabab13615aaf96101321248647dfd8e458ac279a",
+    "tools/dev-tests/multiplayer-ui-cdp.mjs": "ca1cbe45e49f5ce61b99002685b4eee813e6e3012cbdf92d0f15aef2966b82d6",
+    "HANDOFF.md": "2541a55d34dbd1b7babc2f574145a0ce8f0adadf05cd5a35bbe028350b29d5ae"
+  },
+  "evidence": {
+    "server": {
+      "file": "tools/dev-tests/multiplayer-server-summary.json",
+      "sha256": "1b71efee9cf2de36051ef25dcc449e06791f75d3c498935c34841dc10c625207",
+      "report": {
+        "startedAt": "2026-11-12T09:44:05.615Z",
+        "transport": "real WebSocket on loopback",
+        "authoritativePhysics": true,
+        "playerStorageTouched": false,
+        "externalRequests": [],
+        "cases": [
+          {
+            "name": "精確 Origin／WS 路徑限制與健康檢查，不依賴正式服務",
+            "status": "PASS",
+            "details": {
+              "rejectedOrigin": 403,
+              "rejectedPath": 404,
+              "health": {
+                "status": "ok",
+                "version": 1,
+                "physics": "taipei-classic-v1",
+                "rooms": 0,
+                "connections": 0
+              }
+            }
+          },
+          {
+            "name": "錯協定／物理／賽道版本與無效名稱不建立房間",
+            "status": "PASS",
+            "details": {
+              "incompatibleVariants": 3,
+              "invalidNames": 3,
+              "invalidLaps": true
+            }
+          },
+          {
+            "name": "四個真連線共房、第五人拒絕，快照不洩漏重連憑證",
+            "status": "PASS",
+            "details": {
+              "players": 4,
+              "codeLength": 6,
+              "distinctColors": 4,
+              "credentialsPrivate": true
+            }
+          },
+          {
+            "name": "至少兩人且全員準備才起跑；房主權限與共同三秒時鐘",
+            "status": "PASS",
+            "details": {
+              "startAt": 1003000,
+              "sharedMatch": "4ce2687e-b6f3-4087-bcae-e340bc578dce",
+              "noMovementBeforeStart": true
+            }
+          },
+          {
+            "name": "無效輸入／過期 seq／假座標與完賽宣告不改權威車況",
+            "status": "PASS",
+            "details": {
+              "ackSeq": 5,
+              "completedLaps": 0,
+              "finishMs": null,
+              "clientCoordinatesIgnored": true
+            }
+          },
+          {
+            "name": "七百毫秒無新輸入自動煞車，其他車手與伺服器時鐘繼續",
+            "status": "PASS",
+            "details": {
+              "before": {
+                "a": 13.481927093569169,
+                "b": 13.481927093569169
+              },
+              "after": {
+                "a": 0,
+                "b": 37.810230824018625
+              },
+              "elapsedMs": 2000
+            }
+          },
+          {
+            "name": "真物理跑完整圈、依序分段後由伺服器完賽與排序；reset清除上一場",
+            "status": "PASS",
+            "details": {
+              "fullLapByActualPhysics": true,
+              "finishMs": [
+                58426.284,
+                60393.956
+              ],
+              "orderedRanks": [
+                1,
+                2
+              ],
+              "nextMatchFresh": true
+            }
+          },
+          {
+            "name": "房主斷線移交，合法 token 恢復席位與車況且舊 socket 不再有權操作",
+            "status": "PASS",
+            "details": {
+              "samePlayerId": "15e87c6b-c6bc-44f0-825f-7f799ffc84d5",
+              "players": 2,
+              "hostTransferred": true,
+              "singleSocketOwner": true
+            }
+          },
+          {
+            "name": "首位真物理完賽後保留六十秒，逾期未完成者 DNF 並保留贏家時間",
+            "status": "PASS",
+            "details": {
+              "winnerFinishMs": 58426.283979366315,
+              "graceMs": 60000,
+              "pendingDnf": true,
+              "winnerTimePreserved": true
+            }
+          },
+          {
+            "name": "重連超過十秒標示 DNF；離開不能以舊 token 復活",
+            "status": "PASS",
+            "details": {
+              "expiredMs": 10001,
+              "dnf": true,
+              "removedCredentials": true
+            }
+          },
+          {
+            "name": "倒數時斷線取消起跑，回大廳重新準備",
+            "status": "PASS",
+            "details": {
+              "countdownCancelled": true,
+              "allReadyReset": true
+            }
+          },
+          {
+            "name": "大廳離開移交房主，空房期限清理，已關房間無法加入",
+            "status": "PASS",
+            "details": {
+              "hostTransferred": true,
+              "emptyRoomRemovedAfterMs": 60001
+            }
+          },
+          {
+            "name": "全場時間上限與伺服器長停頓均產生 DNF 結果",
+            "status": "PASS",
+            "details": [
+              {
+                "trigger": "raceLimit",
+                "dnf": true
+              },
+              {
+                "trigger": "serverStall",
+                "dnf": true
+              }
+            ]
+          },
+          {
+            "name": "房間與連線容量限制、無效 JSON／過大訊息及操作頻率受限",
+            "status": "PASS",
+            "details": {
+              "maxRooms": true,
+              "maxClients": true,
+              "invalidJsonClosesAfter": 3,
+              "maxPayloadBytes": 4096,
+              "rateLimited": true
+            }
+          }
+        ],
+        "completedAt": "2026-11-12T09:44:45.038Z",
+        "summary": {
+          "passed": 14,
+          "failed": 0
+        },
+        "sourceHashes": {
+          "server/index.mjs": "0727e347f79a8a98e38f4677675c998abf11e169b59dc2df196cd72d53740ed1",
+          "server/room-service.mjs": "0934c2368770c4762c14ffdc98e81d7475277e40421b5bc2268b0a66b0de25e8",
+          "server/physics.mjs": "29aa643523217a84bf25793becfce4ff4bffa75af11636dabece92990f73039b",
+          "shared/multiplayer-protocol.ts": "aba477b1866cfdff1cc76009e6be8accbcdd43a5dd02a111b7828a855cc365e5"
+        },
+        "sourceUnchangedDuringTests": true,
+        "status": "PASS",
+        "limitations": [
+          "本機隔離 WS／真權威物理與注入時鐘，不代表跨網路延遲、手機 FPS 或公開常駐服務可靠度",
+          "未使用正式站、Redis、玩家 storage；瀏覽器與固定單人三回歸另行驗證"
+        ]
+      }
+    },
+    "client": {
+      "file": "tools/dev-tests/shots-multiplayer-client-live-regression.json",
+      "sha256": "1436c02b0cedb2916c8883ec6cb77a5ebfea3417c859ce3cf2d4c6fa189e84d3",
+      "report": {
+        "createdAt": "2026-11-12T09:16:29.920Z",
+        "clientSourceSha256": "3c55713c501d6d96d5ad05bc99f4f6eee4dc1d9ad283eb8d446a53335874d5a8",
+        "protocolSourceSha256": "aba477b1866cfdff1cc76009e6be8accbcdd43a5dd02a111b7828a855cc365e5",
+        "playerStorageTouched": false,
+        "productionUsed": false,
+        "liveServerUsed": true,
+        "cases": [
+          {
+            "name": "constructor不連線、不讀寫單人存檔；名稱／房間碼錯誤也不建立socket",
+            "status": "PASS"
+          },
+          {
+            "name": "真協定新玩家ackSeq=-1可完成建房；sessionStorage只寫專用續接憑證",
+            "status": "PASS"
+          },
+          {
+            "name": "requestId不相符不完成加入；伺服器拒絕後可重試，輸入房碼正規化",
+            "status": "PASS"
+          },
+          {
+            "name": "輸入只傳matchId／序號／steer／brake；限頻、急煞及ack後續序號正確",
+            "status": "PASS"
+          },
+          {
+            "name": "舊時間快照與已結束match不能覆蓋新一場",
+            "status": "PASS"
+          },
+          {
+            "name": "短斷線自動resume；舊socket訊息無效，伺服器ack後可繼續輸入",
+            "status": "PASS"
+          },
+          {
+            "name": "resume被伺服器拒絕會清憑證並停止重試",
+            "status": "PASS"
+          },
+          {
+            "name": "connect逾時會結束Promise、關socket並清timer",
+            "status": "PASS"
+          },
+          {
+            "name": "開socket但不回welcome的entry逾時不會永久pending",
+            "status": "PASS"
+          },
+          {
+            "name": "10秒重連截止會結束未完成連線、清除房間及續接token",
+            "status": "PASS"
+          },
+          {
+            "name": "離房中止待重連timer；已離開的socket回呼不能恢復身分",
+            "status": "PASS"
+          },
+          {
+            "name": "頁面reload保留session憑證但不自動開socket，顯式restore後續接",
+            "status": "PASS"
+          },
+          {
+            "name": "版本或車手資料不合法會安全斷線，不沿用舊房間或自動重連",
+            "status": "PASS"
+          },
+          {
+            "name": "同時加入請求會明確拒絕；disconnect會取消尚未完成的建房",
+            "status": "PASS"
+          },
+          {
+            "name": "ping採往返中點校時；解除訂閱後不再收到狀態與快照",
+            "status": "PASS"
+          },
+          {
+            "name": "真server／真WebSocket：雙人建房、加入、準備起跑、權威移動與斷線續接",
+            "status": "PASS",
+            "detail": {
+              "players": 2,
+              "startAt": 1794474993233,
+              "initialAckSeq": -1,
+              "samePlayerAfterResume": true,
+              "sameMatchAfterResume": true
+            }
+          }
+        ],
+        "limitations": [
+          "純生命週期案例使用真client原始碼配合隔離socket與虛擬時鐘；不能證明實際網路延遲或瀏覽器渲染。",
+          "live案例為本機臨時埠的真server／WebSocket，未部署正式服務。"
+        ],
+        "summary": {
+          "passed": 16,
+          "failed": 0
+        }
+      }
+    },
+    "ui": {
+      "file": "tools/dev-tests/multiplayer-ui-browser-summary.json",
+      "sha256": "378f774073e980b66deeea493c9a8d0cda4782fd9d008a2cec90095d72ed0fa9",
+      "report": {
+        "startedAt": "2026-11-13T02:16:57.627Z",
+        "build": "c27a6eb50a74",
+        "expectedBuild": "c27a6eb50a74",
+        "expectedCases": 11,
+        "cdpPort": 9334,
+        "transport": "single-browser-plus-real-websocket-peer",
+        "isolatedContexts": [
+          {
+            "label": "UI",
+            "context": "351D950238FFB379D2C8165D95ED8E77"
+          }
+        ],
+        "contextsDisposed": [
+          {
+            "context": "351D950238FFB379D2C8165D95ED8E77",
+            "disposed": true
+          }
+        ],
+        "localOnly": true,
+        "playerStorageTouched": false,
+        "localStorageUnchanged": true,
+        "cases": [
+          {
+            "name": "單瀏覽器隔離玩家初始不開socket，錢包12345保持原樣",
+            "status": "PASS",
+            "details": {
+              "sockets": 0,
+              "wallet": 12345,
+              "contexts": 1,
+              "nodePeer": true
+            }
+          },
+          {
+            "name": "入口390×844／844×390／844×220不橫溢，控制至少44px且可捲可點",
+            "status": "PASS",
+            "details": {
+              "viewports": 3
+            }
+          },
+          {
+            "name": "真加入及建立按鈕共房，只有一人時禁止起跑，遠端模型可見",
+            "status": "PASS",
+            "details": {
+              "room": "4XUG7X",
+              "players": 2,
+              "remoteModels": 1,
+              "uiJoinAndCreateButtons": true,
+              "transport": "single-browser-plus-real-websocket-peer"
+            }
+          },
+          {
+            "name": "大廳三尺寸可達操作，全員準備後同步matchId／startAt與HUD名單",
+            "status": "PASS",
+            "details": {
+              "matchId": "32cbb0bb-6803-4df8-b0b7-9fbe83eb00c0",
+              "startAt": 1794536231617,
+              "uiPlayers": 2,
+              "realNodePeer": true
+            }
+          },
+          {
+            "name": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "status": "PASS",
+            "details": {
+              "movedMetres": 3.6490314275043985,
+              "ackSeq": 14,
+              "keyboardAfterButtons": true
+            }
+          },
+          {
+            "name": "切往無3D空白頁真失焦後持續煞車，真WS對手仍前進",
+            "status": "PASS",
+            "details": {
+              "repeatedBrakePackets": 5,
+              "spanMs": 4001,
+              "peerProgress": 126.86168346732268
+            }
+          },
+          {
+            "name": "CDP暫時離線加切斷真socket後自動resume，保留身分及match",
+            "status": "PASS",
+            "details": {
+              "playerId": "634eb1fe-2a87-441e-adb1-4061f2d18902",
+              "matchId": "32cbb0bb-6803-4df8-b0b7-9fbe83eb00c0",
+              "fault": "CDP offline + native socket close"
+            }
+          },
+          {
+            "name": "persisted離頁／回頁事件經真disconnect及restore回到原席位",
+            "status": "PASS",
+            "details": {
+              "playerId": "634eb1fe-2a87-441e-adb1-4061f2d18902",
+              "matchId": "32cbb0bb-6803-4df8-b0b7-9fbe83eb00c0",
+              "syntheticPersistedEvents": true,
+              "nativeBFCacheVerified": false
+            }
+          },
+          {
+            "name": "真比賽HUD三尺寸操作至少44px且不被覆蓋",
+            "status": "PASS",
+            "details": {
+              "viewports": 3,
+              "renderedCars": 2
+            }
+          },
+          {
+            "name": "兩玩家正常方向／煞車以真walltime完賽，成績頁與再戰按鈕同步回大廳",
+            "status": "PASS",
+            "details": {
+              "wallTimeMs": 57868,
+              "finishMs": [
+                63675.022,
+                64859.915
+              ],
+              "ranks": [
+                1,
+                2
+              ],
+              "automatedControlsOnly": true,
+              "rematchViaRealButton": true
+            }
+          },
+          {
+            "name": "第二場真開始取得新match，離開比賽後真WS對手仍前進",
+            "status": "PASS",
+            "details": {
+              "newMatchId": "f02fe6a7-d956-445d-852b-a90a50a5a392",
+              "previousMatchId": "32cbb0bb-6803-4df8-b0b7-9fbe83eb00c0",
+              "departedDnf": true,
+              "remainingPeerContinued": true
+            }
+          }
+        ],
+        "steps": [
+          {
+            "case": "大廳三尺寸可達操作，全員準備後同步matchId／startAt與HUD名單",
+            "label": "browser tracing start before first start button",
+            "at": "2026-11-13T02:17:08.290Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "focus page",
+            "at": "2026-11-13T02:17:11.686Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "initial authority snapshot",
+            "at": "2026-11-13T02:17:11.702Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "wait authority speed >3",
+            "at": "2026-11-13T02:17:11.705Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "click mp-camera",
+            "at": "2026-11-13T02:17:11.902Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-camera button released focus",
+            "at": "2026-11-13T02:17:11.923Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-camera ArrowLeft keyDown",
+            "at": "2026-11-13T02:17:11.933Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-camera wait real steer packet",
+            "at": "2026-11-13T02:17:11.937Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-camera ArrowLeft keyUp",
+            "at": "2026-11-13T02:17:12.034Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "click mp-sound",
+            "at": "2026-11-13T02:17:12.036Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-sound button released focus",
+            "at": "2026-11-13T02:17:12.234Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-sound ArrowLeft keyDown",
+            "at": "2026-11-13T02:17:12.246Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-sound wait real steer packet",
+            "at": "2026-11-13T02:17:12.254Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "mp-sound ArrowLeft keyUp",
+            "at": "2026-11-13T02:17:12.267Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "ArrowDown keyDown",
+            "at": "2026-11-13T02:17:12.270Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "wait real brake packet",
+            "at": "2026-11-13T02:17:12.272Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "ArrowDown keyUp",
+            "at": "2026-11-13T02:17:12.384Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "wait authority position moved >.5m",
+            "at": "2026-11-13T02:17:12.387Z"
+          },
+          {
+            "case": "真方向／煞車鍵改變權威快照；鏡頭及音效點擊後不吞鍵盤",
+            "label": "final authority snapshot",
+            "at": "2026-11-13T02:17:12.389Z"
+          }
+        ],
+        "exceptions": [],
+        "externalRequests": [],
+        "blockedExternalRequests": [],
+        "layouts": [
+          {
+            "stage": "entry",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 316,
+                "height": 48,
+                "left": 37,
+                "right": 353,
+                "top": 273.1875,
+                "bottom": 321.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 188,
+                "height": 48,
+                "left": 37,
+                "right": 225,
+                "top": 361.1875,
+                "bottom": 409.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 237,
+                "right": 353,
+                "top": 361.1875,
+                "bottom": 409.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 204,
+                "height": 48,
+                "left": 37,
+                "right": 241,
+                "top": 407.1875,
+                "bottom": 455.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 253,
+                "right": 353,
+                "top": 407.1875,
+                "bottom": 455.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "entry",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 458,
+                "height": 48,
+                "left": 193,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 330,
+                "height": 48,
+                "left": 193,
+                "right": 523,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 535,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 346,
+                "height": 48,
+                "left": 193,
+                "right": 539,
+                "top": 213.1875,
+                "bottom": 261.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 551,
+                "right": 651,
+                "top": 213.1875,
+                "bottom": 261.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "entry",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 458,
+                "height": 48,
+                "left": 193,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 330,
+                "height": 48,
+                "left": 193,
+                "right": 523,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 535,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 346,
+                "height": 48,
+                "left": 193,
+                "right": 539,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 551,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 257,
+                "right": 353,
+                "top": 259.1875,
+                "bottom": 307.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 153,
+                "height": 48,
+                "left": 37,
+                "right": 190,
+                "top": 445.28125,
+                "bottom": 493.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 153,
+                "height": 48,
+                "left": 200,
+                "right": 353,
+                "top": 445.28125,
+                "bottom": 493.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 316,
+                "height": 48,
+                "left": 37,
+                "right": 353,
+                "top": 503.28125,
+                "bottom": 551.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 555,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 146,
+                "height": 48,
+                "left": 193,
+                "right": 339,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 146,
+                "height": 48,
+                "left": 349,
+                "right": 495,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 146,
+                "height": 48,
+                "left": 505,
+                "right": 651,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 555,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 146,
+                "height": 48,
+                "left": 193,
+                "right": 339,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 146,
+                "height": 48,
+                "left": 349,
+                "right": 495,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 146,
+                "height": 48,
+                "left": 505,
+                "right": 651,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 44,
+                "height": 44,
+                "left": 101,
+                "right": 145,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 66,
+                "height": 44,
+                "left": 151,
+                "right": 217,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 66,
+                "height": 44,
+                "left": 223,
+                "right": 289,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 58,
+                "height": 64,
+                "left": 18,
+                "right": 76,
+                "top": 694,
+                "bottom": 758,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 58,
+                "height": 64,
+                "left": 86,
+                "right": 144,
+                "top": 694,
+                "bottom": 758,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 280,
+                "right": 372,
+                "top": 686,
+                "bottom": 758,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 48,
+                "height": 44,
+                "left": 320,
+                "right": 368,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 70,
+                "height": 44,
+                "left": 376,
+                "right": 446,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 70,
+                "height": 44,
+                "left": 454,
+                "right": 524,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 64,
+                "height": 64,
+                "left": 18,
+                "right": 82,
+                "top": 311,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 64,
+                "height": 64,
+                "left": 92,
+                "right": 156,
+                "top": 311,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 734,
+                "right": 826,
+                "top": 303,
+                "bottom": 375,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 48,
+                "height": 44,
+                "left": 320,
+                "right": 368,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 70,
+                "height": 44,
+                "left": 376,
+                "right": 446,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 70,
+                "height": 44,
+                "left": 454,
+                "right": 524,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 64,
+                "height": 64,
+                "left": 18,
+                "right": 82,
+                "top": 141,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 64,
+                "height": 64,
+                "left": 92,
+                "right": 156,
+                "top": 141,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 734,
+                "right": 826,
+                "top": 133,
+                "bottom": 205,
+                "reachable": true
+              }
+            ]
+          }
+        ],
+        "screenshots": [
+          "entry-390x844.png",
+          "entry-844x390.png",
+          "entry-844x220.png",
+          "lobby-390x844.png",
+          "lobby-844x390.png",
+          "lobby-844x220.png",
+          "race-390x844.png",
+          "race-844x390.png",
+          "race-844x220.png"
+        ],
+        "limitations": [
+          "一個真瀏覽器玩家＋一個真WS玩家，不是雙瀏覽器通過證據；原雙場景測試保持FAIL",
+          "persisted pagehide/pageshow採合成事件驗真disconnect/restore，未宣稱真BFCache命中",
+          "自動駕駛只觀察快照產生方向／煞車，以真伺服器wall clock跑圈，不改車況、進度、終點或伺服器時間",
+          "未驗手機FPS／耗電、音訊聽感、兩台實機或公開WSS延遲"
+        ],
+        "browser": "Chrome/156.0.8078.80",
+        "lastCdpCommands": {
+          "browser": {
+            "label": "browser",
+            "id": 9,
+            "method": "Target.disposeBrowserContext",
+            "startedAt": "2026-11-13T02:18:50.250Z",
+            "params": {
+              "browserContextId": "351D950238FFB379D2C8165D95ED8E77"
+            },
+            "completedAt": "2026-11-13T02:18:50.285Z"
+          },
+          "UI": {
+            "label": "UI",
+            "id": 1012,
+            "method": "Runtime.evaluate",
+            "startedAt": "2026-11-13T02:18:50.246Z",
+            "params": {
+              "expression": "window.__mp?.client?.leave()",
+              "returnByValue": true,
+              "awaitPromise": true
+            },
+            "completedAt": "2026-11-13T02:18:50.248Z"
+          }
+        },
+        "browserVersion": {
+          "protocolVersion": "1.3",
+          "product": "Chrome/156.0.8078.80",
+          "revision": "@fb096c0011f9d50f0a264a9376420cdea9c421e3",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+          "jsVersion": "15.6.75.27"
+        },
+        "systemInfo": {
+          "gpu": {
+            "devices": [
+              {
+                "vendorId": 32902,
+                "deviceId": 18088,
+                "subSysId": 585570218,
+                "revision": 12,
+                "vendorString": "",
+                "deviceString": "Intel(R) Iris(R) Xe Graphics",
+                "driverVendor": "Intel",
+                "driverVersion": "32.0.101.7026"
+              },
+              {
+                "vendorId": 5140,
+                "deviceId": 140,
+                "subSysId": 0,
+                "revision": 0,
+                "vendorString": "",
+                "deviceString": "Microsoft Basic Render Driver",
+                "driverVendor": "",
+                "driverVersion": "10.0.26100.9711"
+              }
+            ],
+            "auxAttributes": {
+              "amdSwitchable": false,
+              "bgra8OverlaySupport": "SCALING",
+              "canSupportThreadedTextureMailbox": false,
+              "directComposition": true,
+              "directMLFeatureLevel": "Not supported",
+              "directRenderingVersion": "",
+              "displayType": "ANGLE_D3D11",
+              "dx12FeatureLevel": "Not supported",
+              "glExtensions": "GL_AMD_performance_monitor GL_ANGLE_base_vertex_base_instance_shader_builtin GL_ANGLE_blob_cache GL_ANGLE_client_arrays GL_ANGLE_clip_cull_distance GL_ANGLE_copy_texture_3d GL_ANGLE_depth_texture GL_ANGLE_framebuffer_blit GL_ANGLE_framebuffer_multisample GL_ANGLE_get_serialized_context_string GL_ANGLE_get_tex_level_parameter GL_ANGLE_instanced_arrays GL_ANGLE_memory_size GL_ANGLE_multiview_multisample GL_ANGLE_pack_reverse_row_order GL_ANGLE_polygon_mode GL_ANGLE_program_binary_readiness_query GL_ANGLE_program_cache_control GL_ANGLE_provoking_vertex GL_ANGLE_renderability_validation GL_ANGLE_request_extension GL_ANGLE_robust_client_memory GL_ANGLE_shader_pixel_local_storage GL_ANGLE_shader_pixel_local_storage_coherent GL_ANGLE_stencil_texturing GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_ANGLE_texture_multisample GL_ANGLE_texture_usage GL_ANGLE_translated_shader_source GL_APPLE_clip_distance GL_ARM_rgba8 GL_CHROMIUM_bind_generates_resource GL_CHROMIUM_bind_uniform_location GL_CHROMIUM_copy_compressed_texture GL_CHROMIUM_copy_texture GL_CHROMIUM_lose_context GL_EXT_EGL_image_external_wrap_modes GL_EXT_base_instance GL_EXT_blend_func_extended GL_EXT_blend_minmax GL_EXT_clip_control GL_EXT_clip_cull_distance GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_conservative_depth GL_EXT_debug_label GL_EXT_debug_marker GL_EXT_depth_clamp GL_EXT_discard_framebuffer GL_EXT_disjoint_timer_query GL_EXT_draw_buffers GL_EXT_draw_buffers_indexed GL_EXT_draw_elements_base_vertex GL_EXT_float_blend GL_EXT_frag_depth GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_occlusion_query_boolean GL_EXT_polygon_offset_clamp GL_EXT_read_format_bgra GL_EXT_render_snorm GL_EXT_robustness GL_EXT_sRGB GL_EXT_shader_texture_lod GL_EXT_texture_border_clamp GL_EXT_texture_compression_bptc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_compression_s3tc_srgb GL_EXT_texture_filter_anisotropic GL_EXT_texture_format_BGRA8888 GL_EXT_texture_mirror_clamp_to_edge GL_EXT_texture_norm16 GL_EXT_texture_rg GL_EXT_texture_storage GL_EXT_texture_type_2_10_10_10_REV GL_EXT_unpack_subimage GL_KHR_debug GL_KHR_parallel_shader_compile GL_KHR_robustness GL_NV_EGL_stream_consumer_external GL_NV_fence GL_NV_framebuffer_blit GL_NV_pack_subimage GL_NV_pixel_buffer_object GL_NV_shader_noperspective_interpolation GL_OES_EGL_image GL_OES_EGL_image_external GL_OES_EGL_image_external_essl3 GL_OES_depth24 GL_OES_depth32 GL_OES_draw_buffers_indexed GL_OES_draw_elements_base_vertex GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_get_program_binary GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_required_internalformat GL_OES_rgb8_rgba8 GL_OES_sample_variables GL_OES_shader_multisample_interpolation GL_OES_standard_derivatives GL_OES_surfaceless_context GL_OES_texture_border_clamp GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_texture_stencil8 GL_OES_texture_storage_multisample_2d_array GL_OES_vertex_array_object GL_OVR_multiview GL_OVR_multiview2 ",
+              "glImplementationParts": "(gl=egl-angle,angle=d3d11)",
+              "glRenderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A8) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.101.7026)",
+              "glResetNotificationStrategy": 33362,
+              "glVendor": "Google Inc. (Intel)",
+              "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28975 git hash: 127e783de334)",
+              "glWsExtensions": "EGL_EXT_create_context_robustness EGL_ANGLE_d3d_share_handle_client_buffer EGL_ANGLE_d3d_texture_client_buffer EGL_ANGLE_surface_d3d_texture_2d_share_handle EGL_ANGLE_query_surface_pointer EGL_ANGLE_window_fixed_size EGL_ANGLE_keyed_mutex EGL_ANGLE_surface_orientation EGL_ANGLE_direct_composition EGL_NV_post_sub_buffer EGL_KHR_create_context EGL_KHR_image EGL_KHR_image_base EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_cubemap_image EGL_KHR_gl_renderbuffer_image EGL_KHR_get_all_proc_addresses EGL_KHR_stream EGL_KHR_stream_consumer_gltexture EGL_NV_stream_consumer_gltexture_yuv EGL_ANGLE_stream_producer_d3d_texture EGL_ANGLE_create_context_webgl_compatibility EGL_CHROMIUM_create_context_bind_generates_resource EGL_CHROMIUM_sync_control EGL_EXT_pixel_format_float EGL_KHR_surfaceless_context EGL_ANGLE_display_texture_share_group EGL_ANGLE_display_semaphore_share_group EGL_ANGLE_create_context_client_arrays EGL_ANGLE_program_cache_control EGL_ANGLE_robust_resource_initialization EGL_ANGLE_create_context_extensions_enabled EGL_ANDROID_blob_cache EGL_ANDROID_recordable EGL_ANGLE_image_d3d11_texture EGL_ANGLE_create_context_backwards_compatible EGL_KHR_no_config_context EGL_KHR_create_context_no_error EGL_KHR_reusable_sync EGL_ANGLE_memory_usage_report ",
+              "glWsVendor": "Google Inc. (Intel)",
+              "glWsVersion": "1.5 (ANGLE 2.1.28975 git hash: 127e783de334)",
+              "inProcessGpu": false,
+              "initializationTime": 0.53883,
+              "isAsan": false,
+              "isClangCoverage": false,
+              "jpegDecodeAcceleratorSupported": false,
+              "maxMsaaSamples": "8",
+              "nv12OverlaySupport": "SCALING",
+              "optimus": false,
+              "p010OverlaySupport": "SOFTWARE",
+              "passthroughCmdDecoder": true,
+              "pixelShaderVersion": "5.0",
+              "processCrashCount": 0,
+              "rgb10a2OverlaySupport": "SOFTWARE",
+              "sandboxed": true,
+              "skiaBackendType": "GaneshGL",
+              "subpixelFontRendering": true,
+              "supportsD3dSharedImages": true,
+              "supportsDirectML": false,
+              "supportsDx12": false,
+              "supportsOverlays": true,
+              "supportsVulkan": false,
+              "targetCpuBits": 64,
+              "vertexShaderVersion": "5.0",
+              "visibilityCallbackCallCount": 0,
+              "vulkanVersion": "Not supported",
+              "yuy2OverlaySupport": "SCALING"
+            },
+            "featureStatus": {
+              "2d_canvas": "enabled",
+              "direct_rendering_display_compositor": "disabled_off_ok",
+              "gpu_compositing": "enabled",
+              "multiple_raster_threads": "enabled_on",
+              "opengl": "enabled_on",
+              "rasterization": "enabled",
+              "raw_draw": "disabled_off_ok",
+              "skia_graphite": "disabled_off",
+              "trees_in_viz": "disabled_off",
+              "video_decode": "enabled",
+              "video_encode": "enabled",
+              "webgl": "enabled",
+              "webgpu": "enabled",
+              "webnn": "disabled_off"
+            },
+            "driverBugWorkarounds": [
+              "d3d12_encode_packed_format_dpb_sizing",
+              "disable_d3d12_h264_encoder_non_reference_frames",
+              "disable_direct_composition_sw_video_overlays",
+              "disable_vp_auto_hdr",
+              "enable_webgl_timer_query_extensions",
+              "exit_on_context_lost",
+              "force_dcomp_triple_buffer_video_swap_chain",
+              "max_msaa_sample_count_4",
+              "msaa_is_slow",
+              "no_downscaled_overlay_promotion",
+              "supports_two_yuv_hardware_overlays",
+              "disabled_extension_GL_KHR_blend_equation_advanced",
+              "disabled_extension_GL_KHR_blend_equation_advanced_coherent"
+            ],
+            "videoDecoding": [],
+            "videoEncoding": []
+          },
+          "modelName": "",
+          "modelVersion": "",
+          "commandLine": "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --remote-debugging-port=9334 --remote-debugging-address=127.0.0.1 --user-data-dir=\"C:\\Users\\RexChiu\\AppData\\Local\\Temp\\taipei-gp-multiplayer-88f3b16081ce477897f65e12a16b60aa\" --no-first-run --no-default-browser-check --headless=new --noerrdialogs --flag-switches-begin --flag-switches-end about:blank"
+        },
+        "trace": {
+          "startedAt": "2026-11-13T02:17:08.376Z",
+          "file": "browser-race-trace.json",
+          "categories": [
+            "devtools.timeline",
+            "v8",
+            "toplevel",
+            "gpu",
+            "blink.user_timing",
+            "disabled-by-default-v8.cpu_profiler",
+            "disabled-by-default-devtools.timeline"
+          ],
+          "status": "FAIL",
+          "error": "Error: browser Tracing.tracingComplete timeout\n    at Timeout.<anonymous> (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-work/tools/dev-tests/multiplayer-ui-browser.mjs:71:124)\n    at listOnTimeout (node:internal/timers:605:17)\n    at process.processTimers (node:internal/timers:541:7)"
+        },
+        "completedAt": "2026-11-13T02:18:50.286Z",
+        "sourceHashes": {
+          "multiplayer.html": "5f8103a4f99e1a140324fea1b037388a0412bd82a56bc675c574def1f54cc3df",
+          "src/multiplayer-game.ts": "c0925f71e63491b133977dd8d7ce82f6188b54a7b97449be9c0af341214ba8c1",
+          "src/multiplayer-client.ts": "3c55713c501d6d96d5ad05bc99f4f6eee4dc1d9ad283eb8d446a53335874d5a8",
+          "src/multiplayer-scene.ts": "aca5cfa2c47223f49e26e2740a215a9502db1168262ae5752ca84dde4c409f09",
+          "src/multiplayer.css": "a2c3de72652097ed90f3eb50217154c89372fd7321baed7369db656b50513531",
+          "shared/multiplayer-protocol.ts": "aba477b1866cfdff1cc76009e6be8accbcdd43a5dd02a111b7828a855cc365e5"
+        },
+        "sourceUnchangedDuringTests": true,
+        "productHash": "79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe",
+        "productUnchangedDuringTests": true,
+        "summary": {
+          "passed": 11,
+          "failed": 0
+        },
+        "status": "PASS"
+      }
+    },
+    "fixed": {
+      "file": "tools/dev-tests/multiplayer-fixed-summary.json",
+      "sha256": "5abc4265cc8d84469f6c335b9ace219fa6ba08dc7f86f7379dd18b7a1cf47159",
+      "report": {
+        "completedAt": "2026-11-13T02:15:52.839Z",
+        "build": "c27a6eb50a74",
+        "status": "PASS",
+        "summary": {
+          "passed": 3,
+          "failed": 0
+        },
+        "code": 0,
+        "signal": null,
+        "sourceHashes": {
+          "src/main.ts": "d61eca515a48c410fa12b936f052bf8a013572dc54738a531e64884ac68988b6",
+          "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+          "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+          "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+          "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32"
+        },
+        "sourceUnchangedDuringTests": true,
+        "historyPreserved": true,
+        "output": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n",
+        "evidence": "tools/dev-tests/multiplayer-fixed-evidence-1794536053915-46dbed7b",
+        "playerStorageTouched": false,
+        "productionUsed": false
+      }
+    },
+    "node": {
+      "file": "tools/dev-tests/multiplayer-node-summary.json",
+      "sha256": "611ef2158d7703cc74d1b9726e603caf54559face876adbc8bf06db816893c25",
+      "report": {
+        "startedAt": "2026-11-13T02:12:23.977Z",
+        "completedAt": "2026-11-13T02:13:40.436Z",
+        "productHash": "79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe",
+        "sourceUnchangedDuringTests": true,
+        "oldSummaryPreserved": true,
+        "historicalSummarySha256": "c4aa85d70dfbe41be7962c9b7447b9b85f7a56140bc8ede4ee6e330dcdb95694",
+        "hashIncludes": [
+          "src/",
+          "api/",
+          "shared/",
+          "server/ (excluding node_modules)",
+          "index.html",
+          "multiplayer.html",
+          "vite.config.ts",
+          "package.json",
+          "package-lock.json",
+          "tools/build-multiplayer-physics.mjs"
+        ],
+        "results": [
+          {
+            "name": "platform-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "b5e7fa473f5a2081fcaa128ffdbf85047a1988256b895dc18ae0b2c99674a303",
+            "error": null
+          },
+          {
+            "name": "mission-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "8c12538ddf6a97918501999fe738149b710de7dac2fa3db1e08ed76c004b95d1",
+            "error": null
+          },
+          {
+            "name": "save-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "4a618ababbb8a0efb95df34b697319f17d9425672283fa66f39bdd7d8a9ea73a",
+            "error": null
+          },
+          {
+            "name": "racing-state-audit",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "483242c25eeee5eb0c51c63375f97a8e2a133b9b3a7ecce9d795550f90700b48",
+            "error": null
+          },
+          {
+            "name": "main-platform-integration",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "2c7b574344f43d51b807042a2d7df6b73fe33e49686ced798fb68d238b8cc58b",
+            "error": null
+          },
+          {
+            "name": "leaderboard-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "887a9c1cb042793eaa398f986060a174582b962c1e2677790b7356f2201b4121",
+            "error": null
+          },
+          {
+            "name": "main-racing-integration",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "c4ef88d9d684e3eb4a985de78295558849bcae558291389e160b670dac1fbd2b",
+            "error": null
+          },
+          {
+            "name": "economy-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "496b3215baab96d778eda263aef92e61d9be23b7d237910cb3854281d8e50eb8",
+            "error": null
+          },
+          {
+            "name": "identity-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "88b4b83e065520406efbf5fb303749ed23fa0028c9c4314543dd0def9a703620",
+            "error": null
+          },
+          {
+            "name": "main-economy-integration",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "552aa9dc5be19c94fed33199b7682cc088c6bb9aa37f196c3da984fb793ce559",
+            "error": null
+          },
+          {
+            "name": "static-ui-contract",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "0f6c88c9a6c3a20a25461ce3b5e62c808fd8b39121c9947c8f2dcc59b06f5db7",
+            "error": null
+          },
+          {
+            "name": "route-preview-audit",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "5875743be928b1de83db5a192ed753c7e07c8c81973a0117976ddb1a47bff77b",
+            "error": null
+          },
+          {
+            "name": "followup-racing-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "1e69f461d26c0f08a6991f41524e2424927df63e86fb7fbb7ae2242c1699af67",
+            "error": null
+          },
+          {
+            "name": "followup-radio-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "44d74c054160ad1317155700b4f71952755d11831b2bb903c256f72e9485f941",
+            "error": null
+          },
+          {
+            "name": "followup-platform-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "5edd024c344a482091e63877b5673b369fcf8844c40a9d6243a159d3d81c9883",
+            "error": null
+          },
+          {
+            "name": "followup-save-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "67394068c432a35ea483a8cfb745e3cf923a4c9547446ac29bee4d497e2f7d28",
+            "error": null
+          },
+          {
+            "name": "abcd-save-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "adc849ed125ac0af34564be4938d20bbc0ebf8b346f2279e08023b6c6ba0783c",
+            "error": null
+          },
+          {
+            "name": "abcd-street-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "51d245e84a50d30f1dafb0728514b5f5d9cb805b247c181b49ceed6f1f717ff4",
+            "error": null
+          },
+          {
+            "name": "abcd-racing-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "a12b7a7de9b513b1ec7bea1202e358f6be8e888a55a21fb0b665e5793ad81aad",
+            "error": null
+          },
+          {
+            "name": "abcd-conflict-integration",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "6a8f1bb3779dc019b92c0eeae4da734aa020295afe3cbdaf4a7da9b533340bf0",
+            "error": null
+          },
+          {
+            "name": "all-platform-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "603871e1243f63fb9f9bcffa1f506ee06e6ba4b46d56e52b7a8ecf00fd44c0c9",
+            "error": null
+          },
+          {
+            "name": "all-racing-features",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "f0c3d5555bea286244bb82a0a1e9f692a7b84fb94f877d90e042493bac8a32c2",
+            "error": null
+          },
+          {
+            "name": "all-street-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "e873952adf50cc7f437d46a219d799e94920167c9f309d2f724e6008bed6b351",
+            "error": null
+          },
+          {
+            "name": "all-street-main",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "24cf7ce0e5775521bda8817129e61a6cfb32c6e8d5aa15a347ed3fd29ea7441e",
+            "error": null
+          },
+          {
+            "name": "all-navigation-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "b57716c035cb25b284a7fb9cf8db5b359a21c01c8d1942ec15c7b88cff0a5928",
+            "error": null
+          },
+          {
+            "name": "all-progress-regression",
+            "code": 0,
+            "signal": null,
+            "status": "PASS",
+            "historyPreserved": true,
+            "resultSha256": "70712c34899bd504ad16f504894d5769d0084562c54b5dca013bec94dcdc68a9",
+            "error": null
+          }
+        ],
+        "summary": {
+          "passed": 26,
+          "failed": 0
+        },
+        "status": "PASS",
+        "evidence": "tools/dev-tests/multiplayer-node-evidence-1794535943983-514e12c0",
+        "limitations": [
+          "原 26 套隔離模組與本機 HTTP 回歸；多人真 WS、瀏覽器及固定三回歸另列，不代表正式服務或手機實機"
+        ]
+      }
+    },
+    "dualBrowser": {
+      "file": "tools/dev-tests/multiplayer-browser-summary.json",
+      "sha256": "27a747f0c772fcf01c07807608f6df75024b02db0a1839505e2ccd6d9311f685",
+      "report": {
+        "startedAt": "2026-11-13T02:23:02.071Z",
+        "build": "c27a6eb50a74",
+        "expectedBuild": "c27a6eb50a74",
+        "cdpPort": 9334,
+        "transport": "two-browser-contexts",
+        "localOnly": true,
+        "isolatedContexts": [
+          {
+            "label": "A",
+            "context": "0DA51D52FD41D7473A75D81E4DFEF644"
+          },
+          {
+            "label": "B",
+            "context": "FDAE2450F6700A479B2E123272F37490"
+          }
+        ],
+        "contextsDisposed": [
+          {
+            "context": "0DA51D52FD41D7473A75D81E4DFEF644",
+            "disposed": true
+          },
+          {
+            "context": "FDAE2450F6700A479B2E123272F37490",
+            "disposed": true
+          }
+        ],
+        "playerStorageTouched": false,
+        "localStorageUnchanged": true,
+        "cases": [
+          {
+            "name": "兩個獨立 context 的初始頁不開 socket，玩家錢包隔離且不改寫單人進度",
+            "status": "PASS",
+            "details": {
+              "sockets": [
+                0,
+                0
+              ],
+              "wallets": [
+                12345,
+                54321
+              ],
+              "separateContexts": true
+            }
+          },
+          {
+            "name": "入口三種手機尺寸不橫溢、控制至少 44px，短螢幕能捲到各操作",
+            "status": "PASS",
+            "details": {
+              "viewports": 3
+            }
+          },
+          {
+            "name": "真建立／加入按鈕取得同房，單人不能開始；房間三尺寸可操作且遠端模型建立",
+            "status": "PASS",
+            "details": {
+              "code": "MKUES5",
+              "distinctPlayers": true,
+              "models": [
+                2,
+                2
+              ],
+              "hostOnlyStart": true
+            }
+          },
+          {
+            "name": "全員真準備與開始按鈕取得同一 matchId／startAt，HUD 名單同步",
+            "status": "PASS",
+            "details": {
+              "matchId": "148b4b45-d6ab-4fb9-805b-a174700fa708",
+              "startAt": 1794536601825,
+              "boardPlayers": 2
+            }
+          },
+          {
+            "name": "真方向／煞車鍵控制伺服器車況，鏡頭與音效點擊後不吞鍵盤",
+            "status": "PASS",
+            "details": {
+              "before": {
+                "x": 442.26837491277536,
+                "z": 509.5976530268451
+              },
+              "after": {
+                "x": 437.66632140325083,
+                "z": 510.2231900527668
+              },
+              "ackSeq": 11,
+              "keyboardAfterButtons": true
+            }
+          },
+          {
+            "name": "失焦持續送煞車而非只送一次，另一位車手與全場時間繼續",
+            "status": "PASS",
+            "details": {
+              "repeatedBrakePackets": 5,
+              "spanMs": 3988,
+              "focusedOtherProgress": 210.00990467490055,
+              "staleCarSpeed": 0
+            }
+          },
+          {
+            "name": "暫時離線加切斷真 transport 會自動 resume，保留 playerId／matchId",
+            "status": "PASS",
+            "details": {
+              "playerId": "45576fc2-afa2-48d8-a3c9-3f167281e129",
+              "matchId": "148b4b45-d6ab-4fb9-805b-a174700fa708",
+              "fault": "CDP offline + native socket close",
+              "socketCount": 3
+            }
+          },
+          {
+            "name": "persisted 離頁／回頁事件使用真 disconnect／restore，恢復同一席位",
+            "status": "PASS",
+            "details": {
+              "playerId": "9dc75db1-08e4-4c10-9f55-3a26aa0683cd",
+              "matchId": "148b4b45-d6ab-4fb9-805b-a174700fa708",
+              "syntheticPersistedEvents": true,
+              "nativeBFCacheVerified": false
+            }
+          },
+          {
+            "name": "比賽三尺寸控制至少 44px 且可點，真離房不停止另一人的比賽",
+            "status": "PASS",
+            "details": {
+              "remainingPhase": "racing",
+              "remainingProgress": 14.840582325051741,
+              "departedDnf": true
+            }
+          }
+        ],
+        "exceptions": [],
+        "blockedExternalRequests": [],
+        "externalRequests": [],
+        "layouts": [
+          {
+            "stage": "entry",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 316,
+                "height": 48,
+                "left": 37,
+                "right": 353,
+                "top": 273.1875,
+                "bottom": 321.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 188,
+                "height": 48,
+                "left": 37,
+                "right": 225,
+                "top": 361.1875,
+                "bottom": 409.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 237,
+                "right": 353,
+                "top": 361.1875,
+                "bottom": 409.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 204,
+                "height": 48,
+                "left": 37,
+                "right": 241,
+                "top": 407.1875,
+                "bottom": 455.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 253,
+                "right": 353,
+                "top": 407.1875,
+                "bottom": 455.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "entry",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 458,
+                "height": 48,
+                "left": 193,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 330,
+                "height": 48,
+                "left": 193,
+                "right": 523,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 535,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 346,
+                "height": 48,
+                "left": 193,
+                "right": 539,
+                "top": 213.1875,
+                "bottom": 261.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 551,
+                "right": 651,
+                "top": 213.1875,
+                "bottom": 261.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "entry",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-name",
+                "width": 458,
+                "height": 48,
+                "left": 193,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-laps",
+                "width": 330,
+                "height": 48,
+                "left": 193,
+                "right": 523,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-create",
+                "width": 116,
+                "height": 48,
+                "left": 535,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-code",
+                "width": 346,
+                "height": 48,
+                "left": 193,
+                "right": 539,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-join",
+                "width": 100,
+                "height": 48,
+                "left": 551,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 257,
+                "right": 353,
+                "top": 259.1875,
+                "bottom": 307.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 153,
+                "height": 48,
+                "left": 37,
+                "right": 190,
+                "top": 398.28125,
+                "bottom": 446.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 153,
+                "height": 48,
+                "left": 200,
+                "right": 353,
+                "top": 398.28125,
+                "bottom": 446.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 316,
+                "height": 48,
+                "left": 37,
+                "right": 353,
+                "top": 436.28125,
+                "bottom": 484.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 555,
+                "right": 651,
+                "top": 171.1875,
+                "bottom": 219.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 146,
+                "height": 48,
+                "left": 193,
+                "right": 339,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 146,
+                "height": 48,
+                "left": 349,
+                "right": 495,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 146,
+                "height": 48,
+                "left": 505,
+                "right": 651,
+                "top": 236.28125,
+                "bottom": 284.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "lobby",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-copy",
+                "width": 96,
+                "height": 48,
+                "left": 555,
+                "right": 651,
+                "top": 86.1875,
+                "bottom": 134.1875,
+                "reachable": true
+              },
+              {
+                "id": "mp-ready",
+                "width": 146,
+                "height": 48,
+                "left": 193,
+                "right": 339,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-start",
+                "width": 146,
+                "height": 48,
+                "left": 349,
+                "right": 495,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              },
+              {
+                "id": "mp-leave",
+                "width": 146,
+                "height": 48,
+                "left": 505,
+                "right": 651,
+                "top": 86.28125,
+                "bottom": 134.28125,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 390,
+            "height": 844,
+            "documentWidth": 390,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 44,
+                "height": 44,
+                "left": 101,
+                "right": 145,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 66,
+                "height": 44,
+                "left": 151,
+                "right": 217,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 66,
+                "height": 44,
+                "left": 223,
+                "right": 289,
+                "top": 782,
+                "bottom": 826,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 58,
+                "height": 64,
+                "left": 18,
+                "right": 76,
+                "top": 694,
+                "bottom": 758,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 58,
+                "height": 64,
+                "left": 86,
+                "right": 144,
+                "top": 694,
+                "bottom": 758,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 280,
+                "right": 372,
+                "top": 686,
+                "bottom": 758,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 844,
+            "height": 390,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 48,
+                "height": 44,
+                "left": 320,
+                "right": 368,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 70,
+                "height": 44,
+                "left": 376,
+                "right": 446,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 70,
+                "height": 44,
+                "left": 454,
+                "right": 524,
+                "top": 331,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 64,
+                "height": 64,
+                "left": 18,
+                "right": 82,
+                "top": 311,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 64,
+                "height": 64,
+                "left": 92,
+                "right": 156,
+                "top": 311,
+                "bottom": 375,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 734,
+                "right": 826,
+                "top": 303,
+                "bottom": 375,
+                "reachable": true
+              }
+            ]
+          },
+          {
+            "stage": "race",
+            "width": 844,
+            "height": 220,
+            "documentWidth": 844,
+            "controls": [
+              {
+                "id": "mp-camera",
+                "width": 48,
+                "height": 44,
+                "left": 320,
+                "right": 368,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-sound",
+                "width": 70,
+                "height": 44,
+                "left": 376,
+                "right": 446,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-race-leave",
+                "width": 70,
+                "height": 44,
+                "left": 454,
+                "right": 524,
+                "top": 161,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-left",
+                "width": 64,
+                "height": 64,
+                "left": 18,
+                "right": 82,
+                "top": 141,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-right",
+                "width": 64,
+                "height": 64,
+                "left": 92,
+                "right": 156,
+                "top": 141,
+                "bottom": 205,
+                "reachable": true
+              },
+              {
+                "id": "mp-brake",
+                "width": 92,
+                "height": 72,
+                "left": 734,
+                "right": 826,
+                "top": 133,
+                "bottom": 205,
+                "reachable": true
+              }
+            ]
+          }
+        ],
+        "screenshots": [
+          "entry-390x844.png",
+          "entry-844x390.png",
+          "entry-844x220.png",
+          "lobby-390x844.png",
+          "lobby-844x390.png",
+          "lobby-844x220.png",
+          "race-390x844.png",
+          "race-844x390.png",
+          "race-844x220.png"
+        ],
+        "limitations": [
+          "兩個隔離 Chrome contexts 的本機 UI／輸入／連線流程，不代表手機 FPS、聲音聽感或公開 WSS 延遲",
+          "persisted pagehide/pageshow 採合成事件驗證真 disconnect/restore，未宣稱真 BFCache 命中",
+          "瀏覽器只驗駕駛與離房；完整圈、完賽及再戰由真權威物理 WS 測試另行涵蓋"
+        ],
+        "setupRenderIsolation": {
+          "requested": false,
+          "pausedOnlyAWhileBLoads": false,
+          "restoredBeforeCases": false
+        },
+        "realFocusPrecondition": {
+          "required": true,
+          "achieved": true,
+          "mechanism": "native same-context about:blank activation",
+          "blankTargetId": "CA9D2E1E31F06C3EA7C0FD1202BA46F7",
+          "context": "0DA51D52FD41D7473A75D81E4DFEF644",
+          "blankDisposedWithContext": true,
+          "focusState": {
+            "a": false,
+            "b": true
+          },
+          "checkedAt": "2026-11-13T02:23:22.810Z"
+        },
+        "diagnostics": [],
+        "browser": "Chrome/156.0.8078.80",
+        "browserVersion": {
+          "protocolVersion": "1.3",
+          "product": "Chrome/156.0.8078.80",
+          "revision": "@fb096c0011f9d50f0a264a9376420cdea9c421e3",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+          "jsVersion": "15.6.75.27"
+        },
+        "systemInfo": {
+          "gpu": {
+            "devices": [
+              {
+                "vendorId": 32902,
+                "deviceId": 18088,
+                "subSysId": 585570218,
+                "revision": 12,
+                "vendorString": "",
+                "deviceString": "Intel(R) Iris(R) Xe Graphics",
+                "driverVendor": "Intel",
+                "driverVersion": "32.0.101.7026"
+              },
+              {
+                "vendorId": 5140,
+                "deviceId": 140,
+                "subSysId": 0,
+                "revision": 0,
+                "vendorString": "",
+                "deviceString": "Microsoft Basic Render Driver",
+                "driverVendor": "",
+                "driverVersion": "10.0.26100.9711"
+              }
+            ],
+            "auxAttributes": {
+              "amdSwitchable": false,
+              "bgra8OverlaySupport": "SCALING",
+              "canSupportThreadedTextureMailbox": false,
+              "directComposition": true,
+              "directMLFeatureLevel": "5.0",
+              "directRenderingVersion": "",
+              "displayType": "ANGLE_D3D11",
+              "dx12FeatureLevel": "D3D 12.1",
+              "glExtensions": "GL_AMD_performance_monitor GL_ANGLE_base_vertex_base_instance_shader_builtin GL_ANGLE_blob_cache GL_ANGLE_client_arrays GL_ANGLE_clip_cull_distance GL_ANGLE_copy_texture_3d GL_ANGLE_depth_texture GL_ANGLE_framebuffer_blit GL_ANGLE_framebuffer_multisample GL_ANGLE_get_serialized_context_string GL_ANGLE_get_tex_level_parameter GL_ANGLE_instanced_arrays GL_ANGLE_memory_size GL_ANGLE_multiview_multisample GL_ANGLE_pack_reverse_row_order GL_ANGLE_polygon_mode GL_ANGLE_program_binary_readiness_query GL_ANGLE_program_cache_control GL_ANGLE_provoking_vertex GL_ANGLE_renderability_validation GL_ANGLE_request_extension GL_ANGLE_robust_client_memory GL_ANGLE_shader_pixel_local_storage GL_ANGLE_shader_pixel_local_storage_coherent GL_ANGLE_stencil_texturing GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_ANGLE_texture_multisample GL_ANGLE_texture_usage GL_ANGLE_translated_shader_source GL_APPLE_clip_distance GL_ARM_rgba8 GL_CHROMIUM_bind_generates_resource GL_CHROMIUM_bind_uniform_location GL_CHROMIUM_copy_compressed_texture GL_CHROMIUM_copy_texture GL_CHROMIUM_lose_context GL_EXT_EGL_image_external_wrap_modes GL_EXT_base_instance GL_EXT_blend_func_extended GL_EXT_blend_minmax GL_EXT_clip_control GL_EXT_clip_cull_distance GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_conservative_depth GL_EXT_debug_label GL_EXT_debug_marker GL_EXT_depth_clamp GL_EXT_discard_framebuffer GL_EXT_disjoint_timer_query GL_EXT_draw_buffers GL_EXT_draw_buffers_indexed GL_EXT_draw_elements_base_vertex GL_EXT_float_blend GL_EXT_frag_depth GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_occlusion_query_boolean GL_EXT_polygon_offset_clamp GL_EXT_read_format_bgra GL_EXT_render_snorm GL_EXT_robustness GL_EXT_sRGB GL_EXT_shader_texture_lod GL_EXT_texture_border_clamp GL_EXT_texture_compression_bptc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_compression_s3tc_srgb GL_EXT_texture_filter_anisotropic GL_EXT_texture_format_BGRA8888 GL_EXT_texture_mirror_clamp_to_edge GL_EXT_texture_norm16 GL_EXT_texture_rg GL_EXT_texture_storage GL_EXT_texture_type_2_10_10_10_REV GL_EXT_unpack_subimage GL_KHR_debug GL_KHR_parallel_shader_compile GL_KHR_robustness GL_NV_EGL_stream_consumer_external GL_NV_fence GL_NV_framebuffer_blit GL_NV_pack_subimage GL_NV_pixel_buffer_object GL_NV_shader_noperspective_interpolation GL_OES_EGL_image GL_OES_EGL_image_external GL_OES_EGL_image_external_essl3 GL_OES_depth24 GL_OES_depth32 GL_OES_draw_buffers_indexed GL_OES_draw_elements_base_vertex GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_get_program_binary GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_required_internalformat GL_OES_rgb8_rgba8 GL_OES_sample_variables GL_OES_shader_multisample_interpolation GL_OES_standard_derivatives GL_OES_surfaceless_context GL_OES_texture_border_clamp GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_texture_stencil8 GL_OES_texture_storage_multisample_2d_array GL_OES_vertex_array_object GL_OVR_multiview GL_OVR_multiview2 ",
+              "glImplementationParts": "(gl=egl-angle,angle=d3d11)",
+              "glRenderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A8) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.101.7026)",
+              "glResetNotificationStrategy": 33362,
+              "glVendor": "Google Inc. (Intel)",
+              "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28975 git hash: 127e783de334)",
+              "glWsExtensions": "EGL_EXT_create_context_robustness EGL_ANGLE_d3d_share_handle_client_buffer EGL_ANGLE_d3d_texture_client_buffer EGL_ANGLE_surface_d3d_texture_2d_share_handle EGL_ANGLE_query_surface_pointer EGL_ANGLE_window_fixed_size EGL_ANGLE_keyed_mutex EGL_ANGLE_surface_orientation EGL_ANGLE_direct_composition EGL_NV_post_sub_buffer EGL_KHR_create_context EGL_KHR_image EGL_KHR_image_base EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_cubemap_image EGL_KHR_gl_renderbuffer_image EGL_KHR_get_all_proc_addresses EGL_KHR_stream EGL_KHR_stream_consumer_gltexture EGL_NV_stream_consumer_gltexture_yuv EGL_ANGLE_stream_producer_d3d_texture EGL_ANGLE_create_context_webgl_compatibility EGL_CHROMIUM_create_context_bind_generates_resource EGL_CHROMIUM_sync_control EGL_EXT_pixel_format_float EGL_KHR_surfaceless_context EGL_ANGLE_display_texture_share_group EGL_ANGLE_display_semaphore_share_group EGL_ANGLE_create_context_client_arrays EGL_ANGLE_program_cache_control EGL_ANGLE_robust_resource_initialization EGL_ANGLE_create_context_extensions_enabled EGL_ANDROID_blob_cache EGL_ANDROID_recordable EGL_ANGLE_image_d3d11_texture EGL_ANGLE_create_context_backwards_compatible EGL_KHR_no_config_context EGL_KHR_create_context_no_error EGL_KHR_reusable_sync EGL_ANGLE_memory_usage_report ",
+              "glWsVendor": "Google Inc. (Intel)",
+              "glWsVersion": "1.5 (ANGLE 2.1.28975 git hash: 127e783de334)",
+              "inProcessGpu": false,
+              "initializationTime": 0.53883,
+              "isAsan": false,
+              "isClangCoverage": false,
+              "jpegDecodeAcceleratorSupported": false,
+              "maxMsaaSamples": "8",
+              "nv12OverlaySupport": "SCALING",
+              "optimus": false,
+              "p010OverlaySupport": "SOFTWARE",
+              "passthroughCmdDecoder": true,
+              "pixelShaderVersion": "5.0",
+              "processCrashCount": 0,
+              "rgb10a2OverlaySupport": "SOFTWARE",
+              "sandboxed": true,
+              "skiaBackendType": "GaneshGL",
+              "subpixelFontRendering": true,
+              "supportsD3dSharedImages": true,
+              "supportsDirectML": true,
+              "supportsDx12": true,
+              "supportsOverlays": true,
+              "supportsVulkan": false,
+              "targetCpuBits": 64,
+              "vertexShaderVersion": "5.0",
+              "visibilityCallbackCallCount": 0,
+              "vulkanVersion": "Not supported",
+              "yuy2OverlaySupport": "SCALING"
+            },
+            "featureStatus": {
+              "2d_canvas": "enabled",
+              "direct_rendering_display_compositor": "disabled_off_ok",
+              "gpu_compositing": "enabled",
+              "multiple_raster_threads": "enabled_on",
+              "opengl": "enabled_on",
+              "rasterization": "enabled",
+              "raw_draw": "disabled_off_ok",
+              "skia_graphite": "disabled_off",
+              "trees_in_viz": "disabled_off",
+              "video_decode": "enabled",
+              "video_encode": "enabled",
+              "webgl": "enabled",
+              "webgpu": "enabled",
+              "webnn": "disabled_off"
+            },
+            "driverBugWorkarounds": [
+              "d3d12_encode_packed_format_dpb_sizing",
+              "disable_d3d12_h264_encoder_non_reference_frames",
+              "disable_direct_composition_sw_video_overlays",
+              "disable_vp_auto_hdr",
+              "enable_webgl_timer_query_extensions",
+              "exit_on_context_lost",
+              "force_dcomp_triple_buffer_video_swap_chain",
+              "max_msaa_sample_count_4",
+              "msaa_is_slow",
+              "no_downscaled_overlay_promotion",
+              "supports_two_yuv_hardware_overlays",
+              "disabled_extension_GL_KHR_blend_equation_advanced",
+              "disabled_extension_GL_KHR_blend_equation_advanced_coherent"
+            ],
+            "videoDecoding": [],
+            "videoEncoding": []
+          },
+          "modelName": "",
+          "modelVersion": "",
+          "commandLine": "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --remote-debugging-port=9334 --remote-debugging-address=127.0.0.1 --user-data-dir=\"C:\\Users\\RexChiu\\AppData\\Local\\Temp\\taipei-gp-multiplayer-88f3b16081ce477897f65e12a16b60aa\" --no-first-run --no-default-browser-check --headless=new --noerrdialogs --flag-switches-begin --flag-switches-end about:blank"
+        },
+        "gpuSummary": {
+          "devices": [
+            {
+              "vendorId": 32902,
+              "deviceId": 18088,
+              "subSysId": 585570218,
+              "revision": 12,
+              "vendorString": "",
+              "deviceString": "Intel(R) Iris(R) Xe Graphics",
+              "driverVendor": "Intel",
+              "driverVersion": "32.0.101.7026"
+            },
+            {
+              "vendorId": 5140,
+              "deviceId": 140,
+              "subSysId": 0,
+              "revision": 0,
+              "vendorString": "",
+              "deviceString": "Microsoft Basic Render Driver",
+              "driverVendor": "",
+              "driverVersion": "10.0.26100.9711"
+            }
+          ],
+          "glVendor": "Google Inc. (Intel)",
+          "glRenderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A8) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.101.7026)",
+          "glImplementationParts": "(gl=egl-angle,angle=d3d11)",
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        },
+        "completedAt": "2026-11-13T02:23:30.975Z",
+        "sourceHashes": {
+          "multiplayer.html": "5f8103a4f99e1a140324fea1b037388a0412bd82a56bc675c574def1f54cc3df",
+          "src/multiplayer-game.ts": "c0925f71e63491b133977dd8d7ce82f6188b54a7b97449be9c0af341214ba8c1",
+          "src/multiplayer-client.ts": "3c55713c501d6d96d5ad05bc99f4f6eee4dc1d9ad283eb8d446a53335874d5a8",
+          "src/multiplayer-scene.ts": "aca5cfa2c47223f49e26e2740a215a9502db1168262ae5752ca84dde4c409f09",
+          "src/multiplayer.css": "a2c3de72652097ed90f3eb50217154c89372fd7321baed7369db656b50513531",
+          "shared/multiplayer-protocol.ts": "aba477b1866cfdff1cc76009e6be8accbcdd43a5dd02a111b7828a855cc365e5"
+        },
+        "sourceUnchangedDuringTests": true,
+        "productHashBefore": "79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe",
+        "productHash": "79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe",
+        "productUnchangedDuringTests": true,
+        "hashIncludes": [
+          "src/",
+          "api/",
+          "shared/",
+          "server/ (excluding node_modules)",
+          "index.html",
+          "multiplayer.html",
+          "vite.config.ts",
+          "package.json",
+          "package-lock.json",
+          "tools/build-multiplayer-physics.mjs"
+        ],
+        "summary": {
+          "passed": 9,
+          "failed": 0
+        },
+        "status": "PASS"
+      }
+    }
+  },
+  "deliveryTools": {
+    "file": "taipei-gp-multiplayer-delivery-validation-summary.json",
+    "sha256": "5b195cc8a959f6b2b82ee7cb747d8d60477e8edf002969ae493049aa1a91466d",
+    "report": {
+      "version": "v2-render-files",
+      "createdAt": "2026-11-13T02:03:02.378Z",
+      "status": "PASS",
+      "summary": {
+        "passed": 16,
+        "failed": 0
+      },
+      "evidenceMethod": "First attempt: 15 PASS and 1 native PowerShell ETIMEDOUT. Only the timed-out case was rerun in isolation and passed; the original evidence is preserved.",
+      "timeoutMs": 120000,
+      "assertionsUnchanged": true,
+      "allowedAdditionalFiles": [
+        "render.yaml",
+        "MULTIPLAYER_DEPLOYMENT.md"
+      ],
+      "officialApplySha256": "3e7fdbe09cc5d50330d3e38ddc9e41e64458b3374b974ce80a5aeadde133145b",
+      "officialTools": [
+        {
+          "path": "prepare-taipei-multiplayer-delivery.mjs",
+          "sha256": "fdb6f6dbe17781167437319f330d0b7918bc636fbb16bc0573dad734db11d517"
+        },
+        {
+          "path": "Apply-TaipeiMultiplayer.ps1",
+          "sha256": "3e7fdbe09cc5d50330d3e38ddc9e41e64458b3374b974ce80a5aeadde133145b"
+        },
+        {
+          "path": "verify-taipei-multiplayer-original.mjs",
+          "sha256": "50896966f3cbef0a403460f1eccfe0b8fabebe4061034f94662558c552db43e7"
+        },
+        {
+          "path": "prepare-taipei-multiplayer-tools.mjs",
+          "sha256": "1a1713b8bd1a18cb7ca03f4d360120439ba0496c409b6b21684610a2e699601c"
+        },
+        {
+          "path": "test-taipei-multiplayer-delivery.mjs",
+          "sha256": "0f5c3b58f2204d006e87a5072062c9deb00277f9b695d4aa9c1199acd1409266"
+        }
+      ],
+      "firstAttempt": {
+        "file": "taipei-gp-multiplayer-delivery-regression-result.json",
+        "passed": 15,
+        "failed": 1,
+        "sha256": "50aa0671e920b23b502b20b20dc2a2b9f4b4e988d06d0d8d27dbaf5d079b75ca"
+      },
+      "isolatedRerun": {
+        "file": "taipei-gp-multiplayer-delivery-regression-rerun-result.json",
+        "passed": 1,
+        "failed": 0,
+        "sha256": "b5b8e48fe333cf5d691b965957bb2824ded456f6baf3fcfe95478762e0635c03",
+        "sourceFixtureSha256": "0f5c3b58f2204d006e87a5072062c9deb00277f9b695d4aa9c1199acd1409266"
+      },
+      "previousVersion": {
+        "directory": "multiplayer-delivery-tools-history-v1-c27c9355-20261113-094321",
+        "passedDistinctCases": 15,
+        "officialApplySha256": "c27c9355fa1b801039be2c481bcb41eda7225037132a952f13bd9fda742f56b9"
+      },
+      "cases": [
+        {
+          "name": "Preflight is read-only and validates inventory.source=original plus HEAD/build",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "套用、備份、build 與重入保留舊未提交／未追蹤、Git index、HEAD、舊交付",
+          "status": "PASS",
+          "detail": {
+            "files": 25,
+            "preservedUntrackedFeatures": 20,
+            "reusedBackup": true,
+            "unchangedGitIndexAndHead": true
+          },
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "任一 payload 損壞整批拒絕，前面可用檔案也不寫入",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "本機交付檔變更整批拒絕",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "舊 protected 檔變更整批拒絕",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "immutable baseline 位元組被改時拒絕",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "inventory SHA 或 build 契約被改拒絕；舊 swVersion 不能替代 build",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "HEAD 不符與原專案路徑被置換拒絕",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "重複、路徑穿越、.git、非允許路徑、before 偽造、漏保護皆拒絕",
+          "status": "PASS",
+          "detail": {
+            "rejectedVariants": 6
+          },
+          "evidence": "taipei-gp-multiplayer-delivery-regression-rerun-result.json",
+          "firstAttempt": "ETIMEDOUT"
+        },
+        {
+          "name": "target junction 不能導向 fixture 外部目錄",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "複製後故障回滾 before、新檔與新目錄，保留正確備份",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "build 失敗保留已套用檔與備份，回報實際 exit code",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "Generator prepares only a fresh multiplayer package and independent verify binds physics/build",
+          "status": "PASS",
+          "detail": {
+            "files": 25,
+            "protectedFiles": 36,
+            "physicsAndBuildVerified": true
+          },
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "Wrong inventory.source/work or HEAD is rejected before creating any package",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "Physics mutation after apply is detected by independent verification",
+          "status": "PASS",
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        },
+        {
+          "name": "Render blueprint and deployment guide survive prepare, apply, build and verification byte-for-byte",
+          "status": "PASS",
+          "detail": {
+            "preservedDeploymentFiles": 2,
+            "realDeploymentPerformed": false
+          },
+          "evidence": "taipei-gp-multiplayer-delivery-regression-result.json"
+        }
+      ],
+      "realOriginalApplied": false,
+      "realDeliveryChanged": false,
+      "committedRealProject": false,
+      "pushed": false
+    }
+  },
+  "counts": {
+    "server": 14,
+    "client": 16,
+    "singleBrowserWithWsPeer": 11,
+    "dualBrowserContexts": 9,
+    "previousNodeSuites": 26,
+    "fixed": 3,
+    "delivery": 16
+  },
+  "dualBrowserPassed": true,
+  "publicDeploymentReady": false,
+  "deployed": false,
+  "committed": false,
+  "pushed": false,
+  "productionUsed": false,
+  "realPlayerStorageTouched": false,
+  "limitations": [
+    "雙 context 本機測試只代表同一台 Chrome 的兩個隔離玩家；不代表兩台實機或外網。歷史強制 SwiftShader 測試曾初始化／截圖逾時，失敗證據保留；新正常圖形環境結果另列，不由環境差異斷言唯一根因。",
+    "本輪單 UI＋真 WebSocket peer 的結果僅代表本機流程；無兩台實機、外網 WSS、行動網路延遲／丟包驗證。",
+    "persisted pagehide/pageshow 使用合成事件；真 BFCache 命中尚未驗證。",
+    "單 UI 的 11 組功能斷言通過，但額外效能診斷未取得 trace：Tracing.tracingComplete 在原 30 秒限制內未完成；診斷失敗另存，不以新環境功能通過斷言舊停頓的唯一根因。",
+    "手機實機 FPS／耗電、音效聽感、感測器操作與真人難度平衡尚未驗證。",
+    "極低高度 844×220 的 HUD 速度與排名文字有局部重疊；操作按鈕的尺寸／可達性測試通過，一般直向與 844×390 另有截圖。低高度文字排版待調整。",
+    "Docker build 尚未實測；Render 免費額度、信用卡要求、區域及 Blueprint 最新欄位未經官方頁面核實，建立時須顯示 Free／0 費用。",
+    "沒有建立 Render 服務、連接帳號、公開 WSS URL 或 Vercel 多人測試部署；尚未授權本輪 commit／push。",
+    "套用原專案的狀態須由 DCISI 本輪 apply-result 及 original-verification 另行核對；此來源驗證文件不能證明已套用或上線。"
+  ]
+}

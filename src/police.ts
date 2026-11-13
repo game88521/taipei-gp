@@ -214,7 +214,10 @@ export class Police {
     this.pursuitT = 180; this.arrestT = 0; this.escapeT = 0;
     this.suspectDistance = Math.hypot(car.x - p.x, car.z - p.z);
     this.lastPursuitReason = null;
-    this.pickGoal(this.suspect, p);
+    if (!this.pickGoal(this.suspect, p)) {
+      this.endPursuit('cancelled');
+      return '⚠️ 附近找不到安全逃跑路線，請換個路口再追緝';
+    }
     return '🎯 嫌犯出現！撞到它停下來';
   }
 
@@ -223,8 +226,9 @@ export class Police {
     for (let k = 0; k < 10; k++) {
       const a = Math.random() * Math.PI * 2, d = 900 + Math.random() * 600;
       const at = this.roadPointNear(u.car.x + Math.sin(a) * d, u.car.z + Math.cos(a) * d, 0, 0);
-      if (at && Math.hypot(at[0] - p.x, at[1] - p.z) > Math.hypot(u.car.x - p.x, u.car.z - p.z)) { u.goal = [at[0], at[1]]; u.repath = 0; return; }
+      if (at && Math.hypot(at[0] - p.x, at[1] - p.z) > Math.hypot(u.car.x - p.x, u.car.z - p.z)) { u.goal = [at[0], at[1]]; u.repath = 0; return true; }
     }
+    return false;
   }
 
   /** 離 (x, z) 最近的主要道路上的點（含順著道路的車頭方向）；minD > 0 時找離玩家至少這麼遠的 */
@@ -408,7 +412,10 @@ export class Police {
       const d = Math.hypot(s.car.x - p.x, s.car.z - p.z);
       this.suspectDistance = d;
       if (this.suspectHp > 0) {
-        if (!s.goal || Math.hypot(s.goal[0] - s.car.x, s.goal[1] - s.car.z) < 40) this.pickGoal(s, p);
+        if ((!s.goal || Math.hypot(s.goal[0] - s.car.x, s.goal[1] - s.car.z) < 40) && !this.pickGoal(s, p)) {
+          this.endPursuit('cancelled');
+          return { msg: '⚠️ 嫌犯路線中斷，本次追緝取消（無獎金或罰款）', money };
+        }
         const hurt = this.suspectHp < 50 ? 0.5 + this.suspectHp / 100 : 1; // 耐久剩一半以下：越來越慢
         const wall = this.drive(s, s.goal![0], s.goal![1], SUSPECT_SPEC.vmax * (d < 60 ? 1 : 0.8) * hurt, dt, col, false, Infinity, traffic);
         if (wall > 4) this.suspectHp = Math.max(0, this.suspectHp - wall * 3); // 自己撞牆也會受傷

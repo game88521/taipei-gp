@@ -1,0 +1,502 @@
+{
+  "generatedAt": "2026-11-11T06:09:24.679Z",
+  "baseline": "2dee076de30da52fe20b4d33faf659e6acf0aed3",
+  "scope": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    17
+  ],
+  "status": "PASS",
+  "scopeOfStatus": "工作副本實作與本機驗證",
+  "sourceHash": "9c7b4916fde33400065ef8f61cb932f3ba044340fbbd99c19c3bc142a34f0d68",
+  "swVersion": "3bdf97336c02",
+  "mainSha256": "a01d7b6eee32cc6be6e2c6b56fa6f2ed133f01db21433f676e4958229386cf45",
+  "productChanges": [
+    {
+      "path": "src/boot.ts",
+      "before": "afa881dbbddd2a3df2f6aa889ef4583b11fd742560dbd37c72ae7de167f592d8",
+      "after": "03877838d3da0f8770aaeab8bf1b39342a76c74941c273cc787cdb19b8f028bf"
+    },
+    {
+      "path": "src/frame-pacing.ts",
+      "before": null,
+      "after": "51fa7e9db183ef48eaf21e55fed08cfca28dc7ca1d20458d677ae4ec8912c46d"
+    },
+    {
+      "path": "src/main.ts",
+      "before": "aa3f111a302ea3e3eaf6fd3c1f3b1bf2fc774af8a72dfd5864847d294c550d21",
+      "after": "a01d7b6eee32cc6be6e2c6b56fa6f2ed133f01db21433f676e4958229386cf45"
+    },
+    {
+      "path": "src/radio.ts",
+      "before": "966c4c6b42b39272e2e2d6065259c2c5e1cfd7acbe09bcf569e8ba3c1d3048d5",
+      "after": "15159e15a21ed5ece020578f2441ec550a21e4ab25b60f5d152d3428d62d492f"
+    },
+    {
+      "path": "src/rivals.ts",
+      "before": "02c2203eadb75858abffdc249ff33deb1cf0945696a661a00848d8f7d17cac19",
+      "after": "be8e3b879a8eca3a60e3d613522080bafe4c8d453fcc325d2415cbf5db039ef0"
+    },
+    {
+      "path": "src/save-recovery-ui.ts",
+      "before": null,
+      "after": "dc87b2b206e3f6999e959eaf7fda7c4939e65eb725393b3202348f138233ea64"
+    },
+    {
+      "path": "src/save.ts",
+      "before": "e3aeb217237fec0ed6c2a1617e092a503fc028d546ea91c540303c843fe8172c",
+      "after": "88a965c62745c2a59a4fe1e21f8132ffcd7818d18098a61433b8a34213826e18"
+    },
+    {
+      "path": "src/style.css",
+      "before": "fb65ff41ef08c1d5e317951a62481ff005c833b3d512058c5a83af7636eba8f6",
+      "after": "fa206d2e7dbad796cc72a3870d4b29a0a5f32ce89caa4d519dddfff203ae86d1"
+    },
+    {
+      "path": "index.html",
+      "before": "fa34f49b4e329d634b1419a4c344997b481a6fce60424919da82d584a9ef5d70",
+      "after": "6efccb3fd90a595b8f76076747a8bdaaf287b3f6b0238500dc0d4d756dfdb9a1"
+    }
+  ],
+  "build": {
+    "command": "npm.cmd run build",
+    "startedAt": "2026-11-11T06:01:27.191Z",
+    "completedAt": "2026-11-11T06:01:37.174Z",
+    "exitCode": 0,
+    "sourceHash": "9c7b4916fde33400065ef8f61cb932f3ba044340fbbd99c19c3bc142a34f0d68",
+    "sourceUnchangedDuringBuild": true,
+    "swVersion": "3bdf97336c02"
+  },
+  "node": {
+    "startedAt": "2026-11-11T06:01:27.122Z",
+    "completedAt": "2026-11-11T06:02:20.085Z",
+    "sourceHash": "9c7b4916fde33400065ef8f61cb932f3ba044340fbbd99c19c3bc142a34f0d68",
+    "sourceUnchangedDuringTests": true,
+    "baseline": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-priority-before-20261111",
+    "results": [
+      {
+        "name": "mission-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "platform-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-platform-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "racing-state-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-racing-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "identity-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "economy-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "leaderboard-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "static-ui-contract",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "main-economy-integration",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "route-preview-audit",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-radio-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-save-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-racing-regression",
+        "code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "followup-platform-regression",
+        "code": 0,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "limitations": [
+      "隔離程式與本機HTTP測試，不代表手機實機或正式Redis",
+      "瀏覽器與固定三回歸另行執行"
+    ]
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:4317",
+    "build": "3bdf97336c02",
+    "externalChrome": true,
+    "isolatedContext": true,
+    "playerStorageTouched": false,
+    "realPhone": false,
+    "cases": [
+      {
+        "name": "壞raw啟動停在救援且不建WebGL/不覆寫；直橫向卡片不溢出、可捲且按鈕至少44px",
+        "status": "PASS"
+      },
+      {
+        "name": "取消建立新檔確認不覆寫，也不離開救援",
+        "status": "PASS"
+      },
+      {
+        "name": "取消恢復不寫入；確認恢復最近快照成功reload並保留錢包",
+        "status": "PASS",
+        "detail": {
+          "money": 12345,
+          "webglCalls": 1,
+          "archive": "{\"taxi\":{\"money\":12345},"
+        }
+      },
+      {
+        "name": "明確建立新進度成功reload，原始raw保留",
+        "status": "PASS",
+        "detail": {
+          "value": {
+            "best": null,
+            "sectors": [
+              null,
+              null,
+              null
+            ],
+            "ghost": null,
+            "opts": {}
+          },
+          "archive": "{\"taxi\":{\"money\":12345},",
+          "calls": 1
+        }
+      },
+      {
+        "name": "救援選擇自己的備份檔：取消不寫入、再次選檔確認後reload",
+        "status": "PASS"
+      },
+      {
+        "name": "WebGL初始getContext拋錯可見重試/低畫質重試，沒有__gp且低畫質重試保留賽道",
+        "status": "PASS",
+        "detail": {
+          "gp": false,
+          "canvases": 0,
+          "text": "無法啟動 3D 畫面。請關閉其他遊戲分頁後重試，或嘗試低畫質。若瀏覽器不支援 3D 圖形，請改用支援的瀏覽器。",
+          "buttons": [
+            {
+              "text": "重試",
+              "height": 44
+            },
+            {
+              "text": "低畫質重試",
+              "height": 44
+            }
+          ],
+          "retriedSearch": "?circuit=australia&notraffic=&q=low"
+        }
+      },
+      {
+        "name": "正常遊戲30/60/unlimited即時套用真main渲染節流，reload保留且fps checkbox仍為boolean",
+        "status": "PASS",
+        "detail": {
+          "samples": [
+            {
+              "cap": "30",
+              "renders": 30,
+              "stored": "30",
+              "sameDocument": true
+            },
+            {
+              "cap": "60",
+              "renders": 60,
+              "stored": "60",
+              "sameDocument": true
+            },
+            {
+              "cap": "unlimited",
+              "renders": 120,
+              "stored": "unlimited",
+              "sameDocument": true
+            }
+          ],
+          "fps": true,
+          "checkbox": true,
+          "reloaded": {
+            "cap": "unlimited",
+            "fps": true,
+            "checkbox": true
+          }
+        }
+      }
+    ],
+    "layouts": [
+      {
+        "width": 390,
+        "height": 844,
+        "documentWidth": 390,
+        "card": {
+          "left": 16,
+          "right": 374,
+          "top": 165.375,
+          "bottom": 678.625,
+          "client": 356,
+          "scroll": 356,
+          "clientHeight": 511,
+          "scrollHeight": 511,
+          "overflow": "auto"
+        },
+        "buttons": [
+          {
+            "id": "save-recovery-export",
+            "width": 308,
+            "height": 48,
+            "top": 341.625,
+            "bottom": 389.625
+          },
+          {
+            "id": "save-recovery-restore",
+            "width": 308,
+            "height": 48,
+            "top": 407.625,
+            "bottom": 455.625
+          },
+          {
+            "id": "save-recovery-import",
+            "width": 308,
+            "height": 48,
+            "top": 473.625,
+            "bottom": 521.625
+          },
+          {
+            "id": "save-recovery-retry",
+            "width": 308,
+            "height": 48,
+            "top": 539.625,
+            "bottom": 587.625
+          },
+          {
+            "id": "save-recovery-new",
+            "width": 308,
+            "height": 48,
+            "top": 605.625,
+            "bottom": 653.625
+          }
+        ]
+      },
+      {
+        "width": 844,
+        "height": 390,
+        "documentWidth": 844,
+        "card": {
+          "left": 152,
+          "right": 692,
+          "top": 16,
+          "bottom": 374,
+          "client": 538,
+          "scroll": 538,
+          "clientHeight": 356,
+          "scrollHeight": 511,
+          "overflow": "auto"
+        },
+        "buttons": [
+          {
+            "id": "save-recovery-export",
+            "width": 490,
+            "height": 48,
+            "top": 192.25,
+            "bottom": 240.25
+          },
+          {
+            "id": "save-recovery-restore",
+            "width": 490,
+            "height": 48,
+            "top": 258.25,
+            "bottom": 306.25
+          },
+          {
+            "id": "save-recovery-import",
+            "width": 490,
+            "height": 48,
+            "top": 324.25,
+            "bottom": 372.25
+          },
+          {
+            "id": "save-recovery-retry",
+            "width": 490,
+            "height": 48,
+            "top": 325.25,
+            "bottom": 373.25
+          },
+          {
+            "id": "save-recovery-new",
+            "width": 490,
+            "height": 48,
+            "top": 325.25,
+            "bottom": 373.25
+          }
+        ]
+      }
+    ],
+    "exceptions": [],
+    "dialogs": [
+      {
+        "message": "確定建立新的遊戲進度？這不會復原舊進度，原始內容會先保留副本。",
+        "accepted": false
+      },
+      {
+        "message": "恢復最近可用的存檔？快照之後的進度可能不在其中；目前原始內容會先保留副本。",
+        "accepted": false
+      },
+      {
+        "message": "恢復最近可用的存檔？快照之後的進度可能不在其中；目前原始內容會先保留副本。",
+        "accepted": true
+      },
+      {
+        "message": "確定建立新的遊戲進度？這不會復原舊進度，原始內容會先保留副本。",
+        "accepted": true
+      },
+      {
+        "message": "以「fixture-backup.json」還原遊戲？目前原始內容會先保留副本。",
+        "accepted": false
+      },
+      {
+        "message": "以「fixture-backup.json」還原遊戲？目前原始內容會先保留副本。",
+        "accepted": true
+      }
+    ],
+    "blockedExternalRequests": [],
+    "limitations": [
+      "軟體Chrome只驗UI/流程，未量真機FPS、功耗或音效",
+      "幀率驗證使用真main的人工120Hz動畫回呼與render呼叫計數，render本身替換為計數器"
+    ],
+    "summary": {
+      "passed": 7,
+      "failed": 0
+    }
+  },
+  "dedicated": {
+    "save": {
+      "passed": 23,
+      "failed": 0
+    },
+    "radio": {
+      "passed": 9,
+      "failed": 0
+    },
+    "platform": {
+      "passed": 10,
+      "failed": 0
+    },
+    "racingChecksPerVersion": 13
+  },
+  "fixedRegression": {
+    "status": "PASS",
+    "passed": 3,
+    "expected": [
+      "BOT lap2 54.425 hits=0 / aiHits 0",
+      "GP 陳冠宇:162.0 / aiHits 8",
+      "pittest 陳冠宇:175.7 / aiHits 5"
+    ],
+    "logSha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a"
+  },
+  "deliveryTools": {
+    "preparerSha256": "2f6113b51c6edb2ea18fe326f8fd40c25ca439a5255f81142476ff9322dca52f",
+    "applySha256": "2e83fa4a719cfa382c72e6d027368af3fb67f1df11e5fe2e037aaa089f8967d9",
+    "realOriginalApplied": false,
+    "realDeliveryGenerated": false,
+    "cases": [
+      {
+        "name": "沿用既有套用工具10項安全回歸，原版腳本／結果不變",
+        "status": "PASS",
+        "details": {
+          "passed": 10,
+          "failed": 0
+        }
+      },
+      {
+        "name": "準備器只收本輪差異，零寫原專案與Gitindex；套用Build／備份／重跑完整驗證",
+        "status": "PASS",
+        "details": {
+          "files": 12,
+          "originalAndGitIndexUnchangedByPreparation": true,
+          "buildExecutedOnlyWithApply": true,
+          "unrelatedEditsPreserved": true
+        }
+      },
+      {
+        "name": "準備器拒絕產品檔本地修改，整個fixture不變",
+        "status": "PASS"
+      },
+      {
+        "name": "準備器拒絕變動HEAD與缺少必要交接文件，完全不產生包",
+        "status": "PASS"
+      },
+      {
+        "name": "準備器拒絕source junction，外部內容與fixture均保留",
+        "status": "PASS"
+      },
+      {
+        "name": "套用器拒絕重複路徑與.git/index，即使payload可通過hash",
+        "status": "PASS"
+      },
+      {
+        "name": "build失敗保留已驗證套用結果與backup，明確built=false",
+        "status": "PASS"
+      }
+    ],
+    "fixtureRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\followup-delivery-fixtures-1794376290174-99d1d2f6",
+    "summary": {
+      "passed": 7,
+      "failed": 0
+    }
+  },
+  "application": {
+    "packagingPhaseOnly": true,
+    "authoritativeResult": "../taipei-gp-followup-apply-result.json",
+    "commitRequested": false,
+    "pushRequested": false
+  },
+  "limitations": [
+    "尚未量測手機實機FPS、耗電、溫度、觸控與聲音",
+    "人工120Hz渲染計數驗證排程，非硬體效能數據",
+    "未測試正式遊戲、排行榜或Redis",
+    "快照為容量允許時的額外保護，不能取代自行匯出的備份",
+    "舊存檔內既有無效最快圈與已發出的賽季積分不追溯修改"
+  ]
+}

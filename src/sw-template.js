@@ -5,6 +5,17 @@ const CACHE = PREFIX + VERSION;
 const PRECACHE = __PRECACHE__;
 const READY = '/__taipei-gp-offline-ready__';
 
+// 管理頁只操作正在控制此分頁的完整版本，不把其他分頁／上一版快取誤認成目前資料。
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'taipei-gp-offline-version' || !e.ports?.[0]) return;
+  e.waitUntil((async () => {
+    try {
+      const ready = !!(await (await caches.open(CACHE)).match(READY));
+      e.ports[0].postMessage({ type: 'taipei-gp-offline-version', cache: CACHE, version: VERSION, ready });
+    } catch { e.ports[0].postMessage({ type: 'taipei-gp-offline-version', ready: false }); }
+  })());
+});
+
 // 期限包含 cache.put 讀完 body；只有回應標頭也不算完成下載。
 async function downloadInto(cache, url) {
   const controller = new AbortController();
@@ -77,6 +88,8 @@ async function navigation(request) {
 self.addEventListener('fetch', (e) => {
   const request = e.request, url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  // 區域管理器需先驗證版本內的 SHA256，再決定是否寫入；取消時不能由背景 fetch 額外留下一份未驗證資料。
+  if (request.headers.get('X-Taipei-GP-Offline-Download') === '1') return;
   if (request.mode === 'navigate') { e.respondWith(navigation(request)); return; }
   e.respondWith((async () => {
     const current = await caches.open(CACHE);

@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripTypeScriptTypes } from 'node:module';
+import { pureSource } from './pure-module-loader.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const before = resolve(process.argv[2] ?? process.env.GP_BASELINE_DIR ?? resolve(root, '../taipei-gp-priority-before-20261111'));
@@ -22,7 +23,7 @@ const identityURL = dataURL(await compiled(root, 'identity.ts'));
 const economyURL = dataURL(await compiled(root, 'economy.ts'));
 const saveSource = {
   before: await compiled(before, 'save.ts'),
-  after: await compiled(root, 'save.ts', { './season': seasonURL, './identity': identityURL, './economy': economyURL }),
+  after: await pureSource(root, 'save.ts'),
 };
 let serial = 0;
 class MemoryStorage {
@@ -33,7 +34,11 @@ class MemoryStorage {
 }
 async function load(which, storage, search = '') {
   globalThis.localStorage = storage; globalThis.location = { search };
-  return import(dataURL(`${saveSource[which]}\n// isolated-load-${++serial}`));
+  // 每次隔離匯入視為一個獨立頁面；Web Locks 的多頁協調由 abcd-save-regression 另外驗證。
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
+  const module = await import(dataURL(`${saveSource[which]}\n// isolated-load-${++serial}`));
+  await module.initializeSaveWriter?.();
+  return module;
 }
 const ghost = (offset = 0) => ({ t: [0, 1, 2], s: [0, 50, 100], x: [offset, offset + 10, offset + 20], z: [0, 1, 2], h: [0, 0.1, 0.2] });
 const rec = (best, v, offset = 0) => ({ best, sectors: [best / 3, best / 3, best / 3], ghost: ghost(offset), gpBest: best - 1, v });

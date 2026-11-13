@@ -60,7 +60,8 @@ function harness(source = current, initialMoney = 1000) {
   const events = { writes: [], toasts: [], paints: [], pursuits: 0, cancelled: [], repairs: 0 };
   const save = { best: null, sectors: [null, null, null], ghost: null, opts: {}, taxi: { money: initialMoney, trips: 0 }, owned: ['sedan', 'police'], ledger: [], season: { pending: {} } };
   const pv = { baseColor: '#ffffff', setPaint(color) { events.paints.push(color); } };
-  const taxi = { money: initialMoney, trips: 0, setCondition() {}, onHit() {}, update() { return null; } };
+  const taxi = { money: initialMoney, trips: 0, settledIds: [], checkpoint: () => null, consumeSettlement: () => null,
+    setCondition() {}, onHit() {}, update() { return null; } };
   const ctx = vm.createContext({ console, Date, Math, Set, performance, Element: class {}, $: get, events, save, taxi, ...economy,
     stats: { earned: 0, gpWins: 0, trips: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0 },
     chosen: { id: 'sedan', name: '街道房車', price: 0 }, preview: { id: 'sedan', name: '街道房車', price: 0 }, pendingPaint: null,
@@ -75,10 +76,11 @@ function harness(source = current, initialMoney = 1000) {
     saveFreePos() {}, showMenu() {}, hideMenu() {}, userStart: async () => {}, clock: { getDelta() {} },
     police: null, nav: null, fcar: {}, collider: null, traffic: null, trafficHit: 0, pedHit: false,
     dt: 0.02, FREE_SIM: false, WANTED_TEST: false, NO_TRAFFIC: false, policeLog: [], impact: 0,
+    taxiCheckpointPending: false, updateTaxiResumeUi() {},
   });
   vm.runInContext(`var PAINT_PRICE = ${priceSource};`, ctx);
   for (const name of ['money', 'setMoney', 'earn']) vm.runInContext(source.fn(name), ctx);
-  if (source === current) { vm.runInContext(interactiveSource, ctx); vm.runInContext(current.fn('gameShortcut'), ctx); }
+  if (source === current) { vm.runInContext(interactiveSource, ctx); vm.runInContext(current.fn('gameShortcut'), ctx); vm.runInContext(current.fn('checkpointTaxi'), ctx); }
   return { ctx, events, get, save, taxi, source, run(code) { return vm.runInContext(code, ctx); }, callback(name, code) { vm.runInContext(`var ${name} = ${code};`, ctx); return ctx[name]; } };
 }
 function pursuit(h) {
@@ -127,12 +129,15 @@ await test('真rewardGpFinish：重複結算只發一次獎金及明細；持久
 
 await test('真freeStep載客區塊：直接收入只記一次差額，後續無結算tick不重記', () => {
   const h = harness(); h.ctx.taxiOn = () => true;
-  let paid = false;
-  h.taxi.update = function () { if (paid) return null; paid = true; this.money += 375; this.trips++; return '💰 完成行程'; };
+  let paid = false, settlement = null;
+  h.taxi.update = function () { if (paid) return null; paid = true; this.money += 375; this.trips++;
+    this.settledIds = ['economy-trip']; settlement = { id: 'economy-trip', status: 'delivered', total: 375 }; return '💰 完成行程'; };
+  h.taxi.consumeSettlement = () => { const result = settlement; settlement = null; return result; };
   h.run(current.taxi()); h.run(current.taxi()); h.run(current.taxi());
   assert.equal(h.ctx.money(), 1375); assert.equal(h.save.taxi.money, 1375); assert.equal(h.ctx.stats.earned, 375);
   assert.equal(h.save.ledger.length, 1); assert.equal(h.save.ledger[0].amount, 375); assert.equal(h.save.ledger[0].balance, 1375);
   assert.equal(h.save.ledger[0].reason, '計程車載客'); assert.equal(h.events.writes.length, 1); assert.equal(h.events.writes[0].ledger.length, 1);
+  assert.deepEqual(clone(h.events.writes[0].taxiSettled), ['economy-trip']);
 });
 
 await test('真維修click：有錢實付100、錢不足免費且不記支出', () => {

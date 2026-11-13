@@ -15,6 +15,11 @@ const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
 const original = path.resolve(process.argv[2] ?? process.env.GP_BASELINE_DIR ?? path.resolve(project, '../taipei-gp-priority-before-20261111'));
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const env = await loadGameModules(project);
+// 新功能只從目前checkout載入；before的真物理及main仍由原有env/source替換。
+const featureEnv = await loadGameModules(project);
+const lapFeatures = await featureEnv.exports('src/racing-laps.ts');
+const replayFeatures = await featureEnv.exports('src/racing-replay.ts');
+const { DriftChallenge } = await featureEnv.exports('src/drift.ts');
 const pitlane = await env.exports('src/pitlane.ts');
 const economy = await env.exports('src/economy.ts');
 const { DriftScore } = await env.exports('src/drift.ts');
@@ -77,6 +82,7 @@ function harness(sources = current, saved) {
     setTimeout, clearTimeout, AbortController, DOMException, location: { search: '' }, document: { title: '', createElement: fakeElement, querySelector: () => null },
     $: get, track, car, field, save, stats, storage, events, CIRCUITS: env.circuits.CIRCUITS, CIRCUIT: env.circuits.CIRCUITS[0], SEASON: true, BOT: false,
     state: 'menu', mode: 'race', raceKind: 'gp', lap: 1, lapTime: 0, lastLap: null, sectorIdx: 0, sectorStart: 0,
+    sessionLaps: new lapFeatures.SessionLaps(10), lapSectors: [null, null, null], qualifyingAttempts: new lapFeatures.QualifyingAttempts(1), qualiAttemptTime: 0,
     rec: { t: [], s: [], x: [], z: [], h: [] }, recAcc: 0, ghostPtr: 0, lapValid: true, clearSectorsAt: 0, camSnap: false,
     countdown: 0, litShown: 0, lightsOutAt: 0, drsPress: false, pitPress: false, qualiRun: false, qualiGrid: null, lastGrid: null,
     strategyWet: 0, lastPos: -1, seasonGrid: [], settled: null, gpSettlementJob: null, gpRewarded: false, prizeNote: '', restoringSeason: false,
@@ -85,10 +91,13 @@ function harness(sources = current, saved) {
     sound: new Proxy({}, { get: () => () => {} }), radio: { reset() {}, say() {} }, taxi: null, sr: null, police: null,
     trackStamp: () => 'track-v1', checkTrackStamp() {}, selectRecordRules() {}, setRaceRain() {}, scBanner() {}, hideMenu() {}, showMenu() {},
     userStart: async () => {}, finishDrift() {}, refreshGarage() {}, checkAchievements() {},
+    abandonTaxi() {}, updateStreetSeriesUi() {}, updateActivityUi() {}, updateTaxiResumeUi() {}, renderProfileTools() {}, updatePinnedTargets() {},
+    driftChallenge: new DriftChallenge(new DriftScore()),
     writeSave() { const snapshot = clone(save); storage.writes.push(snapshot); storage.last = snapshot; },
     toast: (text) => events.toasts.push(text), fmt: (n) => n == null ? '--' : String(n), fmtNT: (n) => `NT$ ${n}`, fmtDelta: (n) => String(n),
     weather: { rainLevel: 0 }, rainTarget: 0, RAIN_OMEN: 25, applyWeather() { events.weatherUpdates = (events.weatherUpdates ?? 0) + 1; },
-    replayT: 0, replaySpeed: 1, camCut: 99, camMode: 'chase', replayLoc: new Map(),
+    replayT: 0, replaySpeed: 1, replayPaused: false, replaySeeking: false, replayWheelIndices: new Map(), camCut: 99, camMode: 'chase', replayLoc: new Map(), ...replayFeatures,
+    scCar: { model: { root: new THREE.Group() } }, scLights: [new THREE.MeshBasicMaterial(), new THREE.MeshBasicMaterial()],
     carModel: { root: new THREE.Group(), body: new THREE.Group(), steer: [], spin: Array.from({ length: 4 }, () => new THREE.Object3D()) },
     ghostModel: { root: new THREE.Group() }, playerCars: new Map(), raceHide: [], traffic: null, peds: null,
     camera: new THREE.PerspectiveCamera(), tvCams: [new THREE.Vector3(0, 10, 0)],
@@ -102,10 +111,10 @@ function harness(sources = current, saved) {
     startPodium() { events.podiums++; ctx.settleRace(); ctx.state = 'podium'; },
     botInput: () => ({ steer: 0, brake: false }), input: { read: () => ({ steer: 0, brake: false }) }, SC_AT: null, gpEvent() {},
   });
-  const names = ['resetRace', 'startLap', 'sectorDone', 'completeLap', 'beginCountdown', 'startTt', 'startGp', 'saveSeasonCheckpoint', 'restoreSeasonCheckpoint',
+  const names = ['recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt', 'resetRace', 'startLap', 'sectorDone', 'completeLap', 'beginCountdown', 'startTt', 'startGp', 'saveSeasonCheckpoint', 'restoreSeasonCheckpoint',
     'settleAbandoned', 'finishRound', 'recordSeason', 'rewardGpFinish', 'settleRace', 'completeGpResults', 'showResults', 'pause', 'money', 'setMoney', 'earn', 'step',
     'inSeasonRound', 'seasonDone', 'resumeSeasonRound', 'raceRainLevel', 'setRaceRain', 'startReplay', 'endReplay', 'replayFrame'];
-  for (const name of names) { try { vm.runInContext(sources.fn(name), ctx); } catch (e) { if (sources !== old) throw e; } }
+  for (const name of names) { try { vm.runInContext(sources.fn(name), ctx); } catch (e) { if (sources !== old && !['recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt'].includes(name)) throw e; } }
   if (sources === current) vm.runInContext(`var exitGpSettlement = ${sources.click('gp-settle-exit')};`, ctx);
   return { ctx, get, storage, events, field, car, track };
 }
@@ -296,7 +305,7 @@ await check('真回放早期乾地／晚期雨胎、抬升與crew來自歷史，
   h.field.me.pit.t = 2.6;
   for (let i = 0; i < 12; i++) h.field.update(1 / 120, true);
   h.field.me.compound = 2; h.field.me.pit = null; h.field.wet = 1;
-  h.field.pitlane = { update(dt, stops) { h.events.crew = { dt, stops }; } };
+  h.field.pitlane = { update(dt, stops) { h.events.crew = { dt, stops }; }, seek(stops) { this.update(0, stops); } };
   const final = clone(h.field.snapshot()); h.ctx.weather.rainLevel = 1;
   h.ctx.startReplay(); h.ctx.replayT = 0; h.ctx.replayFrame(0); assert.equal(h.ctx.weather.rainLevel, 0);
   h.ctx.replayT = 0.15; h.ctx.replayFrame(0);
@@ -313,7 +322,7 @@ await check('真endReplay中途退出：清除拆輪縮放／crew狀態，復原
   h.field.racers[0].model.spin = [new THREE.Object3D()];
   for (const w of [...h.ctx.carModel.spin, ...h.field.racers[0].model.spin]) w.scale.setScalar(1e-4);
   h.ctx.carModel.lastTyreColor = env.rivals.TYRES[3].color; h.ctx.weather.rainLevel = 0;
-  h.field.pitlane = { update(dt, stops) { h.events.crew = { dt, stops }; } };
+  h.field.pitlane = { update(dt, stops) { h.events.crew = { dt, stops }; }, seek(stops) { this.update(0, stops); } };
   const final = clone(h.field.snapshot()); h.ctx.state = 'replay'; h.ctx.endReplay();
   assert.equal(h.ctx.state, 'results'); assert.equal(h.ctx.carModel.lastTyreColor, env.rivals.TYRES[2].color);
   for (const w of [...h.ctx.carModel.spin, ...h.field.racers[0].model.spin]) assert.equal(w.scale.x, 1);

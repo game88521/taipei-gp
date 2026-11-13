@@ -460,6 +460,32 @@ export class PitLane {
   /** 測試用：出站燈現在是不是紅的 */
   get exitIsRed() { return this.exitRed; }
 
+  /** 回放拖曳：直接重建這一刻的姿勢、輪胎與工具，不沿用較晚時間的動畫快取。
+   * 正賽仍只走 update；seek 不產生維修音效。 */
+  seek(stops: Map<number, StopInfo>) {
+    this.active.clear(); this.linger.fill(0); this.released.fill(0); this.lastT.fill(-1);
+    this.spd.fill(0); this.gait.fill(0); this.gunEng.fill(0); this.axle.fill(0); this.toolOn.fill(0); this.toolLift.fill(0);
+    for (let k = 0; k < this.frames.length; k++) {
+      for (let m = 0; m < CREW_N; m++) { this.idlePose(k, m); this.yaw[k * CREW_N + m] = this.idleYaw(k); }
+      for (let q = 0; q < 8; q++) this.tyres[(k * 8 + q) * 3 + 2] = -9;
+      this.sign.setColorAt(k, new THREE.Color('#d81e2a'));
+      const s = stops.get(k);
+      if (s) {
+        this.active.add(k); this.linger[k] = 1.6;
+        this.lastT[k] = s.phase === 'approach' ? -1 : s.t;
+        this.released[k] = s.phase === 'release' ? 1 : 0;
+        for (let m = 0; m < CREW_N; m++) {
+          const [a, b, c, yaw] = this.servicePose(k, m, s), idx = k * CREW_N + m, o = idx * 3;
+          this.pose[o] = a; this.pose[o + 1] = b; this.pose[o + 2] = c; this.yaw[idx] = yaw;
+        }
+        this.animate(k, s, 0, 0);
+      } else this.place(k);
+    }
+    this.dirty = true;
+    this.update(0, stops);
+    this.sounds.length = 0;
+  }
+
   /** 每格：stops = 正在進站的隊伍 → 那一隊的停站狀態 */
   update(dt: number, stops: Map<number, StopInfo>) {
     const k8 = Math.min(1, dt * 6);

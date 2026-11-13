@@ -30,6 +30,22 @@
       </div>
     </div>
     <div id="app"></div>
+    <section id="save-recovery" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="save-recovery-title">
+      <div class="recovery-card">
+        <h2 id="save-recovery-title" tabindex="-1">先救回你的進度</h2>
+        <p id="save-recovery-message"></p>
+        <p id="save-recovery-status" role="status" aria-live="polite"></p>
+        <div class="recovery-actions">
+          <button id="save-recovery-export" class="primary" type="button">下載原始內容</button>
+          <button id="save-recovery-restore" class="ghost-btn" type="button">恢復最近可用的存檔</button>
+          <button id="save-recovery-import" class="ghost-btn" type="button">選擇自己的備份檔</button>
+          <button id="save-recovery-retry" class="ghost-btn" type="button">重新讀取</button>
+          <button id="save-recovery-new" class="ghost-btn" type="button">建立新進度…</button>
+        </div>
+        <label class="recovery-confirm hidden"><input id="save-recovery-exported" type="checkbox" disabled />我已確認原始檔已下載並保留</label>
+        <input id="save-recovery-file" type="file" accept=".json,.txt,application/json,text/plain" hidden />
+      </div>
+    </section>
 
     <div id="hud" class="hidden">
       <canvas id="cockpit"></canvas>
@@ -85,6 +101,9 @@
         <div id="wanted"></div>
         <div id="nav-hud" style="display: none"></div>
         <details id="drift-coach" class="hidden"><summary>甩尾練習提示</summary><p id="coach-status"></p><button id="coach-exit" type="button">結束練習提示</button></details>
+        <div id="drift-challenge-hud" class="hidden" role="status"></div>
+        <button id="drift-challenge-cancel" class="ghost-btn hidden" type="button">結束甩尾挑戰</button>
+        <details id="pinned-targets" class="hidden"><summary>我的目標</summary><div id="pinned-targets-body"></div></details>
       </div>
       <div id="clock" style="display: none"></div>
       <button id="btn-pursuit" style="display: none">🚨 追緝</button>
@@ -116,7 +135,7 @@
             <button data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" /><circle cx="15" cy="6" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="18" r="2" /></svg><span>設定</span></button>
             <button data-tab="records"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5.2a3 3 0 0 0 2.9 4M16 6h2.8a3 3 0 0 1-2.9 4M12 13v4M8.5 21h7M10 17h4" /></svg><span>紀錄</span></button>
           </nav>
-          <div class="m-wallet"><small>錢包</small><b id="wallet"></b></div>
+          <div class="m-wallet"><small id="player-title">新手車手</small><b id="wallet"></b></div>
           <button id="m-update" type="button" hidden>有新版本 · 點此更新</button>
         </aside>
 
@@ -144,6 +163,11 @@
                 <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M13.5 3L5 13.5h6.2L10 21l8.5-10.5h-6.2L13.5 3z" /></svg></span>
                 <span class="m-txt"><b>街頭對決</b><small>開放街道 vs 4 台 AI</small></span>
               </button>
+              <a id="btn-multiplayer" class="m-mode gp" href="/multiplayer.html" style="text-decoration:none;color:inherit">
+                <span class="m-ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M2 21v-3a6 6 0 0 1 12 0v3M16 15a5 5 0 0 1 6 5" /></svg></span>
+                <span class="m-txt"><b>連線對戰</b><small>2～4 人私人房 · 台北賽道競速</small></span>
+                <span class="m-go">›</span>
+              </a>
               <button id="btn-gp" class="m-mode gp">
                 <span class="m-ico"><svg viewBox="0 0 24 24"><path d="M5 21V4" /><path d="M5 4h14v8H5" /><path d="M5 4h3.5v4H5zM12 4h3.5v4H12zM8.5 8H12v4H8.5zM15.5 8H19v4h-3.5z" fill="currentColor" stroke="none" /></svg></span>
                 <span class="m-txt"><b>大獎賽</b><small>排位賽＋正賽 · 22 台車同場</small></span>
@@ -158,6 +182,16 @@
               </button>
             </div>
             <button id="btn-drift-practice" class="ghost-btn" type="button">🌀 甩尾練習提示：速度、角度與入帳</button>
+            <div class="feature-card compact-actions">
+              <label>甩尾限時挑戰 <select id="drift-duration"><option value="60">60 秒</option><option value="90">90 秒</option></select></label>
+              <button id="btn-drift-challenge" class="ghost-btn" type="button">🌀 挑戰獎牌</button>
+              <button id="btn-passport" class="ghost-btn" type="button">📍 探索護照</button>
+            </div>
+            <div id="taxi-resume-panel" class="feature-card" hidden>
+              <p id="taxi-resume-description" class="sub"></p>
+              <button id="taxi-resume-continue" class="primary" type="button">繼續未完成載客</button>
+              <button id="taxi-resume-abandon" class="ghost-btn" type="button">放棄這張訂單</button>
+            </div>
             <div id="m-install" class="m-install" hidden>
               <span class="m-ico"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4" /></svg></span>
               <span class="m-inst-txt"><b>加到主畫面</b><small>像 App 一樣全螢幕開啟，沒網路也能玩</small></span>
@@ -199,6 +233,7 @@
                 <p id="paint-preview-note" aria-live="polite">點選烤漆可先試色，確認後才購買並套用。</p>
                 <button id="paint-apply" class="primary" type="button">購買並套用烤漆</button>
                 <button id="paint-cancel" class="ghost-btn" type="button">取消試色</button>
+                <div id="profile-tools" class="feature-card"></div>
               </div>
             </div>
           </section>
@@ -230,6 +265,14 @@
                   <small id="quality-now"></small>
                 </label>
                 <label class="sw">顯示 FPS<input type="checkbox" id="opt-fps" /></label>
+                <label class="q">畫面幀率
+                  <select id="opt-frame-cap">
+                    <option value="30">省電（最多 30 FPS）</option>
+                    <option value="60">標準（最多 60 FPS）</option>
+                    <option value="unlimited">最高流暢（不設上限）</option>
+                  </select>
+                  <small>立即生效；選單最多 30 FPS。實際流暢度依裝置而定。</small>
+                </label>
               </fieldset>
               <fieldset>
                 <legend>操作</legend>
@@ -244,6 +287,7 @@
                   <label class="sw">傾斜方向反過來<small>往左傾卻往右轉時打開</small><input type="checkbox" id="opt-tilt-inv" /></label>
                   <label class="q rng">傾斜死區<input type="range" id="opt-tilt-dead" min="0" max="8" step="1" /><small id="tilt-dead-val"></small></label>
                   <label class="q">中立角度<button id="opt-tilt-zero" type="button" class="ghost-btn">用現在的角度當直走</button><small id="tilt-zero-val"></small></label>
+                  <div id="tilt-tools" class="feature-tools"></div>
                 </div>
                 <label class="q">觸控按鈕
                   <select id="opt-touch">
@@ -274,6 +318,7 @@
                 <label class="q rng">其他車輛引擎<input type="range" id="opt-vol-others" min="0" max="1" step="0.05" /></label>
                 <label class="q rng">環境聲（雨／風／觀眾）<input type="range" id="opt-vol-ambient" min="0" max="1" step="0.05" /></label>
                 <label class="q rng">音效<input type="range" id="opt-vol-fx" min="0" max="1" step="0.05" /></label>
+                <div id="sound-tools" class="feature-tools"></div>
               </fieldset>
               <fieldset>
                 <legend>比賽</legend>
@@ -292,6 +337,7 @@
                   <small>簡單：AI 過彎、煞車、加速都慢一點，適合剛上手；困難：AI 幾乎不留餘地</small>
                 </label>
                 <label class="sw">排位賽（決定發車位置）<input type="checkbox" id="opt-quali" /></label>
+                <label class="q">排位有效圈數<select id="opt-quali-attempts"><option value="1">1 圈（快速）</option><option value="2">2 圈取最佳</option><option value="3">3 圈取最佳</option></select><small>玩家與 AI 使用相同次數；賽季固定 1 圈。</small></label>
                 <label class="q">正賽天氣
                   <select id="opt-gpwx"><option value="maybe">可能下雨</option><option value="dry">晴天</option><option value="wet">雨戰</option></select>
                 </label>
@@ -302,6 +348,7 @@
                 <label class="sw">影子車（計時賽）<input type="checkbox" id="opt-ghost" /></label>
               </fieldset>
             </div>
+            <details class="feature-card"><summary>離線內容與下載管理</summary><div id="offline-manager"></div></details>
           </section>
 
           <section class="m-pane" data-pane="records">
@@ -333,9 +380,12 @@
             </div>
             <p id="legacy-record-note" class="sub"></p>
             <p id="taxi-last-trip" class="sub"></p>
+            <details id="lap-history" class="feature-card"><summary>本場圈表與分段穩定度（最近 10 圈）</summary><p id="lap-history-summary" class="sub"></p><div class="table-scroll"><table id="lap-history-body"></table></div></details>
+            <div id="activity-records" class="feature-card"></div>
             <details id="economy-history"><summary>收支明細與任務收益</summary><p class="sub">顯示本版開始記錄的最近 100 筆；各類平均為每次入帳金額，不代表每分鐘效率。</p><div id="economy-summary"></div><ol id="economy-list"></ol></details>
             <div class="m-backup">
               <h3>備份存檔</h3>
+              <p id="save-writer-notice" class="sub" hidden></p>
               <p class="sub">最快圈、影子車、錢、車庫、成就都存在這支手機的瀏覽器裡。清掉瀏覽器資料、換手機、或加到主畫面後和 Safari 各自獨立，都會讓它消失。先備份一份，之後可以還原。</p>
               <div class="m-backup-btns">
                 <button id="bk-copy" class="ghost-btn" type="button">複製備份</button>
@@ -391,7 +441,8 @@
     <div id="season-new" class="overlay hidden">
       <div class="card">
         <h1>開始新賽季</h1>
-        <p class="sub">這三項整季固定，中途不能改（成績才公平）</p>
+        <p class="sub">賽曆、圈數、難度與規則整季固定。短賽季獎金依站數比例計算；完整賽季成就仍需 23 站。</p>
+        <label class="q sn">賽季長度<select id="sn-length"><option value="3">3 站短賽季</option><option value="6">6 站</option><option value="12">12 站</option><option value="23" selected>完整 23 站</option></select></label>
         <label class="q sn">每站圈數
           <select id="sn-laps"><option value="3" selected>3 圈（一站約 3 分鐘）</option><option value="6">6 圈（一站約 6 分鐘）</option></select>
         </label>
@@ -447,6 +498,17 @@
       </div>
     </div>
 
+    <div id="save-conflict" class="overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="save-conflict-title" aria-describedby="save-conflict-message">
+      <div class="card">
+        <h1 id="save-conflict-title" tabindex="-1">請重新讀取進度</h1>
+        <p id="save-conflict-message" class="sub"></p>
+        <p class="sub">已停止本頁遊戲與存檔。若另一個分頁正在遊玩，請先關閉它再重新讀取；尚未保存的本頁進度可以先下載備份。</p>
+        <button id="save-conflict-export" class="ghost-btn" type="button">下載本頁進度</button>
+        <p id="save-conflict-status" class="sub" role="status" aria-live="polite"></p>
+        <button id="save-conflict-reload" class="primary" type="button">重新讀取已儲存進度</button>
+      </div>
+    </div>
+
     <!-- 畫面中斷（WebGL context lost）：手機切 App、記憶體吃緊時會發生。城市資料已經釋放，原地還原不了，只能重新載入 -->
     <div id="ctx-lost" class="overlay hidden" role="alertdialog" aria-live="assertive">
       <div class="card">
@@ -461,6 +523,8 @@
         <h1 id="sr-res-title"></h1>
         <p class="sub" id="sr-res-sub"></p>
         <table id="sr-res-table"></table>
+        <p id="sr-series-status" class="sub"></p>
+        <button id="sr-series-next" class="primary" type="button" hidden>下一站</button>
         <button id="sr-again" class="primary" style="display: none">再比一次</button>
         <button id="sr-ok" class="ghost-btn">繼續自由駕駛</button>
       </div>
@@ -470,6 +534,13 @@
       <div class="card">
         <h1>街頭對決<small>CHOOSE A ROUTE</small></h1>
         <p class="sub">開放街道、照常有車流和紅綠燈；4 位對手會鑽車縫、闖紅燈。依序穿過黃色光圈，先到終點的贏。</p>
+        <label class="q">難度<select id="duel-difficulty"><option value="easy">新手</option><option value="standard" selected>標準</option><option value="hard">高手</option></select></label>
+        <label class="q">街賽車輛<select id="duel-car-mode"><option value="unified">統一街賽車（原本手感）</option><option value="selected">目前車庫車款</option></select></label>
+        <p class="sub">車款、難度與規則分開記錄；三站系列中途固定車輛與設定。</p>
+        <label class="sw">三站積分系列<input id="duel-series" type="checkbox" /></label>
+        <p id="street-series-status" class="sub"></p>
+        <button id="street-series-next" class="primary" type="button" hidden>繼續系列</button>
+        <button id="street-series-abandon" class="ghost-btn" type="button" hidden>放棄系列</button>
         <div id="duel-list"></div>
         <button id="duel-back" class="link">返回</button>
       </div>
@@ -482,6 +553,7 @@
         <div id="map-marks"></div>
         <div class="map-zoom"><button id="map-in" aria-label="放大">＋</button><button id="map-out" aria-label="縮小">－</button><button id="map-all">全圖</button></div>
         <button id="map-clear" class="ghost-btn">取消導航</button>
+        <button id="map-passport" class="ghost-btn" type="button">探索護照</button>
         <button id="map-close" class="primary">返回駕駛</button>
       </div>
     </div>
@@ -518,9 +590,34 @@
 
     <div id="replay-ui" class="hidden">
       <span id="replay-time"></span>
+      <button id="replay-pause" type="button">暫停</button>
+      <button id="replay-back" type="button">−5 秒</button>
+      <input id="replay-seek" type="range" min="0" max="1" step="0.05" value="0" aria-label="回放時間軸" />
+      <button id="replay-forward" type="button">＋5 秒</button>
       <button id="replay-speed">2×</button>
+      <label>跟拍<select id="replay-driver" aria-label="回放車手"></select></label>
+      <label>鏡頭<select id="replay-camera"><option value="auto">自動轉播</option><option value="tv">轉播機位</option><option value="chase">追車</option><option value="heli">空拍</option></select></label>
+      <div id="replay-events" aria-label="賽事事件"></div>
       <button id="replay-end">結束回放</button>
     </div>
+
+    <div id="taxi-order-page" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="taxi-order-title">
+      <div class="card wide">
+        <h1 id="taxi-order-title">選擇載客訂單</h1>
+        <p class="sub">先看目的地、路程與預估報酬，再決定要接哪一趟。預估金額會依實際車況與駕駛變動。</p>
+        <label class="sw">休閒不限時（不計限時小費／連送獎勵）<input id="taxi-relaxed" type="checkbox" /></label>
+        <div id="taxi-orders" class="feature-list"></div>
+        <button id="taxi-refresh-orders" class="ghost-btn" type="button">更新訂單</button>
+        <button id="taxi-order-back" class="ghost-btn" type="button">返回</button>
+      </div>
+    </div>
+    <div id="drift-challenge-result" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="drift-result-title">
+      <div class="card"><h1 id="drift-result-title">甩尾挑戰</h1><p id="drift-result-detail" class="sub"></p><button id="drift-result-again" class="primary" type="button">再挑戰一次</button><button id="drift-result-close" class="ghost-btn" type="button">繼續自由駕駛</button></div>
+    </div>
+    <div id="passport-page" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="passport-title">
+      <div class="card wide"><h1 id="passport-title">探索護照</h1><p id="passport-summary" class="sub"></p><div id="passport-regions" class="feature-regions"></div><label class="q">顯示<select id="passport-filter"><option value="all">全部地標</option><option value="unvisited">未造訪</option><option value="visited">已造訪</option></select></label><div id="passport-list" class="feature-list"></div><button id="passport-close" class="primary" type="button">返回</button></div>
+    </div>
+    <div id="street-loading" class="overlay hidden" role="status" aria-live="polite"><div class="card"><h1>準備城市玩法</h1><p id="street-loading-progress" class="sub">正在準備車流、行人與任務…</p></div></div>
 
     <div id="fps" style="display: none"></div>
     <div id="rotate">橫向握持比較好玩 ↻</div>

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
+import { pureSource, pureUrl } from './pure-module-loader.mjs';
 import vm from 'node:vm';
 import { parseAst } from 'rolldown/parseAst';
 
@@ -54,8 +55,9 @@ async function test(name, action) {
 }
 function fakeElement() {
   const classes = new Set(['hidden']), listeners = new Map();
-  return { hidden: false, open: false, value: '', textContent: '', style: {}, className: '', files: null,
-    classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x) },
+  return { hidden: false, open: false, checked: false, value: '', textContent: '', style: {}, className: '', files: null, children: [],
+    classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x), toggle(x, on) { if (on) classes.add(x); else classes.delete(x); } },
+    appendChild(node) { this.children.push(node); }, replaceChildren(...nodes) { this.children = nodes; },
     addEventListener(event, fn) { listeners.set(event, fn); },
     emit(event, payload) { return listeners.get(event)?.(payload ?? { target: this }); },
     focus() {}, select() {}, click() { return this.emit('click'); } };
@@ -75,7 +77,8 @@ const raceURL = dataURL(await compiled('race-state.ts'));
 const seasonURL = dataURL(await compiled('season.ts', { './circuits': circuitsURL, './race-state': raceURL }));
 const identityURL = dataURL(await compiled('identity.ts'));
 const economyURL = dataURL(await compiled('economy.ts')), economy = await import(economyURL);
-const saveCode = await compiled('save.ts', { './season': seasonURL, './identity': identityURL, './economy': economyURL });
+const saveCode = await pureSource(root, 'save.ts');
+const realMission = await import(await pureUrl(root, 'mission.ts'));
 let loadNo = 0;
 class MemoryStorage {
   data = new Map(); writes = []; fail = null;
@@ -87,7 +90,10 @@ const backupText = (best) => JSON.stringify({ app: 'taipei-gp', version: 3, save
 async function backupHarness(source = current) {
   const storage = new MemoryStorage(); storage.data.set(KEY, JSON.stringify(fixture(70)));
   globalThis.localStorage = storage; globalThis.location = { search: '' };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
   const saveModule = await import(dataURL(`${saveCode}\n// ui-isolated-${++loadNo}`));
+  await saveModule.initializeSaveWriter?.();
+  storage.writes.length = 0; // 載入時的有效快照不屬於下列UI操作；仍嚴格檢查操作期間不得寫入任何key。
   const d = dom(), events = { toasts: [], reloads: 0, timers: [] };
   const ctx = vm.createContext({ console, ...saveModule, $: d.get, KEY, localStorage: storage, navigator: {},
     toast: (t) => events.toasts.push(t), fmt: (n) => String(n),
@@ -146,7 +152,8 @@ function context(extra = {}) {
   const ctx = vm.createContext({ console, performance, ...economy, $: d.get, events, nav: { nm: '手動目的地' }, mode: 'free', state: 'free',
     fcar: { x: 0, z: 0, y: 10, h: 0, place(...v) { events.push(['place', ...v]); } },
     toast: (...v) => events.push(['toast', ...v]), finishDrift: (action) => events.push(['drift', action]),
-    chosen: { id: 'sedan' }, taxi: null, sr: null, police: null, ...extra });
+    chosen: { id: 'sedan' }, taxi: null, sr: null, police: null, BOT: false, NO_TRAFFIC: false,
+    save: {}, taxiCheckpointPending: false, document: { createElement: () => fakeElement() }, updateTaxiResumeUi() {}, ...extra });
   for (const name of ['taxiOn', 'streetRacing']) vm.runInContext(current.fn(name), ctx);
   return { ...d, ctx, events, load(...names) { for (const n of names) vm.runInContext(current.fn(n), ctx); } };
 }
@@ -169,7 +176,7 @@ await test('同時有手動目的地時，街頭與計程車路線依任務優�
   const routes = { street: [[1, 1], [2, 2]], taxi: [[3, 3], [4, 4]], manual: [[0, 0], [100, 0]] }, calls = [];
   const h = context({ sr: { phase: 'race', active: { path: routes.street } }, taxi: { phase: 'ride', target: {}, route: routes.taxi, routeYs: [9.5, 9.5] },
     nav: { x: 100, z: 0, y: 10, nm: '手動目的地', path: routes.manual, ys: [9.5, 9.5], t: 0 }, router: { route() { throw Error('任務路線不應重算手動導航'); } },
-    navArrows: { update: (...v) => calls.push(v) }, routeRemaining: () => 100, sameRoadLevel: () => false, ROAD_Y: 0.5 });
+    navArrows: { update: (...v) => calls.push(v) }, routeRemaining: () => 100, routeDeviation: realMission.routeDeviation, sameRoadLevel: () => false, ROAD_Y: 0.5 });
   h.load('updateNav'); h.ctx.updateNav(0.1); assert.equal(calls.at(-1)[0], routes.street);
   h.ctx.sr.phase = 'idle'; h.ctx.updateNav(0.1); assert.equal(calls.at(-1)[0], routes.taxi); assert.equal(calls.at(-1)[4], h.ctx.taxi.routeYs);
   assert.equal(h.get('nav-hud').style.display, 'none'); assert.equal(h.ctx.nav.t, 0);
@@ -178,7 +185,7 @@ await test('同時有手動目的地時，街頭與計程車路線依任務優�
 
 await test('手動導航同平面才抵達，高架錯層不會清除路線', async () => {
   const h = context({ nav: { x: 0, z: 0, y: 1, nm: '地面目的地', path: [[0, 0], [1, 0]], ys: [0.5, 0.5], t: 0 },
-    navArrows: { update() {} }, router: {}, routeRemaining: () => 0, sameRoadLevel: (a, b) => Math.abs(a.y - b.y) <= 2, ROAD_Y: 0.5 });
+    navArrows: { update() {} }, router: { route: () => ({ path: [[0, 0], [1, 0]], ys: [0.5, 0.5] }) }, routeRemaining: () => 0, routeDeviation: realMission.routeDeviation, sameRoadLevel: (a, b) => Math.abs(a.y - b.y) <= 2, ROAD_Y: 0.5 });
   h.load('updateNav'); h.ctx.updateNav(0.1); assert.ok(h.ctx.nav); h.ctx.fcar.y = 1; h.ctx.updateNav(0.1); assert.equal(h.ctx.nav, null);
 });
 
@@ -204,8 +211,8 @@ await test('使用車款立即切換既有車損，街頭賽暫態車損不污�
   vm.runInContext(`var useCar = ${current.click('car-use')};`, h.ctx); h.ctx.useCar();
   assert.equal(damage.value, 0.2); assert.equal(h.ctx.chosen.id, 'police'); assert.equal(h.ctx.save.damage.sedan, 0.8); assert.deepEqual(h.events.slice(0, 2), [['drift', 'bank'], ['save']]);
   h.ctx.sr = { begin: () => h.events.push(['street-begin']), cancel() { this.active = null; }, active: {}, phase: 'race' };
-  h.ctx.taxi = { stop: () => h.events.push(['taxi-stop']) }; h.ctx.police = { hide: () => h.events.push(['police-hide']) }; h.ctx.updateOffer = () => {};
-  h.load('acceptChallenge', 'abandonStreetRace'); h.ctx.bigMsg = () => {}; h.ctx.sound = { beep() {} };
+  h.ctx.taxi = { abandon: () => h.events.push(['taxi-stop']), settledIds: [], money: 0, trips: 0 }; h.ctx.police = { hide: () => h.events.push(['police-hide']) }; h.ctx.updateOffer = () => {};
+  h.load('currentStreetOptions', 'abandonTaxi', 'acceptChallenge', 'abandonStreetRace'); h.ctx.bigMsg = () => {}; h.ctx.sound = { beep() {} };
   h.ctx.acceptChallenge({}); assert.equal(h.ctx.nav, null); assert.equal(damage.value, 0); damage.value = 0.9;
   assert.equal(damage.snapshot().__street__, undefined); assert.equal(damage.snapshot().police, 0.2);
   h.ctx.abandonStreetRace(); assert.equal(damage.value, 0.2); assert.equal(damage.valueFor('sedan'), 0.8);
@@ -223,14 +230,31 @@ await test('購車即換車會結算甩尾、切換車損後才扣款保存；�
   const count = h.events.length; h.ctx.buyCar(); assert.equal(h.events.length, count); assert.equal(h.ctx.save.taxi.money, 1000);
 });
 
-await test('計程車入口結束街頭／警察任務，以目前車損倍率開始同層行程', async () => {
-  const h = context({ damage: isolatedDamage(), userStart: async () => {}, field: { hide() {} }, hideMenu() {},
-    sr: { phase: 'race', active: {}, cancel: () => h.events.push(['street-cancel']) }, police: { hide: () => h.events.push(['police-hide']) },
-    beginFree: () => h.events.push(['begin-free']), taxi: { phase: 'off', setCondition: (n) => h.events.push(['condition', n]), start: (...v) => h.events.push(['taxi-start', ...v]) } });
+await test('計程車先看訂單不開車；點選後結束街頭／警察，以目前車損倍率開始同層行程', async () => {
+  const order = { id: 'ui-order', from: '起點', to: '目的地', pickupDistance: 0, distance: 1000, timeLimit: 120, estimatedFare: 85,
+    pickup: { x: 0, z: 0, y: 10 }, destination: { x: 1000, z: 0, y: 10 } };
+  const t = { phase: 'off', money: 1000, trips: 0, settledIds: [],
+    setCondition: (n) => h.events.push(['condition', n]), previewOrders: (...v) => { h.events.push(['preview', ...v]); return [order]; },
+    acceptOrder: (...v) => { h.events.push(['taxi-start', ...v]); t.phase = 'seek'; return true; }, checkpoint: () => ({ id: order.id }) };
+  const h = context({ damage: isolatedDamage(), userStart: async () => {}, ensureStreetSystems: async () => true,
+    field: { hide() {} }, hideMenu() {}, clock: { getDelta: () => h.events.push(['resume-free']) },
+    save: { freePos: { x: 0, z: 0, y: 10, h: 0 } }, validFreePos: (p) => !!p, pausedFrom: 'free',
+    pause() { h.events.push(['pause']); h.ctx.state = 'paused'; }, menu: fakeElement(), writeSave() {},
+    sr: { phase: 'race', active: {}, cancel() { h.events.push(['street-cancel']); this.active = null; } },
+    police: { hide: () => h.events.push(['police-hide']) }, taxi: t });
+  h.load('renderTaxiOrders', 'checkpointTaxi');
   vm.runInContext(`var startTaxi = ${current.click('btn-taxi')};`, h.ctx); await h.ctx.startTaxi();
-  assert.equal(h.ctx.nav, null); assert.ok(h.events.some((e) => e[0] === 'street-cancel')); assert.ok(h.events.some((e) => e[0] === 'police-hide'));
-  assert.ok(Math.abs(h.events.find((e) => e[0] === 'condition')[1] - 0.9) < 1e-12); assert.deepEqual(h.events.find((e) => e[0] === 'taxi-start'), ['taxi-start', 0, 0, 10]);
-  assert.ok(h.events.findIndex((e) => e[0] === 'street-cancel') < h.events.findIndex((e) => e[0] === 'taxi-start'));
+  assert.equal(t.phase, 'off'); assert.equal(h.ctx.state, 'paused'); assert.equal(h.ctx.nav.nm, '手動目的地');
+  assert.equal(h.events.some((e) => e[0] === 'taxi-start' || e[0] === 'street-cancel' || e[0] === 'police-hide'), false);
+  assert.equal(h.get('taxi-order-page').classList.contains('hidden'), false);
+  assert.ok(Math.abs(h.events.find((e) => e[0] === 'condition')[1] - 0.9) < 1e-12);
+  assert.deepEqual(h.events.find((e) => e[0] === 'preview'), ['preview', 0, 0, 10]);
+  await h.get('taxi-orders').children[0].click();
+  assert.equal(h.ctx.nav, null); assert.equal(t.phase, 'seek'); assert.equal(h.ctx.state, 'free');
+  assert.ok(h.events.some((e) => e[0] === 'street-cancel')); assert.ok(h.events.some((e) => e[0] === 'police-hide'));
+  assert.deepEqual(h.events.find((e) => e[0] === 'taxi-start'), ['taxi-start', 'ui-order', 0, 0, 10, false]);
+  assert.ok(h.events.findIndex((e) => e[0] === 'street-cancel') < h.events.findIndex((e) => e[0] === 'resume-free'));
+  assert.ok(h.events.findIndex((e) => e[0] === 'police-hide') < h.events.findIndex((e) => e[0] === 'resume-free'));
 });
 
 const failed = report.cases.filter((c) => c.status === 'FAIL'); report.summary = { passed: report.cases.length - failed.length, failed: failed.length };

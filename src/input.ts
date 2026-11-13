@@ -1,6 +1,14 @@
 // 操作：手機（左下 ◀ ▶ 按鈕或拖曳滑桿轉向 / 右下油門、煞車 / 可選傾斜轉向），電腦（方向鍵、WASD、空白鍵）
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+const TILT_MAX_AGE_MS = 1500;
+export interface TiltState {
+  status: 'unsupported' | 'denied' | 'waiting' | 'ready' | 'invalid' | 'stale';
+  raw: number | null;
+  ageMs: number | null;
+  canCalibrate: boolean;
+  message: string;
+}
 
 export class Input {
   /** main 接上駕駛狀態；選單、地圖或教學覆蓋層不攔截鍵盤。 */
@@ -24,6 +32,9 @@ export class Input {
   private driftIds = new Set<number>();
   private keys = new Set<string>();
   private tiltSteer = 0;
+  private tiltAt: number | null = null;
+  private tiltPermission: 'unknown' | 'waiting' | 'denied' | 'unsupported' = 'unknown';
+  private tiltInvalid = false;
 
   constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement, leftBtn: HTMLElement, rightBtn: HTMLElement, driftBtn?: HTMLElement) {
     // 按住型的按鈕：多指同時按也不會互相干擾（每根手指各自記 pointerId）
@@ -110,7 +121,7 @@ export class Input {
     const reset = () => {
       this.keys.clear();
       for (const ids of [this.brakeIds, this.gasIds, this.leftIds, this.rightIds, this.driftIds]) ids.clear();
-      this.padId = -1; this.padSteer = 0; this.tiltSteer = 0;
+      this.padId = -1; this.padSteer = 0; this.tiltSteer = 0; this.tiltAt = null; this.tiltInvalid = false;
       dot.style.transform = '';
       for (const btn of [brakeBtn, gasBtn, leftBtn, rightBtn, driftBtn]) btn?.classList.remove('on');
     };
@@ -123,10 +134,13 @@ export class Input {
     // 方向在不同手機上可能相反：設定裡可以「反轉」；握的姿勢不一定剛好水平：可以「校正」把現在的角度當成直走
     addEventListener('deviceorientation', (e) => {
       const angle = screen.orientation?.angle ?? 0;
-      const beta = e.beta ?? 0, gamma = e.gamma ?? 0;
-      let s = gamma;
-      if (angle === 90) s = beta;
-      else if (angle === 270 || angle === -90) s = -beta;
+      const axis = angle === 90 || angle === 270 || angle === -90 ? e.beta : e.gamma;
+      if (document.hidden || typeof axis !== 'number' || !Number.isFinite(axis) || Math.abs(axis) > 180) {
+        this.tiltAt = null; this.tiltSteer = 0; this.tiltInvalid = true;
+        return;
+      }
+      const s = angle === 270 || angle === -90 ? -axis : axis;
+      this.tiltAt = performance.now(); this.tiltInvalid = false;
       this.tiltRaw = s;
       let a = s - this.tiltZero;
       // 死區：小於 tiltDead 度不轉；超過的部分從 0 開始算（不會一出死區就跳一下）
@@ -137,12 +151,43 @@ export class Input {
 
   /** iOS 要在使用者點擊時才能要求陀螺儀權限 */
   async enableTilt(): Promise<boolean> {
-    if (!('DeviceOrientationEvent' in window)) return false;
+    if (!('DeviceOrientationEvent' in window)) { this.tiltPermission = 'unsupported'; return false; }
     const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
+    this.tiltPermission = 'waiting';
     if (typeof DOE.requestPermission === 'function') {
-      try { return (await DOE.requestPermission()) === 'granted'; } catch { return false; }
+      try {
+        const granted = (await DOE.requestPermission()) === 'granted';
+        if (!granted) { this.tiltPermission = 'denied'; this.tiltAt = null; this.tiltSteer = 0; }
+        return granted;
+      } catch { this.tiltPermission = 'denied'; this.tiltAt = null; this.tiltSteer = 0; return false; }
     }
-    return 'DeviceOrientationEvent' in window;
+    return true;
+  }
+
+  private tiltStatus(now: number): TiltState['status'] {
+    return this.tiltPermission === 'unsupported' || this.tiltPermission === 'denied'
+      ? this.tiltPermission : this.tiltInvalid ? 'invalid' : this.tiltAt === null ? 'waiting'
+      : now - this.tiltAt > TILT_MAX_AGE_MS ? 'stale' : 'ready';
+  }
+  getTiltState(now = performance.now()): TiltState {
+    const ageMs = this.tiltAt === null ? null : Math.max(0, now - this.tiltAt);
+    const status = this.tiltStatus(now);
+    const messages: Record<TiltState['status'], string> = {
+      unsupported: '此裝置未提供傾斜感測，請使用按鈕或拖曳轉向。',
+      denied: '傾斜權限未開啟，請在瀏覽器允許動作感測後重試。',
+      waiting: '等待有效感測資料，請輕轉手機。等待期間方向會回正。',
+      invalid: '感測資料無效，已回正。請輕轉手機，或改用按鈕轉向。',
+      stale: '感測資料已逾時，已回正。請輕轉手機重新確認。',
+      ready: `感測正常：${this.tiltRaw.toFixed(1)}°；中立 ${this.tiltZero.toFixed(1)}°。`,
+    };
+    return { status, raw: status === 'ready' ? this.tiltRaw : null, ageMs, canCalibrate: status === 'ready' && Math.abs(this.tiltRaw) <= 90, message: messages[status] };
+  }
+
+  calibrateTilt(): { ok: true; zero: number } | { ok: false; error: string } {
+    const state = this.getTiltState();
+    if (!state.canCalibrate) return { ok: false, error: state.status === 'ready' ? '請將手機回到自然握姿再校正。' : state.message };
+    this.tiltZero = Math.round(this.tiltRaw); this.tiltSteer = 0;
+    return { ok: true, zero: this.tiltZero };
   }
 
   read() {
@@ -153,7 +198,7 @@ export class Input {
     if (k.has('ArrowRight') || k.has('KeyD')) steer += 1;
     if (this.padId >= 0) steer = this.padSteer;
     else if (this.leftIds.size || this.rightIds.size) steer = (this.rightIds.size ? 1 : 0) - (this.leftIds.size ? 1 : 0);
-    else if (this.tilt && steer === 0) steer = this.tiltSteer;
+    else if (this.tilt && steer === 0) steer = this.tiltStatus(performance.now()) === 'ready' ? this.tiltSteer : 0;
     const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
     const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
     if (this.curve === 'gentle') steer = Math.sign(steer) * Math.abs(steer) ** 1.6;
