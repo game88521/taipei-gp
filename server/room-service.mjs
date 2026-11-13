@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
-import { Car, buildTrack } from './physics.mjs';
-import { PROTOCOL_VERSION, PHYSICS_VERSION, TRACK_STAMP } from '../shared/multiplayer-protocol.ts';
+import { readFileSync } from 'node:fs';
+import { Car, buildMultiplayerTrackGeometry, getMultiplayerTrack, verifyMultiplayerTrackData, DEFAULT_MULTIPLAYER_TRACK_ID } from './physics.mjs';
+import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
 
 export const TICK_MS = 1000 / 60;
 export const SNAPSHOT_MS = 1000 / 20;
@@ -17,6 +18,8 @@ const ERRORS = {
   NOT_IN_ROOM: '請先建立或加入房間。', HOST_ONLY: '只有房主能進行這項操作。',
   NOT_READY: '至少兩名車手，而且所有人都要連線並準備完成。', INVALID_PHASE: '目前無法進行這項操作。',
   STALE_MATCH: '這是上一場比賽的操作，已忽略。', RATE_LIMIT: '操作過於頻繁，請稍後再試。',
+  INVALID_TRACK: '不支援這張連線賽道。', STALE_TRACK: '房間賽道已變更，請等待新賽道載入。',
+  TRACK_UNAVAILABLE: '這張賽道暫時無法載入，請稍後重試。',
 };
 
 function validName(value) {
@@ -35,7 +38,7 @@ function equalToken(a, b) {
 export class RoomService {
   constructor(options = {}) {
     this.now = options.now ?? Date.now;
-    this.track = buildTrack();
+    this.trackCache = new Map();
     this.rooms = new Map();
     this.clients = new Set();
     this.bySocket = new WeakMap();
@@ -83,7 +86,28 @@ export class RoomService {
   }
 
   compatible(message) {
-    return message.version === PROTOCOL_VERSION && message.physics === PHYSICS_VERSION && message.trackStamp === TRACK_STAMP;
+    return message.version === PROTOCOL_VERSION && message.physics === PHYSICS_VERSION && message.catalogStamp === CATALOG_STAMP;
+  }
+
+  trackFor(id) {
+    const descriptor = getMultiplayerTrack(id);
+    if (!descriptor) return null;
+    let cached = this.trackCache.get(id);
+    if (!cached) {
+      const source = descriptor.circuit ? `../public/data/circuits/${id}.json` : '../src/data/track.json';
+      const data = JSON.parse(readFileSync(new URL(source, import.meta.url), 'utf8'));
+      verifyMultiplayerTrackData(descriptor, data);
+      cached = Object.freeze(buildMultiplayerTrackGeometry(descriptor, data));
+      this.trackCache.set(id, cached);
+    }
+    // Each room owns its arrays. Cached geometry is never passed to Car.update.
+    const track = Object.freeze(Object.fromEntries(Object.entries(cached).map(([key, value]) => [key, ArrayBuffer.isView(value) ? value.slice() : value])));
+    return { descriptor, track };
+  }
+
+  currentSelection(room, message, stamp = false) {
+    return Number.isSafeInteger(message.trackRevision) && message.trackRevision === room.trackRevision
+      && (!stamp || message.trackStamp === room.trackStamp);
   }
 
   receive(client, message) {
@@ -108,9 +132,13 @@ export class RoomService {
       if (message.type === 'create') {
         if (![1, 3, 5].includes(message.laps)) return this.fail(client, 'BAD_MESSAGE', message);
         if (this.rooms.size >= this.maxRooms) return this.fail(client, 'SERVER_FULL', message);
+        const trackId = message.trackId ?? DEFAULT_MULTIPLAYER_TRACK_ID;
+        if (typeof trackId !== 'string' || !getMultiplayerTrack(trackId)) return this.fail(client, 'INVALID_TRACK', message);
+        let selected; try { selected = this.trackFor(trackId); } catch { return this.fail(client, 'TRACK_UNAVAILABLE', message); }
         let code;
         do { code = Array.from({ length: 6 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join(''); } while (this.rooms.has(code));
         const room = { code, hostId: '', phase: 'lobby', matchId: null, startAt: null, laps: message.laps,
+          trackId, trackStamp: selected.descriptor.trackStamp, trackRevision: 1, track: selected.track,
           players: new Map(), createdAt: now, updatedAt: now, emptySince: null, simAt: null,
           lastSnapshotAt: now, firstFinishAt: null };
         this.rooms.set(code, room); this.addPlayer(client, room, name, message, now); return;
@@ -127,17 +155,35 @@ export class RoomService {
     if (!room || !player) return this.fail(client, 'NOT_IN_ROOM', message);
     switch (message.type) {
       case 'leave': this.leave(client, now); this.send(client, { type: 'left' }); return;
+      case 'select-track': {
+        if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
+        if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
+        if (!Number.isSafeInteger(message.expectedRevision) || message.expectedRevision !== room.trackRevision) return this.fail(client, 'STALE_TRACK', message);
+        if (typeof message.trackId !== 'string' || !getMultiplayerTrack(message.trackId)) return this.fail(client, 'INVALID_TRACK', message);
+        if (message.trackId === room.trackId) { this.broadcast(room, 'room', now); return; }
+        let selected; try { selected = this.trackFor(message.trackId); } catch { return this.fail(client, 'TRACK_UNAVAILABLE', message); }
+        room.trackId = message.trackId; room.trackStamp = selected.descriptor.trackStamp; room.track = selected.track; room.trackRevision++;
+        room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now;
+        for (const p of room.players.values()) { this.resetPlayer(room, p, now); p.ready = false; p.loaded = false; }
+        this.broadcast(room, 'room', now); return;
+      }
+      case 'track-loaded':
+        if (!this.currentSelection(room, message, true) || message.trackId !== room.trackId) return this.fail(client, 'STALE_TRACK', message);
+        player.loaded = true; room.updatedAt = now; this.broadcast(room, 'room', now); return;
       case 'ready':
         if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
         if (typeof message.ready !== 'boolean') return this.fail(client, 'BAD_MESSAGE', message);
+        if (!this.currentSelection(room, message, true)) return this.fail(client, 'STALE_TRACK', message);
+        if (message.ready && !player.loaded) return this.fail(client, 'NOT_READY', message);
         player.ready = message.ready; room.updatedAt = now; this.broadcast(room, 'room', now); return;
       case 'start':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
         if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
-        if (room.players.size < 2 || [...room.players.values()].some((p) => !p.connected || !p.ready)) return this.fail(client, 'NOT_READY', message);
+        if (!this.currentSelection(room, message)) return this.fail(client, 'STALE_TRACK', message);
+        if (room.players.size < 2 || [...room.players.values()].some((p) => !p.connected || !p.loaded || !p.ready)) return this.fail(client, 'NOT_READY', message);
         room.phase = 'countdown'; room.matchId = randomUUID(); room.startAt = now + 3000; room.simAt = room.startAt;
         room.firstFinishAt = null; room.updatedAt = now;
-        for (const p of room.players.values()) this.resetPlayer(p, now);
+        for (const p of room.players.values()) this.resetPlayer(room, p, now);
         this.broadcast(room, 'room', now); return;
       case 'reset':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
@@ -146,7 +192,9 @@ export class RoomService {
         this.toLobby(room, now); return;
       case 'input':
         if (message.matchId !== room.matchId || typeof message.matchId !== 'string') return this.fail(client, 'STALE_MATCH', message);
+        if (!this.currentSelection(room, message)) return this.fail(client, 'STALE_TRACK', message);
         if (room.phase !== 'racing' && room.phase !== 'countdown') return;
+        if (!player.loaded) return this.fail(client, 'NOT_READY', message);
         if (!Number.isSafeInteger(message.seq) || message.seq < 0 || message.seq > MAX_SEQUENCE || typeof message.steer !== 'number' || !Number.isFinite(message.steer) || Math.abs(message.steer) > 1 || typeof message.brake !== 'boolean') return this.fail(client, 'BAD_MESSAGE', message);
         if (message.seq <= player.receivedSeq || player.dnf || player.finishMs !== null) return;
         player.receivedSeq = message.seq; player.input = { steer: message.steer, brake: message.brake }; player.lastInputAt = now; return;
@@ -154,11 +202,12 @@ export class RoomService {
     }
   }
 
-  newCar(slot) {
-    const car = new Car(); car.resetTransient(false); car.placeAt(this.track, 0);
+  newCar(room, slot) {
+    const track = room.track;
+    const car = new Car(); car.resetTransient(false); car.placeAt(track, 0);
     // All players start at the same longitudinal point. Cars do not collide.
     const lat = [-3, -1, 1, 3][slot];
-    car.x += -this.track.tz[0] * lat; car.z += this.track.tx[0] * lat; car.pos.lat = lat;
+    car.x += -track.tz[0] * lat; car.z += track.tx[0] * lat; car.pos.lat = lat;
     return car;
   }
 
@@ -166,8 +215,8 @@ export class RoomService {
     const used = new Set([...room.players.values()].map((p) => p.slot));
     const slot = [0, 1, 2, 3].find((n) => !used.has(n));
     const player = { id: randomUUID(), token: randomBytes(32).toString('hex'), name, slot,
-      color: COLORS[slot], ready: false, connected: true, client, disconnectedAt: null, expired: false,
-      car: this.newCar(slot), ackSeq: -1, receivedSeq: -1, input: { steer: 0, brake: true }, lastInputAt: now,
+      color: COLORS[slot], ready: false, loaded: false, connected: true, client, disconnectedAt: null, expired: false,
+      car: this.newCar(room, slot), ackSeq: -1, receivedSeq: -1, input: { steer: 0, brake: true }, lastInputAt: now,
       completedLaps: 0, distance: 0, nextGate: 1, finishMs: null, dnf: false, joinedAt: now };
     client.room = room; client.player = player; room.players.set(player.id, player);
     room.hostId ||= player.id; room.updatedAt = now; room.emptySince = null;
@@ -196,22 +245,22 @@ export class RoomService {
     if (previous && previous !== client) {
       previous.room = null; previous.player = null; this.send(previous, { type: 'left' }); previous.ws.close(1000, 'Session resumed');
     }
-    player.client = client; player.connected = true; player.disconnectedAt = null;
+    player.client = client; player.connected = true; player.disconnectedAt = null; player.loaded = false; player.ready = false;
     player.input = { steer: 0, brake: true }; player.lastInputAt = now; player.receivedSeq = player.ackSeq;
     client.room = room; client.player = player; room.emptySince = null; room.updatedAt = now;
     if (!room.players.get(room.hostId)?.connected) room.hostId = player.id;
     this.welcome(client, request, now); this.broadcast(room, 'room', now);
   }
 
-  resetPlayer(player, now) {
-    player.car = this.newCar(player.slot); player.ackSeq = -1; player.receivedSeq = -1; player.input = { steer: 0, brake: true };
+  resetPlayer(room, player, now) {
+    player.car = this.newCar(room, player.slot); player.ackSeq = -1; player.receivedSeq = -1; player.input = { steer: 0, brake: true };
     player.lastInputAt = now; player.completedLaps = 0; player.distance = 0; player.nextGate = 1;
     player.finishMs = null; player.dnf = false;
   }
 
   toLobby(room, now) {
     room.phase = 'lobby'; room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now;
-    for (const player of room.players.values()) { this.resetPlayer(player, now); player.ready = false; }
+    for (const player of room.players.values()) { this.resetPlayer(room, player, now); player.ready = false; }
     this.electHost(room); this.broadcast(room, 'room', now);
   }
 
@@ -225,7 +274,7 @@ export class RoomService {
     const room = client.room, player = client.player;
     client.room = null; client.player = null;
     if (!room || !player || player.client !== client) return;
-    const now = this.now(); player.client = null; player.connected = false; player.ready = false;
+    const now = this.now(); player.client = null; player.connected = false; player.ready = false; player.loaded = false;
     player.disconnectedAt = now; player.input = { steer: 0, brake: true }; player.lastInputAt = now;
     this.electHost(room); room.updatedAt = now;
     if (![...room.players.values()].some((p) => p.connected)) room.emptySince ??= now;
@@ -237,7 +286,7 @@ export class RoomService {
     const room = client.room, player = client.player;
     client.room = null; client.player = null;
     if (!room || !player) return;
-    player.client = null; player.connected = false; player.token = null; player.expired = true;
+    player.client = null; player.connected = false; player.loaded = false; player.token = null; player.expired = true;
     player.disconnectedAt = now; player.dnf = player.finishMs === null; player.input = { steer: 0, brake: true };
     if (room.phase === 'lobby' || room.phase === 'countdown') room.players.delete(player.id);
     this.electHost(room); room.updatedAt = now;
@@ -265,12 +314,12 @@ export class RoomService {
   }
 
   simulate(room, at) {
-    const length = this.track.length;
+    const track = room.track, length = track.length;
     for (const player of room.players.values()) {
       if (player.dnf || player.finishMs !== null) continue;
       const previous = player.car.pos.s;
       const stale = !player.connected || at - player.lastInputAt > 700;
-      player.car.update(1 / 60, this.track, stale ? 0 : player.input.steer, stale || player.input.brake);
+      player.car.update(1 / 60, track, stale ? 0 : player.input.steer, stale || player.input.brake);
       player.ackSeq = player.receivedSeq;
       let delta = player.car.pos.s - previous;
       if (delta > length / 2) delta -= length;
@@ -326,12 +375,13 @@ export class RoomService {
       }
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
       return b.distance - a.distance || a.slot - b.slot;
-    }).map((p, index) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready, connected: p.connected,
+    }).map((p, index) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready, loaded: p.loaded, connected: p.connected,
       car: p.car.snapshot(), ackSeq: p.ackSeq, completedLaps: p.completedLaps, progress: Math.max(0, p.distance),
       finishMs: p.finishMs === null ? null : Math.round(p.finishMs * 1000) / 1000, dnf: p.dnf, rank: index + 1 }));
-    return { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, trackStamp: TRACK_STAMP,
+    return { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP,
+      trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision,
       code: room.code, hostId: room.hostId, phase: room.phase, matchId: room.matchId, startAt: room.startAt,
-      laps: room.laps, serverTime: now, trackLength: this.track.length, players };
+      laps: room.laps, serverTime: now, trackLength: room.track.length, players };
   }
 
   broadcast(room, type, now = this.now()) {

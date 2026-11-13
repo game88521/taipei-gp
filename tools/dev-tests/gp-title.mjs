@@ -9,7 +9,9 @@ const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.se
 await new Promise(r => ws.onopen = r);
 await send('Runtime.enable');
 const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true })).result.result?.value;
-await send('Page.navigate', { url: 'http://127.0.0.1:4317/?' + url });
+const origin = process.env.GP_TEST_ORIGIN ?? 'http://127.0.0.1:4317';
+if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(origin)) throw new Error('固定回歸只允許本機 HTTP origin');
+await send('Page.navigate', { url: origin + '/?' + url });
 let t = '';
 for (let k = 0; k < +tmo; k++) { await new Promise(r => setTimeout(r, 1000)); t = await ev('document.title'); if (t && t.startsWith(prefix)) break; }
 console.log(t); console.log('aiHits', await ev('window.__gp?.field?.aiHits'));

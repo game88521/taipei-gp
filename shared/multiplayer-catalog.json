@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "recipeVersion": "classic-gp-geometry-v1",
+  "recipeHash": "c2e050883abb6f7b28a549c9dbffb957a53d144a0befa9700e85562dab93e5aa",
+  "recipeSources": {
+    "shared/multiplayer-track-recipe.ts": "39c4dadb91f2b84b652e32b198194b0d7daeeb066f8e13eacabb193b0958e3c6",
+    "shared/multiplayer-track-fingerprint.ts": "25c95743417becd4e907db6dd6a2d5630f5870722089a8c75ca9ce6d83023cb5",
+    "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+    "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd"
+  },
+  "catalogStamp": "catalog-v2:c6b17e2cc2291b1415b700d0930e89e3b5f8ffa7710b4481a00439643f6f228c",
+  "tracks": [
+    {
+      "id": "taipei",
+      "name": "台北信義街道賽",
+      "place": "台灣 台北",
+      "flag": "🇹🇼",
+      "trackStamp": "track-v2:4afa6a90dd5165378e9c4d500d025da907fbd01aec5114bb55caae5871ac52a3",
+      "dataSha256": "a8a0e919091346370ee7462af26d1b9960812cf7e5cbe0a0cd50f68eab943aca",
+      "metaSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "source": "src/data/track.json",
+      "fileSha256": "0b05d7ff3338a9e02abfd8b2ab9e34f1bdf939b1058a0a49d9f10dd077ea2297"
+    },
+    {
+      "id": "australia",
+      "name": "Albert Park",
+      "place": "澳洲 墨爾本",
+      "flag": "🇦🇺",
+      "trackStamp": "track-v2:76061dd37eef78bfab607c262366b1f08db9221d42ba8785b3f98cbdb1c53fbd",
+      "dataSha256": "44e5980272be4d138867ff1b03e6a69cfec40f688fbd4d1c65b92d4657d8cc1a",
+      "metaSha256": "a8258395894feb6726fcd6a409ccb8660542f9b9e267355c22f305f97276e908",
+      "source": "public/data/circuits/australia.json",
+      "fileSha256": "4b2e78aeccc71004ea50e52e915f943d55784a47adbc84bad24ac632ae5fcb31"
+    },
+    {
+      "id": "china",
+      "name": "上海國際賽車場",
+      "place": "中國 上海",
+      "flag": "🇨🇳",
+      "trackStamp": "track-v2:8d45bd817833f7781f6e5ad5bbb965339f9d2ac3654133d05fc6d879929a5baf",
+      "dataSha256": "55c3c6c0418135f56083be4c95306c411d2ff58b5d2c70e238010356e68d45da",
+      "metaSha256": "a9350aa8020f89ee9af671412b069d62982b7b89f408819767572c6ed388f631",
+      "source": "public/data/circuits/china.json",
+      "fileSha256": "b3408ca779b09cb26ab9b93dce404e6b9cb1c4f33dbfb0d6fcd107b7a60be6c7"
+    },
+    {
+      "id": "japan",
+      "name": "鈴鹿賽道",
+      "place": "日本 三重縣鈴鹿市",
+      "flag": "🇯🇵",
+      "trackStamp": "track-v2:562067c2b61c525329e5028757d183712248ec52a8dc87ee32f485180dfd33ed",
+      "dataSha256": "0ae4ff2ff586688a44c16419984a7222b9c50c9dac98cf506535d0d92d0d4b55",
+      "metaSha256": "23565d456b7a0351b900488494eddc83aa045b74f3cbe7ccf74f3769cb6abf6f",
+      "source": "public/data/circuits/japan.json",
+      "fileSha256": "fc9276fcb5f21f55aa7413b587df37ff11097713e667ccc52bc56debc3f5b36b"
+    },
+    {
+      "id": "miami",
+      "name": "Miami International Autodrome",
+      "place": "美國 邁阿密花園市",
+      "flag": "🇺🇸",
+      "trackStamp": "track-v2:bd9dba156b9101840c2d8121969b8089a1634d7e82d55ca17646f004b60afed9",
+      "dataSha256": "df1b7404b0161b4db95deb1c6265bc827d295b510e26e961122f23a11de4e84f",
+      "metaSha256": "14d45781e29fe860265cb30e2f5b177bd5eb506923aa4ede4223dcd8121119b6",
+      "source": "public/data/circuits/miami.json",
+      "fileSha256": "1bf4ef2fac6cb2ec9ac974069479e422168af2415684a485e86eba633ad203b9"
+    },
+    {
+      "id": "canada",
+      "name": "Gilles Villeneuve 賽道",
+      "place": "加拿大 蒙特婁",
+      "flag": "🇨🇦",
+      "trackStamp": "track-v2:0c76b6ea8e2552640e2fbb758d3627acb423d3ff85014f8a1924b538d3cf0035",
+      "dataSha256": "f4a6c80aa371e45a1d4029eee140bde4944d5ce678eed3f461ef09cdefe740d9",
+      "metaSha256": "ee245a09633d49d6af2cff94cbb470b2620e173ed1a48e4fdc2a8842663d5383",
+      "source": "public/data/circuits/canada.json",
+      "fileSha256": "9c6e99ec8acf619cb56308917522f6583fe49ad27d25ed711e4b3360cdc36545"
+    },
+    {
+      "id": "monaco",
+      "name": "摩納哥街道賽道",
+      "place": "摩納哥 蒙地卡羅",
+      "flag": "🇲🇨",
+      "trackStamp": "track-v2:0c98b0015702d6f8c05321915684163d0dce523e44e2d7bf502bec65e2fe3bb2",
+      "dataSha256": "4b7ebf0a77e3f0438781a743bb13cbfe9d47a6d29adec45fa01a3c3aced81bc8",
+      "metaSha256": "ab5d9d8f83e5916e8780c8311b19b932e6ec5fde09373c228c8d2f5aa6fc1ae5",
+      "source": "public/data/circuits/monaco.json",
+      "fileSha256": "af820fe429d938752d356b27f50f81ee8c95b0c64af2763fb5b1d20f0b69aae8"
+    },
+    {
+      "id": "barcelona",
+      "name": "巴塞隆納-加泰隆尼亞賽道",
+      "place": "西班牙 蒙梅洛",
+      "flag": "🇪🇸",
+      "trackStamp": "track-v2:952ffecda5bd55c082acbc5ad5b1ff0d30e4e9221dcdfbb7eefa48a770b6a244",
+      "dataSha256": "d32d4fc5a0a56a552b41dc87c538ac3913aa64b1f23d18ca762df87336a360d6",
+      "metaSha256": "897222bef4dc7d2f6861eedc6a403bdda150edd11de28eba7f1e4928f1694766",
+      "source": "public/data/circuits/barcelona.json",
+      "fileSha256": "50726f3ef12db7e58e202d404f0ddba485e0ef5b4c75e1325925d14ae0c09779"
+    },
+    {
+      "id": "austria",
+      "name": "史匹堡賽道",
+      "place": "奧地利 史匹堡",
+      "flag": "🇦🇹",
+      "trackStamp": "track-v2:5abec01895fae6734ea6b8c196061cb0a97a5b2854269ea893650e6dc0909070",
+      "dataSha256": "cd502483ac00f82d35b5bc432c0a19785516ee660f5fe4da17da1b98ebe0c6b7",
+      "metaSha256": "d32bc83e83db21d2c6ba82ab947c41cb4944704108461d6038196d55c953e228",
+      "source": "public/data/circuits/austria.json",
+      "fileSha256": "560c532f3400a6473170976e853bec67def5c6ce7d6e0ba434ddbddb5704c787"
+    },
+    {
+      "id": "britain",
+      "name": "銀石賽道",
+      "place": "英國 銀石",
+      "flag": "🇬🇧",
+      "trackStamp": "track-v2:53ff8f19342996f364afce8e4d4ce9e4c3cf3a3498499bebe1dc483d4d3b5e6a",
+      "dataSha256": "55ff9eaf20e413ca2afaeec823466eed36d560a302563f557ae5fec42d450d59",
+      "metaSha256": "fb347290069153f13b9fc8b2b7ddebd0b41ba7ea6111fc3a74e94931e53c92da",
+      "source": "public/data/circuits/britain.json",
+      "fileSha256": "346eb8624d2567b93b4c6552c9bb42a688b4bda2be535e11132f22042473918f"
+    },
+    {
+      "id": "belgium",
+      "name": "斯帕-法蘭柯香賽道",
+      "place": "比利時 斯塔沃",
+      "flag": "🇧🇪",
+      "trackStamp": "track-v2:291abe9afffc557dcf6914af466c830d116777c5390ac108f486b5b521539eb1",
+      "dataSha256": "ba13c5755bdfe07580c833e3f9031e22d55c2535fa89757d013967e3c9b82672",
+      "metaSha256": "e0724ff2dd09154f89e1dbd1781f4b46d7febc6f5c7642fa73916db4fde9f351",
+      "source": "public/data/circuits/belgium.json",
+      "fileSha256": "887512926a6066c1617a99974d343a65762e16eaaf0812b10c0c7ead2ad1de95"
+    },
+    {
+      "id": "hungary",
+      "name": "Hungaroring",
+      "place": "匈牙利 莫焦羅德",
+      "flag": "🇭🇺",
+      "trackStamp": "track-v2:93e0a140a278d34a5ac935713632b7a44efb6d49cb55b8719dd95cb5e945fc7f",
+      "dataSha256": "3734b1797ed97ba0b8612f1685e84bfc18d99a0dea32a663f7d78bd4ca245a47",
+      "metaSha256": "7ecdbcce7f90595acc851050d5e98c8b698b1088553fae893a33ad3cb9580b5d",
+      "source": "public/data/circuits/hungary.json",
+      "fileSha256": "035ec93fde8784eb2e0cae8653e8d54c74b59b8dd72d3fd304ceb134d15f3dbf"
+    },
+    {
+      "id": "netherlands",
+      "name": "贊德沃特賽道",
+      "place": "荷蘭 贊德沃特",
+      "flag": "🇳🇱",
+      "trackStamp": "track-v2:2fd61a79a7a85f442c509afff81f58fa3199cd203ed2a32d14f775626aacf279",
+      "dataSha256": "50ee3336004d318f1b18051f3000d5950d46d006beb8d40f1d23ed758921143c",
+      "metaSha256": "a0a79fdd93008ca55dc362b4e23010bad3c0183a9512afe978312df0d664a098",
+      "source": "public/data/circuits/netherlands.json",
+      "fileSha256": "c3dd48a284a77415cfb8633ddc9cace9b7f4fe09ad424378debc12c69db215ea"
+    },
+    {
+      "id": "italy",
+      "name": "蒙札賽道",
+      "place": "義大利 蒙札",
+      "flag": "🇮🇹",
+      "trackStamp": "track-v2:f7f6f8d5d101d57726a881110c0dcadb0b0aa3f4c48b62bd9b19fc6425ce609d",
+      "dataSha256": "ae678f64ad07d69c6bc6f32fab55b62c56da63e2f3f0d57aa52cac6963691493",
+      "metaSha256": "0af0bb42b05b7bafb8593e1576a5504513c78427163fba422a69543b58c6889d",
+      "source": "public/data/circuits/italy.json",
+      "fileSha256": "f3b009f27f01d713c60ed2582d810621063c2509655800ddd29dbff6edc8ce4d"
+    },
+    {
+      "id": "madrid",
+      "name": "Madring",
+      "place": "西班牙 馬德里",
+      "flag": "🇪🇸",
+      "trackStamp": "track-v2:252262d8f92439b3d3562b7548e4521d2ce1c928862ee97661e63c3e2feffd23",
+      "dataSha256": "e91900c2e69ebdb1a8b67a33424a00bd285665c29e41d3a00fb92a9c2b0dcb0b",
+      "metaSha256": "61273898f86a826eef71f7d35ade2f1d46c00af843b7d20a3905f75171431037",
+      "source": "public/data/circuits/madrid.json",
+      "fileSha256": "6b6827f84958a0b05c0d794654ea9396bb136be52eff528639451d457d724f02"
+    },
+    {
+      "id": "azerbaijan",
+      "name": "巴庫街道賽道",
+      "place": "亞塞拜然 巴庫",
+      "flag": "🇦🇿",
+      "trackStamp": "track-v2:0bb7aeb02396a998d80e63d213b0b3adad481efaa76eb0ce6121c42383df44b4",
+      "dataSha256": "79c9a0fa5fe778651d9ebca40b45c7bcd62b1255c0c6bf664a996462667ee757",
+      "metaSha256": "8a2f700732f620fb882d1528e0a52799a60906d6003c4cbdadacae54198bc069",
+      "source": "public/data/circuits/azerbaijan.json",
+      "fileSha256": "3ad6c07952d31e5edbb59cec00882d2894fadf8f4f7cc9b5563e54d520c45a0b"
+    },
+    {
+      "id": "malaysia",
+      "name": "雪邦國際賽車場",
+      "place": "馬來西亞 雪邦",
+      "flag": "🇲🇾",
+      "trackStamp": "track-v2:acdeb6c58832a0f74ea4a6c8bb32d43f08fcfd716358b88bbe0367805cefcd00",
+      "dataSha256": "2b49fc6ae33bbb98a608dc03d9dc63f7cedbbbbe8e54cd29fcba3e589e382ed7",
+      "metaSha256": "7806005ee8e4713639e9b39ba3379570fa99a9b76eb7a0f8dcb20f73a2acf6b8",
+      "source": "public/data/circuits/malaysia.json",
+      "fileSha256": "4fbfcfa444095cf7bd6bbdfda9afbffa608e33242ce6795984d29cb32da17a43"
+    },
+    {
+      "id": "singapore",
+      "name": "濱海灣街道賽道",
+      "place": "新加坡",
+      "flag": "🇸🇬",
+      "trackStamp": "track-v2:0a3dfc8c43a791fb95ea4a2003344e1c45107c73ada4b54e4185568e719fbd41",
+      "dataSha256": "cc1ab2d96deddf050e12dd362350d5e9691ff25915ac3d9ca014d5227a21a416",
+      "metaSha256": "2add871d587e78c76ffa86dba802528cdfbfde8b118003004530c18d879d9902",
+      "source": "public/data/circuits/singapore.json",
+      "fileSha256": "09874fc8442398fb4e8be8efb07f8dca550439d05d69981149f538bf4ea06a41"
+    },
+    {
+      "id": "usa",
+      "name": "美洲賽道 COTA",
+      "place": "美國 德州奧斯汀",
+      "flag": "🇺🇸",
+      "trackStamp": "track-v2:5c00a5cd1dbb14b8bc6cd018e723953513642754731ddb01de3000bce4176f1d",
+      "dataSha256": "250675e23ef9cea1ae43d2e5f862f8db0e8053cd67562c824997b85186a13e36",
+      "metaSha256": "196a704815aaaeeeab77cb8ff5b50195326dc3ca640ebd248032873947425afc",
+      "source": "public/data/circuits/usa.json",
+      "fileSha256": "99b70dc754fb0dfb702699c8152b44a3b2d02135c4a4bbd438c101427cbbed92"
+    },
+    {
+      "id": "mexico",
+      "name": "Hermanos Rodríguez",
+      "place": "墨西哥 墨西哥城",
+      "flag": "🇲🇽",
+      "trackStamp": "track-v2:c91c95f6fd368df7a3454098f520f8a590a163a696ade9bb84414563bec5f1be",
+      "dataSha256": "877017414c70c4df22721de418360c3fa2a3fb04591b0b77219f01151dd8b3d6",
+      "metaSha256": "bf1aa1afec81c184d464f2cfd0fe127f6a6afcddfc165c5d5d279353f0022300",
+      "source": "public/data/circuits/mexico.json",
+      "fileSha256": "d87451ff78709c827186511b93b79ffcf6e5dabe3a38a2772505b2433d7337ce"
+    },
+    {
+      "id": "brazil",
+      "name": "Interlagos",
+      "place": "巴西 聖保羅",
+      "flag": "🇧🇷",
+      "trackStamp": "track-v2:b54db7f3af6fe2909a2a29844140f8b0126ddca1337afb9c6c716486dc78db04",
+      "dataSha256": "48af08679fca33cde5f3e77405fb2e7ccba8a96393d6c3412a63cef44fa05f34",
+      "metaSha256": "9793d09b196c60123011e5dcf2dd22e48360bf715fd647cd400e700b2e6dd7e6",
+      "source": "public/data/circuits/brazil.json",
+      "fileSha256": "aa2b416590c387a5caf6f788b6a26b6cde766350cf6906ac394e06886302a4e3"
+    },
+    {
+      "id": "lasvegas",
+      "name": "拉斯維加斯街道賽道",
+      "place": "美國 拉斯維加斯",
+      "flag": "🇺🇸",
+      "trackStamp": "track-v2:861a3575872266ba397e1e8b56f669f1129f26b1b6c0caefb0099e20b9a27901",
+      "dataSha256": "e3df8e8945a5c452cde18f6bb53705d2853184d576038a433b0482c6d1bde4a7",
+      "metaSha256": "9c61c9922c7b8d5f7a05495236306a7b8cba4250ad443b47a7f15dbc5f1b9bb4",
+      "source": "public/data/circuits/lasvegas.json",
+      "fileSha256": "72abd969e732a5d8360c9d4c61723e012ea7e63742bd669ab35ffa67c1cc2abd"
+    },
+    {
+      "id": "qatar",
+      "name": "Lusail 國際賽車場",
+      "place": "卡達 盧賽爾",
+      "flag": "🇶🇦",
+      "trackStamp": "track-v2:057d2e6f56cc130968d34569c6319a1d76bd92c51103f59b3b6d978c0e7bed9c",
+      "dataSha256": "e255aac429cbbae3f687f09e26d05f78e730362af764cc5224830c9b96af5e74",
+      "metaSha256": "1fb114192b21412dceb47d39d12ed884e734f4abd814c34e7118e5c73a9f68e2",
+      "source": "public/data/circuits/qatar.json",
+      "fileSha256": "1df63b97ac96b3b25776a4b8704b4f311e18873ca9dcbc3a867117355ed496dc"
+    },
+    {
+      "id": "abudhabi",
+      "name": "Yas Marina",
+      "place": "阿聯 阿布達比",
+      "flag": "🇦🇪",
+      "trackStamp": "track-v2:e8157fb98779350048d4509b62be871f856d2b04c4bb881f0272f6383a6c81df",
+      "dataSha256": "5f45374b21f112d0b9be27ca9f904544f90a10223fcbd9d0cfedbf5ecf370054",
+      "metaSha256": "235ce74f56b649fbfe76175d43250195331b4b76bfee730b7738a08d2147329c",
+      "source": "public/data/circuits/abudhabi.json",
+      "fileSha256": "89f238ffeb513140073502291f9fbcdfc9aa3ced6189a58141aaef4c383b5885"
+    }
+  ]
+}

@@ -1,4 +1,6 @@
-# 私人房連線競速驗證（2026-11-13）
+# 私人房連線競速驗證（v1 歷史，2026-11-13）
+
+> 本檔保留 v1 原始證據；下方「未建立服務／未公開」只描述當時狀態。之後 Rex 已回報透過 Render／Vercel 成功對戰。本輪 24 圖 v2 結果見 [MULTIPLAYER_MAPS_VALIDATION.md](./MULTIPLAYER_MAPS_VALIDATION.md)，v2 尚未部署，不混用兩輪結果。
 
 build **c27a6eb50a74**，產品來源 SHA256 **79c25ed69d7cb0ad04e37b00070bd091d0826f599f8107ab62dccca305346bbe**。本機核心流程已驗證，同 Chrome 的兩個隔離玩家畫面通過，未部署外網服務。逐檔來源雜湊、測試完整摘要與證據檔雜湊見 [MULTIPLAYER_VALIDATION.json](./MULTIPLAYER_VALIDATION.json)。
 

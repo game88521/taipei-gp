@@ -8,7 +8,7 @@ import { Trains } from './trains';
 import { buildWater, buildMarket, buildLevee } from './riverside';
 import { canvasTex, SHADOW_PER_M, bakedShadowMaterial, blobTexture } from './world';
 import { TOWER_101, CITY_SIZE, type Track } from './track';
-import { stage, fetchJson } from './loading';
+import { stage as loadingStage, fetchJson } from './loading';
 
 // 真實台北：public/data/city.json 由 tools/build-city.mjs 從 OpenStreetMap 產生
 // 地圖資料 © OpenStreetMap contributors（ODbL）
@@ -242,10 +242,19 @@ export interface CityStream {
   readonly avgMs: number;
   tick(dt: number): void;
   update(x: number, z: number, r: number): void;
+  /** 停止串流與背景下載；場景的 GPU 資源由擁有者釋放。 */
+  dispose(): void;
 }
 
 /** opts.all：一次載入全部區塊、不卸載（自動測試是同步模擬，等不到背景載入）；cx, cz：開場先載入哪一帶 */
-export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: { all?: boolean; cx: number; cz: number }): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][]; collider: Collider; stream: CityStream; surface: Surface; tunnels: TunnelHits }> {
+export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: { all?: boolean; cx: number; cz: number; signal?: AbortSignal }): Promise<{ data: CityData; landmarks: Landmark[]; breakables: Breakables; raceHide: THREE.Object3D[]; cull: (x: number, z: number, r: number) => void; filler: Filler; elev: ElevatedHits; trains: Trains; marketSpots: [number, number][]; collider: Collider; stream: CityStream; surface: Surface; tunnels: TunnelHits }> {
+  let stopped = false, completed = false, tilePool: TilePool | null = null;
+  const stop = () => { stopped = true; tilePool?.dispose(); };
+  const checkActive = () => { if (stopped || opts.signal?.aborted) throw new DOMException('城市載入已取消。', 'AbortError'); };
+  const stage = async (label: string, fraction: number) => { checkActive(); await loadingStage(label, fraction); checkActive(); };
+  opts.signal?.addEventListener('abort', stop, { once: true });
+  try {
+  checkActive();
   // 依距離顯示：每個區塊記住中心點，離鏡頭太遠就整塊不畫（地圖變大後很重要）
   // 分四層：far = 整個可視距離（建築、屋頂）；mid = 一半多（樹冠）；near = 550 m 內（店面、招牌、地上影子、機車、樹幹）；
   // close = 300 m 內（路名牌：一支一個物件，離遠了也看不清字）。遠處的小東西在手機螢幕上只有幾個像素，卻一個就多一次繪製
@@ -263,7 +272,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     c.o.visible = inRange && !c.o.userData.off; // off = 街道賽時藏起來的
   };
   const breakables = new Breakables();
-  const data = decodeCity(await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4));
+  const data = decodeCity(await fetchJson<CityData>('/data/city.json', CITY_SIZE, '下載台北街景', 0.02, 0.4, { signal: opts.signal }));
   await stage('鋪地面與綠地', 0.42);
 
   // 賽道取樣點的格狀索引：查「離賽道多遠、賽道往哪走」
@@ -409,14 +418,21 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   type Cull = { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number };
   let sliceStart = performance.now(), budget = Infinity, busyMs = 0, built = 0; // busyMs：蓋區塊實際花掉的時間（不含等下一格）
   const slice = async () => {
+    checkActive();
     if (performance.now() - sliceStart < budget) return;
     busyMs += performance.now() - sliceStart;
-    await new Promise<void>((res) => requestAnimationFrame(() => res()));
+    await new Promise<void>((res) => {
+      let frameId = 0;
+      const finish = () => { cancelAnimationFrame(frameId); opts.signal?.removeEventListener('abort', finish); res(); };
+      opts.signal?.addEventListener('abort', finish, { once: true });
+      frameId = requestAnimationFrame(finish);
+    });
+    checkActive();
     sliceStart = performance.now();
   };
 
   // 區塊的計算（外牆、屋頂、招牌的頂點…）在背景執行緒做（tilegen.ts、tileworker.ts），這裡只建網格
-  const pool = new TilePool({
+  const pool = tilePool = new TilePool({
     roads: (() => {
       const o: number[] = [], NN = data.net.nodes;
       for (const w of data.net.ways) if (w.c <= 2) for (let k = 0; k + 1 < w.n.length; k++) o.push(NN[w.n[k] * 2], NN[w.n[k] * 2 + 1], NN[w.n[k + 1] * 2], NN[w.n[k + 1] * 2 + 1], w.w / 2);
@@ -546,11 +562,14 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   const tileUrl = (i: number) => `/data/tiles/${TI.list[i][0]}_${TI.list[i][1]}.json`;
   /** pre：已經先送去背景算的結果（開場、串流都會先送下一塊） */
   async function loadTile(i: number, pre?: Promise<GenOut>) {
+    checkActive();
     const out = await (pre ?? pool.run(tileUrl(i), i));
+    checkActive();
     if (loaded.has(i)) return;
     sliceStart = performance.now();
     const group = new THREE.Group();
     const { cull: cl, bb } = await buildTile(out, i, group, center(i));
+    checkActive();
     busyMs += performance.now() - sliceStart;
     built++;
     scene.add(group);
@@ -583,11 +602,11 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     stream.onRemove?.();
   }
   async function pump() {
-    if (busy) return;
+    if (busy || stopped) return;
     busy = true;
     try {
       let nextPre: { i: number; p: Promise<GenOut> } | null = null;
-      while (want.length) {
+      while (want.length && !stopped) {
         const i = want.shift()!;
         if (loaded.has(i)) continue;
         const p = nextPre?.i === i ? nextPre.p : pool.run(tileUrl(i), i);
@@ -595,7 +614,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
         const n = want.find((j) => !loaded.has(j));
         nextPre = n === undefined ? null : { i: n, p: pool.run(tileUrl(n), n) };
         nextPre?.p.catch(() => {}); // 沒用到（玩家轉向了）也不要變成未處理的錯誤
-        try { await loadTile(i, p); } catch (e) { console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
+        try { await loadTile(i, p); } catch (e) { if (stopped) break; console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
       }
     } finally { busy = false; }
   }
@@ -613,6 +632,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     get avgMs() { return built ? busyMs / built : 0; }, // 測試用：平均蓋一塊花多少毫秒
     /** 每格呼叫：新區塊長起來的動畫 */
     tick(dt: number) {
+      if (stopped) return;
       for (let k = growing.length - 1; k >= 0; k--) {
         const it = growing[k];
         it.t += dt;
@@ -623,7 +643,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     },
     /** 每 0.4 秒呼叫：x, z = 鏡頭位置、r = 可視距離 */
     update(x: number, z: number, r: number) {
-      if (keepAll) return;
+      if (keepAll || stopped) return;
       const drop = (r + S * 0.71 + 550) ** 2; // 比載入範圍多 450 m 才卸掉，在邊界來回開不會一直重蓋
       for (const i of [...loaded.keys()]) if (d2(i, x, z) > drop) unload(i);
       want = inRadius(x, z, r).filter((i) => !loaded.has(i));
@@ -631,13 +651,24 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
       budget = want.length && d2(want[0], x, z) < (S * 1.2) ** 2 ? 25 : 6;
       void pump();
     },
+    dispose() {
+      stop();
+      opts.signal?.removeEventListener('abort', stop);
+      want = []; growing.length = 0; cullables.clear(); loaded.clear();
+      stream.onAdd = stream.onRemove = null;
+    },
   };
   {
     // 開場先把起點附近（或測試時全部）的區塊蓋好再進遊戲
     const ids = keepAll ? TI.list.map((_, i) => i) : inRadius(opts.cx, opts.cz, q.viewDist);
     // 背景執行緒有幾個，就先多送幾塊下去算
     const pre = new Map<number, Promise<GenOut>>();
-    const ask = (k: number) => { if (k < ids.length && !pre.has(k)) pre.set(k, pool.run(tileUrl(ids[k]), ids[k])); };
+    const ask = (k: number) => {
+      if (k >= ids.length || pre.has(k)) return;
+      const task = pool.run(tileUrl(ids[k]), ids[k]);
+      task.catch(() => {}); // 換圖會一併取消尚未輪到 await 的預先工作。
+      pre.set(k, task);
+    };
     for (let k = 0; k < ids.length; k++) {
       for (let j = k; j <= k + pool.size; j++) ask(j);
       if (k % 3 === 0) await stage(`蓋房子、種行道樹（${k}/${ids.length} 區）`, 0.52 + (0.22 * k) / ids.length);
@@ -687,7 +718,12 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     for (let i = 0; i < TI.list.length; i++) lodShow(i, !(loaded.has(i) && d2(i, x, z) < (r + S * 0.71) ** 2));
     if (lodDirty && lodMesh) { lodMesh.instanceMatrix.needsUpdate = true; lodDirty = false; }
   };
+  checkActive();
+  completed = true;
   return { data, landmarks, breakables, raceHide, cull, filler, elev, trains, marketSpots, collider, stream, surface, tunnels };
+  } finally {
+    if (!completed) { stop(); opts.signal?.removeEventListener('abort', stop); }
+  }
 }
 
 function build101(): THREE.Group {

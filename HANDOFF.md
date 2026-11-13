@@ -1,3 +1,17 @@
+<!-- multiplayer-maps-current-start -->
+# 2026-11-13 最新：多人可選台北與全部23條GP地圖
+
+Rex已回報舊v1成功連線，請勿繼續把舊endpoint／分享登入問題當作當前阻擋。本輪已完成24圖、房主大廳換圖、全員載入確認與重新準備、失敗重試、GP場景及換圖資源清理，使用既有multiplayer classic性能。版本為v2，尚未公開部署；v1/v2不相容，需同步更新前後端。未授權本輪commit／push。
+
+build **65dd59ab8882**，產品 SHA256 **841581350e52fadea6ed41e06a0d3a76ff4f97967069a44e5839f68b9c1dde41**；server14／maps-server9／client26／UI生命周期8／geometry26／resources4／雙browser6／原Node26／固定3全部通過。三固定值54.425 hits0／aiHits0、162.0／aiHits8、175.7／aiHits5完全不變，單人核心五檔bytes不變。完整限制見 [MULTIPLAYER_MAPS_VALIDATION.md](./MULTIPLAYER_MAPS_VALIDATION.md) 與JSON；舊v1證據保留，不當成本輪結果。
+
+本輪工作副本 `DCISI/taipei-gp-maps-work`；不可變before `DCISI/taipei-gp-maps-before-f41315a`，來源HEAD `f41315a3e4fff78a251d5ebbf97b53b26571d2be`，原專案當時乾淨。不要用舊multiplayer／ALL／ABCD套用或發布工具：舊工具綁不同baseline。新交付 `DCISI/taipei-gp-maps-delivery` 與 `Apply-TaipeiMaps.ps1` 先唯讀預檢、備份、保護464個baseline檔、套用、build及逐檔核對，不commit／push。是否已套回原專案，以 `DCISI/taipei-gp-maps-apply-result.json` 的manifest身份、applied／built／verified及逐檔現況為準，不能由這份來源文件推定。
+
+功能見 [MULTIPLAYER_MAPS.md](./MULTIPLAYER_MAPS.md)，發布見 [MULTIPLAYER_DEPLOYMENT.md](./MULTIPLAYER_DEPLOYMENT.md)，現有端點 `wss://taipei-gp.onrender.com/ws` 仍是舊v1。手機實機最後測；本輪v2外網與Docker尚未驗。CDP9334可用，maps browser／fixed各自開新4318 preview並只清自己的contexts，別誤連舊4317／4320的v1。幾何測試回原專案執行時請用--baseline指定DCISI中的本輪before。
+<!-- multiplayer-maps-current-end -->
+
+以下為先前各輪歷史，當前狀態以上方maps段落為準。
+
 <!-- multiplayer-current-start -->
 # 2026-11-13 最新交接：私人房連線競速
 

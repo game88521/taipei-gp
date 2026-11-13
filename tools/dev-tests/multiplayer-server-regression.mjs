@@ -5,12 +5,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createMultiplayerServer } from '../../server/index.mjs';
-import { PROTOCOL_VERSION, PHYSICS_VERSION, TRACK_STAMP } from '../../shared/multiplayer-protocol.ts';
+import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../../shared/multiplayer-protocol.ts';
 import { WireClient, ORIGIN, drivingInput, settle } from './multiplayer-test-helpers.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const project = path.resolve(directory, '../..');
-const compatibility = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, trackStamp: TRACK_STAMP };
+const compatibility = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP };
 const report = { startedAt: new Date().toISOString(), transport: 'real WebSocket on loopback', authoritativePhysics: true, playerStorageTouched: false, externalRequests: [], cases: [] };
 const testedFiles = ['server/index.mjs', 'server/room-service.mjs', 'server/physics.mjs', 'shared/multiplayer-protocol.ts'];
 const sourceHashes = async () => Object.fromEntries(await Promise.all(testedFiles.map(async (file) => [file, createHash('sha256').update(await readFile(path.join(project, file))).digest('hex')])));
@@ -34,7 +34,15 @@ async function withServer(exercise, roomOptions = {}) {
   const url = `ws://127.0.0.1:${address.port}/ws`, http = `http://127.0.0.1:${address.port}`;
   const clients = [];
   const open = async (origin = ORIGIN, endpoint = url) => {
-    const client = new WireClient(endpoint, origin); clients.push(client); await client.open(); return client;
+    const client = new WireClient(endpoint, origin); clients.push(client); await client.open();
+    // Preserve all fourteen assertions; v2 commands bind the latest room map.
+    const send = client.send.bind(client);
+    client.send = (message) => {
+      const room = client.messages.findLast(value => value.room)?.room;
+      if (['ready', 'start', 'input'].includes(message.type)) message = { trackRevision: room?.trackRevision, ...(message.type === 'ready' ? { trackStamp: room?.trackStamp } : {}), ...message };
+      send(message);
+    };
+    return client;
   };
   const advance = (ms) => {
     const end = now + ms;
@@ -48,7 +56,11 @@ async function withServer(exercise, roomOptions = {}) {
 
 async function welcome(client, message) {
   const mark = client.mark(); client.send({ ...compatibility, ...message });
-  return client.until((response) => response.type === 'welcome', mark);
+  const response = await client.until((value) => value.type === 'welcome', mark);
+  const loadedAt = client.mark(), room = response.room;
+  client.send({ type: 'track-loaded', trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision });
+  await client.until(value => value.room?.players.some(player => player.id === response.playerId && player.loaded), loadedAt);
+  return response;
 }
 async function expectError(client, message, code) {
   const mark = client.mark(); client.send(message);
@@ -83,7 +95,7 @@ await check('精確 Origin／WS 路徑限制與健康檢查，不依賴正式服
 
 await check('錯協定／物理／賽道版本與無效名稱不建立房間', () => withServer(async (h) => {
   const client = await h.open();
-  for (const incompatible of [{ version: PROTOCOL_VERSION + 1 }, { physics: 'old-physics' }, { trackStamp: 'old-track' }]) {
+  for (const incompatible of [{ version: PROTOCOL_VERSION + 1 }, { physics: 'old-physics' }, { catalogStamp: 'old-catalog' }]) {
     await expectError(client, { ...compatibility, ...incompatible, type: 'create', name: '車手', laps: 1 }, 'INCOMPATIBLE_VERSION');
   }
   for (const name of ['', '<script>', '車手'.repeat(9)]) {
@@ -176,7 +188,7 @@ await check('真物理跑完整圈、依序分段後由伺服器完賽與排序�
   for (let frame = 0; frame < 120 * 60 && players.room.phase === 'racing'; frame += 3) {
     for (let index = 0; index < sockets.length; index++) {
       const player = players.room.players.get(ids[index]);
-      const command = index === 1 && frame < 120 ? { steer: 0, brake: true } : drivingInput(player.car, h.service.track);
+      const command = index === 1 && frame < 120 ? { steer: 0, brake: true } : drivingInput(player.car, players.room.track);
       sockets[index].send({ type: 'input', matchId, seq, ...command });
     }
     seq++; await settle(); h.clock.advance(50);
@@ -228,7 +240,7 @@ await check('首位真物理完賽後保留六十秒，逾期未完成者 DNF �
   const players = await pair(h); await begin(h, players);
   const winner = players.room.players.get(players.first.playerId), pending = players.room.players.get(players.second.playerId);
   for (let frame = 0; frame < 120 * 60 && winner.finishMs === null; frame += 3) {
-    players.a.send({ type: 'input', matchId: players.room.matchId, seq: frame, ...drivingInput(winner.car, h.service.track) });
+    players.a.send({ type: 'input', matchId: players.room.matchId, seq: frame, ...drivingInput(winner.car, players.room.track) });
     await settle(); h.clock.advance(50);
   }
   assert.ok(winner.finishMs > 30_000 && winner.finishMs < 120_000);

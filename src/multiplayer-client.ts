@@ -1,7 +1,8 @@
 import {
-  PROTOCOL_VERSION, PHYSICS_VERSION, TRACK_STAMP,
+  PROTOCOL_VERSION, PHYSICS_VERSION,
   type ClientMessage, type ServerMessage, type RoomSnapshot,
 } from '../shared/multiplayer-protocol';
+import { CATALOG_STAMP, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../shared/multiplayer-tracks';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
@@ -9,17 +10,17 @@ type SnapshotListener = (room: RoomSnapshot) => void;
 type EntryKind = 'create' | 'join' | 'resume';
 interface SavedSession {
   endpoint: string; code: string; playerId: string; token: string;
-  version: number; physics: string; trackStamp: string; savedAt: number;
+  version: number; physics: string; catalogStamp: string; savedAt: number;
 }
 interface PendingEntry {
   kind: EntryKind; id: string; timer: ReturnType<typeof setTimeout>;
   resolve: () => void; reject: (error: Error) => void;
 }
 
-const SESSION_KEY = 'taipei-gp-multiplayer-session-v1';
+const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, trackStamp: TRACK_STAMP };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -59,6 +60,7 @@ export class MultiplayerClient {
   private _snapshot: RoomSnapshot | null = null;
   private _selfId: string | null = null;
   private _rttMs: number | null = null;
+  private _connectionGeneration = 0;
 
   constructor(url: string) {
     let endpoint: URL;
@@ -74,6 +76,8 @@ export class MultiplayerClient {
   get snapshot() { return this._snapshot; }
   get selfId() { return this._selfId; }
   get rttMs() { return this._rttMs; }
+  /** Changes on disconnect and authenticated welcome, including same-room resume. */
+  get connectionGeneration() { return this._connectionGeneration; }
   get hasSavedSession() { return this.readSession() !== null; }
   serverNow() { return Date.now() + this.offset; }
 
@@ -139,9 +143,10 @@ export class MultiplayerClient {
     return promise;
   }
 
-  async create(name: string, laps: 1 | 3 | 5 = 3) {
+  async create(name: string, laps: 1 | 3 | 5 = 3, trackId = DEFAULT_MULTIPLAYER_TRACK_ID) {
     if (![1, 3, 5].includes(laps)) throw new Error('請選擇 1、3 或 5 圈。');
-    await this.enter('create', { type: 'create', ...identity, name: this.cleanName(name), laps });
+    if (!getMultiplayerTrack(trackId)) throw new Error('請選擇可用的比賽地圖。');
+    await this.enter('create', { type: 'create', ...identity, name: this.cleanName(name), laps, trackId });
   }
   async join(code: string, name: string) {
     const normalized = code.trim().toUpperCase();
@@ -159,13 +164,31 @@ export class MultiplayerClient {
     return true;
   }
 
-  ready(ready: boolean) { return this.command({ type: 'ready', ready }); }
-  start() { return this.command({ type: 'start' }); }
+  selectTrack(trackId: string) {
+    if (!getMultiplayerTrack(trackId)) { this._error = '請選擇可用的比賽地圖。'; this.notify(); return false; }
+    if (this._room && (this._room.hostId !== this._selfId || this._room.phase !== 'lobby')) {
+      this._error = '只有房主能在大廳更換地圖。'; this.notify(); return false;
+    }
+    return this.command({ type: 'select-track', trackId, expectedRevision: this._room?.trackRevision ?? 0 });
+  }
+  trackLoaded(selection: Pick<RoomSnapshot, 'trackId' | 'trackStamp' | 'trackRevision'>, generation = this._connectionGeneration) {
+    const room = this._room;
+    if (generation !== this._connectionGeneration || !room || room.trackId !== selection.trackId || room.trackStamp !== selection.trackStamp || room.trackRevision !== selection.trackRevision) return false;
+    return this.command({ type: 'track-loaded', trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision });
+  }
+  ready(ready: boolean) {
+    const room = this._room;
+    if (ready && room && !room.players.find(player => player.id === this._selfId)?.loaded) {
+      this._error = '請等目前地圖載入完成後再準備。'; this.notify(); return false;
+    }
+    return this.command({ type: 'ready', ready, trackRevision: room?.trackRevision ?? 0, trackStamp: room?.trackStamp ?? '' });
+  }
+  start() { return this.command({ type: 'start', trackRevision: this._room?.trackRevision ?? 0 }); }
   reset() { return this.command({ type: 'reset' }); }
 
   /** 最多約 30 次／秒；緊急煞車不等待下一個傳送時槽。 */
   sendInput(steer: number, brake: boolean) {
-    if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId) return false;
+    if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
     const now = clock();
     if (now - this.lastInputAt < 1000 / 30 && !(brake && !this.lastInputBrake)) return false;
     if ((this.socket?.bufferedAmount ?? 0) > 65536) {
@@ -173,7 +196,7 @@ export class MultiplayerClient {
       return false;
     }
     this.lastInputAt = now; this.lastInputBrake = brake;
-    return this.send({ type: 'input', matchId: this._room.matchId, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake });
+    return this.send({ type: 'input', matchId: this._room.matchId, trackRevision: this._room.trackRevision, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake });
   }
 
   leave() {
@@ -279,6 +302,7 @@ export class MultiplayerClient {
       this.credentials = { endpoint: this.url, code: message.room.code, playerId: message.playerId, token: message.resumeToken, ...identity, savedAt: Date.now() };
       this.persistSession();
       this.authenticated = true; this.reconnectDeadline = 0; this.reconnectAttempts = 0;
+      this._connectionGeneration++;
       this._status = 'connected'; this._error = null;
       this.lastRoomTime = -Infinity;
       if (!this.clockSamples.length) this.offset = message.room.serverTime - Date.now();
@@ -298,17 +322,23 @@ export class MultiplayerClient {
   }
 
   private validateRoom(room: unknown): asserts room is RoomSnapshot {
-    if (!object(room) || room.version !== PROTOCOL_VERSION || room.physics !== PHYSICS_VERSION || room.trackStamp !== TRACK_STAMP) throw new Error('遊戲與伺服器版本或賽道不一致，請更新後重新連線。');
+    if (!object(room) || room.version !== PROTOCOL_VERSION || room.physics !== PHYSICS_VERSION || room.catalogStamp !== CATALOG_STAMP) throw new Error('遊戲與伺服器版本或地圖清單不一致，請更新後重新連線。');
+    const descriptor = typeof room.trackId === 'string' ? getMultiplayerTrack(room.trackId) : undefined;
+    if (!descriptor || room.trackStamp !== descriptor.trackStamp || !Number.isSafeInteger(room.trackRevision) || Number(room.trackRevision) < 1) throw new Error('伺服器提供的地圖版本不一致，請更新後重新連線。');
     if (typeof room.code !== 'string' || typeof room.hostId !== 'string' || !['lobby', 'countdown', 'racing', 'results'].includes(String(room.phase)) || !finite(room.serverTime) || !finite(room.trackLength) || room.trackLength <= 0 || ![1, 3, 5].includes(Number(room.laps)) || (room.matchId !== null && typeof room.matchId !== 'string') || (room.startAt !== null && !finite(room.startAt)) || !Array.isArray(room.players) || room.players.length < 1 || room.players.length > 4) throw new Error('房間資料格式不正確，請重新連線。');
     const ids = new Set<string>();
     for (const player of room.players) {
-      if (!object(player) || typeof player.id !== 'string' || ids.has(player.id) || typeof player.name !== 'string' || player.name.length > 64 || typeof player.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(player.color) || typeof player.ready !== 'boolean' || typeof player.connected !== 'boolean' || typeof player.dnf !== 'boolean' || !finite(player.ackSeq) || !Number.isSafeInteger(player.ackSeq) || player.ackSeq < -1 || !finite(player.completedLaps) || !finite(player.progress) || !finite(player.rank) || (player.finishMs !== null && !finite(player.finishMs)) || !object(player.car) || !object(player.car.pos) || !['x', 'z', 'h', 'v', 'steer'].every(key => finite((player.car as Record<string, unknown>)[key])) || !['i', 's', 'lat'].every(key => finite((player.car as { pos: Record<string, unknown> }).pos[key]))) throw new Error('車手狀態格式不正確，請重新連線。');
+      if (!object(player) || typeof player.id !== 'string' || ids.has(player.id) || typeof player.name !== 'string' || player.name.length > 64 || typeof player.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(player.color) || typeof player.ready !== 'boolean' || typeof player.loaded !== 'boolean' || typeof player.connected !== 'boolean' || typeof player.dnf !== 'boolean' || !finite(player.ackSeq) || !Number.isSafeInteger(player.ackSeq) || player.ackSeq < -1 || !finite(player.completedLaps) || !finite(player.progress) || !finite(player.rank) || (player.finishMs !== null && !finite(player.finishMs)) || !object(player.car) || !object(player.car.pos) || !['x', 'z', 'h', 'v', 'steer'].every(key => finite((player.car as Record<string, unknown>)[key])) || !['i', 's', 'lat'].every(key => finite((player.car as { pos: Record<string, unknown> }).pos[key]))) throw new Error('車手狀態格式不正確，請重新連線。');
       ids.add(player.id);
     }
   }
   private acceptRoom(room: RoomSnapshot, snapshot: boolean) {
     if (this.credentials && room.code !== this.credentials.code) return;
-    if (room.serverTime < this.lastRoomTime || (room.matchId && this.retiredMatches.has(room.matchId))) return;
+    const previousRoom = this._room;
+    if (previousRoom && room.trackRevision < previousRoom.trackRevision) return;
+    const changedTrack = !!previousRoom && room.trackRevision !== previousRoom.trackRevision;
+    if (previousRoom && !changedTrack && (room.trackId !== previousRoom.trackId || room.trackStamp !== previousRoom.trackStamp)) throw new Error('地圖更新順序不正確，請重新連線。');
+    if ((!changedTrack && room.serverTime < this.lastRoomTime) || (room.matchId && this.retiredMatches.has(room.matchId))) return;
     const previous = this._room?.matchId;
     if (previous && previous !== room.matchId) {
       this.retiredMatches.add(previous);
@@ -316,6 +346,9 @@ export class MultiplayerClient {
     }
     this.lastRoomTime = room.serverTime;
     this._room = room;
+    if (changedTrack) {
+      this._snapshot = null; this.inputSeq = 0; this.lastInputAt = -Infinity; this.lastInputBrake = true;
+    }
     const me = room.players.find(player => player.id === this._selfId);
     if (me) this.inputSeq = Math.max(this.inputSeq, me.ackSeq);
     if (snapshot) {
@@ -346,6 +379,7 @@ export class MultiplayerClient {
   private closed(socket: WebSocket, reason = '連線中斷，正在重新連線。') {
     if (this.socket !== socket) return;
     this.socket = null; this.authenticated = false;
+    this._connectionGeneration++;
     this.clearConnectTimer(); this.clearHeartbeat();
     const reject = this.connectReject;
     this.connection = null; this.connectResolve = this.connectReject = null;
@@ -387,7 +421,7 @@ export class MultiplayerClient {
       const raw = sessionStorage.getItem(SESSION_KEY);
       if (!raw || raw.length > 2048) return null;
       const value: unknown = JSON.parse(raw);
-      if (!object(value) || value.endpoint !== this.url || value.version !== PROTOCOL_VERSION || value.physics !== PHYSICS_VERSION || value.trackStamp !== TRACK_STAMP || typeof value.code !== 'string' || !/^[A-HJ-NP-Z2-9]{6}$/.test(value.code) || typeof value.playerId !== 'string' || value.playerId.length > 128 || typeof value.token !== 'string' || value.token.length < 8 || value.token.length > 512 || !finite(value.savedAt) || Date.now() - value.savedAt > 86400000) return null;
+      if (!object(value) || value.endpoint !== this.url || value.version !== PROTOCOL_VERSION || value.physics !== PHYSICS_VERSION || value.catalogStamp !== CATALOG_STAMP || typeof value.code !== 'string' || !/^[A-HJ-NP-Z2-9]{6}$/.test(value.code) || typeof value.playerId !== 'string' || value.playerId.length > 128 || typeof value.token !== 'string' || value.token.length < 8 || value.token.length > 512 || !finite(value.savedAt) || Date.now() - value.savedAt > 86400000) return null;
       return value as unknown as SavedSession;
     } catch { return null; }
   }

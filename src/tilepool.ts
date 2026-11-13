@@ -10,6 +10,8 @@ export class TilePool {
   private id = 0;
   private wait = new Map<number, { res: (o: GenOut) => void; rej: (e: Error) => void; w: Worker }>();
   private local: GenCtx | null = null;
+  private disposed = false;
+  private controller = new AbortController();
 
   constructor(private init: GenInit, n: number) {
     try {
@@ -21,6 +23,7 @@ export class TilePool {
         this.workers.push(w);
       }
     } catch {
+      for (const worker of this.workers) worker.terminate();
       this.workers = [];
     }
   }
@@ -43,18 +46,34 @@ export class TilePool {
     for (const [id, p] of this.wait) if (p.w === w) { this.wait.delete(id); p.rej(new Error('Worker 失敗')); }
   }
 
+  /** 換地圖時停止背景工作；取消不走 Worker 失敗的主執行緒備援。 */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.controller.abort();
+    for (const worker of this.workers) { worker.onmessage = null; worker.onerror = null; worker.terminate(); }
+    this.workers = [];
+    const error = new DOMException('城市載入已取消。', 'AbortError');
+    for (const pending of this.wait.values()) pending.rej(error);
+    this.wait.clear();
+    this.local = null;
+  }
+
   run(url: string, tag: number): Promise<GenOut> {
+    if (this.disposed) return Promise.reject(new DOMException('城市載入已取消。', 'AbortError'));
     if (!this.workers.length) return this.runLocal(url, tag);
     const w = this.workers[this.next++ % this.workers.length], id = ++this.id;
     return new Promise<GenOut>((res, rej) => {
       this.wait.set(id, { res, rej, w });
       w.postMessage({ type: 'tile', id, url, tag });
-    }).catch((e) => (this.workers.length ? Promise.reject(e) : this.runLocal(url, tag)));
+    }).catch((e) => (this.disposed || this.workers.length ? Promise.reject(e) : this.runLocal(url, tag)));
   }
 
   private async runLocal(url: string, tag: number): Promise<GenOut> {
+    if (this.disposed) throw new DOMException('城市載入已取消。', 'AbortError');
     this.local ??= makeCtx(this.init);
-    const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(url, { label: '城市區塊' });
+    const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(url, { label: '城市區塊', signal: this.controller.signal });
+    if (this.disposed) throw new DOMException('城市載入已取消。', 'AbortError');
     return genTile(decodeTile(data), tag, this.local);
   }
 }

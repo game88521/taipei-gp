@@ -1,4 +1,22 @@
-# Render 免費測試部署
+# Render 免費測試部署與選圖 v2 更新
+
+## 目前狀態與本輪更新
+
+Rex 已建立 `https://taipei-gp.onrender.com`，對戰端點為 `wss://taipei-gp.onrender.com/ws`，並回報 v1 成功與朋友對戰。24 圖功能為 v2，目前僅完成本機驗證，尚未部署。本輪未授權 commit／push；上一輪推送舊 v1 的授權不能當成後續發布許可。
+
+v2 與 v1 不相容，必須配套更新 Render 及 Vercel。在沒有比賽時，授權推送本輪測試分支後，Render Manual Deploy 部署 `multiplayer-test` 最新提交，再重新建置 Vercel 測試前端。服務重啟會清空房間；同一個 Render 端點升為 v2 後，舊 v1 前端不能再連線。要同時保留兩版多人玩法，須另配 v2 服務與前端端點。單人模式不依賴對戰服務。
+
+既有服務 Root Directory 留白，Build Command 沿用 `render.yaml` 的完整命令，Start Command 為 `node server/index.mjs`，Node 24.18.0、`HOST=0.0.0.0`、health path `/health`。v2 的 `/health` 應回 `version: 2`。`npm run build:multiplayer` 先產生 catalog，再建立 ignored physics bundle，不須 commit bundle 或上傳 node_modules。
+
+服務執行需要 `shared/multiplayer-catalog.json`、`shared/multiplayer-protocol.ts`、`src/data/track.json`、`public/data/circuits/*.json`；Git 原生部署會保留這些資料。Dockerfile 已配套調整，但 Docker build 尚未實測。
+
+Vercel Preview 建置變數使用 `VITE_MULTIPLAYER_URL=wss://taipei-gp.onrender.com/ws`；如果另開 v2 服務則填新端點。Render `ALLOWED_ORIGINS` 加入新前端部署的精確 HTTPS origin，不附路徑或尾斜線。新的不可變 preview URL 可能改變，環境變數更新也不會改寫舊部署。朋友使用新部署的 `/multiplayer.html`；不要分享帶管理工具授權參數的網址。
+
+發布後再用兩位玩家驗選圖、重新準備、起跑、重連及再戰，手機最後實測。上述是後續操作步驟，不是已通過的外網驗證。
+
+## v1 初始設定歷史
+
+以下保留首次建置時的文件；「尚未建立服務／登入／推送」只描述當時狀態，目前狀態以上方為準。
 
 Rex 選擇「沒有主機，請幫我選免費測試方案」，本輪選用 **Render 的 Free Web Service**，前端繼續沿用 Vercel。此檔和 `render.yaml` 是部署準備，尚未建立服務、連接帳號或公開上線。
 

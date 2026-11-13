@@ -1,10 +1,12 @@
-import manifest from './taipei-track.json' with { type: 'json' };
+import catalog from './multiplayer-catalog.json' with { type: 'json' };
 import type { CarState } from '../src/car';
 
 export type { CarState };
-export const PROTOCOL_VERSION = 1;
-export const PHYSICS_VERSION = 'taipei-classic-v1';
-export const TRACK_STAMP: string = manifest.stamp;
+export const PROTOCOL_VERSION = 2;
+export const PHYSICS_VERSION = 'classic-multitrack-v2';
+export const CATALOG_STAMP: string = catalog.catalogStamp;
+/** Legacy test import only; v2 entry messages require catalogStamp. */
+export const TRACK_STAMP: string = catalog.tracks[0].trackStamp;
 export const MULTIPLAYER_MAX_PLAYERS = 4;
 export const MULTIPLAYER_INPUT_HZ = 30;
 export const MULTIPLAYER_TICK_HZ = 60;
@@ -15,7 +17,12 @@ export type RoomPhase = 'lobby' | 'countdown' | 'racing' | 'results';
 export interface Compatibility {
   version: number;
   physics: string;
+  catalogStamp: string;
+}
+export interface TrackSelection {
+  trackId: string;
   trackStamp: string;
+  trackRevision: number;
 }
 
 export interface RoomPlayer {
@@ -24,6 +31,7 @@ export interface RoomPlayer {
   color: string;
   ready: boolean;
   connected: boolean;
+  loaded: boolean;
   car: CarState;
   ackSeq: number;
   completedLaps: number;
@@ -35,7 +43,7 @@ export interface RoomPlayer {
   rank: number;
 }
 
-export interface RoomSnapshot extends Compatibility {
+export interface RoomSnapshot extends Compatibility, TrackSelection {
   code: string;
   hostId: string;
   phase: RoomPhase;
@@ -49,14 +57,16 @@ export interface RoomSnapshot extends Compatibility {
 
 type Request = { requestId?: string };
 export type ClientMessage =
-  | ({ type: 'create'; name: string; laps: MultiplayerLaps } & Compatibility & Request)
+  | ({ type: 'create'; name: string; laps: MultiplayerLaps; trackId?: string } & Compatibility & Request)
   | ({ type: 'join'; code: string; name: string } & Compatibility & Request)
   | ({ type: 'resume'; code: string; playerId: string; token: string } & Compatibility & Request)
-  | { type: 'ready'; ready: boolean }
-  | { type: 'start' }
+  | { type: 'select-track'; trackId: string; expectedRevision: number }
+  | ({ type: 'track-loaded' } & TrackSelection)
+  | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string }
+  | { type: 'start'; trackRevision: number }
   | { type: 'reset' }
   | { type: 'leave' }
-  | { type: 'input'; matchId: string; seq: number; steer: number; brake: boolean }
+  | { type: 'input'; matchId: string; trackRevision: number; seq: number; steer: number; brake: boolean }
   | { type: 'ping'; sentAt: number };
 
 export type ServerMessage =

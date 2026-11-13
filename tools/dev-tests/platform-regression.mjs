@@ -146,7 +146,8 @@ try {
   loading.prefetch('/prefetch-cancel'); loading.cancelPrefetch('/prefetch-cancel');
   await sleep(1);
   globalThis.location = { search: '?circuit=japan' };
-  const circuits = await import(await moduleURL(root, 'circuits.ts', { './network': networkURL }));
+  const circuitCatalogURL = await moduleURL(root, '../shared/circuit-catalog.ts');
+  const circuits = await import(await moduleURL(root, 'circuits.ts', { './network': networkURL, '../shared/circuit-catalog': circuitCatalogURL }));
   await assert.rejects(circuits.loadCircuitData({ timeoutMs: 20, idleTimeoutMs: 100, retries: 0 }), (e) => e.code === 'timeout');
   results.network = { beforeStalled: 'pending', timeout: 'PASS', bodyIdleCancellation: 'PASS', get503Retry: 2, get404Requests: 1, post503Requests: 1, invalidJSONRequests: 1, externalAbort: 'PASS', explicitCancel: 'PASS', prefetchRequests: 1, prefetchTimeout: 'PASS', abortedPrefetchHandoff: 'PASS', circuitTimeout: 'PASS' };
 } finally { globalThis.fetch = realFetch; }

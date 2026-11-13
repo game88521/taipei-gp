@@ -1,6 +1,8 @@
 import { build } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Direct invocation and Render's build task both refresh the complete map catalog.
+await import('./build-multiplayer-catalog.mjs');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 await build({
   configFile: false,

@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { RoomService } from './room-service.mjs';
-import { PROTOCOL_VERSION, PHYSICS_VERSION } from '../shared/multiplayer-protocol.ts';
+import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
 
 const DEFAULT_ORIGINS = ['http://127.0.0.1:4317', 'http://localhost:4317', 'http://127.0.0.1:5173', 'http://localhost:5173'];
 
@@ -27,7 +27,7 @@ export function createMultiplayerServer(options = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.method === 'GET' && req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ status: 'ok', version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, rooms: service.rooms.size, connections: service.clients.size }));
+      res.end(JSON.stringify({ status: 'ok', version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, rooms: service.rooms.size, connections: service.clients.size }));
     } else { res.writeHead(404); res.end(); }
   });
   httpServer.headersTimeout = 10_000; httpServer.requestTimeout = 10_000;

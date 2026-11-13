@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
@@ -17,8 +17,11 @@ async function moduleSource(base, name) {
   const key = `${base}/${name}`;
   if (loaded.has(key)) return loaded.get(key);
   let code = stripTypeScriptTypes(await readFile(resolve(base, 'src', name), 'utf8'), { mode: 'transform' });
-  const imports = [...code.matchAll(/from (['"])(\.\/[^'"]+)\1/g)];
-  for (const [, quote, spec] of imports) code = code.replaceAll(`from ${quote}${spec}${quote}`, `from ${quote}${url(await moduleSource(base, `${spec.slice(2)}.ts`))}${quote}`);
+  const imports = [...code.matchAll(/from (['"])(\.{1,2}\/[^'"]+)\1/g)];
+  for (const [, quote, spec] of imports) {
+    const dependency = resolve(dirname(resolve(base, 'src', name)), extname(spec) ? spec : `${spec}.ts`);
+    code = code.replaceAll(`from ${quote}${spec}${quote}`, `from ${quote}${url(await moduleSource(base, dependency))}${quote}`);
+  }
   loaded.set(key, code); return code;
 }
 const report = { root, before, playerStorageTouched: false, browserUsed: false, networkUsed: false, hashes: {}, cases: [], limitations: ['真實產品模組配合記憶體storage、感測事件、Web Audio替身及Cache替身。', '無法證明手機感測權限、聲音聽感、iOS背景播放或瀏覽器離線實際容量；需另做實機驗證。'] };

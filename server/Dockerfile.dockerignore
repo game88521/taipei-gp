@@ -8,3 +8,11 @@
 !shared/
 !shared/multiplayer-protocol.ts
 !shared/taipei-track.json
+!shared/multiplayer-catalog.json
+!src/
+!src/data/
+!src/data/track.json
+!public/
+!public/data/
+!public/data/circuits/
+!public/data/circuits/*.json

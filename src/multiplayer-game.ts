@@ -3,7 +3,8 @@ import { MultiplayerClient } from './multiplayer-client';
 import { MultiplayerScene } from './multiplayer-scene';
 import { Input } from './input';
 import { Sound } from './audio';
-import type { RoomPlayer, MultiplayerLaps } from '../shared/multiplayer-protocol';
+import type { RoomPlayer, MultiplayerLaps, TrackSelection } from '../shared/multiplayer-protocol';
+import { MULTIPLAYER_TRACKS, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../shared/multiplayer-tracks';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const time = (ms: number) => {
@@ -15,12 +16,75 @@ const endpoint = String(import.meta.env.VITE_MULTIPLAYER_URL ?? '').trim() || (l
 let client: MultiplayerClient | null = null;
 let scene: MultiplayerScene | null = null;
 let graphicsReady = false, busy = false, notice = '', soundEnabled = false;
+let mapContextKey = '', mapLoadToken = 0, mapLoading = false, mapError = '', mapProgress = '', loadedAckKey = '';
 let focused = document.hasFocus();
 let previousPhase = '';
+for (const id of ['mp-track', 'mp-room-track']) {
+  const select = $<HTMLSelectElement>(id);
+  for (const descriptor of MULTIPLAYER_TRACKS) {
+    const option = document.createElement('option'); option.value = descriptor.id;
+    option.textContent = `${descriptor.flag} ${descriptor.name} · ${descriptor.place}`;
+    select.appendChild(option);
+  }
+  select.value = DEFAULT_MULTIPLAYER_TRACK_ID;
+}
 const input = new Input($('mp-pad'), $('mp-pad-dot'), $('mp-brake'), $('mp-gas'), $('mp-left'), $('mp-right'));
 const sound = new Sound();
-const canDrive = () => !!client && client.status === 'connected' && client.room?.phase === 'racing' && !!client.room.players.find(p => p.id === client?.selfId && !p.dnf && p.finishMs === null) && focused && !document.hidden && !scene?.contextLost;
+const canDrive = () => !!client && client.status === 'connected' && client.room?.phase === 'racing' && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && p.finishMs === null) && focused && !document.hidden && !scene.contextLost;
 input.isDriving = canDrive;
+
+function desiredMap() {
+  if (!scene || scene.contextLost) return null;
+  const room = client?.room;
+  if (room) {
+    if (client?.status !== 'connected' || !client.selfId) return null;
+    const selection: TrackSelection = { trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision };
+    return { selection, key: `${room.code}:${client.selfId}:${client.connectionGeneration}:${selection.trackId}:${selection.trackStamp}:${selection.trackRevision}`, generation: client.connectionGeneration, inRoom: true };
+  }
+  const descriptor = getMultiplayerTrack($<HTMLSelectElement>('mp-track').value)!;
+  const selection: TrackSelection = { trackId: descriptor.id, trackStamp: descriptor.trackStamp, trackRevision: 0 };
+  return { selection, key: `preview:${selection.trackId}:${selection.trackStamp}`, generation: -1, inRoom: false };
+}
+
+/** 房間、地圖版本、續接世代都要相符，才接受非同步完成並確認載入。 */
+function synchronizeMap(force = false) {
+  const desired = desiredMap();
+  if (!desired) {
+    if (mapContextKey) { mapLoadToken++; mapContextKey = ''; loadedAckKey = ''; }
+    graphicsReady = false; mapLoading = false; return;
+  }
+  if (!force && desired.key === mapContextKey) return;
+  mapContextKey = desired.key;
+  const token = ++mapLoadToken, mapScene = scene!;
+  const current = () => token === mapLoadToken && desiredMap()?.key === desired.key;
+  graphicsReady = false; mapLoading = true; mapError = ''; loadedAckKey = '';
+  mapProgress = '正在準備所選賽道…';
+  sound.engine(0, 0, false);
+  void mapScene.prepareMap(desired.selection, text => {
+    if (!current()) return;
+    mapProgress = text; renderUi();
+  }).then(prepared => {
+    if (!current()) return;
+    if (!prepared || !mapScene.matchesMap(desired.selection)) throw new Error('地圖尚未就緒，請重試載入。');
+    graphicsReady = true; mapLoading = false;
+    mapProgress = '賽道已就緒，邀請朋友一起比賽。';
+    const room = client?.room;
+    if (desired.inRoom && room && client?.selfId && client.status === 'connected') {
+      mapScene.accept(room, client.selfId, client.serverNow());
+      // command 會同步通知訂閱者；先記錄確認鍵，避免重複傳送。
+      if (loadedAckKey !== desired.key) {
+        loadedAckKey = desired.key;
+        if (!client.trackLoaded(desired.selection, desired.generation)) loadedAckKey = '';
+      }
+    }
+    renderUi();
+  }).catch(error => {
+    if (!current()) return;
+    graphicsReady = false; mapLoading = false;
+    mapError = error instanceof Error ? error.message : '地圖載入失敗，請再試一次。';
+    mapProgress = '地圖載入未完成。'; renderUi();
+  });
+}
 
 function playerItem(player: RoomPlayer, results = false) {
   const li = document.createElement('li');
@@ -30,7 +94,7 @@ function playerItem(player: RoomPlayer, results = false) {
   const small = document.createElement('small');
   small.textContent = results ? `${player.completedLaps} 圈${player.dnf ? ' · 未完成' : ''}` : `${player.id === client?.room?.hostId ? '房主 · ' : ''}${player.connected ? '已連線' : '暫時失聯，等待重連'}`;
   name.appendChild(small);
-  const status = document.createElement('b'); status.textContent = results ? player.finishMs !== null ? time(player.finishMs) : 'DNF' : player.ready ? '已準備' : '準備中';
+  const status = document.createElement('b'); status.textContent = results ? player.finishMs !== null ? time(player.finishMs) : 'DNF' : !player.connected ? '等待重連' : !player.loaded ? '載入地圖中' : player.ready ? '已準備' : '準備中';
   li.append(color, name, status); return li;
 }
 
@@ -38,27 +102,40 @@ function renderUi() {
   const room = client?.room, me = room?.players.find(p => p.id === client?.selfId);
   const phase = room?.phase ?? '', active = phase === 'countdown' || phase === 'racing';
   const connected = client?.status === 'connected';
+  const localMapReady = graphicsReady && !!room && !!scene?.matchesMap(room) && !!me?.loaded;
   const connectionLabels = { idle: '尚未連線', connecting: '正在連線…', connected: '已連線', reconnecting: '正在重新連線…', disconnected: '連線已中斷' };
   $('mp-connection').textContent = client ? `${connectionLabels[client.status]}${connected && client.rttMs !== null ? ` · ${Math.round(client.rttMs)} ms` : ''}` : '連線對戰尚未開放';
-  $('mp-message').textContent = client?.error ?? notice;
-  $('mp-panel').hidden = active;
-  $('mp-hud').hidden = !active;
+  $('mp-message').textContent = mapError || client?.error || notice;
+  $('mp-loading').textContent = room && !connected ? '重新連線後會確認目前的比賽地圖。' : mapProgress || '正在準備賽道…';
+  $('mp-map-retry').hidden = !mapError;
+  $<HTMLButtonElement>('mp-map-retry').disabled = mapLoading || (!!room && !connected);
+  $('mp-panel').hidden = active && !mapError;
+  $('mp-hud').hidden = !active || !!mapError;
   $('mp-entry').hidden = !!room;
   $('mp-room').hidden = phase !== 'lobby';
   $('mp-results').hidden = phase !== 'results';
   $<HTMLButtonElement>('mp-create').disabled = !client || !graphicsReady || busy;
-  $<HTMLButtonElement>('mp-join').disabled = !client || !graphicsReady || busy;
+  $<HTMLButtonElement>('mp-join').disabled = !client || !scene || scene.contextLost || busy;
+  $<HTMLSelectElement>('mp-track').disabled = busy;
   $('mp-restore').hidden = !!room || !client?.hasSavedSession;
-  $<HTMLButtonElement>('mp-restore').disabled = !graphicsReady || busy;
+  $<HTMLButtonElement>('mp-restore').disabled = !scene || scene.contextLost || busy;
   if (room) {
+    const descriptor = getMultiplayerTrack(room.trackId)!;
+    const trackLabel = `${descriptor.flag} ${descriptor.name}`;
     $('mp-room-code').textContent = room.code;
-    $('mp-room-description').textContent = `台北賽道 · ${room.laps} 圈 · ${room.players.length} / 4 人`;
+    $('mp-room-description').textContent = `${trackLabel} · ${room.laps} 圈 · ${room.players.length} / 4 人`;
+    $<HTMLSelectElement>('mp-room-track').value = room.trackId;
+    $<HTMLSelectElement>('mp-room-track').disabled = !connected || room.hostId !== client?.selfId || phase !== 'lobby';
+    $('mp-map-status').textContent = !connected ? '等待重新連線以確認地圖。' : mapError ? '載入失敗，可重試或由房主更換地圖。' : !localMapReady ? mapLoading ? mapProgress : '正在確認地圖載入狀態…' : room.players.some(p => !p.loaded) ? '你的地圖已就緒，等待其他車手載入。' : '所有車手地圖已就緒，準備好即可開始。';
+    $('mp-map-status').dataset.loading = String(!localMapReady);
     $('mp-players').replaceChildren(...room.players.map(p => playerItem(p)));
     $('mp-ready').textContent = me?.ready ? '取消準備' : '我準備好了';
-    $<HTMLButtonElement>('mp-ready').disabled = !connected || !graphicsReady;
+    $<HTMLButtonElement>('mp-ready').disabled = !connected || !localMapReady;
     $('mp-start').hidden = room.hostId !== client?.selfId;
-    $<HTMLButtonElement>('mp-start').disabled = !connected || room.players.length < 2 || room.players.some(p => !p.ready || !p.connected);
-    $('mp-start').textContent = room.players.length < 2 ? '等待朋友加入' : room.players.some(p => !p.ready) ? '等待全員準備' : '開始倒數';
+    $<HTMLButtonElement>('mp-start').disabled = !connected || !localMapReady || room.players.length < 2 || room.players.some(p => !p.ready || !p.connected || !p.loaded);
+    $('mp-start').textContent = room.players.length < 2 ? '等待朋友加入' : room.players.some(p => !p.loaded) ? '等待地圖載入' : room.players.some(p => !p.ready || !p.connected) ? '等待全員準備' : '開始倒數';
+    $('mp-result-track').textContent = `${trackLabel} · ${room.laps} 圈`;
+    $('mp-race-track').textContent = trackLabel;
     $('mp-results-list').replaceChildren(...room.players.map(p => playerItem(p, true)));
     $('mp-rematch').hidden = room.hostId !== client?.selfId;
     $<HTMLButtonElement>('mp-rematch').disabled = !connected;
@@ -74,7 +151,8 @@ function renderUi() {
       $('mp-position').textContent = `P${me.rank}`;
       $('mp-lap').textContent = `${Math.min(room.laps, me.completedLaps + 1)} / ${room.laps} 圈`;
     }
-    $('mp-race-message').textContent = client?.status === 'reconnecting' ? '連線中斷，自車已煞停；正在重連，其他車手繼續比賽。'
+    $('mp-race-message').textContent = !connected ? '連線中斷，自車已煞停；正在重連，其他車手繼續比賽。'
+      : !localMapReady ? '正在載入並確認比賽地圖，自車保持煞車。'
       : me?.dnf ? '本場未完成；等待其他車手完賽。'
       : me?.finishMs !== null && me?.finishMs !== undefined ? `🏁 你已完賽：${time(me.finishMs)}，等待其他車手。`
       : phase === 'countdown' ? '同步起跑準備中' : '';
@@ -98,7 +176,10 @@ try { if (endpoint) client = new MultiplayerClient(endpoint); }
 catch (error) { notice = error instanceof Error ? error.message : '連線設定無法使用。'; }
 if (!endpoint) notice = '連線服務尚未開放，請稍後再來；你可以先回主選單遊玩其他模式。';
 
-$('mp-create').addEventListener('click', () => void action(async () => { await client?.create($<HTMLInputElement>('mp-name').value, Number($<HTMLSelectElement>('mp-laps').value) as MultiplayerLaps); }));
+$('mp-create').addEventListener('click', () => void action(async () => { await client?.create($<HTMLInputElement>('mp-name').value, Number($<HTMLSelectElement>('mp-laps').value) as MultiplayerLaps, $<HTMLSelectElement>('mp-track').value); }));
+$('mp-track').addEventListener('change', () => { synchronizeMap(); renderUi(); });
+$('mp-room-track').addEventListener('change', () => { client?.selectTrack($<HTMLSelectElement>('mp-room-track').value); renderUi(); });
+$('mp-map-retry').addEventListener('click', () => { synchronizeMap(true); renderUi(); });
 $('mp-join').addEventListener('click', () => void action(async () => { await client?.join($<HTMLInputElement>('mp-code').value, $<HTMLInputElement>('mp-name').value); }));
 $('mp-code').addEventListener('input', () => { const field = $<HTMLInputElement>('mp-code'); field.value = field.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, '').slice(0, 6); });
 $('mp-restore').addEventListener('click', () => void action(async () => { if (!await client?.restore()) notice = '目前沒有可以恢復的房間。'; }));
@@ -141,13 +222,13 @@ addEventListener('pageshow', event => {
     void action(() => client!.restore());
   }
 });
-client?.subscribe(renderUi);
-client?.onSnapshot(room => { if (client?.selfId) scene?.accept(room, client.selfId, client.serverNow()); });
+client?.subscribe(() => { synchronizeMap(); renderUi(); });
+client?.onSnapshot(room => { if (graphicsReady && scene?.matchesMap(room) && client?.selfId) scene.accept(room, client.selfId, client.serverNow()); });
 renderUi();
 
 try {
   scene = new MultiplayerScene($('mp-scene'));
-  scene.onContextLost = () => { client?.sendInput(0, true); client?.disconnect(); sound.engine(0, 0, false); $('mp-graphics-error').hidden = false; };
+  scene.onContextLost = () => { graphicsReady = false; mapLoadToken++; client?.sendInput(0, true); client?.disconnect(); sound.engine(0, 0, false); $('mp-graphics-error').hidden = false; };
   let previousAt = performance.now();
   scene.renderer.setAnimationLoop(() => {
     const at = performance.now(), dt = Math.min(.1, (at - previousAt) / 1000); previousAt = at;
@@ -162,9 +243,7 @@ try {
     $('mp-speed').textContent = String(Math.round((scene?.car.v ?? 0) * 3.6));
     if (soundEnabled) sound.engine(.15 + .7 * Math.min(1, (scene?.car.v ?? 0) / 85), control.brake ? .1 : 1, drive);
   });
-  await scene.prepare(text => { $('mp-loading').textContent = text; });
-  graphicsReady = true;
-  $('mp-loading').textContent = '賽道已就緒，邀請朋友一起比賽。';
+  synchronizeMap();
   renderUi();
   // 使用獨立時鐘傳輸，背景分頁停rAF時仍會先煞車；伺服器也另有輸入逾時保護。
   setInterval(() => {

@@ -11,11 +11,13 @@
   <div id="mp-scene" aria-hidden="true"></div>
   <header class="mp-header"><a id="mp-home" href="/">← 台北街道賽</a><span id="mp-connection" role="status">尚未連線</span></header>
   <main id="mp-panel" class="mp-panel">
-    <div class="mp-heading"><span class="mp-eyebrow">TAIPEI · PRIVATE RACE</span><h1>和朋友，一起上場。</h1><p>台北賽道 / 2～4 位車手 / 即時競速</p></div>
+    <div class="mp-heading"><span class="mp-eyebrow">PRIVATE RACE</span><h1>和朋友，一起上場。</h1><p>台北與 23 條大獎賽賽道 / 2～4 位車手 / 即時競速</p></div>
     <p id="mp-loading" class="mp-hint" role="status">正在準備賽道…</p>
     <p id="mp-message" class="mp-message" role="status" aria-live="polite"></p>
     <section id="mp-entry" aria-label="建立或加入房間">
       <label class="mp-field">車手暱稱<input id="mp-name" maxlength="16" value="車手" autocomplete="nickname" /></label>
+      <label class="mp-field mp-track-field">比賽地圖<select id="mp-track" aria-describedby="mp-track-help"></select></label>
+      <p id="mp-track-help" class="mp-hint">房主選擇地圖，加入的朋友會自動載入同一條賽道。</p>
       <div class="mp-create-row"><label class="mp-field">比賽圈數<select id="mp-laps"><option value="1">1 圈 · 衝刺</option><option value="3" selected>3 圈 · 短賽</option><option value="5">5 圈 · 耐力</option></select></label><button id="mp-create" class="mp-primary" disabled>建立私人房</button></div>
       <div class="mp-divider">已有朋友開房？</div>
       <div class="mp-join-row"><label class="mp-field">六碼房間碼<input id="mp-code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="輸入房間碼" /></label><button id="mp-join" disabled>加入房間</button></div>
@@ -24,18 +26,23 @@
     </section>
     <section id="mp-room" hidden aria-label="房間大廳">
       <div class="mp-room-top"><div><span class="mp-eyebrow">把房間碼交給朋友</span><strong id="mp-room-code"></strong></div><button id="mp-copy">複製房間碼</button></div>
-      <p id="mp-room-description" class="mp-hint"></p><ol id="mp-players" class="mp-player-list"></ol>
+      <p id="mp-room-description" class="mp-hint"></p>
+      <label class="mp-field mp-track-field">比賽地圖<select id="mp-room-track" aria-describedby="mp-map-policy"></select></label>
+      <p id="mp-map-policy" class="mp-hint">只有房主能在大廳換地圖；換圖後所有人需要重新準備。</p>
+      <p id="mp-map-status" class="mp-map-status" role="status" aria-live="polite"></p>
+      <ol id="mp-players" class="mp-player-list"></ol>
       <div class="mp-actions"><button id="mp-ready" class="mp-primary">我準備好了</button><button id="mp-start">全員就緒後開始</button><button id="mp-leave">離開房間</button></div>
       <p class="mp-note">至少 2 人，所有車手準備完成後由房主開始。離開大廳的房主會自動交棒。</p>
     </section>
     <section id="mp-results" hidden aria-label="比賽成績">
-      <span class="mp-eyebrow">RACE CLASSIFICATION</span><h2>方格旗，下一場見。</h2><ol id="mp-results-list" class="mp-player-list"></ol>
+      <span class="mp-eyebrow">RACE CLASSIFICATION</span><h2>方格旗，下一場見。</h2><p id="mp-result-track" class="mp-hint"></p><ol id="mp-results-list" class="mp-player-list"></ol>
       <div class="mp-actions"><button id="mp-rematch" class="mp-primary">再來一場</button><button id="mp-result-leave">離開房間</button></div>
       <p id="mp-results-note" class="mp-note"></p>
     </section>
+    <button id="mp-map-retry" class="mp-wide" hidden>重試載入地圖</button>
   </main>
   <section id="mp-hud" hidden aria-label="即時比賽狀態">
-    <div class="mp-race-stats"><b id="mp-position">P1</b><span id="mp-lap">1 / 3 圈</span><time id="mp-time">0:00.000</time></div>
+    <div class="mp-race-stats"><b id="mp-position">P1</b><span id="mp-race-track"></span><span id="mp-lap">1 / 3 圈</span><time id="mp-time">0:00.000</time></div>
     <ol id="mp-board" class="mp-board"></ol><p id="mp-race-message" class="mp-race-message" role="status"></p>
     <div class="mp-race-actions"><button id="mp-camera" aria-label="切換鏡頭">鏡頭</button><button id="mp-sound" aria-pressed="false">開啟音效</button><button id="mp-race-leave">離開比賽</button></div>
     <div class="mp-speed"><b id="mp-speed">0</b><small>km/h</small></div>

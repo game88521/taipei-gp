@@ -1,5 +1,25 @@
 # 私人房連線競速測試
 
+## 多人選圖 v2（目前入口）
+
+結果見 [MULTIPLAYER_MAPS_VALIDATION.md](../../MULTIPLAYER_MAPS_VALIDATION.md)。先 `npm.cmd run build`，來源穩定後依序執行。兩支 maps 瀏覽器 runner 各自開本次 work 的 4318 preview，使用已啟動的獨立 Chrome CDP 9334，只清掉自己建立的 context，不要同時執行。
+
+```powershell
+node tools/dev-tests/multiplayer-server-regression.mjs
+node tools/dev-tests/multiplayer-maps-server-regression.mjs
+node tools/dev-tests/multiplayer-client-regression.mjs --live
+node tools/dev-tests/multiplayer-map-ui-lifecycle.mjs
+node tools/dev-tests/multiplayer-map-resources-regression.mjs
+node tools/dev-tests/multiplayer-maps-geometry.mjs
+node tools/dev-tests/multiplayer-maps-browser.mjs
+node tools/dev-tests/multiplayer-maps-fixed.mjs
+node --experimental-vm-modules tools/dev-tests/multiplayer-checks.mjs
+```
+
+幾何對照預設讀 sibling `taipei-gp-maps-before-f41315a`，可用 `--baseline <不可變原版路徑>` 指定。固定回歸仍執行原 `chain-stab.sh`，只由 `GP_TEST_ORIGIN` 指向本次 4318 dist，未變更數值及 aiHits 斷言。舊平台毫秒級網路案例請避開建置或瀏覽器初始化，保留原 timeout。
+
+以下雙瀏覽器／單 UI 歷史 runner 與 build 屬 v1；v2 改用上方 maps runner。舊證據保留供追查，不算本輪通過。
+
 只用本機服務及隔離資料。結果依每次 JSON 中的來源雜湊與時間為準；下方是重跑方式，不表示公開服務或手機已驗證。
 
 ## 權威伺服器

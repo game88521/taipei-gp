@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc --noEmit && vite build && npm run build:multiplayer",
+    "build": "npm run build:multiplayer:catalog && tsc --noEmit && vite build && npm run build:multiplayer",
+    "build:multiplayer:catalog": "node tools/build-multiplayer-catalog.mjs",
     "build:multiplayer": "node tools/build-multiplayer-physics.mjs",
     "multiplayer": "node server/index.mjs",
     "preview": "vite preview --host",
