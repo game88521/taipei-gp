@@ -35,6 +35,7 @@ const old = await source(before), current = await source(root);
 const frame = await import(dataUrl(compile(await readFile(resolve(root, 'src/frame-pacing.ts'), 'utf8'))));
 const achievements = await import(dataUrl(compile(await readFile(resolve(root, 'src/achievements.ts'), 'utf8'))));
 const mission = await import(await pureUrl(root, 'mission.ts'));
+const { CityGuidance } = await import(await pureUrl(root, 'city-guidance.ts'));
 const report = { before, after: root, beforeMainHash: old.hash, afterMainHash: current.hash, cases: [], evidence: {},
   playTimeDefinition: 'state為free／race的遊玩時間包含看地圖；paused／menu／其餘狀態不累積。地圖中不累積駕駛里程、夜間里程或最高車速。',
   browserUsed: false, playerStorageTouched: false,
@@ -50,9 +51,9 @@ function statsHarness(src, { hz = 60, state = 'free', map = false, speed = 20, n
   const noop = () => {}, physics = (dt) => { steps++; car.x += car.v * dt; };
   const context = vm.createContext({ console, Math, Number, performance: { now: () => now }, clock: { getDelta: () => delta },
     ...frame, framePacer: new frame.RenderPacer(), renderMeter: new frame.RenderMeter(), frameCapPref: '60',
-    BOT: false, SIM: 0, state, mode: state === 'race' ? 'race' : 'free', raceKind: 'tt', mapOpen: map,
+    BOT: false, SIM: 0, practiceRun: undefined, state, mode: state === 'race' ? 'race' : 'free', raceKind: 'tt', mapOpen: map,
     ctxLostNow: false, holdRender: false, STEP: 1 / 120, composer: null, scene: {}, camera: { position: { x: 0, z: 0 } },
-    renderer: { render: noop }, bigmap: { draw: noop }, sr: null, streetRacing: () => false, taxiOn: () => false, taxi: null, nav: null,
+    renderer: { render: noop }, bigmap: { draw: noop }, sr: null, streetRacing: () => false, streetResultOpen: () => false, taxiOn: () => false, taxi: null, nav: null,
     fcar: car, surface: null, CEIL: 1, CIRCUIT: null, step: physics, freeStep: physics, updateCountdown: noop,
     tickRain: noop, applyWeather: noop, weather: { night, stepPicked: noop, update: noop, sunI: 1, hemiI: 1 },
     replayFrame: noop, updateVisuals: noop, podiumFrame: noop, circuitEnv: null, cityStream: null, radioTick: noop, radio: { update: noop }, garage3d: null,
@@ -111,6 +112,7 @@ function navHarness(src, { hz = 60, off = 0, navTime = 0, street = false, taxi =
   const route = [[off, 0], [10000, 0]], streetRoute = [[5, 5], [50, 50]], taxiRoute = [[8, 8], [80, 80]], taxiYs = [3, 4];
   const element = (id) => { if (!elements.has(id)) elements.set(id, { style: {}, textContent: '', className: '' }); return elements.get(id); };
   const context = vm.createContext({ console, Math, Number, performance: { now: () => now * 1000 }, $: element, ROAD_Y: -0.25,
+    cityGuidance: new CityGuidance(), groundH: () => 0, state: 'free', save: { opts: {} }, sound: { beep() {} },
     fcar: { x: 0, z: 0, y: 0, h: 0, v: 0 }, nav: { x: 10000, z: 0, y: 0, nm: '固定遠方目標', path: route, ys: [0, 0], t: navTime },
     mapOpen: false, roadAcc: 0, roadShown: '', lmAcc: 0, lmLast: '', lmAt: 0, toastUntil: 0, bigUntil: 0,
     roadNet: { nearestNamed: () => null }, landmarks: [], minimap: null, sr: { active: { path: streetRoute } }, police: null,
@@ -122,6 +124,7 @@ function navHarness(src, { hz = 60, off = 0, navTime = 0, street = false, taxi =
     updateWantedHud() {}, updateDamageHud() {}, updateDriftHud() {}, playTrafficHonks() {}, playScreams() {}, updateTaxiHud() {}, updateSrHud() {},
     closeMap() { context.mapOpen = false; }, toast: (text) => toasts.push(text),
   });
+  if (src === current) vm.runInContext(src.fn('showCityGuidance'), context);
   for (const name of ['setNav', 'updateNav', 'updateFreeHud']) vm.runInContext(src.fn(name), context);
   const updateFreeHud = vm.runInContext('updateFreeHud', context);
   return { context, calls, arrows, toasts, streetRoute, taxiRoute, taxiYs,

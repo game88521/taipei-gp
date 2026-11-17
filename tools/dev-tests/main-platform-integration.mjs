@@ -55,9 +55,10 @@ async function test(name, action) {
 }
 function fakeElement() {
   const classes = new Set(['hidden']), listeners = new Map();
-  return { hidden: false, open: false, checked: false, value: '', textContent: '', style: {}, className: '', files: null, children: [],
+  return { hidden: false, open: false, checked: false, isConnected: true, disabled: false, value: '', textContent: '', style: {}, className: '', files: null, children: [],
     classList: { add: (x) => classes.add(x), remove: (x) => classes.delete(x), contains: (x) => classes.has(x), toggle(x, on) { if (on) classes.add(x); else classes.delete(x); } },
     appendChild(node) { this.children.push(node); }, replaceChildren(...nodes) { this.children = nodes; },
+    contains(node) { return this.children.includes(node); },
     addEventListener(event, fn) { listeners.set(event, fn); },
     emit(event, payload) { return listeners.get(event)?.(payload ?? { target: this }); },
     focus() {}, select() {}, click() { return this.emit('click'); } };
@@ -79,6 +80,8 @@ const identityURL = dataURL(await compiled('identity.ts'));
 const economyURL = dataURL(await compiled('economy.ts')), economy = await import(economyURL);
 const saveCode = await pureSource(root, 'save.ts');
 const realMission = await import(await pureUrl(root, 'mission.ts'));
+const { CityEntryIntent } = await import(await pureUrl(root, 'city-entry-intent.ts'));
+const { CityGuidance } = await import(await pureUrl(root, 'city-guidance.ts'));
 let loadNo = 0;
 class MemoryStorage {
   data = new Map(); writes = []; fail = null;
@@ -153,8 +156,10 @@ function context(extra = {}) {
     fcar: { x: 0, z: 0, y: 10, h: 0, place(...v) { events.push(['place', ...v]); } },
     toast: (...v) => events.push(['toast', ...v]), finishDrift: (action) => events.push(['drift', action]),
     chosen: { id: 'sedan' }, taxi: null, sr: null, police: null, BOT: false, NO_TRAFFIC: false,
-    save: {}, taxiCheckpointPending: false, document: { createElement: () => fakeElement() }, updateTaxiResumeUi() {}, ...extra });
-  for (const name of ['taxiOn', 'streetRacing']) vm.runInContext(current.fn(name), ctx);
+    save: { opts: {} }, sound: { beep() {} }, groundH: () => 0, cityGuidance: new CityGuidance(), cityEntryIntent: new CityEntryIntent(),
+    taxiCheckpointPending: false, cityJobsUi: undefined, document: { createElement: () => fakeElement() }, updateTaxiResumeUi() {}, ...extra });
+  // 執行真main共同取消/職涯同步函式；本檔警方替身不產生新勤務結果。
+  for (const name of ['taxiOn', 'streetRacing', 'syncPoliceCareer', 'stopPolice', 'beginCityEntry', 'showCityGuidance']) vm.runInContext(current.fn(name), ctx);
   return { ...d, ctx, events, load(...names) { for (const n of names) vm.runInContext(current.fn(n), ctx); } };
 }
 const trip = { from: '市府', to: '車站', distance: 3456, driven: 1200, remaining: 2256, timeLimit: 364, timeLeft: 150, junctions: 8,
@@ -211,9 +216,10 @@ await test('使用車款立即切換既有車損，街頭賽暫態車損不污�
   vm.runInContext(`var useCar = ${current.click('car-use')};`, h.ctx); h.ctx.useCar();
   assert.equal(damage.value, 0.2); assert.equal(h.ctx.chosen.id, 'police'); assert.equal(h.ctx.save.damage.sedan, 0.8); assert.deepEqual(h.events.slice(0, 2), [['drift', 'bank'], ['save']]);
   h.ctx.sr = { begin: () => h.events.push(['street-begin']), cancel() { this.active = null; }, active: {}, phase: 'race' };
-  h.ctx.taxi = { abandon: () => h.events.push(['taxi-stop']), settledIds: [], money: 0, trips: 0 }; h.ctx.police = { hide: () => h.events.push(['police-hide']) }; h.ctx.updateOffer = () => {};
-  h.load('currentStreetOptions', 'abandonTaxi', 'acceptChallenge', 'abandonStreetRace'); h.ctx.bigMsg = () => {}; h.ctx.sound = { beep() {} };
-  h.ctx.acceptChallenge({}); assert.equal(h.ctx.nav, null); assert.equal(damage.value, 0); damage.value = 0.9;
+  h.ctx.taxi = { abandon: () => h.events.push(['taxi-stop']), settledIds: [], money: 0, trips: 0 }; h.ctx.police = { hide: () => h.events.push(['police-hide']), consumeDutyResult: () => null }; h.ctx.updateOffer = () => {};
+  h.ctx.streetSeriesStartToken = {};
+  h.load('cancelPendingStreetSeriesStart', 'currentStreetOptions', 'abandonTaxi', 'acceptChallenge', 'abandonStreetRace'); h.ctx.bigMsg = () => {}; h.ctx.sound = { beep() {} };
+  h.ctx.acceptChallenge({}); assert.equal(h.ctx.streetSeriesStartToken, null); assert.equal(h.ctx.nav, null); assert.equal(damage.value, 0); damage.value = 0.9;
   assert.equal(damage.snapshot().__street__, undefined); assert.equal(damage.snapshot().police, 0.2);
   h.ctx.abandonStreetRace(); assert.equal(damage.value, 0.2); assert.equal(damage.valueFor('sedan'), 0.8);
   const stop = h.events.findIndex((e) => e[0] === 'taxi-stop'), begin = h.events.findIndex((e) => e[0] === 'street-begin'); assert.ok(stop >= 0 && begin > stop);
@@ -241,7 +247,7 @@ await test('計程車先看訂單不開車；點選後結束街頭／警察，�
     save: { freePos: { x: 0, z: 0, y: 10, h: 0 } }, validFreePos: (p) => !!p, pausedFrom: 'free',
     pause() { h.events.push(['pause']); h.ctx.state = 'paused'; }, menu: fakeElement(), writeSave() {},
     sr: { phase: 'race', active: {}, cancel() { h.events.push(['street-cancel']); this.active = null; } },
-    police: { hide: () => h.events.push(['police-hide']) }, taxi: t });
+    police: { hide: () => h.events.push(['police-hide']), consumeDutyResult: () => null }, taxi: t });
   h.load('renderTaxiOrders', 'checkpointTaxi');
   vm.runInContext(`var startTaxi = ${current.click('btn-taxi')};`, h.ctx); await h.ctx.startTaxi();
   assert.equal(t.phase, 'off'); assert.equal(h.ctx.state, 'paused'); assert.equal(h.ctx.nav.nm, '手動目的地');

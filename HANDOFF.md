@@ -1,3 +1,89 @@
+<!-- twelve-current-start -->
+# 2026-11-17 最新：十二項改善（Twelve）
+
+Rex授權的12項已完成整合本機驗證：長時錄製／存檔、同分決勝、接單取消、追緝預警、多人平滑／雷達／戰績／房規、TT區段練習、進站校準、逐路口導航與同級街賽。build **d251460c360c**，Node88、before22、新browser29、原26套、legacy27套305案、固定3、交付fixture19通過。規格見[TWELVE_FIXES.md](./TWELVE_FIXES.md)，完整證據與限制見[TWELVE_VALIDATION.md](./TWELVE_VALIDATION.md)／JSON。
+
+work=DCISI/taipei-gp-twelve-work；不可變before=DCISI/taipei-gp-twelve-before-102e84eea8ea；inventory557檔，SHA256 b4538336021ffb6a1d9d5e16d4314ca15ad57ad5e29bb24955219bb160ee6f15。Git HEAD仍57b09b2f3f78dffd5dadac0ca83581c01f9c42c3、multiplayer-test，main為2dee076de30da52fe20b4d33faf659e6acf0aed3。不得用Git HEAD覆蓋既有未提交成果或重跑舊Apply／Publish。
+
+本來源文件只表示工作副本通過，**尚未證明套回原專案，沒有commit、push或部署**。只使用新的DCISI/Apply-TaipeiTwelve.ps1；不帶旗標先預檢，-Apply -Build才備份、套用、離線建置與逐檔驗證。成功收據=taipei-gp-twelve-apply-receipt.json；latest或失敗預檢不能取代成功收據。原專案狀態依manifest雜湊、成功收據、verify-taipei-twelve-original.mjs與DCISI根交接確認，動態保留原有未知／忽略檔。
+
+AGENTS仍適用：繁中、虛構品牌、未獲當輪明確授權不push、只測本機、手機實機最後做。署名Rex <game88521@gmail.com>。不改Render/Vercel/Origin。多人房規需新前後端配套，外網／手機／長時四人／真下載／難度平衡與校準準確度未驗，不能把受控fixture當成真人證據。
+<!-- twelve-current-end -->
+
+以下完整保留此前交接；各段「目前／尚未」是當輪歷史。
+
+<!-- tenpack-current-start -->
+# 2026-11-16 最新：十項改善（TenPack）
+
+Rex選擇的十項均已完成：GP小螢幕HUD、完賽觀戰、同房圈數、自動畫質、3～5圖連賽、全車逐圈胎段、自訂賽季、TT遙測教練、分級警察職涯、3～5站觀光載客。最終工作副本build **102e84eea8ea**。新增Node100、新版browser29、舊26套、固定3、交付fixture19全PASS；另有before browser3與舊Node205。規格／使用入口見 [TENPACK_FIXES.md](./TENPACK_FIXES.md)，範圍與限制見 [TENPACK_VALIDATION.md](./TENPACK_VALIDATION.md)／JSON。
+
+work=DCISI/taipei-gp-tenpack-work；不可變before=DCISI/taipei-gp-tenpack-before-c220d98a7f5c；inventory529檔，SHA256 cc14632b7689778895e31d624fbfa10edecdab619fb89d9ea9cf324a6e8283eb；來源HEAD 57b09b2f3f78dffd5dadac0ca83581c01f9c42c3，multiplayer-test，main 2dee076de30da52fe20b4d33faf659e6acf0aed3。不可從Git HEAD還原既有未提交改善。原專案另74個既有未知／忽略檔由套用前完整盤點動態保留。
+
+只用新的 Apply-TaipeiTenPack.ps1（預檢不帶旗標，套用需-Apply -Build）；先備份、檢查整批與保留檔、離線build、逐檔驗證，不commit／push。成功真套用收據=DCISI/taipei-gp-tenpack-apply-receipt.json；latest結果與preflight各自另存；預檢／失敗／零檔重建不抹成功收據。原專案狀態必須由此收據＋verify-taipei-tenpack-original.mjs --manifest-sha256 <reviewed SHA>＋DCISI根交接確認，不能由本封存來源文件推定已套用。
+
+不得重跑舊套用／發布工具；AGENTS規則繼續適用。手機實機最後測，外網／真人完整連賽、耗電與難度平衡尚未驗證，未授權本輪提交／推送／部署。
+<!-- tenpack-current-end -->
+
+以下保留先前交接原文；各段「目前／尚未」是當輪歷史。
+
+<!-- lobbybrake-current-start -->
+# 2026-11-16 最新：連線等待、房主管理與即時抓地提示
+
+接續 Rex「幫我繼續優化遊戲」，完成進房等待／取消／明確重試、大廳移除車手／房主交棒，以及 GP 雨天、胎種與磨耗反映到煞車提示及輔助線。詳細功能見 [LOBBYBRAKE_FIXES.md](./LOBBYBRAKE_FIXES.md)，管理訊息與相容契約見 [LOBBYBRAKE_HOST_CONTRACT.md](./LOBBYBRAKE_HOST_CONTRACT.md)。
+
+最終 build **c220d98a7f5c**，baseline **57b09b2f3f78dffd5dadac0ca83581c01f9c42c3**，分支 `multiplayer-test`。**完整本機驗證已通過**：新增 Node 68 案、舊 Node 118 案（上一輪42＋既有多人76）、原單人26套、最終版browser28案、before對照2案、固定三回歸與安全套用fixture15案全部PASS。`LOBBYBRAKE_VALIDATION.json` 為 `status=PASS`，收錄27份報告及22個交付程式／測試來源雜湊；產品SHA256為 `a877800df9e2026a5ed0b19e36736f18e4cceb35bb5c9ab3e0f0daa5388fd56c`。最終browser與固定回歸均驗本build；詳見 [LOBBYBRAKE_VALIDATION.md](./LOBBYBRAKE_VALIDATION.md)，各組有重疊覆蓋。
+
+三固定基準完全一致：TT 54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5，未修改期望數字。car／track／rivals／pitlane／server physics五檔與before逐位元一致；本輪main、world、獨立提示模型及多人相關程式有修改，不更動模擬亂數。wire仍v2加法相容，physics仍classic-multitrack-collisions-v3。
+
+入口僅重試WebSocket握手：原單次7秒、間隔1.5秒、總等待上限45秒；傳輸開啟後，建立／加入／續接命令只送一次，房間拒絕改由玩家明確重試。可取消、保留輸入，不新增HTTP健康探測。房主管理僅在大廳且server提供能力時顯示，確認後再次檢查房碼／世代／權限；被移除身分撤銷續接憑證並停止自動重連，仍可手動取得新身分加入。舊server省略能力時隱藏管理入口。
+
+GP提示讀取已有胎種／濕度／磨耗的car.gripMul，獨立保守曲線最多4Hz更新，重用線色buffer；不回寫track.vTarget或車輛／AI物理。進維修道in／box／out不顯示煞車警告，非GP／排位／回放恢復原曲線。提示屬中心線估計，未量測真人整圈改善或保證實際安全速度。
+
+work=`DCISI/taipei-gp-lobbybrake-work`；不可變before=`DCISI/taipei-gp-lobbybrake-before-f8ca4b1d251c`；inventory=`taipei-gp-lobbybrake-baseline.json`，完整515檔，SHA256=`d9e2ad65d1989fae60b153d11a9323f036f21557c8cb4b409170610cf4f5f692`，已包含前幾輪未提交成果。歷史NEXT6三份與RACEPLUS三份文件／JSON均保留原bytes。before browser使用保留f8ca4b1d251c建置的`DCISI/taipei-gp-raceplus-work`；彙整另核其完整515檔與inventory一致，報告來源hash仍對不可變snapshot，不接受任意control路徑。
+
+**目前尚未套回原專案，沒有commit、push或部署。** 本文件於封裝前寫入；原專案後續套用須核對 `DCISI/taipei-gp-lobbybrake-apply-result.json`、獨立 `DCISI/taipei-gp-lobbybrake-original-verification.json`、manifest與逐檔現況，後續由`DCISI/TAIPEI_GP_CODEX_HANDOFF.md`追蹤。只用本輪`DCISI/Apply-TaipeiLobbyBrake.ps1`；無參數唯讀預檢，`-Apply -Build`才先備份、套用、建置及逐檔驗證。不要重跑舊Apply／Publish，也不以Git HEAD覆蓋未提交成果；來源與測試通過不等於已套回或已發布。
+
+只測本機，不改Render／Vercel／ALLOWED_ORIGINS。CDP預設9334；本輪多人preview4330／WS4331、抓地提示4332；既有圈速4325／4326、策略4327、期限4319／4322、固定三基準4318，browser循序執行。手機尺寸為桌面Chrome模擬；844×220既有策略摘要覆蓋warning上緣約8px但文字主體可見，390×844直式橫握提醒疊在warning下緣，不能宣稱完全無遮擋。手機實機、外網延遲、長時間四人對戰、全24圖真人完整駕駛、策略估值誤差、真觸控、耗電／FPS未驗證；手機實機最後測。clipboard／share仍採替身，未發送訊息。後續明確授權提交時使用繁中訊息與`Rex <game88521@gmail.com>`。
+<!-- lobbybrake-current-end -->
+
+以下完整保留各輪歷史；下方的「最新／未套回」是當輪記錄，本輪狀態以上方LobbyBrake段落及實際驗證／套用狀態檔為準。
+
+<!-- raceplus-current-start -->
+# 2026-11-16 最新：進站策略、多人圈速與房碼邀請
+
+接續 Rex「幫我繼續優化遊戲」：進站估值納入指定下一套胎、當下濕度與近期有效胎耗，進站中改顯示階段／鎖定胎種；多人增加權威逐圈、最快圈、完賽差距與可切換車手的圈表；新增乾淨邀請連結、分享及手動複製備援。朋友開連結只預填房碼，按加入才連線。完整範圍見 [RACEPLUS_FIXES.md](./RACEPLUS_FIXES.md)。
+
+最終 build **f8ca4b1d251c**，baseline **57b09b2f3f78dffd5dadac0ca83581c01f9c42c3**，分支 `multiplayer-test`。**完整本機驗證已通過**：新增 Node 42 案、既有多人 Node 76 案、原單人 26 套、最終 browser 15 案、舊版對照 4 案、固定三回歸與安全套用 fixture 12 案全部 PASS。`RACEPLUS_VALIDATION.json` 為 `status=PASS`，收錄 19 份報告、22 個交付程式／測試雜湊，產品 SHA256 為 `263b8b728692918a5acb07f2247f7b19179da8acb02d32ab06b84c3f68dafd53`。最終 browser／固定回歸均驗本 build；詳見 [RACEPLUS_VALIDATION.md](./RACEPLUS_VALIDATION.md)，各組有重疊覆蓋。
+
+三固定基準完全一致：TT 54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5，未改基準。car／track／rivals／pitlane／server physics 五檔已核對與 before 逐位元一致；本輪 main／strategy 與相關 UI 有修改。wire protocol 仍 v2 加法相容、physics 仍 classic-multitrack-collisions-v3；舊 server 無逐圈欄位時明示未提供成績，不捏造圈速。
+
+work=`DCISI/taipei-gp-raceplus-work`；不可變 before=`DCISI/taipei-gp-raceplus-before-38335611f205`；inventory=`taipei-gp-raceplus-baseline.json`，共 504 檔，已包含 Rex 確認套回的上一輪 34 個未提交修改。歷史 `NEXT6_FIXES.md`、`NEXT6_VALIDATION.md`、`NEXT6_VALIDATION.json` 原封保留；下方「最新／未套回」是各輪當時記錄，不代表本輪狀態。
+
+本文件於封裝前寫入，當時尚未核對原專案套用，也未 commit、push 或部署。原專案是否已套用，以 `DCISI/taipei-gp-raceplus-apply-result.json`、獨立 `DCISI/taipei-gp-raceplus-original-verification.json`、manifest 與逐檔現況為準；後續狀態由 `DCISI/TAIPEI_GP_CODEX_HANDOFF.md` 追蹤。只用新 `DCISI/Apply-TaipeiRacePlus.ps1`，無參數唯讀預檢，`-Apply -Build` 才備份／套用／建置／逐檔驗證。來源交接及測試通過不等於已套用。不要重跑舊 Apply／Publish 工具或用 Git HEAD 還原未提交成果，本輪未有發布授權。
+
+只測本機，不改 Render／Vercel／ALLOWED_ORIGINS。新多人 browser 用 preview4325／WS4326，策略 browser 用4327，既有多人 browser 用4319／WS4322，固定三基準用4318，CDP預設9334；browser循序執行。手機實機、外網延遲、長時間四人對戰、全24圖真人完整駕駛、策略估值誤差與耗電／FPS尚未驗證；clipboard／share為替身，未發送訊息。後續明確授權提交時使用繁中訊息及 `Rex <game88521@gmail.com>`。
+<!-- raceplus-current-end -->
+
+以下保留全部歷史，本輪狀態以上方 RacePlus 段落及實際驗證／套用狀態檔為準。
+
+<!-- next6-current-start -->
+# 2026-11-16 最新：Rex 選定的六項優化已完成驗證
+
+範圍為 [NEXT6_FIXES.md](./NEXT6_FIXES.md) 的 1～6：有效 TT 完圈才提交最佳分段、排位／GP 紀錄隔離、賽季續賽分段、警車碰撞回饋、街賽結算凍結與非同步下一站保護、多人 keyed 清單／30及60fps／閒置10fps、伺服器完賽倒數及 DNF 原因。未擴做分析的 7～13。
+
+最終 build **38335611f205**，baseline **57b09b2f3f78dffd5dadac0ca83581c01f9c42c3**，分支 `multiplayer-test`。建置、原26套、分項新增53案例、原多人client/UI/碰撞client/server共63案例、真browser14案例、固定3基準與套用fixture12案例均通過。原26套有一項毫秒級下載逾時測試先失敗，再以同產品／原斷言孤立重跑一次通過；原失敗保留。詳見 [NEXT6_VALIDATION.md](./NEXT6_VALIDATION.md) 與完整JSON，不將各組重疊覆蓋當成獨立功能數量。
+
+三固定值仍為54.425 hits0／aiHits0、陳冠宇162.0／aiHits8、進站175.7／aiHits5。car／track／rivals／pitlane與server physics bytes未變；wire protocol仍v2加法相容，physics仍classic-multitrack-collisions-v3。新截止與DNF資訊需新server提供欄位；本輪未commit、push或部署。
+
+work=`DCISI/taipei-gp-next6-work`；不可變before=`DCISI/taipei-gp-next6-before-57b09b2`；inventory=`taipei-gp-next6-baseline.json`，490檔。只用新 `DCISI/Apply-TaipeiNext6.ps1`，無參數唯讀預檢，`-Apply -Build`才備份／套用／建置／逐檔驗證。原專案是否已套回以 `DCISI/taipei-gp-next6-apply-result.json`、manifest及當下檔案核對為準；來源交接不預先宣稱套用成功。不要重跑舊Apply／Publish工具，也不以Git HEAD覆蓋未提交成果。
+
+不清歷史來源不明的最佳分段；續賽前歷史圈表／回放從續賽起重記，當圈分段保留。手機實機、耗電、音質、外網真人碰撞與全24圖逐圖駕駛未驗。CDP9334；新browser用4319/4322與4324、固定三基準自開4318，不碰既有4317；詳細命令見驗證文件。
+
+上一輪碰撞提交57b09b2已推送測試分支，Rex回報兩平台已更新，最新頁面為 https://taipei-p7316te67-rex-7837.vercel.app/multiplayer.html ，Render為 https://taipei-gp.onrender.com 。該Origin後端10項通過，Rex僅確認「能開頁，尚未雙人測試」。本輪不連外、不改Origin、不重新部署；下方碰撞／24圖的「未發布」是當時歷史，不能當作現況或本輪發布授權。
+<!-- next6-current-end -->
+
+以下保留各輪歷史，現況以本輪段落、DCISI狀態檔及逐檔驗證為準。
+
 <!-- multiplayer-collisions-current-start -->
 # 2026-11-13 最新：多人車輛碰撞
 

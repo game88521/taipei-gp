@@ -35,7 +35,7 @@ async function mainSource(base) {
     event(id, event = 'click') { return slice(eventCall(ast, (n) => n.type === 'CallExpression' && n.callee?.name === '$' && n.arguments[0]?.value === id, event)?.arguments[1]); },
     swatch() { return slice(eventCall(fnNode('refreshGarage'), (n) => n.type === 'Identifier' && n.name === 'sw', 'click')?.arguments[1]); },
     taxi() { return slice(fnNode('freeStep').body.body.find((n) => n.type === 'IfStatement' && walk(n.consequent, (x) => x.type === 'VariableDeclarator' && x.id?.name === 'moneyBefore'))); },
-    police() { return slice(fnNode('freeStep').body.body.find((n) => n.type === 'IfStatement' && n.test.type === 'Identifier' && n.test.name === 'police')); },
+    police() { return slice(walk(fnNode('freeStep'), (n) => n.type === 'IfStatement' && n.test.type === 'Identifier' && n.test.name === 'police' && walk(n.consequent, x => x.type === 'CallExpression' && x.callee?.object?.name === 'police' && x.callee?.property?.name === 'update'))); },
     pursuitKey() { return slice(walk(ast, (n) => n.type === 'CallExpression' && n.callee?.name === 'addEventListener' && n.arguments[0]?.value === 'keydown' && walk(n.arguments[1], (x) => x.type === 'Literal' && x.value === 'KeyG'))?.arguments[1]); },
   };
 }
@@ -75,17 +75,23 @@ function harness(source = current, initialMoney = 1000) {
     state: 'free', mode: 'free', pausedFrom: 'free', streetRacing: () => false, taxiOn: () => false,
     saveFreePos() {}, showMenu() {}, hideMenu() {}, userStart: async () => {}, clock: { getDelta() {} },
     police: null, nav: null, fcar: {}, collider: null, traffic: null, trafficHit: 0, pedHit: false,
-    dt: 0.02, FREE_SIM: false, WANTED_TEST: false, NO_TRAFFIC: false, policeLog: [], impact: 0,
-    taxiCheckpointPending: false, updateTaxiResumeUi() {},
+    dt: 0.02, FREE_SIM: false, WANTED_TEST: false, NO_TRAFFIC: false, policeLog: [], impact: 0, carHit: 0,
+    streetResultOpen: () => false, practiceRun: undefined,
+    taxiCheckpointPending: false, updateTaxiResumeUi() {}, cityJobsUi: undefined,
   });
   vm.runInContext(`var PAINT_PRICE = ${priceSource};`, ctx);
   for (const name of ['money', 'setMoney', 'earn']) vm.runInContext(source.fn(name), ctx);
-  if (source === current) { vm.runInContext(interactiveSource, ctx); vm.runInContext(current.fn('gameShortcut'), ctx); vm.runInContext(current.fn('checkpointTaxi'), ctx); }
+  if (source === current) {
+    vm.runInContext(interactiveSource, ctx);
+    // 真main函式取代新增依賴；舊經濟警方替身不產生勤務事件，原交易斷言保持。
+    for (const name of ['gameShortcut', 'checkpointTaxi', 'syncPoliceCareer', 'stopPolice']) vm.runInContext(current.fn(name), ctx);
+  }
   return { ctx, events, get, save, taxi, source, run(code) { return vm.runInContext(code, ctx); }, callback(name, code) { vm.runInContext(`var ${name} = ${code};`, ctx); return ctx[name]; } };
 }
 function pursuit(h) {
   h.ctx.chosen = { id: 'police' };
   h.ctx.police = { suspect: {}, active: true, wanted: false, stars: 0,
+    consumeDutyResult: () => null,
     endPursuit(reason) { h.events.cancelled.push(reason); this.suspect = null; this.active = false; },
     startPursuit() { h.events.pursuits++; this.suspect = {}; this.active = true; return '追緝啟動'; },
   };
@@ -151,7 +157,7 @@ await test('真維修click：有錢實付100、錢不足免費且不記支出', 
 await test('真freeStep警方區塊：罰款按可付餘額記錄，零錢包零筆；追緝獎金獨立原因', () => {
   for (const [initial, delta, expected, amount, reason] of [[500, -150, 350, -150, '通緝罰款'], [50, -150, 0, -50, '通緝罰款'], [0, -150, 0, 0, null], [100, 400, 500, 400, '巡邏追緝獎金']]) {
     const h = harness(current, initial);
-    h.ctx.police = { stars: 0, update: () => ({ msg: delta > 0 ? '✅ 逮捕嫌犯' : '🚔 被捕', money: delta }) };
+    h.ctx.police = { stars: 0, consumeDutyResult: () => null, update: () => ({ msg: delta > 0 ? '✅ 逮捕嫌犯' : '🚔 被捕', money: delta, playerImpact: 0 }) };
     h.run(current.police()); assert.equal(h.ctx.money(), expected); assert.equal(h.save.ledger.length, amount ? 1 : 0);
     if (amount) { assert.equal(h.save.ledger[0].amount, amount); assert.equal(h.save.ledger[0].reason, reason); }
     if (delta > 0) { assert.equal(h.ctx.stats.arrests, 1); assert.equal(h.ctx.stats.earned, 400); }

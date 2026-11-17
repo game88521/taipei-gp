@@ -6,6 +6,7 @@ import { CIRCUIT } from './circuits';
 import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, type Track } from './track';
 import { PIT, boxS, laneLat, signedS, mountedAt, type PitLane, type StopInfo } from './pitlane';
 import { RaceTiming } from './race-timing';
+import { recordingBracket, REPLAY_FRAME_LIMIT } from './bounded-recording';
 import { parseRaceSnapshot, type RaceSnapshot, type ReplayState, type ReplayEvent, type QualifyingOptions, type CompletionOptions, type CompletionProgress } from './race-state';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
@@ -133,6 +134,10 @@ export class RaceField {
   private completing = false;
   private completionJob: object | null = null;
   private replayStates: ReplayState[] = [];
+  private replayTimes: number[] = [];
+  private replayDuration = 0;
+  private replayInterval = 0.05;
+  get replaySampleTimes(): readonly number[] { return this.replayTimes; }
   private replayTimeline: ReplayEvent[] = [];
   private emitEvent(type: string) {
     this.events.push(type);
@@ -234,6 +239,7 @@ export class RaceField {
     this.recAcc = 0;
     this.timing.clear();
     this.replayStates = [];
+    this.replayTimes = []; this.replayDuration = 0; this.replayInterval = 0.05;
     this.replayTimeline = [];
     this.replayStartTime = 0;
     this.completing = false;
@@ -339,6 +345,7 @@ export class RaceField {
     });
     this.replayStartTime = s.raceTime;
     this.replayStates = [];
+    this.replayTimes = []; this.replayDuration = 0; this.replayInterval = 0.05;
     this.replayTimeline = [];
     return true;
   }
@@ -399,7 +406,7 @@ export class RaceField {
         pit: r.pit ? { ...r.pit } : null, lift: r.lift, energy: r.car.energy })) };
   }
   replayStateAt(time: number): ReplayState | null {
-    const i = Math.max(0, Math.min(this.replayStates.length - 1, Math.floor(time / 0.05)));
+    const i = recordingBracket(this.replayTimes, time).a;
     const state = this.replayStates[i];
     if (!state) return null;
     return { ...state, sc: { ...state.sc }, cars: state.cars.map((r) => ({ ...r, pit: r.pit ? { ...r.pit } : null })) };
@@ -512,8 +519,17 @@ export class RaceField {
       this.recAcc += dt;
       if (this.recAcc >= 0.05) {
         this.recAcc -= 0.05;
-        for (const r of this.racers) r.rec.push(r.car.x, r.car.z, r.car.h, r.car.steer, r.car.v);
-        this.replayStates.push(this.captureReplayState(this.replayStates.length * 0.05));
+        const time = this.replayDuration; this.replayDuration += 0.05;
+        if (!this.replayTimes.length || time - this.replayTimes[this.replayTimes.length - 1] >= this.replayInterval - 1e-7) {
+          for (const r of this.racers) r.rec.push(r.car.x, r.car.z, r.car.h, r.car.steer, r.car.v);
+          this.replayTimes.push(time); this.replayStates.push(this.captureReplayState(time));
+          if (this.replayTimes.length > REPLAY_FRAME_LIMIT) {
+            this.replayTimes = this.replayTimes.filter((_, i) => i % 2 === 0);
+            this.replayStates = this.replayStates.filter((_, i) => i % 2 === 0);
+            for (const r of this.racers) r.rec = r.rec.filter((_, i) => Math.floor(i / 5) % 2 === 0);
+            this.replayInterval *= 2;
+          }
+        }
       }
     }
     // ---- 車與車碰撞：前後兩個圓，同質量的動量交換（被撞的那台會被推開、車頭被撞歪）
@@ -826,17 +842,17 @@ export class RaceField {
 
   /** 回放：第 t 秒每台車的位置（線性內插） */
   replayAt(time: number, apply: (r: Racer, x: number, z: number, h: number, steer: number, v: number) => void) {
-    const f = time / 0.05, i = Math.floor(f), k = f - i;
+    const bracket = recordingBracket(this.replayTimes, time), i = bracket.a, k = bracket.f;
     for (const r of this.racers) {
       const n = r.rec.length / 5;
       if (!n) continue;
-      const a = Math.min(n - 1, i), b = Math.min(n - 1, i + 1), A = a * 5, B = b * 5;
+      const a = Math.min(n - 1, i), b = Math.min(n - 1, bracket.b), A = a * 5, B = b * 5;
       let dh = r.rec[B + 2] - r.rec[A + 2];
       dh = Math.atan2(Math.sin(dh), Math.cos(dh));
       apply(r, r.rec[A] + (r.rec[B] - r.rec[A]) * k, r.rec[A + 1] + (r.rec[B + 1] - r.rec[A + 1]) * k, r.rec[A + 2] + dh * k, r.rec[A + 3], r.rec[A + 4]);
     }
   }
-  get replayLength() { return (this.me.rec.length / 5) * 0.05; }
+  get replayLength() { return this.replayDuration; }
 
   private drive(r: Racer, cooldown: boolean, dt: number) {
     const t = this.t, c = r.car, i = c.pos.i, N = t.N, P = r.persona;

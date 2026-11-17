@@ -1,14 +1,18 @@
 export interface TaxiStop { x: number; z: number; y: number; nm: string }
 export interface TaxiPosition { x: number; z: number; y?: number; h?: number }
+export interface TaxiTour { stops: TaxiStop[]; next: number; distance: number }
 export interface TaxiCheckpoint {
   v: 1; id: string; phase: 'seek' | 'ride'; from: string; target: TaxiStop; destination: TaxiStop | null;
   relaxed: boolean; position: TaxiPosition; timeLeft: number; timeLimit: number; odo: number; hits: number;
   streak: number; routeLen: number; junctions: number; condition: number;
+  tour?: TaxiTour;
 }
 export interface TaxiOrder {
   id: string; from: string; to: string; pickup: TaxiStop; destination: TaxiStop; pickupDistance: number;
   distance: number; timeLimit: number; estimatedFare: number; estimatedTotal: number; junctions: number;
 }
+export interface TaxiTourOrder extends TaxiOrder { tourStops: TaxiStop[]; tourBonus: number }
+export const tourCompletionBonus = (stops: number) => stops * 80;
 export interface TaxiSettlement { id: string; status: 'delivered' | 'timeout'; total: number }
 const finite = (n: unknown, min: number, max: number): n is number => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
 const idOK = (id: unknown): id is string => typeof id === 'string' && /^[a-zA-Z0-9._:-]{1,160}$/.test(id);
@@ -33,8 +37,21 @@ export function parseTaxiCheckpoint(raw: unknown): TaxiCheckpoint | null {
     || !finite(r.routeLen, 0, 1e7) || !Number.isSafeInteger(r.junctions) || r.junctions < 0 || r.junctions > 1e5 || !finite(r.condition, 0.7, 1)
     || r.phase === 'ride' && !r.relaxed && (r.timeLimit <= 0 || r.timeLeft <= 0)
     || r.relaxed && (r.timeLeft !== 0 || r.timeLimit !== 0)) return null;
+  let tour: TaxiTour | undefined;
+  if ('tour' in r) {
+    const t = r.tour;
+    if (!t || typeof t !== 'object' || !Array.isArray(t.stops) || t.stops.length < 3 || t.stops.length > 5
+      || !Number.isInteger(t.next) || t.next < 0 || t.next >= t.stops.length || !finite(t.distance, 1, 100000)
+      || !r.relaxed || !destination || r.phase === 'seek' && (t.next !== 0 || r.odo !== 0 || r.from !== target.nm)) return null;
+    const stops = t.stops.map(stop);
+    if (stops.some((s) => !s || s.nm === r.from) || new Set(stops.map((s) => s!.nm)).size !== stops.length) return null;
+    const last = stops[stops.length - 1]!;
+    const equals = (a: TaxiStop, b: TaxiStop) => a.nm === b.nm && a.x === b.x && a.z === b.z && a.y === b.y;
+    if (!equals(last, destination) || r.phase === 'ride' && (!equals(stops[t.next]!, target) || r.routeLen !== t.distance)) return null;
+    tour = { stops: stops as TaxiStop[], next: t.next, distance: t.distance };
+  }
   return { v: 1, id: r.id, phase: r.phase, from: r.from, target, destination, relaxed: r.relaxed,
     position: { x: p.x, z: p.z, ...(p.y != null ? { y: p.y } : {}), ...(p.h != null ? { h: p.h } : {}) },
     timeLeft: r.timeLeft, timeLimit: r.timeLimit, odo: r.odo, hits: r.hits, streak: r.streak, routeLen: r.routeLen,
-    junctions: r.junctions, condition: r.condition };
+    junctions: r.junctions, condition: r.condition, ...(tour ? { tour } : {}) };
 }

@@ -250,7 +250,10 @@ try {
     return { newMatchId: current.matchId, previousMatchId: oldMatch, departedDnf: true, remainingPeerContinued: true };
   });
   const storage = await page.evaluate(`({initial:__mpInitialStorage,current:Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)])),writes:__mpStorageWrites})`);
-  assert.deepEqual(storage.current, storage.initial); assert.deepEqual(storage.writes, []); report.localStorageUnchanged = true;
+  const protectedEntries = data => Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'taipei-gp-multiplayer-history-v1'));
+  assert.deepEqual(protectedEntries(storage.current), protectedEntries(storage.initial));
+  assert.deepEqual(storage.writes.filter(row => row.args[0] !== 'taipei-gp-multiplayer-history-v1' || row.method === 'clear'), []);
+  report.localStorageUnchanged = JSON.stringify(storage.current) === JSON.stringify(storage.initial); report.protectedStorageUnchanged = true; report.historyWrites = storage.writes.length;
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.externalRequests, []); assert.deepEqual(report.blockedExternalRequests, []);
 } catch (error) {
   if (!report.cases.some(test => test.status === 'FAIL')) report.cases.push({ name: currentCase, status: 'FAIL', error: error.stack ?? String(error) });
@@ -269,7 +272,7 @@ try {
   report.completedAt = new Date().toISOString(); report.sourceHashes = await hashes(); report.sourceUnchangedDuringTests = JSON.stringify(beforeHashes) === JSON.stringify(report.sourceHashes);
   report.productHash = await productHash(); report.productUnchangedDuringTests = beforeProductHash === report.productHash;
   report.summary = { passed: report.cases.filter(test => test.status === 'PASS').length, failed: report.cases.filter(test => test.status === 'FAIL').length };
-  report.status = report.summary.passed === expectedCases && report.summary.failed === 0 && report.localStorageUnchanged && report.exceptions.length === 0 && report.externalRequests.length === 0 && report.blockedExternalRequests.length === 0 && report.contextsDisposed.length === 1 && report.contextsDisposed[0].disposed && report.sourceUnchangedDuringTests && report.productUnchangedDuringTests ? 'PASS' : 'FAIL';
+  report.status = report.summary.passed === expectedCases && report.summary.failed === 0 && report.protectedStorageUnchanged && report.exceptions.length === 0 && report.externalRequests.length === 0 && report.blockedExternalRequests.length === 0 && report.contextsDisposed.length === 1 && report.contextsDisposed[0].disposed && report.sourceUnchangedDuringTests && report.productUnchangedDuringTests ? 'PASS' : 'FAIL';
   await writeFile(path.join(evidence, 'multiplayer-ui-browser-summary.json'), JSON.stringify(report, null, 2) + '\n'); await writeFile(summaryPath, JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify({ status: report.status, ...report.summary, transport: report.transport, sourceUnchangedDuringTests: report.sourceUnchangedDuringTests, productHash: report.productHash, productUnchangedDuringTests: report.productUnchangedDuringTests, evidence: path.relative(project, evidence) }));
   if (report.status !== 'PASS') process.exitCode = 1;

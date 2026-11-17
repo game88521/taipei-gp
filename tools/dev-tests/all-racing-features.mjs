@@ -32,7 +32,7 @@ function element() { const c = new Set(); return { children: [], className: '', 
   classList: { add: (x) => c.add(x), remove: (x) => c.delete(x), contains: (x) => c.has(x) },
   appendChild(x) { this.children.push(x); }, append(...x) { this.children.push(...x); }, replaceChildren(...x) { this.children = x; }, addEventListener() {} }; }
 function context(extra = {}) { const elements = new Map(), $ = (id) => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
-  return vm.createContext({ console, performance, Date, Math, document: { createElement: element }, $, ...extra }); }
+  return vm.createContext({ console, performance, Date, Math, document: { createElement: element }, $, racingTools: undefined, seasonEditor: undefined, ...extra }); }
 function loadFunctions(ctx, names) { for (const name of names) vm.runInContext(fn(name), ctx); }
 
 await check('Y 真22站賽果：200分8勝對174分0勝，最後26分也無法奪冠', () => {

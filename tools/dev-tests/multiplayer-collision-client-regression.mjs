@@ -7,7 +7,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as THREE from 'three';
+import { MultiplayerNetworkWindow } from '../../src/multiplayer-network.ts';
+
 import { Car, buildTrack, multiplayerCarsOverlap, resolveMultiplayerCollisions } from '../../server/physics.mjs';
+import { spectatorTarget } from '../../src/multiplayer-spectator.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baselineFlag = process.argv.indexOf('--baseline');
@@ -25,7 +28,7 @@ const feedbackContext = vm.createContext({ multiplayerCarsOverlap, Math });
 vm.runInContext(stripImports(feedbackSource).replace(/\bexport (?=(?:function|const)\b)/g, '') + '\nglobalThis.feedback = { authoritativeCollisionChanged, nearMultiplayerOpponent, nearMultiplayerOpponents, collisionVisualTarget, MULTIPLAYER_COLLISION_FEEDBACK_MS, MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS };', feedbackContext);
 const feedback = feedbackContext.feedback;
 function sceneClass(text) {
-  const context = vm.createContext({ THREE, Car, ...feedback, console, Math, locate, multiplayerCarsOverlap, resolveMultiplayerCollisions,
+  const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, ...feedback, console, Math, locate, multiplayerCarsOverlap, resolveMultiplayerCollisions, spectatorTarget,
     surfaceY: (t, i, lat) => t.py[i] + Math.max(-7, Math.min(7, lat)) * t.bank[i],
     bankRoll: (t, i, lat) => Math.abs(lat) <= 7 ? Math.atan(-t.bank[i]) : 0,
     heightAt: (t, s) => {
@@ -58,7 +61,7 @@ function room(self, peer, extra = {}) {
 function scene(previous, Class = Scene, t = track) {
   const instance = Object.create(Class.prototype);
   Object.assign(instance, {
-    currentTrack: t, car: new Car(), correction: new THREE.Vector3(.5, 0, -.5),
+    network: new MultiplayerNetworkWindow(), visualTargets: new Map(), currentTrack: t, car: new Car(), correction: new THREE.Vector3(.5, 0, -.5),
     authoritativeSelf: { at: 1000, car: previous }, collisionRecoveryUntil: -Infinity, collisionVisualUntil: new Map(),
     predictionAt: 1000, predictedPeers: new Map(), predictionContact: false,
     room: null, selfId: 'self', matchId: 'race-one', inputHistory: [{ at: 1000, steer: 0, brake: false }],

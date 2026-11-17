@@ -6,6 +6,8 @@ import { createRequire, stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import vm from 'node:vm';
+import * as roomRules from '../../shared/multiplayer-room-rules.ts';
+
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const source = await readFile(resolve(root, 'src/multiplayer-client.ts'), 'utf8');
@@ -13,9 +15,10 @@ const protocolSource = await readFile(resolve(root, 'shared/multiplayer-protocol
 const protocol = await import(pathToFileURL(resolve(root, 'shared/multiplayer-protocol.ts')).href);
 const registry = await import(pathToFileURL(resolve(root, 'shared/multiplayer-tracks.ts')).href);
 const code = stripTypeScriptTypes(source, { mode: 'transform' })
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-protocol['"];?/, 'const { PROTOCOL_VERSION, PHYSICS_VERSION } = protocol;')
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-protocol['"];?/, 'const { PROTOCOL_VERSION, PHYSICS_VERSION, validSeries, validSeriesTracks } = protocol;')
   .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-tracks['"];?/, 'const { CATALOG_STAMP, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } = registry;')
-  .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client = MultiplayerClient;';
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-room-rules['"];?/, 'const {parseRoomRules}=roomRules;')
+    .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client = MultiplayerClient;';
 const hash = text => createHash('sha256').update(text).digest('hex');
 const report = { createdAt: new Date().toISOString(), clientSourceSha256: hash(source), protocolSourceSha256: hash(protocolSource), playerStorageTouched: false, productionUsed: false, liveServerUsed: process.argv.includes('--live'), cases: [], limitations: ['純生命週期案例使用真client原始碼配合隔離socket與虛擬時鐘；不能證明實際網路延遲或瀏覽器渲染。', 'live案例為本機臨時埠的真server／WebSocket，未部署正式服務。'] };
 const identity = { version: protocol.PROTOCOL_VERSION, physics: protocol.PHYSICS_VERSION, catalogStamp: registry.CATALOG_STAMP };
@@ -53,7 +56,7 @@ function environment(storage = new Storage()) {
   }
   const schedule = (fn, ms, interval) => { const id = next++; timers.set(id, { fn, at: now + ms, interval }); return id; };
   class FakeDate extends Date { static now() { return 1700000000000 + now; } }
-  const context = vm.createContext({ protocol, registry, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now }, sessionStorage: storage, location: { protocol: 'http:' }, console,
+  const context = vm.createContext({ protocol, registry, roomRules, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now }, sessionStorage: storage, location: { protocol: 'http:' }, console,
     setTimeout: (fn, ms) => schedule(fn, ms, 0), clearTimeout: id => timers.delete(id),
     setInterval: (fn, ms) => schedule(fn, ms, ms), clearInterval: id => timers.delete(id),
   });
@@ -333,7 +336,7 @@ if (report.liveServerUsed) await test('真server／真WebSocket：雙人建房�
   const endpoint = `ws://127.0.0.1:${server.httpServer.address().port}/ws`;
   const clients = [];
   const make = () => {
-    const context = vm.createContext({ protocol, registry, URL, WebSocket: BrowserSocket, Date, performance, sessionStorage: new Storage(), location: { protocol: 'http:' }, console, setTimeout, clearTimeout, setInterval, clearInterval });
+    const context = vm.createContext({ protocol, registry, roomRules, URL, WebSocket: BrowserSocket, Date, performance, sessionStorage: new Storage(), location: { protocol: 'http:' }, console, setTimeout, clearTimeout, setInterval, clearInterval });
     Object.defineProperty(context, 'localStorage', { get() { throw Error('不得碰玩家localStorage'); } });
     vm.runInContext(code, context); const value = new context.Client(endpoint); clients.push(value); return value;
   };

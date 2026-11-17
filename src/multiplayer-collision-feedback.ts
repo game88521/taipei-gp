@@ -17,10 +17,11 @@ export function nearMultiplayerOpponent(track: Track, self: RoomPlayer, players:
 }
 
 /** 接觸的遠車先顯示最新權威姿態，再漸回一般插值延遲，時間軸不倒退。 */
-export function collisionVisualTarget(now: number, contactUntil?: number) {
-  if (contactUntil === undefined) return now - 110;
+export function collisionVisualTarget(now: number, contactUntil?: number, delayMs = 110) {
+  const delay = Math.max(80, Math.min(220, delayMs));
+  if (contactUntil === undefined) return now - delay;
   const recovery = Math.max(0, Math.min(1, (now - contactUntil) / MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS));
-  return now - 110 * recovery;
+  return now - delay * recovery;
 }
 
 /** 正常跟車／煞車照常預測；只有權威狀態的接觸突變才立即顯示。 */

@@ -45,6 +45,7 @@ function harness() {
     },
   };
   const ctx = vm.createContext({
+    racingTools: undefined,
     AbortController, console: { error: (...args) => events.errors.push(args.map(String).join(' ')) },
     state: 'race', mode: 'race', raceKind: 'gp', gpSettlementJob: null, settled: null, writerPhase: 'ready',
     getSaveWriterState: () => ({ phase: ctx.writerPhase }),

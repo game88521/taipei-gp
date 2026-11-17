@@ -127,8 +127,17 @@ report.after.snapshotBytes = Buffer.byteLength(JSON.stringify(snapshot));
 
 const s = { round: 0, results: [], laps: 3, diff: 'normal', rules: 'classic', seed: 42, form: {}, no: 1,
   pending: { id: 'australia', grid: snapshot.racers.map((r) => r.name), at: 100, elapsed: 10,
-    checkpoint: { trackV: 'test-track', race: snapshot, player: { lap: 1, lapTime: 10, lastLap: null, sectorIdx: 0, sectorStart: 0, lapValid: true }, savedAt: 200 } } };
+    checkpoint: { trackV: 'test-track', race: snapshot, player: { lap: 1, lapTime: 10, lastLap: null, sectorIdx: 0, sectorStart: 0, lapValid: true, lapSectors: [null, null, null] }, savedAt: 200 } } };
 check('完整賽季檢查點可安全往返', () => assert.deepEqual(clone(after.season.parseSeasonSave(clone(s))), s));
+check('舊檢查點缺當圈分段：安全正規化為未知，不捏造已通過分段或修改輸入', () => {
+  const legacy = clone(s), player = legacy.pending.checkpoint.player;
+  delete player.lapSectors; player.sectorIdx = 2; player.sectorStart = 8;
+  const expected = clone(legacy); expected.pending.checkpoint.player.lapSectors = [null, null, null];
+  const parsed = after.season.parseSeasonSave(legacy);
+  assert.ok(parsed?.pending?.checkpoint);
+  assert.deepEqual(clone(parsed), expected);
+  assert.equal(Object.hasOwn(player, 'lapSectors'), false);
+});
 check('檢查點保存無效圈；舊檢查點預設有效，錯誤型別只捨棄檢查點', () => {
   const invalid = clone(s); invalid.pending.checkpoint.player.lapValid = false;
   assert.equal(after.season.parseSeasonSave(invalid).pending.checkpoint.player.lapValid, false);

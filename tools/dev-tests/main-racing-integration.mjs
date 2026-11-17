@@ -19,6 +19,7 @@ const env = await loadGameModules(project);
 const featureEnv = await loadGameModules(project);
 const lapFeatures = await featureEnv.exports('src/racing-laps.ts');
 const replayFeatures = await featureEnv.exports('src/racing-replay.ts');
+const boundedRecording = await featureEnv.exports('src/bounded-recording.ts');
 const { DriftChallenge } = await featureEnv.exports('src/drift.ts');
 const pitlane = await env.exports('src/pitlane.ts');
 const economy = await env.exports('src/economy.ts');
@@ -29,6 +30,11 @@ async function check(label, action) { await action(); report.checks.push(label);
 async function source(root) {
   const raw = await readFile(path.join(root, 'src/main.ts'), 'utf8');
   const code = stripTypeScriptTypes(raw, { mode: 'transform' }), ast = parseAst(code);
+  function hasFn(name) {
+    return ast.body.some((node) =>
+      (node.type === 'FunctionDeclaration' && node.id?.name === name) ||
+      (node.type === 'VariableDeclaration' && node.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === name && d.init)));
+  }
   function fn(name) {
     for (const node of ast.body) {
       if (node.type === 'FunctionDeclaration' && node.id?.name === name) return code.slice(node.start, node.end);
@@ -58,7 +64,7 @@ async function source(root) {
     if (!node) throw Error('main 尚無比賽即時 HUD');
     return code.slice(node.start, node.end);
   }
-  return { fn, click, settingsLoop, visualHud, hash: createHash('sha256').update(raw).digest('hex') };
+  return { fn, hasFn, click, settingsLoop, visualHud, hash: createHash('sha256').update(raw).digest('hex') };
 }
 const current = await source(project), old = await source(original); report.sourceHash = current.hash;
 
@@ -81,6 +87,9 @@ function harness(sources = current, saved) {
   const ctx = vm.createContext({ console: { ...console, error: (...a) => events.errors.push(a.map(String).join(' ')) }, performance, Date, Math, URLSearchParams,
     setTimeout, clearTimeout, AbortController, DOMException, location: { search: '' }, document: { title: '', createElement: fakeElement, querySelector: () => null },
     $: get, track, car, field, save, stats, storage, events, CIRCUITS: env.circuits.CIRCUITS, CIRCUIT: env.circuits.CIRCUITS[0], SEASON: true, BOT: false,
+    racingTools: undefined, seasonEditor: undefined, cityJobsUi: undefined,
+    practiceRun: undefined, practiceUi: undefined, practiceIntent: 0,
+    pitCalibration: undefined, observePitCalibration() {}, ...boundedRecording,
     state: 'menu', mode: 'race', raceKind: 'gp', lap: 1, lapTime: 0, lastLap: null, sectorIdx: 0, sectorStart: 0,
     sessionLaps: new lapFeatures.SessionLaps(10), lapSectors: [null, null, null], qualifyingAttempts: new lapFeatures.QualifyingAttempts(1), qualiAttemptTime: 0,
     rec: { t: [], s: [], x: [], z: [], h: [] }, recAcc: 0, ghostPtr: 0, lapValid: true, clearSectorsAt: 0, camSnap: false,
@@ -90,8 +99,9 @@ function harness(sources = current, saved) {
     world: { setStartLights() {}, race: { visible: true }, sky: new THREE.Object3D(), mountains: new THREE.Object3D() }, clock: { getDelta() { events.clockResets++; return 0; } },
     sound: new Proxy({}, { get: () => () => {} }), radio: { reset() {}, say() {} }, taxi: null, sr: null, police: null,
     trackStamp: () => 'track-v1', checkTrackStamp() {}, selectRecordRules() {}, setRaceRain() {}, scBanner() {}, hideMenu() {}, showMenu() {},
+    updateBrakingAssist() {}, // Display-only guidance is covered by lobbybrake-assist-main.mjs.
     userStart: async () => {}, finishDrift() {}, refreshGarage() {}, checkAchievements() {},
-    abandonTaxi() {}, updateStreetSeriesUi() {}, updateActivityUi() {}, updateTaxiResumeUi() {}, renderProfileTools() {}, updatePinnedTargets() {},
+    abandonTaxi() {}, stopPolice() {}, streetResultOpen: () => false, updateStreetSeriesUi() {}, updateActivityUi() {}, updateTaxiResumeUi() {}, renderProfileTools() {}, updatePinnedTargets() {},
     driftChallenge: new DriftChallenge(new DriftScore()),
     writeSave() { const snapshot = clone(save); storage.writes.push(snapshot); storage.last = snapshot; },
     toast: (text) => events.toasts.push(text), fmt: (n) => n == null ? '--' : String(n), fmtNT: (n) => `NT$ ${n}`, fmtDelta: (n) => String(n),
@@ -111,10 +121,14 @@ function harness(sources = current, saved) {
     startPodium() { events.podiums++; ctx.settleRace(); ctx.state = 'podium'; },
     botInput: () => ({ steer: 0, brake: false }), input: { read: () => ({ steer: 0, brake: false }) }, SC_AT: null, gpEvent() {},
   });
-  const names = ['recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt', 'resetRace', 'startLap', 'sectorDone', 'completeLap', 'beginCountdown', 'startTt', 'startGp', 'saveSeasonCheckpoint', 'restoreSeasonCheckpoint',
+  const names = ['streetResultOpen', 'recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt', 'resetRace', 'startLap', 'sectorDone', 'completeLap', 'beginCountdown', 'startTt', 'startGp', 'saveSeasonCheckpoint', 'restoreSeasonCheckpoint',
     'settleAbandoned', 'finishRound', 'recordSeason', 'rewardGpFinish', 'settleRace', 'completeGpResults', 'showResults', 'pause', 'money', 'setMoney', 'earn', 'step',
     'inSeasonRound', 'seasonDone', 'resumeSeasonRound', 'raceRainLevel', 'setRaceRain', 'startReplay', 'endReplay', 'replayFrame'];
-  for (const name of names) { try { vm.runInContext(sources.fn(name), ctx); } catch (e) { if (sources !== old && !['recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt'].includes(name)) throw e; } }
+  for (const name of names) {
+    // 跨版本 harness 的 current 也可能是歷史來源；只有確實缺少新 helper 才用隔離替身。
+    if (name === 'streetResultOpen' && !sources.hasFn(name)) continue;
+    try { vm.runInContext(sources.fn(name), ctx); } catch (e) { if (sources !== old && !['recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt'].includes(name)) throw e; }
+  }
   if (sources === current) vm.runInContext(`var exitGpSettlement = ${sources.click('gp-settle-exit')};`, ctx);
   return { ctx, get, storage, events, field, car, track };
 }
@@ -164,13 +178,16 @@ await check('真completeLap計時無效圈：舊版會存40並上傳，新版保
   report.before.invalidTtBest = 40; report.after.invalidTtBest = 60;
 });
 
-await check('真sectorDone無效圈不寫三分段；有效計時圈仍保存最佳並上傳', async () => {
+await check('真sectorDone無效圈不寫三分段；完整有效計時圈才保存最佳並上傳', async () => {
   const h = harness(); h.ctx.CIRCUIT = null; h.ctx.raceKind = 'tt'; h.ctx.save.sectors = [20, 20, 20]; h.ctx.lapValid = false;
   for (let k = 0; k < 3; k++) h.ctx.sectorDone(k, 5); assert.deepEqual(clone(h.ctx.save.sectors), [20, 20, 20]);
-  h.ctx.lapValid = true; h.ctx.sectorDone(0, 18); assert.equal(h.ctx.save.sectors[0], 18);
   const uploads = []; let persist = 0; h.ctx.submitLap = async (t) => uploads.push(t); h.ctx.askPersist = async () => persist++;
-  h.ctx.startLap(); h.ctx.lapTime = 50; h.ctx.sectorStart = 35; h.ctx.completeLap();
-  assert.equal(h.ctx.save.best, 50); assert.deepEqual(uploads, [50]); assert.equal(persist, 1); assert.equal(h.ctx.save.sectors[2], 15);
+  h.ctx.startLap(); h.ctx.sectorDone(0, 18); assert.equal(h.ctx.save.sectors[0], 20);
+  h.ctx.sectorDone(1, 17); assert.deepEqual(clone(h.ctx.save.sectors), [20, 20, 20]);
+  h.ctx.lapTime = 50; h.ctx.sectorStart = 35; h.ctx.sectorIdx = 2; h.ctx.completeLap();
+  assert.equal(h.ctx.save.best, 50); assert.deepEqual(uploads, [50]); assert.equal(persist, 1);
+  assert.deepEqual(clone(h.ctx.save.sectors), [18, 17, 15]);
+  const row = h.ctx.sessionLaps.rows()[0]; assert.equal(row.valid, true); assert.equal(row.time, 50); assert.deepEqual(clone(row.sectors), [18, 17, 15]);
 });
 
 await check('真GP無效圈不更新本地PB：普通圈舊40覆蓋60，新版保留60；最後圈同樣保護', async () => {

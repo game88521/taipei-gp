@@ -94,6 +94,7 @@
           <span id="taxi-distance"></span>
           <span id="taxi-time"></span>
           <span id="taxi-wallet" class="money"></span>
+          <div id="taxi-guidance" style="display: none"></div>
           <details id="taxi-details"><summary>行程明細</summary><p id="taxi-trip-text"></p></details>
         </div>
         <div id="sr-hud" class="hidden"></div>
@@ -187,6 +188,7 @@
               <button id="btn-drift-challenge" class="ghost-btn" type="button">🌀 挑戰獎牌</button>
               <button id="btn-passport" class="ghost-btn" type="button">📍 探索護照</button>
             </div>
+            <div id="police-duty-panel" class="feature-card city-jobs" hidden></div>
             <div id="taxi-resume-panel" class="feature-card" hidden>
               <p id="taxi-resume-description" class="sub"></p>
               <button id="taxi-resume-continue" class="primary" type="button">繼續未完成載客</button>
@@ -313,6 +315,9 @@
               <fieldset>
                 <legend>音效</legend>
                 <label class="sw">音效<input type="checkbox" id="opt-sound" /></label>
+                <label class="sw">追緝跟丟倒數短音<input type="checkbox" id="city-pursuit-sound" /></label>
+                <label class="sw">導航轉向短音<input type="checkbox" id="city-nav-sound" /></label>
+                <p class="sub">城市導航顯示沿路轉向與路層，提示僅供參考；短音也會遵守上方總音效開關。</p>
                 <label class="q rng">主音量<input type="range" id="opt-vol-master" min="0" max="1" step="0.05" /></label>
                 <label class="q rng">自己的引擎<input type="range" id="opt-vol-engine" min="0" max="1" step="0.05" /></label>
                 <label class="q rng">其他車輛引擎<input type="range" id="opt-vol-others" min="0" max="1" step="0.05" /></label>
@@ -381,6 +386,8 @@
             <p id="legacy-record-note" class="sub"></p>
             <p id="taxi-last-trip" class="sub"></p>
             <details id="lap-history" class="feature-card"><summary>本場圈表與分段穩定度（最近 10 圈）</summary><p id="lap-history-summary" class="sub"></p><div class="table-scroll"><table id="lap-history-body"></table></div></details>
+            <div id="practice-host" class="racing-tools"></div>
+            <div id="tt-coach-host" class="racing-tools"></div>
             <div id="activity-records" class="feature-card"></div>
             <details id="economy-history"><summary>收支明細與任務收益</summary><p class="sub">顯示本版開始記錄的最近 100 筆；各類平均為每次入帳金額，不代表每分鐘效率。</p><div id="economy-summary"></div><ol id="economy-list"></ol></details>
             <div class="m-backup">
@@ -443,6 +450,7 @@
         <h1>開始新賽季</h1>
         <p class="sub">賽曆、圈數、難度與規則整季固定。短賽季獎金依站數比例計算；完整賽季成就仍需 23 站。</p>
         <label class="q sn">賽季長度<select id="sn-length"><option value="3">3 站短賽季</option><option value="6">6 站</option><option value="12">12 站</option><option value="23" selected>完整 23 站</option></select></label>
+        <div id="season-editor" class="feature-card racing-tools"></div>
         <label class="q sn">每站圈數
           <select id="sn-laps"><option value="3" selected>3 圈（一站約 3 分鐘）</option><option value="6">6 圈（一站約 6 分鐘）</option></select>
         </label>
@@ -490,6 +498,7 @@
       <div class="card wide">
         <h1 id="res-title">比賽結果</h1>
         <table id="res-table"></table>
+        <div id="race-analysis-host" class="racing-tools"></div>
         <div id="season-res" hidden><h3 id="season-res-title"></h3><table id="season-res-table" class="season-table"></table></div>
         <button id="btn-next-round" class="primary" style="display: none">下一站 ›</button>
         <button id="btn-again" class="primary">再比一次</button>
@@ -536,6 +545,8 @@
         <p class="sub">開放街道、照常有車流和紅綠燈；4 位對手會鑽車縫、闖紅燈。依序穿過黃色光圈，先到終點的贏。</p>
         <label class="q">難度<select id="duel-difficulty"><option value="easy">新手</option><option value="standard" selected>標準</option><option value="hard">高手</option></select></label>
         <label class="q">街賽車輛<select id="duel-car-mode"><option value="unified">統一街賽車（原本手感）</option><option value="selected">目前車庫車款</option></select></label>
+        <label class="q">對手性能<select id="duel-opponents"><option value="original">原版固定對手</option><option value="class">同級車挑戰 v1</option></select></label>
+        <p class="sub">同級車依所選車款的極速、加速、煞車與抓地力配置對手，使用獨立紀錄；對手外觀仍為街賽車。v1 平衡待試玩調整。</p>
         <p class="sub">車款、難度與規則分開記錄；三站系列中途固定車輛與設定。</p>
         <label class="sw">三站積分系列<input id="duel-series" type="checkbox" /></label>
         <p id="street-series-status" class="sub"></p>
@@ -607,6 +618,7 @@
         <p class="sub">先看目的地、路程與預估報酬，再決定要接哪一趟。預估金額會依實際車況與駕駛變動。</p>
         <label class="sw">休閒不限時（不計限時小費／連送獎勵）<input id="taxi-relaxed" type="checkbox" /></label>
         <div id="taxi-orders" class="feature-list"></div>
+        <div id="taxi-tour-panel" class="feature-card city-jobs"></div>
         <button id="taxi-refresh-orders" class="ghost-btn" type="button">更新訂單</button>
         <button id="taxi-order-back" class="ghost-btn" type="button">返回</button>
       </div>

@@ -1,0 +1,4857 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-16T08:23:38.123Z",
+  "status": "PASS",
+  "release": "lobbybrake",
+  "baseline": "57b09b2f3f78dffd5dadac0ca83581c01f9c42c3",
+  "branch": "multiplayer-test",
+  "build": "c220d98a7f5c",
+  "scope": [
+    "多人進房等待、取消與重試",
+    "大廳房主管理與被移除後的工作階段清理",
+    "依大獎賽即時抓地力調整煞車提示與輔助線"
+  ],
+  "baselineInventory": {
+    "sha256": "d9e2ad65d1989fae60b153d11a9323f036f21557c8cb4b409170610cf4f5f692",
+    "files": 515,
+    "baseBuild": "f8ca4b1d251c",
+    "priorRelease": "raceplus"
+  },
+  "sourceHashes": {
+    "multiplayer.html": "bb2e2d22f84132bd7a3e112aaeb7529a1c2c6a3a44a49869a8455ef7243a6eb2",
+    "server/room-service.mjs": "efddeb5a6c3fc21b639beb035507a95469fb52b3e6fd842904003d8426935884",
+    "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+    "src/braking-assist.ts": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f",
+    "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+    "src/multiplayer-client.ts": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+    "src/multiplayer-entry.ts": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d",
+    "src/multiplayer-game.ts": "6d2525a0e14e265db08d4989147d01d844f7b1b562ed718cff211b8c4e80685b",
+    "src/multiplayer.css": "98e4fc8ec7f53fbb5e6e90ee57115b6a33772bb87470799e950aaac6112ae22c",
+    "src/world.ts": "24fd219e4a85b76ba67e0fa4f9a26a4341cb2f70200b63d84b8c450c999f392a",
+    "tools/dev-tests/lobbybrake-assist-browser.mjs": "6a5b7d565af663d58f5d56b55da3113e00c703a2dfcc9bf7f0e1c035e77a2368",
+    "tools/dev-tests/lobbybrake-assist-main.mjs": "ab86009cce96652c79d34f7ff4cac796d57ea52572753cdaa67488c8c83cb838",
+    "tools/dev-tests/lobbybrake-assist-model.mjs": "a991d5774fcf552508932039af263c8f998e54318ed55bed4df5d0065b8347c7",
+    "tools/dev-tests/lobbybrake-browser.mjs": "c0b2824d7f472223e1bcc46c1a0a4562997ffb987f8902f348628ec0def333ca",
+    "tools/dev-tests/lobbybrake-client.mjs": "c0a611a177d31e6d0f9fb5e68028bf32dde152fa85b3dc25e2d92fb30a46b87c",
+    "tools/dev-tests/lobbybrake-entry.mjs": "e1ca3dab45e0824ebf545d2d0ba6076a54c89497fa9ff289f886ac2fc4adda36",
+    "tools/dev-tests/lobbybrake-host.mjs": "760f542e71381016fe92f05a6f2066fb6430ecc82a95caf103031000211dfb87",
+    "tools/dev-tests/lobbybrake-ui.mjs": "3e70a7071fad2676fbc99536d0259224fd135092ea212295992837f0e8f9e4fc",
+    "tools/dev-tests/main-racing-integration.mjs": "19d40b0596115005e738f7cf8e2960c082bfd72736353535b4afcd8e8411fd25",
+    "tools/dev-tests/multiplayer-map-ui-lifecycle.mjs": "a3e76237625e0a29b2ae9b71c1915cb0b6eb0a21cf771b763b2e36ba7018a948",
+    "tools/dev-tests/next6-multiplayer-ui.mjs": "c081d61c684c66294184d7f979b79e47c4a30a419e6a4ca2529106d338e2fea3",
+    "tools/dev-tests/next6-racing-regression.mjs": "3a37ca30c13f0ecfc09bfaa67b1bba618c8fb7649c7e3a907f07bf1073cad554"
+  },
+  "unchangedFiles": {
+    "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+    "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+    "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+    "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+    "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc"
+  },
+  "preservedHistory": {
+    "NEXT6_FIXES.md": "68a548cc3527b20f9be809788816b98a74b3700eb0a7b76f3b25be79d3488f1b",
+    "NEXT6_VALIDATION.md": "5b2e5b68bc2de88f01cc13f2f2c09d58af991d671eee7825b663aafe3cf62a36",
+    "NEXT6_VALIDATION.json": "38fb3d8edb6f14ae525a2829d1172d2f90bc637a8a1da3a317835bf5b2cf06e7",
+    "RACEPLUS_FIXES.md": "cc0bd1d37b198fcd61cbcdd5787e1898bc15b8289675c67e1119a070612079fb",
+    "RACEPLUS_VALIDATION.md": "eaf01206864a9cc7289c396404a791fa12540c53aa7453b6d084814541774737",
+    "RACEPLUS_VALIDATION.json": "93cfd12b990a8943f113c0fd54d836c4425d44cb00ab5d179dcb98cb33c29cac"
+  },
+  "productHash": "a877800df9e2026a5ed0b19e36736f18e4cceb35bb5c9ab3e0f0daa5388fd56c",
+  "testScriptHashes": {
+    "tools/dev-tests/lobbybrake-host.mjs": "760f542e71381016fe92f05a6f2066fb6430ecc82a95caf103031000211dfb87",
+    "tools/dev-tests/lobbybrake-client.mjs": "c0a611a177d31e6d0f9fb5e68028bf32dde152fa85b3dc25e2d92fb30a46b87c",
+    "tools/dev-tests/lobbybrake-entry.mjs": "e1ca3dab45e0824ebf545d2d0ba6076a54c89497fa9ff289f886ac2fc4adda36",
+    "tools/dev-tests/lobbybrake-ui.mjs": "3e70a7071fad2676fbc99536d0259224fd135092ea212295992837f0e8f9e4fc",
+    "tools/dev-tests/lobbybrake-assist-model.mjs": "a991d5774fcf552508932039af263c8f998e54318ed55bed4df5d0065b8347c7",
+    "tools/dev-tests/lobbybrake-assist-main.mjs": "ab86009cce96652c79d34f7ff4cac796d57ea52572753cdaa67488c8c83cb838",
+    "tools/dev-tests/raceplus-strategy.mjs": "dbea7f6737d6a9d890508f63dd57bf716170af98f599b9d1b5e2347a94f86b00",
+    "tools/dev-tests/raceplus-strategy-main.mjs": "24e14e5d4b2124d44f0335272a6c26bc798a436d0dc184ca80feb69b43bc6b71",
+    "tools/dev-tests/raceplus-laps-regression.mjs": "ba327630306708f12ce94f7539e65952e87bb08111b72558c43047d44a50285a",
+    "tools/dev-tests/raceplus-invite.mjs": "2ba01f9325bb11e1568068b29f5ec7c7bdce5ddc87d2f945e8783e9fcea97b0d",
+    "tools/dev-tests/raceplus-invite-main.mjs": "a7816fb88b1bc52f2e4a62f7a4964e8c77df12406961dd81968b8bcbdd47bafb",
+    "tools/dev-tests/multiplayer-client-regression.mjs": "f33a05436df3fad95c7048256a57910a1a9f48e02aa507de3963169e9fd14404",
+    "tools/dev-tests/multiplayer-server-regression.mjs": "7a717bf7a37a1b2c35861e34628e22ab8656ab53481cff948101f95003284c23",
+    "tools/dev-tests/multiplayer-map-ui-lifecycle.mjs": "a3e76237625e0a29b2ae9b71c1915cb0b6eb0a21cf771b763b2e36ba7018a948",
+    "tools/dev-tests/next6-multiplayer-ui.mjs": "c081d61c684c66294184d7f979b79e47c4a30a419e6a4ca2529106d338e2fea3",
+    "tools/dev-tests/next6-multiplayer-deadlines.mjs": "6ace1a4d9fa58382cdeb7e73b3d94b28e8a4c7d06db96e604387ee32864870a1",
+    "tools/dev-tests/next6-multiplayer-pacing.mjs": "d2747e37e0a4eeeec1066de9449eaaeb757f1c45e551281c1ea85cb6761b04f7",
+    "tools/dev-tests/multiplayer-collision-client-regression.mjs": "5b099d558e02ba2f5370c45c3caf316165de756bdb934de998754eec8f47ff97",
+    "tools/dev-tests/lobbybrake-browser.mjs": "c0b2824d7f472223e1bcc46c1a0a4562997ffb987f8902f348628ec0def333ca",
+    "tools/dev-tests/lobbybrake-assist-browser.mjs": "6a5b7d565af663d58f5d56b55da3113e00c703a2dfcc9bf7f0e1c035e77a2368",
+    "tools/dev-tests/raceplus-multiplayer-browser.mjs": "47e01386044e3f027336fc870cd081a3ea6f3512399a8c46aa8c7e8340ead59c",
+    "tools/dev-tests/raceplus-strategy-browser.mjs": "c015793612de01b89bfd2388fc163319432aab80fc72ab5b3dfa5909937b9a63",
+    "tools/dev-tests/next6-multiplayer-browser.mjs": "f8ef2b6b6c9c51921fea287337f258176bdc8e61c02f1c7577384dcf77b21b00",
+    "tools/dev-tests/multiplayer-maps-fixed.mjs": "b8e81a5f19ce941477cbb517c2cd796ea5ba01554641928dcd162e809c94e8cd",
+    "tools/dev-tests/gp-title.mjs": "4066b1fbdeb2ecaeabebfa514b10e3a3a8d3c6d2c4419fb1531ae8be4c855c6e",
+    "tools/dev-tests/external-browser.mjs": "69150e4034b37d3c2e6e39beb70cdb1de4b91c42ea55ba8a29ddd56299589290",
+    "tools/dev-tests/chain-stab.sh": "d405030c359b83a35db72d7eccf8218b59bf8348ac7b277609b74a28a0c5a353",
+    "tools/dev-tests/run-one.sh": "f7d64aec3f6961c87360a991ab162f96bd46f45874e4676e70022164f6490db3",
+    "tools/dev-tests/multiplayer-checks.mjs": "ae69e0b0ac606658a654987ac37ea309080c0aca04cc989b35afa06a21263a0b",
+    "tools/dev-tests/platform-regression.mjs": "5f22923a3665d2825e9003e8050ba5b7304ad4acdb3134b2e82d57c093c2a2d9",
+    "tools/dev-tests/mission-regression.mjs": "bbf0b8b74025430c87e0e7884bd000a1a074fb853995aa296e76f8f391df9b8a",
+    "tools/dev-tests/save-regression.mjs": "55df29c29c35ea65515590a6356e1556e696b547283779962c8b0b06abe87d9a",
+    "tools/dev-tests/racing-state-audit.mjs": "fdacdd1f78b6f7f81c42a8c5eaa614bc2f5544b977643575ad9645a7f15d9355",
+    "tools/dev-tests/main-platform-integration.mjs": "6a84b213c130daf234dc7e05761420eaf5b40e7851c99297e9ae16c08bc06b99",
+    "tools/dev-tests/leaderboard-regression.mjs": "2932272090aca90463e7f2bd2d7a8111c473d2601ab3d123d5522d4127589915",
+    "tools/dev-tests/main-racing-integration.mjs": "19d40b0596115005e738f7cf8e2960c082bfd72736353535b4afcd8e8411fd25",
+    "tools/dev-tests/identity-regression.mjs": "f3ba04491b64d91473602d0f75239892083979162f100ec25a1ecd155d09d7b1",
+    "tools/dev-tests/economy-regression.mjs": "dd4f3155724c2fdce446f14ce52e48fa9e0268c0a0a763060dd14b66a635fb5e",
+    "tools/dev-tests/main-economy-integration.mjs": "377cc3d8335f374a2e6fdc5910869d233592bef5b8c85aa13707dc7d1f5cce50",
+    "tools/dev-tests/static-ui-contract.mjs": "e820f2f4b52aa2f0483e1465c9755074567f4df5ac5d6cea7aa812982f475199",
+    "tools/dev-tests/route-preview-audit.mjs": "a0a0e23344b140181534e5e9f52589fbb858cf46eef9b2490894694309c2d9ee",
+    "tools/dev-tests/followup-racing-regression.mjs": "8eb23814b953d4d006c92c81608f8e6e49ae2310b1449d4c553c0ebaae68d664",
+    "tools/dev-tests/followup-radio-regression.mjs": "f79617b0b5ca9b8ec8052c5186ff368134d2b09ea157ebf85f72e234ff809d18",
+    "tools/dev-tests/followup-platform-regression.mjs": "35973f6edc4dcff490387ac8f63ee8c817eeab29601522d4c0aa562e5f248b9f",
+    "tools/dev-tests/followup-save-regression.mjs": "f578a06a5b19bc5a3160d8c9289e96878e3e16cc75fd5f431e807ffadb06c751",
+    "tools/dev-tests/abcd-save-regression.mjs": "030e9b5e5c728b8080ba19bfe4ca8e9a02e9b5fa21e8d2b9d7723f38021761bc",
+    "tools/dev-tests/abcd-street-regression.mjs": "ad87cbdb4348b266d90ee5e79250972d57877bc15cb22fdc817336a440e5da95",
+    "tools/dev-tests/abcd-racing-regression.mjs": "e43b0cacd7b9a25db31aeec0396f7bbd19f5eb3fee2bc2e79a3285b61d587ea2",
+    "tools/dev-tests/abcd-conflict-integration.mjs": "c423d5beef153c8b7cc80157a130633da5837010792f56289414e7451116b0bf",
+    "tools/dev-tests/all-platform-regression.mjs": "c7ab0dda1f3ff4091ce06ba6b4d1743b5edf2acb1343ecb260b4ab7432b27f43",
+    "tools/dev-tests/all-racing-features.mjs": "4be71e86e023c241f3001624568f139f81aad9b10991d124c5d0d44cf50015b2",
+    "tools/dev-tests/all-street-main.mjs": "9dbf638440d7937dcfc10adea7c78889f0fa3cb5fc38305fe222c4ce9fb1430a",
+    "tools/dev-tests/all-street-regression.mjs": "c55f1daa6b77c34141bcdefe775aa4541ef4dda3553f8fd5d3e3435cbfd5bc60",
+    "tools/dev-tests/all-navigation-regression.mjs": "89a6c1cd6d60e8d0be31114d4e7db786d68dcf6f4c66f2066eecc50fe904347d",
+    "tools/dev-tests/all-progress-regression.mjs": "302600234e3e74e2c86956a400c465f6a27d9d12596d6308dbcf5ee7db94d3be"
+  },
+  "checks": [
+    {
+      "result": "tools/dev-tests/lobbybrake-host-result.json",
+      "cases": 18,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-client-result.json",
+      "cases": 14,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-entry-result.json",
+      "cases": 10,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-ui-result.json",
+      "cases": 9,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-assist-model-result.json",
+      "cases": 9,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-assist-main-result.json",
+      "cases": 8,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-strategy-result.json",
+      "cases": 10,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-strategy-main-result.json",
+      "cases": 4,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-laps-result.json",
+      "cases": 9,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-invite-result.json",
+      "cases": 12,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-invite-main-result.json",
+      "cases": 7,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/shots-multiplayer-maps-client-regression.json",
+      "cases": 25,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/multiplayer-server-summary.json",
+      "cases": 14,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/shots-multiplayer-map-ui-lifecycle.json",
+      "cases": 8,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/next6-multiplayer-ui-result.json",
+      "cases": 4,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/next6-multiplayer-deadlines-result.json",
+      "cases": 6,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/next6-multiplayer-pacing-result.json",
+      "cases": 3,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/multiplayer-collision-client-result.json",
+      "cases": 16,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-browser-result.json",
+      "cases": 9,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-browser-before.json",
+      "cases": 1,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-assist-browser-result.json",
+      "cases": 4,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/lobbybrake-assist-browser-before.json",
+      "cases": 1,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-browser-result.json",
+      "cases": 7,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/raceplus-strategy-browser-result.json",
+      "cases": 3,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/next6-multiplayer-browser-result.json",
+      "cases": 5,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/multiplayer-maps-fixed-summary.json",
+      "cases": null,
+      "status": "PASS"
+    },
+    {
+      "result": "tools/dev-tests/multiplayer-node-summary.json",
+      "cases": null,
+      "status": "PASS"
+    }
+  ],
+  "evidenceHashes": {
+    "tools/dev-tests/lobbybrake-host-result.json": "fef873ad46bc7c0f696849feaa2313c2dcd735d3566abb4c6f45b6e4aba8e501",
+    "tools/dev-tests/lobbybrake-client-result.json": "b9aa185998406d98185b8a9d346a8ee4cb3a23d043f9209b397aff5d056a49b6",
+    "tools/dev-tests/lobbybrake-entry-result.json": "c07e727e0e7239f3a26c84acbc319e809de318a4d627a1008d0f3f22441bb3bc",
+    "tools/dev-tests/lobbybrake-ui-result.json": "035b373cafbbafe40aef4724f04cabeef816c1cd816914892b6e7bfdc38b7c9e",
+    "tools/dev-tests/lobbybrake-assist-model-result.json": "47750a8d450350cca31aff5a985b64eb1c8c8ed4359056edfb7dfdb39244a4cd",
+    "tools/dev-tests/lobbybrake-assist-main-result.json": "cb1d6fcf87402c9d9b7c40c1c6f8344042daf4a028a2acb8a8b10df1a35c7dcf",
+    "tools/dev-tests/raceplus-strategy-result.json": "3d23b844f6f8a0ea1d4b8d78e463f8e8d3149cda6f0756bbec0669f889c5b4e4",
+    "tools/dev-tests/raceplus-strategy-main-result.json": "5eb5040efbb2c3feef8732b1f04c0ff48aaf3e4d80466953b03fb65b00d6fa29",
+    "tools/dev-tests/raceplus-laps-result.json": "cda853ce8fa0fa699835a142a05b83d4178fc29e8608d7769def94323d71fd12",
+    "tools/dev-tests/raceplus-invite-result.json": "0324373fb4489019a5ab87a6f6be2ac5c8bebe5e3e9d74639e6fde3bb91120dc",
+    "tools/dev-tests/raceplus-invite-main-result.json": "0bc1d61dc6f42df626c74bbfd338b7fe3e19bcec9f0bd9d6dda78cb8e1b10b8d",
+    "tools/dev-tests/shots-multiplayer-maps-client-regression.json": "774f62d0716448b4b91fc2bda216e23e7e13104c03b9d30babc36960d7eab70e",
+    "tools/dev-tests/multiplayer-server-summary.json": "5de6ae0495a722d1ebd4ff3a5c3731d5972ba08634a791167952e0c706748028",
+    "tools/dev-tests/multiplayer-server-evidence-1794816369346-1c57601c/multiplayer-server-summary.json": "5de6ae0495a722d1ebd4ff3a5c3731d5972ba08634a791167952e0c706748028",
+    "tools/dev-tests/shots-multiplayer-map-ui-lifecycle.json": "565b9205cde53f42446330ae06bba09635e43956bc289603efe74d2a908fa32f",
+    "tools/dev-tests/next6-multiplayer-ui-result.json": "d9052eaa8b8157929fc080c4a9dcd4aa15d6357b3c80fe960eba817faf029c7c",
+    "tools/dev-tests/next6-multiplayer-deadlines-result.json": "b6608085e0a48baa95bdc8010c8627f20487e26c6df2facf16c7f9ce0ee78803",
+    "tools/dev-tests/next6-multiplayer-pacing-result.json": "5b43e11101eb86f1f47865d944bd03df3335605b8ec415a03c9903f862de67d4",
+    "tools/dev-tests/multiplayer-collision-client-result.json": "493277c2394ce9fea521d646ea3fb4f4b469ccb900b3e5e24e0e84a13e7343e9",
+    "tools/dev-tests/lobbybrake-browser-result.json": "c2df75f5f066cf922f09a608a13b527e2479995ab6fc64c5f51e3a6bf0b3addb",
+    "tools/dev-tests/lobbybrake-browser-evidence-1794817059498/summary.json": "c2df75f5f066cf922f09a608a13b527e2479995ab6fc64c5f51e3a6bf0b3addb",
+    "tools/dev-tests/lobbybrake-browser-before.json": "64162e50d30bb28c5af19e01341499f3ce86e066627a12384b95e24f6ba6e619",
+    "tools/dev-tests/lobbybrake-browser-evidence-1794817053624/summary.json": "64162e50d30bb28c5af19e01341499f3ce86e066627a12384b95e24f6ba6e619",
+    "tools/dev-tests/lobbybrake-assist-browser-result.json": "cb71a9eb1643f67e6a5c061631f63d10701651b1568569f699fe0976b533c67c",
+    "tools/dev-tests/lobbybrake-assist-browser-evidence-1794817139112/summary.json": "cb71a9eb1643f67e6a5c061631f63d10701651b1568569f699fe0976b533c67c",
+    "tools/dev-tests/lobbybrake-assist-browser-before.json": "d5c0a6d595136e010c3aaeb08e24bae773d766ddfc6f56cb85fb9dbbc82d2559",
+    "tools/dev-tests/lobbybrake-assist-browser-evidence-1794817126245/summary.json": "d5c0a6d595136e010c3aaeb08e24bae773d766ddfc6f56cb85fb9dbbc82d2559",
+    "tools/dev-tests/raceplus-browser-result.json": "0aea26707d954639e44fa3995cac8136e1539995f9a797259e814487ed9937a3",
+    "tools/dev-tests/raceplus-browser-evidence-1794817250510/summary.json": "0aea26707d954639e44fa3995cac8136e1539995f9a797259e814487ed9937a3",
+    "tools/dev-tests/raceplus-strategy-browser-result.json": "3ade1724218618e5b3f832ec05647307860c856df382556b6c9182da96f8ddd1",
+    "tools/dev-tests/raceplus-strategy-browser-evidence-1794817281064/summary.json": "3ade1724218618e5b3f832ec05647307860c856df382556b6c9182da96f8ddd1",
+    "tools/dev-tests/next6-multiplayer-browser-result.json": "ec2a8e12aaf8c143b5dd1ca86469685512b09a3fe1a68445142e5695db1579a6",
+    "tools/dev-tests/next6-multiplayer-browser-evidence-1794817293750/summary.json": "ec2a8e12aaf8c143b5dd1ca86469685512b09a3fe1a68445142e5695db1579a6",
+    "tools/dev-tests/multiplayer-maps-fixed-summary.json": "beea8fc6e00b5b3a1c4a3102a6de33d73d5d34459457d05ed14f7da009eafa07",
+    "tools/dev-tests/multiplayer-maps-fixed-evidence-1794817340966-e0aa5d77/summary.json": "beea8fc6e00b5b3a1c4a3102a6de33d73d5d34459457d05ed14f7da009eafa07",
+    "tools/dev-tests/multiplayer-maps-fixed-evidence-1794817340966-e0aa5d77/chain-stab-out.txt": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a",
+    "tools/dev-tests/multiplayer-node-summary.json": "b0906d0d7998bb03cba67c8d9b719e9679867c639296d9093f9217499ac0406e",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/platform-regression.result.json": "1a2c9a3897fa71add354efe8d18564982484330e7f05962d51d6612c3e25c9c9",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/mission-regression.result.json": "5431e467f29c3dcbf769798ac08f07829d40d3b8279b17dddd35e77fdba93a4c",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/save-regression.result.json": "a15d37f242da9c12e65067de367ef35f35c2d1e9ec4a432c7598576ab981b161",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/racing-state-audit.result.json": "b7086ccccadd0c733a6dab904491f288058a2b0e92b48ec1d3f35c6c60c0fa4a",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/main-platform-integration.result.json": "66d679ca1b48ee9b66053c59bbc3f68c866971774d78c5511960a2f4414732bd",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/leaderboard-regression.result.json": "4ac5c80f75c729b2c8eddc36c6f516d9bc5befd7f6ef456230fea0adf8f06ba1",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/main-racing-integration.result.json": "c20d771665230a5cb12dc275e45d83437f5bf39843bd0b5bb83aad1248a6ae81",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/identity-regression.result.json": "88b4b83e065520406efbf5fb303749ed23fa0028c9c4314543dd0def9a703620",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/economy-regression.result.json": "496b3215baab96d778eda263aef92e61d9be23b7d237910cb3854281d8e50eb8",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/main-economy-integration.result.json": "9db6fd9f1ba23815e2e9065d3e72bac61a0c5a2f0571c128cda9342c6196dd4f",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/static-ui-contract.result.json": "0f6c88c9a6c3a20a25461ce3b5e62c808fd8b39121c9947c8f2dcc59b06f5db7",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/route-preview-audit.result.json": "1468339337b04799f349f8e1184582a8eb678c7d494bf087783491a3898aeaa5",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/followup-racing-regression.result.json": "a54098652bf1ed0e6af2862be23d58424a2e8cc56e65ea39e303198edcc1747e",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/followup-radio-regression.result.json": "55a185745e560df738f6e11dd0b308e9486fba4625d1da8e700366bb712997d4",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/followup-platform-regression.result.json": "60c5e3c21bd53d33be0d09d5e1306b1aa18764c441e8ac010fba819a9535a601",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/followup-save-regression.result.json": "a964cda25fb0be6c171bcfa15e6f1789b1194701a7db7ed0aa4229207ad8580a",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/abcd-save-regression.result.json": "251182a1b634fcc3c67e01c387ee5f82d3cad6a5a2740ac9d8bc52e36c5419c9",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/abcd-street-regression.result.json": "eb55945e9c13b64a8c98992935e91cebce4935c58ef346bd8506077cc7062db0",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/abcd-racing-regression.result.json": "8b5da43f0e796149464e51a33d5b4fb5ee10112f839ecb27ae2ad928b6170528",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/abcd-conflict-integration.result.json": "09880880ba8aa89f62bcb2fab422f98f8f748b91dda97a527585a0941cd83b6f",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-platform-regression.result.json": "5c258db8ad4fea36b5ca47ade97b99c4e86edf38c96185c000a90d855df041bf",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-racing-features.result.json": "9770990ccda5fc6ea252b78f45a90e9941891a8fef4582a0643beb474e2dbadb",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-street-main.result.json": "cd57b943bd7c74e8686f4880144fe28eb236d5279f28d886dec064d89538d906",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-street-regression.result.json": "b51182a5be38ca2930ea850fdde5dda115d7a84b2444dc0c23b05fa96f5100b4",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-navigation-regression.result.json": "aec180aa1ed908760e6cbbc2f29e87be66ae764440cc2fb43f527688b33f93aa",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/all-progress-regression.result.json": "70712c34899bd504ad16f504894d5769d0084562c54b5dca013bec94dcdc68a9",
+    "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920/multiplayer-node-summary.json": "b0906d0d7998bb03cba67c8d9b719e9679867c639296d9093f9217499ac0406e"
+  },
+  "summaryCopies": {
+    "tools/dev-tests/multiplayer-server-summary.json": [
+      "tools/dev-tests/multiplayer-server-evidence-1794816369346-1c57601c/multiplayer-server-summary.json"
+    ],
+    "tools/dev-tests/lobbybrake-browser-result.json": [
+      "tools/dev-tests/lobbybrake-browser-evidence-1794817059498/summary.json"
+    ],
+    "tools/dev-tests/lobbybrake-browser-before.json": [
+      "tools/dev-tests/lobbybrake-browser-evidence-1794817053624/summary.json"
+    ],
+    "tools/dev-tests/lobbybrake-assist-browser-result.json": [
+      "tools/dev-tests/lobbybrake-assist-browser-evidence-1794817139112/summary.json"
+    ],
+    "tools/dev-tests/lobbybrake-assist-browser-before.json": [
+      "tools/dev-tests/lobbybrake-assist-browser-evidence-1794817126245/summary.json"
+    ],
+    "tools/dev-tests/raceplus-browser-result.json": [
+      "tools/dev-tests/raceplus-browser-evidence-1794817250510/summary.json"
+    ],
+    "tools/dev-tests/raceplus-strategy-browser-result.json": [
+      "tools/dev-tests/raceplus-strategy-browser-evidence-1794817281064/summary.json"
+    ],
+    "tools/dev-tests/next6-multiplayer-browser-result.json": [
+      "tools/dev-tests/next6-multiplayer-browser-evidence-1794817293750/summary.json"
+    ]
+  },
+  "controlProjectEvidence": {
+    "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-raceplus-work": {
+      "inventorySha256": "d9e2ad65d1989fae60b153d11a9323f036f21557c8cb4b409170610cf4f5f692",
+      "matchedFiles": 515,
+      "build": "f8ca4b1d251c",
+      "swSha256": "8af369019d4ccb9b2c07ed72789b68af1c6eed2c48d47b5664fcc7516c2509b4"
+    }
+  },
+  "reports": {
+    "tools/dev-tests/lobbybrake-host-result.json": {
+      "createdAt": "2026-11-16T08:04:18.411Z",
+      "localOnly": true,
+      "transport": "real loopback WebSocket",
+      "externalRequests": [],
+      "playerStorageTouched": false,
+      "browserUsed": false,
+      "cases": [
+        {
+          "name": "before has no capability or host commands; old standard v2 entry remains usable",
+          "status": "PASS",
+          "details": {
+            "capabilityAbsent": true,
+            "oldCommandsRejected": 2,
+            "oldEntryUnchanged": true
+          }
+        },
+        {
+          "name": "new server advertises additive capability and snapshots still parse in the old client",
+          "status": "PASS",
+          "details": {
+            "lobbyRevision": 1,
+            "legacyParserAccepted": true
+          }
+        },
+        {
+          "name": "non-host players cannot remove or transfer; neither command mutates the lobby",
+          "status": "PASS"
+        },
+        {
+          "name": "self, missing, malformed and foreign targets are rejected without changing readiness or host",
+          "status": "PASS",
+          "details": {
+            "rejectedCommands": 12
+          }
+        },
+        {
+          "name": "missing, stale, fractional, negative and cross-room generation metadata is rejected",
+          "status": "PASS",
+          "details": {
+            "rejectedCommands": 16
+          }
+        },
+        {
+          "name": "host transfer reaches all three sockets and retains loaded/ready state",
+          "status": "PASS",
+          "details": {
+            "recipients": 3,
+            "newHost": "f056aa5a-4d4b-44bd-8366-01fd6b763f27",
+            "readinessPreserved": true
+          }
+        },
+        {
+          "name": "former host immediately loses control and the new host can start normally",
+          "status": "PASS"
+        },
+        {
+          "name": "kick explicitly notifies, closes normally, revokes resume, and permits a fresh manual join",
+          "status": "PASS",
+          "details": {
+            "closeCode": 1000,
+            "revoked": true,
+            "manualJoinCreatedNewIdentity": true
+          }
+        },
+        {
+          "name": "an offline player can be removed and receives an explicit removal error on resume",
+          "status": "PASS"
+        },
+        {
+          "name": "legacy client left handler clears its saved identity and stops automatic reconnect",
+          "status": "PASS"
+        },
+        {
+          "name": "stale actions from another room cannot apply even when both rooms use lobby generation one",
+          "status": "PASS"
+        },
+        {
+          "name": "map changes retire old management confirmations even without a race",
+          "status": "PASS"
+        },
+        {
+          "name": "management commands are rejected throughout countdown, racing and results",
+          "status": "PASS",
+          "details": {
+            "phases": 3,
+            "rejectedCommands": 6
+          }
+        },
+        {
+          "name": "a rematch retires the prior lobby generation even on the same map and room code",
+          "status": "PASS"
+        },
+        {
+          "name": "automatic host election advances the lobby generation and resumed former hosts do not steal it",
+          "status": "PASS"
+        },
+        {
+          "name": "resuming when every socket was offline elects a connected host in a new generation",
+          "status": "PASS"
+        },
+        {
+          "name": "removed identity memory is bounded and discarded tombstones still cannot resume",
+          "status": "PASS",
+          "details": {
+            "removals": 65,
+            "retainedIds": 64,
+            "evictedIdentityStillRejected": true
+          }
+        },
+        {
+          "name": "snapshots expose neither revoked IDs nor resume tokens, and core files remain unchanged",
+          "status": "PASS",
+          "details": {
+            "privateRevocationState": true,
+            "immutableCoreFiles": 5
+          }
+        }
+      ],
+      "limitations": [
+        "Real local WebSocket transport and RoomService; deterministic private server clock/phase setup, not human driving or public-network timing.",
+        "Legacy client runs its real parser/left handler in an isolated VM with test sessionStorage; actual player storage is never accessed.",
+        "A maximum of 64 removed player IDs is retained per room; older revoked identities still fail INVALID_SESSION and cannot resume."
+      ],
+      "sourceHashes": {
+        "server/room-service.mjs": "efddeb5a6c3fc21b639beb035507a95469fb52b3e6fd842904003d8426935884",
+        "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+        "tools/dev-tests/lobbybrake-host.mjs": "760f542e71381016fe92f05a6f2066fb6430ecc82a95caf103031000211dfb87",
+        "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+        "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+        "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc"
+      },
+      "sourceUnchangedDuringTests": true,
+      "beforeHashes": {
+        "server/room-service.mjs": "c7c26c27cd3e47c9a0983ab7a78ab86f84adac74a9dd4cdad10eb950efdb9ba2",
+        "src/multiplayer-client.ts": "ce6abf7a78ee8ecf94392104e3ee7744fd566175f0d7616804c9b682e9f9a235"
+      },
+      "summary": {
+        "passed": 18,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/lobbybrake-client-result.json": {
+      "createdAt": "2026-11-16T08:11:36.192Z",
+      "localOnly": true,
+      "externalRequests": [],
+      "playerStorageTouched": false,
+      "browserUsed": false,
+      "transport": "isolated sockets; true current/before client implementations",
+      "cases": [
+        {
+          "name": "before has no host methods; current client accepts an old server omitting the capability",
+          "status": "PASS",
+          "details": {
+            "newMethodsOnBefore": false,
+            "oldServerEntryAndReadyAccepted": true
+          }
+        },
+        {
+          "name": "current client validates the capability while before intentionally ignores the additive metadata",
+          "status": "PASS",
+          "details": {
+            "validRevisions": 4,
+            "rejectedMetadataShapes": 14,
+            "oldOmissionAccepted": true
+          }
+        },
+        {
+          "name": "host methods send the exact current room/target/generation without creating another socket",
+          "status": "PASS"
+        },
+        {
+          "name": "non-host and every active/result phase reject management locally",
+          "status": "PASS",
+          "details": {
+            "rejectedCommands": 8
+          }
+        },
+        {
+          "name": "self/missing targets are rejected; offline players can be removed but cannot receive host control",
+          "status": "PASS"
+        },
+        {
+          "name": "a disconnected transport cannot send management using its cached lobby",
+          "status": "PASS"
+        },
+        {
+          "name": "lower lobby generations are ignored even with newer times; before would accept the stale host",
+          "status": "PASS",
+          "details": {
+            "newerTimestampCannotReviveOldHost": true,
+            "beforeReproduced": true
+          }
+        },
+        {
+          "name": "same-generation readiness updates work and a higher generation immediately revokes former host buttons",
+          "status": "PASS"
+        },
+        {
+          "name": "map changes keep their existing snapshot reset and also bind management to the newest generation",
+          "status": "PASS"
+        },
+        {
+          "name": "matching kicked notification clears identity/timers, does not send leave, and never automatically resumes",
+          "status": "PASS",
+          "details": {
+            "automaticResumeRequests": 0,
+            "leaveRequests": 0,
+            "clearSession": true
+          }
+        },
+        {
+          "name": "foreign or incomplete kicked notifications cannot clear the current room/session",
+          "status": "PASS"
+        },
+        {
+          "name": "metadata-free old left notifications retain the established compatibility cleanup",
+          "status": "PASS"
+        },
+        {
+          "name": "offline REMOVED_BY_HOST resume rejection clears credentials and stops the ten-second reconnect loop",
+          "status": "PASS"
+        },
+        {
+          "name": "after a kick only an explicit manual join creates a new connection; malformed capability fails closed",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "Runs the real client parser, public methods and lifecycle with isolated socket/sessionStorage and virtual timers; not a browser or real-network test.",
+        "Server authorization, real loopback WebSockets and revoked identity behavior are covered separately by lobbybrake-host.mjs."
+      ],
+      "sourceHashes": {
+        "src/multiplayer-client.ts": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+        "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+        "tools/dev-tests/lobbybrake-client.mjs": "c0a611a177d31e6d0f9fb5e68028bf32dde152fa85b3dc25e2d92fb30a46b87c"
+      },
+      "sourceUnchangedDuringTests": true,
+      "beforeHashes": {
+        "src/multiplayer-client.ts": "ce6abf7a78ee8ecf94392104e3ee7744fd566175f0d7616804c9b682e9f9a235"
+      },
+      "summary": {
+        "passed": 14,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/lobbybrake-entry-result.json": {
+      "status": "PASS",
+      "localOnly": true,
+      "productionUsed": false,
+      "externalRequests": 0,
+      "sourceHashes": {
+        "src/multiplayer-entry.ts": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d",
+        "src/multiplayer-client.ts": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+        "tools/dev-tests/lobbybrake-client.mjs": "c0a611a177d31e6d0f9fb5e68028bf32dde152fa85b3dc25e2d92fb30a46b87c",
+        "before/src/multiplayer-client.ts": "ce6abf7a78ee8ecf94392104e3ee7744fd566175f0d7616804c9b682e9f9a235"
+      },
+      "cases": [
+        {
+          "name": "before真client單次握手7秒逾時，沒有啟動等待／重試",
+          "status": "PASS"
+        },
+        {
+          "name": "constructor無連線；握手慢於7秒會重試，成功才送一次加入",
+          "status": "PASS"
+        },
+        {
+          "name": "45秒總期限截斷最後一次握手，不會等到單次7秒滿才停止",
+          "status": "PASS"
+        },
+        {
+          "name": "握手等待可取消，舊socket晚到open不送出任何房間請求",
+          "status": "PASS"
+        },
+        {
+          "name": "重試間隔可取消，不會多開下一條socket",
+          "status": "PASS"
+        },
+        {
+          "name": "取消後立即重試，舊finally不會清掉新一輪deadline或成功",
+          "status": "PASS"
+        },
+        {
+          "name": "連點不能建立第二個等待流程或額外socket",
+          "status": "PASS"
+        },
+        {
+          "name": "房間操作被拒絕只執行一次，不將ROOM_FULL等錯誤當成握手重試",
+          "status": "PASS"
+        },
+        {
+          "name": "即時網路錯誤採1500ms間隔，不忙迴圈且總等待有上限",
+          "status": "PASS"
+        },
+        {
+          "name": "進度文字標示可能啟動、已等待及總期限，不假稱已確認服務狀態",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "真client與等待協調器，WebSocket及時鐘為隔離替身；不代表真服務啟動秒數或外網品質。"
+      ],
+      "sourceUnchanged": true,
+      "summary": {
+        "passed": 10,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/lobbybrake-ui-result.json": {
+      "status": "PASS",
+      "localOnly": true,
+      "productionUsed": false,
+      "externalRequests": 0,
+      "sourceHashes": {
+        "game": "6d2525a0e14e265db08d4989147d01d844f7b1b562ed718cff211b8c4e80685b",
+        "ui": "2ecd510277ff30dde2b3e45d299afc8a1c7fba57e9b9a72044f58cca9e3f8269",
+        "invite": "094ec3008c1df99a5e9c64e1a7708746d4874eba7463d79872da9bb104fa2a63",
+        "pacing": "51fa7e9db183ef48eaf21e55fed08cfca28dc7ca1d20458d677ae4ec8912c46d",
+        "entry": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d",
+        "tools/dev-tests/multiplayer-map-ui-lifecycle.mjs": "a3e76237625e0a29b2ae9b71c1915cb0b6eb0a21cf771b763b2e36ba7018a948"
+      },
+      "cases": [
+        {
+          "name": "等待可見且可取消；保留輸入、解除busy，晚到open不加入",
+          "status": "PASS"
+        },
+        {
+          "name": "房間拒絕不自動重送，明確重試按鈕沿用目前輸入",
+          "status": "PASS"
+        },
+        {
+          "name": "舊連線錯誤不覆蓋本次空暱稱／無效房碼提示，也不建立連線",
+          "status": "PASS"
+        },
+        {
+          "name": "支援能力＋房主＋大廳才顯示管理；舊server、非房主、比賽中隱藏",
+          "status": "PASS"
+        },
+        {
+          "name": "離線車手可移出但不能交棒；無目標或失聯時停用按鈕",
+          "status": "PASS"
+        },
+        {
+          "name": "原生確認取消不送出；確認後才送給選定車手",
+          "status": "PASS"
+        },
+        {
+          "name": "確認期間換圖／大廳版本或房主改變，不送出晚到管理命令",
+          "status": "PASS"
+        },
+        {
+          "name": "確認期間目標離線不交棒；交棒後舊房主立即失去管理入口",
+          "status": "PASS"
+        },
+        {
+          "name": "穩定大廳不重建管理選單；離房與新房不沿用舊目標",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "真控制器與真等待協調器，DOM／client／場景為替身；實際WebSocket另有server/client與browser測試。"
+      ],
+      "summary": {
+        "passed": 9,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/lobbybrake-assist-model-result.json": {
+      "status": "PASS",
+      "localOnly": true,
+      "cases": [
+        {
+          "name": "fresh dry medium/soft keep original target values and never share writable physics storage",
+          "status": "PASS"
+        },
+        {
+          "name": "real RaceField supplies the complete grip factor once: dry/wet/worn/rain tyres",
+          "status": "PASS",
+          "details": {
+            "dry": {
+              "grip": 1,
+              "minimumTarget": 17.92872428894043,
+              "reducedPoints": 0
+            },
+            "wet": {
+              "grip": 0.776,
+              "minimumTarget": 15.617354393005371,
+              "reducedPoints": 850
+            },
+            "worn": {
+              "grip": 0.8463133057158168,
+              "minimumTarget": 16.34808349609375,
+              "reducedPoints": 846
+            },
+            "wetWorn": {
+              "grip": 0.6567391252354738,
+              "minimumTarget": 14.294673919677734,
+              "reducedPoints": 919
+            },
+            "rainWet": {
+              "grip": 0.9239366399999999,
+              "minimumTarget": 17.152576446533203,
+              "reducedPoints": 841
+            },
+            "rainDry": {
+              "grip": 0.8924,
+              "minimumTarget": 16.854434967041016,
+              "reducedPoints": 843
+            }
+          }
+        },
+        {
+          "name": "grip decrease cannot increase any display target; physics target array remains byte-identical",
+          "status": "PASS"
+        },
+        {
+          "name": "speed units and tyre factor are applied once in the lateral-force equation",
+          "status": "PASS",
+          "details": {
+            "expectedMps": 29.377532609885417,
+            "actualMps": 29.377532958984375,
+            "actualKmh": 105.75911865234376
+          }
+        },
+        {
+          "name": "backward braking propagation crosses the start line and honours original longitudinal deceleration",
+          "status": "PASS",
+          "details": {
+            "beforeStart": 29.522743225097656,
+            "afterStartCorner": 16.48006248474121
+          }
+        },
+        {
+          "name": "4Hz limit, conservative one-percent bins, stable buffers and immediate non-GP restoration",
+          "status": "PASS"
+        },
+        {
+          "name": "new session reset/new track cannot inherit old wet targets or throttle timestamp",
+          "status": "PASS"
+        },
+        {
+          "name": "invalid inputs remain finite and fall back without corrupting track data",
+          "status": "PASS"
+        },
+        {
+          "name": "car/track/AI/pitlane/physics files exactly match immutable before",
+          "status": "PASS"
+        }
+      ],
+      "sourceHashes": {
+        "src/braking-assist.ts": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f",
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+        "src/world.ts": "24fd219e4a85b76ba67e0fa4f9a26a4341cb2f70200b63d84b8c450c999f392a",
+        "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+        "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+        "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc"
+      },
+      "realGrip": {
+        "dry": {
+          "grip": 1,
+          "minimumTarget": 17.92872428894043,
+          "reducedPoints": 0
+        },
+        "wet": {
+          "grip": 0.776,
+          "minimumTarget": 15.617354393005371,
+          "reducedPoints": 850
+        },
+        "worn": {
+          "grip": 0.8463133057158168,
+          "minimumTarget": 16.34808349609375,
+          "reducedPoints": 846
+        },
+        "wetWorn": {
+          "grip": 0.6567391252354738,
+          "minimumTarget": 14.294673919677734,
+          "reducedPoints": 919
+        },
+        "rainWet": {
+          "grip": 0.9239366399999999,
+          "minimumTarget": 17.152576446533203,
+          "reducedPoints": 841
+        },
+        "rainDry": {
+          "grip": 0.8924,
+          "minimumTarget": 16.854434967041016,
+          "reducedPoints": 843
+        }
+      },
+      "limitations": [
+        "Uses the real RaceField tyre/wetness/wear formula and real track data; cars/models are isolated CPU objects.",
+        "Display profile is a conservative centre-line estimate, not a measured guarantee of cornering/braking safety or lap-time improvement.",
+        "No build, browser, GPU, phone or public-site test is run by this script."
+      ],
+      "sourceUnchanged": true
+    },
+    "tools/dev-tests/lobbybrake-assist-main-result.json": {
+      "status": "PASS",
+      "localOnly": true,
+      "cases": [
+        {
+          "name": "before/after dry and non-GP ribbon colors/positions/UVs are exactly identical",
+          "status": "PASS",
+          "details": {
+            "vertices": 9354,
+            "triangles": 3118
+          }
+        },
+        {
+          "name": "real main uses one complete GP grip factor and issues an earlier warning than immutable before",
+          "status": "PASS",
+          "details": {
+            "sample": 1013,
+            "speedMps": 30.632244110107422,
+            "originalTargetMps": 27.52313804626465,
+            "adjustedTargetMps": 23.741350173950195,
+            "oldWarning": "",
+            "newWarning": "煞車！"
+          }
+        },
+        {
+          "name": "wet/worn updates change real world colors in place, preserve geometry attributes and obey 4Hz",
+          "status": "PASS",
+          "details": {
+            "updateCallsFor1002Invocations": 2,
+            "geometryUuid": "1254051b-0527-4bc4-ac3d-a86906ce32ae",
+            "colorBufferReused": true
+          }
+        },
+        {
+          "name": "GP to TT/qualifying/free/replay and disabling assist restore original colors and thresholds",
+          "status": "PASS"
+        },
+        {
+          "name": "driver braking/pit suppress warning; wrong-way warning retains precedence",
+          "status": "PASS"
+        },
+        {
+          "name": "new-race and season restore call cache reset; reset recomputes despite old throttling epoch",
+          "status": "PASS"
+        },
+        {
+          "name": "world invalid/mismatched targets fall back to original valid vertex colors",
+          "status": "PASS"
+        },
+        {
+          "name": "BOT target source and core update sequence remain the original ones",
+          "status": "PASS"
+        }
+      ],
+      "sourceHashes": {
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+        "src/world.ts": "24fd219e4a85b76ba67e0fa4f9a26a4341cb2f70200b63d84b8c450c999f392a",
+        "src/braking-assist.ts": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f"
+      },
+      "beforeHashes": {
+        "src/main.ts": "4c647d962447aabfd0dc405c351f39448100c2be5e13af3bc3bdb8d276e086b3",
+        "src/world.ts": "24ee12a022a7364a81855bc65f03a73e16c05dd7ea4a0aa35dd9f0a8c5ffe2c7"
+      },
+      "limitations": [
+        "Real source functions and warning branch are extracted by AST; the full main module/DOM/audio is not booted.",
+        "Real ribbon and Three.js geometry/color attributes are executed on CPU, without GPU rendering or mobile visual verification.",
+        "Grip inputs and vehicle positions are arranged fixtures; this does not measure driving safety, lap times, FPS or phone performance."
+      ],
+      "sourceUnchanged": true
+    },
+    "tools/dev-tests/raceplus-strategy-result.json": {
+      "createdAt": "2026-11-16T08:16:21.180Z",
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "before": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-raceplus-before-38335611f205",
+      "cases": [
+        {
+          "name": "未提供胎種資料：原本本圈/下圈/排隊/安全車/出站名次數字完全不變",
+          "status": "PASS",
+          "details": {
+            "variants": 6
+          }
+        },
+        {
+          "name": "下一套胎影響估計：舊版忽略軟/硬選擇，新版單圈新軟胎有較低淨代價",
+          "status": "PASS",
+          "details": {
+            "before": {
+              "soft": {
+                "min": 16.283357337216522,
+                "max": 22.719967732135796
+              },
+              "hard": {
+                "min": 16.283357337216522,
+                "max": 22.719967732135796
+              }
+            },
+            "after": {
+              "soft": {
+                "min": 15.526487267902127,
+                "max": 22.385836959935393
+              },
+              "hard": {
+                "min": 16.692641072643152,
+                "max": 23.242363530886898
+              }
+            }
+          }
+        },
+        {
+          "name": "已觀察80%濕度：換雨胎優於繼續換乾胎，舊版兩者無差異",
+          "status": "PASS",
+          "details": {
+            "rain": {
+              "min": 0.42825722584329107,
+              "max": 15.915166941910178
+            },
+            "dry": {
+              "min": 15.379421567924103,
+              "max": 22.322808802801955
+            }
+          }
+        },
+        {
+          "name": "乾地新雨胎可有負收益：不把錯胎當成免費收益或裁為零",
+          "status": "PASS",
+          "details": {
+            "wrongTyreNet": {
+              "min": 22.623397880755338,
+              "max": 37.08079608314867
+            },
+            "pitLoss": {
+              "min": 16.50534922896034,
+              "max": 22.805349228960342
+            },
+            "dryTyreNet": {
+              "min": 16.50534922896034,
+              "max": 22.805349228960342
+            }
+          }
+        },
+        {
+          "name": "兩套胎各自退化：相同新胎抓地下，低耗損胎的多圈代價較低",
+          "status": "PASS",
+          "details": {
+            "fastWear": {
+              "min": 11.48676842926578,
+              "max": 20.6545288862341
+            },
+            "slowWear": {
+              "min": 2.3903290014316276,
+              "max": 16.75605484573375
+            }
+          }
+        },
+        {
+          "name": "近期真實胎耗會調整當前與下一套退化，缺樣本明確標示假設",
+          "status": "PASS",
+          "details": {
+            "unobserved": {
+              "min": 17.294694937557423,
+              "max": 24.647155882353537
+            },
+            "observed": {
+              "min": 15.363571606503662,
+              "max": 22.316015962193195
+            }
+          }
+        },
+        {
+          "name": "趨勢只放寬收益範圍：當下濕度相同則中心值相同，不暗自預測未來",
+          "status": "PASS",
+          "details": {
+            "steady": {
+              "min": -4.093873770541606,
+              "max": 13.977110800602365
+            },
+            "changing": {
+              "min": -7.7723064490240965,
+              "max": 17.655543479084855
+            }
+          }
+        },
+        {
+          "name": "排隊/安全車/出站名次保留，最後一圈無下圈選項",
+          "status": "PASS",
+          "details": {
+            "rejoin": {
+              "best": 3,
+              "worst": 4
+            }
+          }
+        },
+        {
+          "name": "有效胎種/濕度/觀測邊界皆有限且範圍有序，錯誤新資料不靜默猜測",
+          "status": "PASS",
+          "details": {
+            "validVariants": 432,
+            "invalidVariants": 11
+          }
+        },
+        {
+          "name": "不改輸入、車輛核心或未來狀態；仍只讀公開觀察欄位",
+          "status": "PASS",
+          "details": {
+            "coreFilesUnchanged": 4,
+            "futureStateReads": 0
+          }
+        }
+      ],
+      "sourceHashes": {
+        "src/strategy.ts": "9163db21e6a806c1eb23f72b062b868039046db36d9cb387e335cfad666e5848",
+        "before/src/strategy.ts": "7a28d31845fadcee6b53ff8c0c8be94f769cbda7e24b1de1df8177ef48ed5ebc",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "tools/dev-tests/raceplus-strategy.mjs": "dbea7f6737d6a9d890508f63dd57bf716170af98f599b9d1b5e2347a94f86b00"
+      },
+      "localOnly": true,
+      "externalRequests": 0,
+      "limitations": [
+        "真策略函式與公開胎種資料；未量測實際進站估值誤差、區間涵蓋率、手機或瀏覽器。",
+        "維持當下已觀察濕度，雨勢趨勢只擴大不確定區間；不預測未來天氣。",
+        "舊呼叫無胎種資料時保留原退化模型。"
+      ],
+      "summary": {
+        "passed": 10,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/raceplus-strategy-main-result.json": {
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "before未傳下一套胎；after使用玩家指定硬胎與當下濕度，切換雨胎立即反映",
+          "status": "PASS",
+          "details": {
+            "beforeHasTyres": false,
+            "afterSelected": "雨胎",
+            "wetness": 0.8
+          }
+        },
+        {
+          "name": "未指定時用車隊建議；三種進站階段顯示鎖定胎種並停止假設再進站，不回讀預抽結果",
+          "status": "PASS"
+        },
+        {
+          "name": "短樣本不當實測；走過0.12圈後用近期實際胎耗，關閉策略面板仍取樣",
+          "status": "PASS",
+          "details": {
+            "observedWearPerLap": 0.20000000000000037
+          }
+        },
+        {
+          "name": "新場次/換胎/回溯/濕度明顯改變清掉舊樣本；跳躍和磨光不捏造零胎耗",
+          "status": "PASS"
+        }
+      ],
+      "sourceHashes": {
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3"
+      },
+      "beforeMainSha256": "e389352b7822f134047e05cd6e2258b46ff56dee8f06c52a8c09042a8310de16",
+      "limitations": [
+        "真updateStrategy函式；估計器用捕捉輸入替身，模型數值由raceplus-strategy.mjs另驗，不代表實際進站誤差或手機測試。"
+      ]
+    },
+    "tools/dev-tests/raceplus-laps-result.json": {
+      "createdAt": "2026-11-16T08:16:25.312Z",
+      "externalRequests": 0,
+      "playerStorageTouched": false,
+      "cases": [
+        {
+          "name": "before has no lap metadata; new server starts with a strict empty timing pair",
+          "status": "PASS",
+          "details": {
+            "legacyClientAndServerAccepted": true,
+            "protocol": 2
+          }
+        },
+        {
+          "name": "three real Car laps retain the original finish interpolation and car pose",
+          "status": "PASS",
+          "details": {
+            "finishBefore": 135014.05002255645,
+            "finishAfter": 135014.05002255645,
+            "lapTimesMs": [
+              45014.05,
+              45000,
+              45000
+            ],
+            "physicsUnchanged": true
+          }
+        },
+        {
+          "name": "one- and five-lap rooms finish at exactly their configured lap count",
+          "status": "PASS",
+          "details": [
+            {
+              "laps": 1,
+              "finishMs": 45014.050022556316
+            },
+            {
+              "laps": 5,
+              "finishMs": 225014.05002255645
+            }
+          ]
+        },
+        {
+          "name": "unfinished third lap and reverse/recross cannot fabricate completed lap records",
+          "status": "PASS"
+        },
+        {
+          "name": "DNF/disconnect and finished leave preserve completed timing; reset and map change clear it",
+          "status": "PASS"
+        },
+        {
+          "name": "client-provided lap/result fields are ignored and snapshots do not expose mutable arrays",
+          "status": "PASS"
+        },
+        {
+          "name": "new client strictly rejects partial, malformed, oversized and contradictory timing metadata",
+          "status": "PASS",
+          "details": {
+            "malformedPlayerCases": 23,
+            "legacyNoMetadataAccepted": true
+          }
+        },
+        {
+          "name": "result rows add best lap and winner gap, retain total time, and never assign DNF a gap",
+          "status": "PASS"
+        },
+        {
+          "name": "keyed lap rows update selected drivers, mark best laps and skip unchanged writes",
+          "status": "PASS",
+          "details": {
+            "stableSnapshots": 20,
+            "created": 0,
+            "unchangedWrites": 0,
+            "driverSwitchReusesRows": true
+          }
+        }
+      ],
+      "limitations": [
+        "True RoomService/Car/track gate crossings, with isolated sockets and arranged test positions/times; not full human driving.",
+        "Client and UI use isolated VM/DOM fixtures; browser/mobile/real network validation are separate."
+      ],
+      "sourceHashes": {
+        "server/room-service.mjs": "efddeb5a6c3fc21b639beb035507a95469fb52b3e6fd842904003d8426935884",
+        "src/multiplayer-client.ts": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+        "src/multiplayer-ui.ts": "2ecd510277ff30dde2b3e45d299afc8a1c7fba57e9b9a72044f58cca9e3f8269",
+        "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+        "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc"
+      },
+      "sourceUnchanged": true,
+      "summary": {
+        "passed": 9,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/raceplus-invite-result.json": {
+      "createdAt": "2026-11-16T08:16:25.894Z",
+      "localOnly": true,
+      "externalRequests": 0,
+      "browserUsed": false,
+      "clipboardOrShareUsed": false,
+      "sourceHashes": {
+        "src/multiplayer-invite.ts": "094ec3008c1df99a5e9c64e1a7708746d4874eba7463d79872da9bb104fa2a63",
+        "baselineGame": "ddad581f3af2cae2f3acbe9fa6a77a5ee1415aa76bfb15d4a80401e66a0de60c"
+      },
+      "cases": [
+        {
+          "name": "before只複製六碼；after產可開頁的邀請並清除所有舊query/hash",
+          "status": "PASS",
+          "details": {
+            "before": "ABCD23",
+            "after": "https://example.invalid/games/multiplayer.html?room=ABCD23"
+          }
+        },
+        {
+          "name": "邀請保持目前origin、子路徑及本機埠，不依賴固定公開域名",
+          "status": "PASS"
+        },
+        {
+          "name": "有效邀請正規化小寫與外側空白，回傳預填資料而無入房動作",
+          "status": "PASS"
+        },
+        {
+          "name": "無room參數及僅hash內room不觸發邀請；手動六碼入口可保留",
+          "status": "PASS"
+        },
+        {
+          "name": "重複、百分比編碼同名及大小寫衝突room一律拒絕，不任意挑第一個",
+          "status": "PASS"
+        },
+        {
+          "name": "非法字元、長短、Unicode大寫展開與URL/HTML注入不能變成房碼",
+          "status": "PASS"
+        },
+        {
+          "name": "超長網址、非http(s)、憑證URL及非多人頁面提供明確失敗",
+          "status": "PASS"
+        },
+        {
+          "name": "clipboard成功只寫乾淨邀請，不洩漏工具token；不直接讀navigator",
+          "status": "PASS"
+        },
+        {
+          "name": "clipboard不存在或被拒絕時，回傳可選取的同一安全連結與手動提示",
+          "status": "PASS"
+        },
+        {
+          "name": "share成功使用乾淨URL，未帶入其他參數、片段或登入資訊",
+          "status": "PASS"
+        },
+        {
+          "name": "分享取消與功能不可用/失敗分開回報，均保留手動連結而不自動轉送",
+          "status": "PASS"
+        },
+        {
+          "name": "無效邀請不能呼叫clipboard或share，包括重複房碼",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "執行真邀請helper，clipboard/share均由測試替身注入，未接觸系統剪貼簿或實際分享。",
+        "預填與手動確認、選取備援欄位的真DOM行為由root另行整合／瀏覽器驗證；本腳本不宣稱已測。"
+      ],
+      "sourceUnchanged": true,
+      "summary": {
+        "passed": 12,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/raceplus-invite-main-result.json": {
+      "createdAt": "2026-11-16T08:16:26.676Z",
+      "localOnly": true,
+      "browserUsed": false,
+      "externalRequests": 0,
+      "actualClipboardOrShareUsed": false,
+      "sourceHashes": {
+        "game": "6d2525a0e14e265db08d4989147d01d844f7b1b562ed718cff211b8c4e80685b",
+        "ui": "2ecd510277ff30dde2b3e45d299afc8a1c7fba57e9b9a72044f58cca9e3f8269",
+        "invite": "094ec3008c1df99a5e9c64e1a7708746d4874eba7463d79872da9bb104fa2a63",
+        "pacing": "51fa7e9db183ef48eaf21e55fed08cfca28dc7ca1d20458d677ae4ec8912c46d",
+        "entry": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d"
+      },
+      "cases": [
+        {
+          "name": "開邀請頁僅預填房碼與提示，場景就緒後仍等使用者確認加入",
+          "status": "PASS",
+          "details": {
+            "code": "ABCD23",
+            "joins": 1
+          }
+        },
+        {
+          "name": "重複或無效邀請不預填不自動加入，保留手動輸入與確認入口",
+          "status": "PASS"
+        },
+        {
+          "name": "大廳提供目前房碼的乾淨邀請，原六碼複製按鈕仍可用",
+          "status": "PASS",
+          "details": {
+            "invite": "http://127.0.0.1:4319/multiplayer.html?room=ABC234",
+            "legacyCode": "ABC234"
+          }
+        },
+        {
+          "name": "複製被拒與分享不支援時留下可選取連結，點欄位可手動複製",
+          "status": "PASS"
+        },
+        {
+          "name": "分享取消有獨立提示，不自動轉成clipboard或入房命令",
+          "status": "PASS"
+        },
+        {
+          "name": "複製尚未完成時離房再入另一房，舊成功回覆不覆蓋新房間提示或連結",
+          "status": "PASS"
+        },
+        {
+          "name": "分享尚未完成時離房，晚到錯誤不留下舊房間邀請或錯誤訊息",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "真controller事件與UI狀態；DOM、場景、連線、clipboard/share為隔離替身，非瀏覽器、手機或外網驗收。"
+      ],
+      "sourceUnchangedDuringTests": true,
+      "summary": {
+        "passed": 7,
+        "failed": 0
+      },
+      "status": "PASS"
+    },
+    "tools/dev-tests/shots-multiplayer-maps-client-regression.json": {
+      "createdAt": "2026-11-16T08:16:16.995Z",
+      "clientSourceSha256": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+      "protocolSourceSha256": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+      "playerStorageTouched": false,
+      "productionUsed": false,
+      "liveServerUsed": false,
+      "cases": [
+        {
+          "name": "constructor不連線、不讀寫單人存檔；名稱／房間碼錯誤也不建立socket",
+          "status": "PASS"
+        },
+        {
+          "name": "真協定新玩家ackSeq=-1可完成建房；sessionStorage只寫專用續接憑證",
+          "status": "PASS"
+        },
+        {
+          "name": "requestId不相符不完成加入；伺服器拒絕後可重試，輸入房碼正規化",
+          "status": "PASS"
+        },
+        {
+          "name": "輸入只傳matchId／地圖版本／序號／steer／brake；限頻、急煞及ack後續序號正確",
+          "status": "PASS"
+        },
+        {
+          "name": "舊時間快照與已結束match不能覆蓋新一場",
+          "status": "PASS"
+        },
+        {
+          "name": "短斷線自動resume；舊socket訊息無效，伺服器ack後可繼續輸入",
+          "status": "PASS"
+        },
+        {
+          "name": "resume被伺服器拒絕會清憑證並停止重試",
+          "status": "PASS"
+        },
+        {
+          "name": "connect逾時會結束Promise、關socket並清timer",
+          "status": "PASS"
+        },
+        {
+          "name": "開socket但不回welcome的entry逾時不會永久pending",
+          "status": "PASS"
+        },
+        {
+          "name": "10秒重連截止會結束未完成連線、清除房間及續接token",
+          "status": "PASS"
+        },
+        {
+          "name": "離房中止待重連timer；已離開的socket回呼不能恢復身分",
+          "status": "PASS"
+        },
+        {
+          "name": "頁面reload保留session憑證但不自動開socket，顯式restore後續接",
+          "status": "PASS"
+        },
+        {
+          "name": "版本或車手資料不合法會安全斷線，不沿用舊房間或自動重連",
+          "status": "PASS"
+        },
+        {
+          "name": "同時加入請求會明確拒絕；disconnect會取消尚未完成的建房",
+          "status": "PASS"
+        },
+        {
+          "name": "ping採往返中點校時；解除訂閱後不再收到狀態與快照",
+          "status": "PASS"
+        },
+        {
+          "name": "24張目錄地圖均可建房；未知地圖在建立socket前拒絕",
+          "status": "PASS",
+          "detail": {
+            "maps": [
+              "taipei",
+              "australia",
+              "china",
+              "japan",
+              "miami",
+              "canada",
+              "monaco",
+              "barcelona",
+              "austria",
+              "britain",
+              "belgium",
+              "hungary",
+              "netherlands",
+              "italy",
+              "madrid",
+              "azerbaijan",
+              "malaysia",
+              "singapore",
+              "usa",
+              "mexico",
+              "brazil",
+              "lasvegas",
+              "qatar",
+              "abudhabi"
+            ]
+          }
+        },
+        {
+          "name": "房主僅在大廳可換圖，命令帶當前版本；房客與比賽中拒絕",
+          "status": "PASS"
+        },
+        {
+          "name": "未載入不能準備或駕駛；精確地圖載入確認後才可操作",
+          "status": "PASS"
+        },
+        {
+          "name": "錯誤ID／指紋／版本／連線世代的載入完成不得確認",
+          "status": "PASS"
+        },
+        {
+          "name": "換圖清快照與輸入序號；較晚到的舊地圖即使時間較新仍忽略",
+          "status": "PASS"
+        },
+        {
+          "name": "同版本不得偷偷換圖；地圖指紋錯誤、舊目錄、缺少loaded均安全拒絕",
+          "status": "PASS"
+        },
+        {
+          "name": "ready／start命令攜帶現圖版本與指紋，禁止誤用前一張地圖",
+          "status": "PASS"
+        },
+        {
+          "name": "房主於斷線期間換圖，同目錄憑證可續接新圖；舊非同步載入不能確認",
+          "status": "PASS"
+        },
+        {
+          "name": "同圖續接亦需要新連線的載入確認，晚到舊世代不得確認",
+          "status": "PASS"
+        },
+        {
+          "name": "v1續接憑證不會用於v2服務；新版憑證儲存空間與舊版隔離",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "純生命週期案例使用真client原始碼配合隔離socket與虛擬時鐘；不能證明實際網路延遲或瀏覽器渲染。",
+        "live案例為本機臨時埠的真server／WebSocket，未部署正式服務。"
+      ],
+      "summary": {
+        "passed": 25,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/multiplayer-server-summary.json": {
+      "startedAt": "2026-11-16T08:05:29.685Z",
+      "transport": "real WebSocket on loopback",
+      "authoritativePhysics": true,
+      "playerStorageTouched": false,
+      "externalRequests": [],
+      "cases": [
+        {
+          "name": "精確 Origin／WS 路徑限制與健康檢查，不依賴正式服務",
+          "status": "PASS",
+          "details": {
+            "rejectedOrigin": 403,
+            "rejectedPath": 404,
+            "health": {
+              "status": "ok",
+              "version": 2,
+              "physics": "classic-multitrack-collisions-v3",
+              "catalogStamp": "catalog-v2:c6b17e2cc2291b1415b700d0930e89e3b5f8ffa7710b4481a00439643f6f228c",
+              "rooms": 0,
+              "connections": 0
+            }
+          }
+        },
+        {
+          "name": "錯協定／物理／賽道版本與無效名稱不建立房間",
+          "status": "PASS",
+          "details": {
+            "incompatibleVariants": 3,
+            "invalidNames": 3,
+            "invalidLaps": true
+          }
+        },
+        {
+          "name": "四個真連線共房、第五人拒絕，快照不洩漏重連憑證",
+          "status": "PASS",
+          "details": {
+            "players": 4,
+            "codeLength": 6,
+            "distinctColors": 4,
+            "credentialsPrivate": true
+          }
+        },
+        {
+          "name": "至少兩人且全員準備才起跑；房主權限與共同三秒時鐘",
+          "status": "PASS",
+          "details": {
+            "startAt": 1003000,
+            "sharedMatch": "5a2e5d11-b6bb-41e5-9903-a14d193500b7",
+            "noMovementBeforeStart": true
+          }
+        },
+        {
+          "name": "無效輸入／過期 seq／假座標與完賽宣告不改權威車況",
+          "status": "PASS",
+          "details": {
+            "ackSeq": 5,
+            "completedLaps": 0,
+            "finishMs": null,
+            "clientCoordinatesIgnored": true
+          }
+        },
+        {
+          "name": "七百毫秒無新輸入自動煞車，其他車手與伺服器時鐘繼續",
+          "status": "PASS",
+          "details": {
+            "before": {
+              "a": 13.481927093569169,
+              "b": 13.481927093569169
+            },
+            "after": {
+              "a": 0,
+              "b": 37.810230824018625
+            },
+            "elapsedMs": 2000
+          }
+        },
+        {
+          "name": "真物理跑完整圈、依序分段後由伺服器完賽與排序；reset清除上一場",
+          "status": "PASS",
+          "details": {
+            "fullLapByActualPhysics": true,
+            "finishMs": [
+              58426.665,
+              60393.953
+            ],
+            "orderedRanks": [
+              1,
+              2
+            ],
+            "nextMatchFresh": true
+          }
+        },
+        {
+          "name": "房主斷線移交，合法 token 恢復席位與車況且舊 socket 不再有權操作",
+          "status": "PASS",
+          "details": {
+            "samePlayerId": "db63c06b-12b5-49ec-a739-48af9eac6899",
+            "players": 2,
+            "hostTransferred": true,
+            "singleSocketOwner": true
+          }
+        },
+        {
+          "name": "首位真物理完賽後保留六十秒，逾期未完成者 DNF 並保留贏家時間",
+          "status": "PASS",
+          "details": {
+            "winnerFinishMs": 58520.96115578565,
+            "graceMs": 60000,
+            "pendingDnf": true,
+            "winnerTimePreserved": true
+          }
+        },
+        {
+          "name": "重連超過十秒標示 DNF；離開不能以舊 token 復活",
+          "status": "PASS",
+          "details": {
+            "expiredMs": 10001,
+            "dnf": true,
+            "removedCredentials": true
+          }
+        },
+        {
+          "name": "倒數時斷線取消起跑，回大廳重新準備",
+          "status": "PASS",
+          "details": {
+            "countdownCancelled": true,
+            "allReadyReset": true
+          }
+        },
+        {
+          "name": "大廳離開移交房主，空房期限清理，已關房間無法加入",
+          "status": "PASS",
+          "details": {
+            "hostTransferred": true,
+            "emptyRoomRemovedAfterMs": 60001
+          }
+        },
+        {
+          "name": "全場時間上限與伺服器長停頓均產生 DNF 結果",
+          "status": "PASS",
+          "details": [
+            {
+              "trigger": "raceLimit",
+              "dnf": true
+            },
+            {
+              "trigger": "serverStall",
+              "dnf": true
+            }
+          ]
+        },
+        {
+          "name": "房間與連線容量限制、無效 JSON／過大訊息及操作頻率受限",
+          "status": "PASS",
+          "details": {
+            "maxRooms": true,
+            "maxClients": true,
+            "invalidJsonClosesAfter": 3,
+            "maxPayloadBytes": 4096,
+            "rateLimited": true
+          }
+        }
+      ],
+      "completedAt": "2026-11-16T08:06:09.343Z",
+      "summary": {
+        "passed": 14,
+        "failed": 0
+      },
+      "sourceHashes": {
+        "server/index.mjs": "de0f835ce25a8ce4da1f2c201c21e4841897c992fdb09e54014f1d296d8e31f0",
+        "server/room-service.mjs": "efddeb5a6c3fc21b639beb035507a95469fb52b3e6fd842904003d8426935884",
+        "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc",
+        "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842"
+      },
+      "sourceUnchangedDuringTests": true,
+      "status": "PASS",
+      "limitations": [
+        "本機隔離 WS／真權威物理與注入時鐘，不代表跨網路延遲、手機 FPS 或公開常駐服務可靠度",
+        "未使用正式站、Redis、玩家 storage；瀏覽器與固定單人三回歸另行驗證"
+      ]
+    },
+    "tools/dev-tests/shots-multiplayer-map-ui-lifecycle.json": {
+      "createdAt": "2026-11-16T08:10:55.315Z",
+      "gameSourceSha256": "6d2525a0e14e265db08d4989147d01d844f7b1b562ed718cff211b8c4e80685b",
+      "localOnly": true,
+      "productionUsed": false,
+      "playerStorageTouched": false,
+      "cases": [
+        {
+          "name": "入口／大廳均提供24圖，預覽未完成不可建房，完成後解鎖",
+          "status": "PASS"
+        },
+        {
+          "name": "快速換圖忽略晚到進度與完成，只確認最新地圖版本",
+          "status": "PASS"
+        },
+        {
+          "name": "場景完成仍等server.loaded，載入中的車手不能準備或起跑",
+          "status": "PASS"
+        },
+        {
+          "name": "載入失敗保留連線與房間，房主仍可換圖並成功重試",
+          "status": "PASS"
+        },
+        {
+          "name": "換圖可取代失敗工作，房客選單鎖定，成績與HUD顯示現圖",
+          "status": "PASS"
+        },
+        {
+          "name": "同圖重連重送新世代確認，斷線期間不得接受晚到完成",
+          "status": "PASS"
+        },
+        {
+          "name": "離房加入另一房間即使相同圖與版號，也只確認最新房間",
+          "status": "PASS"
+        },
+        {
+          "name": "比賽中續接載入失敗仍看得到重試，失聯／未載入時不能駕駛",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "真控制器與隔離DOM／場景工作；不證明WebGL畫面、實際網路或手機操作。"
+      ],
+      "summary": {
+        "passed": 8,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/next6-multiplayer-ui-result.json": {
+      "externalRequests": 0,
+      "storageTouched": false,
+      "cases": [
+        {
+          "name": "四人20筆穩定比賽快照：before建立1120元素，after為0，無不變文字寫入",
+          "status": "PASS",
+          "details": {
+            "before": {
+              "created": 1120,
+              "writes": 1000,
+              "moves": 1120
+            },
+            "after": {
+              "created": 0,
+              "writes": 0,
+              "moves": 0
+            }
+          }
+        },
+        {
+          "name": "只更新可見清單；大廳、比賽、結果各自延遲建立且保留其他面板節點",
+          "status": "PASS"
+        },
+        {
+          "name": "排名改變移動既有玩家；改名、斷線及離房後資料正確，不累積舊列",
+          "status": "PASS"
+        },
+        {
+          "name": "倒數取伺服器同步時間、秒數向上取整／不變負數；舊server不捏造期限",
+          "status": "PASS"
+        }
+      ],
+      "limitations": [
+        "真控制器renderUi與UI模組配合隔離DOM計數，不是實際瀏覽器的FPS或手機耗電量。"
+      ],
+      "summary": {
+        "passed": 4,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/next6-multiplayer-deadlines-result.json": {
+      "externalRequests": 0,
+      "storageTouched": false,
+      "cases": [
+        {
+          "name": "舊版缺少期限與原因，新版明確同步；新舊client相互讀取v2快照",
+          "status": "PASS",
+          "details": {
+            "protocolVersion": 2,
+            "legacyServerAccepted": true,
+            "legacyClientAccepted": true,
+            "raceLimitMs": 600000
+          }
+        },
+        {
+          "name": "10分鐘到期前不結束，邊界與舊版相同；新增race-timeout原因",
+          "status": "PASS"
+        },
+        {
+          "name": "首位完賽後60秒仍沿用舊邊界；靠近10分鐘時取較早期限",
+          "status": "PASS"
+        },
+        {
+          "name": "斷線仍有10秒重連期限，逾期記原因；主動退出及長停頓原因各自保留",
+          "status": "PASS"
+        },
+        {
+          "name": "已完賽再離線保持有效成績；再戰與取消倒數清除期限和舊原因",
+          "status": "PASS"
+        },
+        {
+          "name": "新client拒絕不完整／錯型別／矛盾deadline與DNF原因，合法原因全數接受",
+          "status": "PASS",
+          "details": {
+            "invalidDeadlineCases": 8,
+            "validReasons": 5,
+            "invalidReasonCases": 10,
+            "legacyDnfWithoutReasonAccepted": true
+          }
+        }
+      ],
+      "limitations": [
+        "真RoomService與client驗證器，使用隔離socket及注入時鐘；不代表真瀏覽器或外網對戰驗收。"
+      ],
+      "summary": {
+        "passed": 6,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/next6-multiplayer-pacing-result.json": {
+      "externalRequests": 0,
+      "cases": [
+        {
+          "name": "144Hz回呼的draw全開／60／30fps，預測物理、校正、inputHistory完全一致",
+          "status": "PASS",
+          "details": {
+            "callbacks": 144,
+            "draws": {
+              "every": 145,
+              "sixty": 61,
+              "thirty": 31
+            },
+            "stateIdentical": true
+          }
+        },
+        {
+          "name": "before忽略繪圖gate仍畫145次，after30fps為31次；物理結果維持一致",
+          "status": "PASS",
+          "details": {
+            "beforeDraws": 145,
+            "afterDraws": 31
+          }
+        },
+        {
+          "name": "30／60fps與大廳／結果10fps：天氣、觀眾、列車保持一秒進度；鏡頭及LOD仍更新",
+          "status": "PASS",
+          "details": [
+            {
+              "draws": 31,
+              "weatherSeconds": 0.9999999999999998,
+              "lodUpdates": 3
+            },
+            {
+              "draws": 61,
+              "weatherSeconds": 0.9999999999999996,
+              "lodUpdates": 3
+            },
+            {
+              "draws": 11,
+              "weatherSeconds": 1.0000000000000004,
+              "lodUpdates": 3
+            },
+            {
+              "draws": 11,
+              "weatherSeconds": 1.0000000000000004,
+              "lodUpdates": 3
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "真scene.frame／Car／碰撞helper，以renderer計數替代GPU繪圖；不能證明手機FPS或視覺效果。"
+      ],
+      "summary": {
+        "passed": 3,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/multiplayer-collision-client-result.json": {
+      "createdAt": "2026-11-16T08:16:20.705Z",
+      "productionUsed": false,
+      "externalRequests": 0,
+      "sourceHashes": {
+        "scene": "26c911d09b551acbf65b79e49057e3402c9e77edc5653ba46eb09f0172101242",
+        "feedback": "55228dc2c2b113ecb560964e79a9ee048029835cb7eb69de06c0a192c89a6972",
+        "baselineScene": "8d94f5ba4a9c43b5b36c7c1255016fd5bb9fb9919d4a0933462e4a88e89198cf"
+      },
+      "limitations": [
+        "真接觸查詢、Car、scene.accept與非零dt scene.frame，檢查模型姿態；跳過WebGL建構、模型建立與繪圖，不證明瀏覽器視覺或實際網路。",
+        "對照組僅替換回不可變before的scene原始碼，Car維持未修改的單人原物理。"
+      ],
+      "cases": [
+        {
+          "name": "追撞權威掉速立即採用，不重播穿回前車；遠車快照不變",
+          "status": "PASS"
+        },
+        {
+          "name": "側擦推開即時顯示，不以舊畫面偏移抹回重疊",
+          "status": "PASS"
+        },
+        {
+          "name": "前車受到追撞加速也立即採權威狀態",
+          "status": "PASS"
+        },
+        {
+          "name": "正常近距離跟車保留自車預測，避免額外操作延遲",
+          "status": "PASS"
+        },
+        {
+          "name": "正常煞車不誤判為碰撞，近車亦保留預測",
+          "status": "PASS"
+        },
+        {
+          "name": "無接觸的速度突變、斷線／未載入／DNF／完賽車不觸發近車校正",
+          "status": "PASS"
+        },
+        {
+          "name": "高架與下層重疊的車不觸發碰撞畫面校正",
+          "status": "PASS"
+        },
+        {
+          "name": "重複／過舊取樣不誤判為接觸突變",
+          "status": "PASS"
+        },
+        {
+          "name": "接觸後短暫校正到期恢復預測；換場與換圖清除殘留",
+          "status": "PASS"
+        },
+        {
+          "name": "接觸遠車採最新權威姿態，非接觸遠車保留110ms插值",
+          "status": "PASS"
+        },
+        {
+          "name": "接觸插值漸回正常延遲時，目標時間不會突然倒退",
+          "status": "PASS"
+        },
+        {
+          "name": "原scene對照會重播越過碰撞位置並平滑舊偏移，新scene即刻顯示權威結果",
+          "status": "PASS",
+          "details": {
+            "oldReplayDistance": 1.2705770298908712,
+            "newReplayDistance": 0
+          }
+        },
+        {
+          "name": "追撞校正後連續非零dt frame不會重新穿入前車，無新snapshot最多外推180ms",
+          "status": "PASS",
+          "details": {
+            "nonzeroFrames": 90,
+            "durationMs": 1500,
+            "minModelGap": 5.200071670142708,
+            "predictedMs": 180
+          }
+        },
+        {
+          "name": "20Hz權威samples與60Hz frame持續貼車，100ms恢復期後仍不重疊",
+          "status": "PASS",
+          "details": {
+            "authorityHz": 20,
+            "frameHz": 60,
+            "nonzeroFrames": 120,
+            "durationMs": 2000,
+            "minModelGap": 5.200070809554135,
+            "minPostRecoveryModelGap": 5.200116747183651
+          }
+        },
+        {
+          "name": "20Hz正常近距離無碰撞跟車仍保留每幀預測與油門，不凍結或誤減速",
+          "status": "PASS",
+          "details": {
+            "authorityHz": 20,
+            "frameHz": 60,
+            "nonzeroFrames": 60,
+            "minFrameAdvance": 0.42009997795414217,
+            "minModelGap": 5.779422868017108
+          }
+        },
+        {
+          "name": "高速追向慢車時非零dt暫態碰撞會掉速且不穿車，最終仍由新權威sample覆蓋",
+          "status": "PASS",
+          "details": {
+            "nonzeroFrames": 8,
+            "minModelGap": 5.218602030470817,
+            "adoptedAuthoritySpeed": 12
+          }
+        }
+      ],
+      "summary": {
+        "passed": 16,
+        "failed": 0
+      }
+    },
+    "tools/dev-tests/lobbybrake-browser-result.json": {
+      "startedAt": "2026-11-16T08:17:39.501Z",
+      "before": false,
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "localOnly": true,
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "entry_is_explicit_and_real_503_handshakes_retry_before_one_create",
+          "status": "PASS",
+          "details": {
+            "failedHandshakes": 2,
+            "socketAttempts": 3,
+            "createCommands": 1,
+            "rooms": 1
+          }
+        },
+        {
+          "name": "waiting_cancel_is_reachable_in_three_viewports",
+          "status": "PASS",
+          "details": {
+            "viewports": 3,
+            "entryCommandsBeforeHandshake": 0
+          }
+        },
+        {
+          "name": "cancel_preserves_fields_stops_late_retry_and_manual_join_sends_once",
+          "status": "PASS",
+          "details": {
+            "cancelledSocketAttempts": 1,
+            "quietPeriodMs": 2000,
+            "preservedNameAndCode": true,
+            "joinCommands": 1
+          }
+        },
+        {
+          "name": "manual_retry_control_is_reachable_and_uses_edited_room_code",
+          "status": "PASS",
+          "details": {
+            "manualAttempts": 2,
+            "commandsPerAttempt": 1,
+            "actualPlayers": 3,
+            "viewports": 3
+          }
+        },
+        {
+          "name": "cancelled_confirmation_and_offline_target_do_not_transfer_host",
+          "status": "PASS",
+          "details": {
+            "cancelSentNoCommand": true,
+            "offlineTargetBecameHost": false,
+            "peerRestoredThroughRealTransport": true
+          }
+        },
+        {
+          "name": "host_transfer_updates_all_three_clients_and_permissions",
+          "status": "PASS",
+          "details": {
+            "newHost": "e8a63119-f40e-4f4a-8f65-77a47c7bb6a8",
+            "oldHostControlsHidden": true,
+            "guestBecameManager": true,
+            "clients": 3
+          }
+        },
+        {
+          "name": "host_management_controls_are_reachable_in_three_viewports",
+          "status": "PASS",
+          "details": {
+            "viewports": 3,
+            "controls": [
+              "mp-host-target",
+              "mp-host-transfer",
+              "mp-host-kick"
+            ]
+          }
+        },
+        {
+          "name": "kick_notifies_clears_session_and_does_not_automatically_reconnect",
+          "status": "PASS",
+          "details": {
+            "sessionRemoved": true,
+            "revokedIdentity": true,
+            "quietPeriodMs": 2000,
+            "automaticReconnects": 0
+          }
+        },
+        {
+          "name": "kicked_player_can_manually_rejoin_with_a_new_identity",
+          "status": "PASS",
+          "details": {
+            "oldIdentityRevoked": true,
+            "newIdentity": "9eadcaa5-8efc-4bf8-a86f-8e9cb07db81f",
+            "joinCommands": 1,
+            "players": 3
+          }
+        }
+      ],
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [
+        {
+          "stage": "lobbybrake-wait",
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "controls": [
+            {
+              "id": "mp-cancel-connect",
+              "width": 286,
+              "height": 48,
+              "left": 52,
+              "right": 338,
+              "top": 299.28125,
+              "bottom": 347.28125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-wait",
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-cancel-connect",
+              "width": 428,
+              "height": 48,
+              "left": 208,
+              "right": 636,
+              "top": 171.28125,
+              "bottom": 219.28125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-wait",
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-cancel-connect",
+              "width": 428,
+              "height": 48,
+              "left": 208,
+              "right": 636,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-retry",
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "controls": [
+            {
+              "id": "mp-name",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 308.28125,
+              "bottom": 356.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-track",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 397.28125,
+              "bottom": 445.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-laps",
+              "width": 188,
+              "height": 48,
+              "left": 37,
+              "right": 225,
+              "top": 398.375,
+              "bottom": 446.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-create",
+              "width": 116,
+              "height": 48,
+              "left": 237,
+              "right": 353,
+              "top": 398.375,
+              "bottom": 446.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-code",
+              "width": 204,
+              "height": 48,
+              "left": 37,
+              "right": 241,
+              "top": 515.375,
+              "bottom": 563.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-join",
+              "width": 100,
+              "height": 48,
+              "left": 253,
+              "right": 353,
+              "top": 515.375,
+              "bottom": 563.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-entry-retry",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 651.5625,
+              "bottom": 699.5625,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-retry",
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-name",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 171.28125,
+              "bottom": 219.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-track",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 171.28125,
+              "bottom": 219.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-laps",
+              "width": 330,
+              "height": 48,
+              "left": 193,
+              "right": 523,
+              "top": 171.375,
+              "bottom": 219.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-create",
+              "width": 116,
+              "height": 48,
+              "left": 535,
+              "right": 651,
+              "top": 171.375,
+              "bottom": 219.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-code",
+              "width": 346,
+              "height": 48,
+              "left": 193,
+              "right": 539,
+              "top": 171.375,
+              "bottom": 219.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-join",
+              "width": 100,
+              "height": 48,
+              "left": 551,
+              "right": 651,
+              "top": 171.375,
+              "bottom": 219.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-entry-retry",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 213.46875,
+              "bottom": 261.46875,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-retry",
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-name",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-track",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-laps",
+              "width": 330,
+              "height": 48,
+              "left": 193,
+              "right": 523,
+              "top": 86.375,
+              "bottom": 134.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-create",
+              "width": 116,
+              "height": 48,
+              "left": 535,
+              "right": 651,
+              "top": 86.375,
+              "bottom": 134.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-code",
+              "width": 346,
+              "height": 48,
+              "left": 193,
+              "right": 539,
+              "top": 86.375,
+              "bottom": 134.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-join",
+              "width": 100,
+              "height": 48,
+              "left": 551,
+              "right": 651,
+              "top": 86.375,
+              "bottom": 134.375,
+              "reachable": true
+            },
+            {
+              "id": "mp-entry-retry",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 86.46875,
+              "bottom": 134.46875,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-host",
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "controls": [
+            {
+              "id": "mp-host-target",
+              "width": 282,
+              "height": 48,
+              "left": 54,
+              "right": 336,
+              "top": 410.046875,
+              "bottom": 458.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 136,
+              "height": 48,
+              "left": 54,
+              "right": 190,
+              "top": 470.046875,
+              "bottom": 518.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 136,
+              "height": 48,
+              "left": 200,
+              "right": 336,
+              "top": 470.046875,
+              "bottom": 518.046875,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-host",
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-host-target",
+              "width": 424,
+              "height": 48,
+              "left": 210,
+              "right": 634,
+              "top": 170.953125,
+              "bottom": 218.953125,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 207,
+              "height": 48,
+              "left": 210,
+              "right": 417,
+              "top": 170.953125,
+              "bottom": 218.953125,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 207,
+              "height": 48,
+              "left": 427,
+              "right": 634,
+              "top": 170.953125,
+              "bottom": 218.953125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "lobbybrake-host",
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-host-target",
+              "width": 424,
+              "height": 48,
+              "left": 210,
+              "right": 634,
+              "top": 85.953125,
+              "bottom": 133.953125,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 207,
+              "height": 48,
+              "left": 210,
+              "right": 417,
+              "top": 85.953125,
+              "bottom": 133.953125,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 207,
+              "height": 48,
+              "left": 427,
+              "right": 634,
+              "top": 85.953125,
+              "bottom": 133.953125,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "screenshots": [
+        "lobbybrake-wait-390x844.png",
+        "lobbybrake-wait-844x390.png",
+        "lobbybrake-wait-844x220.png",
+        "lobbybrake-retry-390x844.png",
+        "lobbybrake-retry-844x390.png",
+        "lobbybrake-retry-844x220.png",
+        "lobbybrake-host-390x844.png",
+        "lobbybrake-host-844x390.png",
+        "lobbybrake-host-844x220.png"
+      ],
+      "dialogs": [
+        {
+          "label": "host",
+          "type": "confirm",
+          "message": "將房主交給「車手丙」？你仍會留在房間。"
+        },
+        {
+          "label": "host",
+          "type": "confirm",
+          "message": "將房主交給「車手丙」？你仍會留在房間。"
+        },
+        {
+          "label": "host",
+          "type": "confirm",
+          "message": "將房主交給「車手乙」？你仍會留在房間。"
+        },
+        {
+          "label": "guest",
+          "type": "confirm",
+          "message": "將「房主甲」移出大廳？對方仍可重新輸入房碼加入。"
+        }
+      ],
+      "sourceHashes": {
+        "src/multiplayer-client.ts": "fabbe2066ccc4b5c2fd70d15bdfafaacb94ed8bafe53748e3756220bdd2477b3",
+        "src/multiplayer-game.ts": "6d2525a0e14e265db08d4989147d01d844f7b1b562ed718cff211b8c4e80685b",
+        "src/multiplayer-entry.ts": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d",
+        "src/multiplayer-ui.ts": "2ecd510277ff30dde2b3e45d299afc8a1c7fba57e9b9a72044f58cca9e3f8269",
+        "src/multiplayer.css": "98e4fc8ec7f53fbb5e6e90ee57115b6a33772bb87470799e950aaac6112ae22c",
+        "shared/multiplayer-protocol.ts": "4b9027afe88c5d06b586bcc3beb38a1800823ed02a08e587a13f4c8b4103f842",
+        "server/room-service.mjs": "efddeb5a6c3fc21b639beb035507a95469fb52b3e6fd842904003d8426935884",
+        "multiplayer.html": "bb2e2d22f84132bd7a3e112aaeb7529a1c2c6a3a44a49869a8455ef7243a6eb2"
+      },
+      "scriptSha256": "c0b2824d7f472223e1bcc46c1a0a4562997ffb987f8902f348628ec0def333ca",
+      "build": "c220d98a7f5c",
+      "backend": {
+        "host": "127.0.0.1",
+        "port": 59518,
+        "realService": true
+      },
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 9,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:18:00.082Z",
+          "params": {
+            "browserContextId": "021F174E11D92D52630B8160B303BD12"
+          },
+          "completedAt": "2026-11-16T08:18:00.127Z"
+        },
+        "host": {
+          "label": "host",
+          "id": 130,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:17:59.949Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:17:59.959Z"
+        },
+        "guest": {
+          "label": "guest",
+          "id": 100,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:17:59.960Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:17:59.970Z"
+        },
+        "third": {
+          "label": "third",
+          "id": 71,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:17:59.970Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:17:59.978Z"
+        }
+      },
+      "sourceUnchangedDuringTests": true,
+      "cleanupComplete": true,
+      "transport": {
+        "upgrades": 8,
+        "rejected503": 2,
+        "held": 1,
+        "forwarded": 5
+      },
+      "contexts": 3,
+      "completedAt": "2026-11-16T08:18:00.143Z",
+      "limitations": [
+        "新版使用本機三個隔離Chrome contexts與真WebSocket，不是外網、跨裝置或手機實機。",
+        "HTTP upgrade proxy只安排503／握手等待並轉發真後端；不測Render實際冷啟動秒數或服務方案。",
+        "玩家離線案例由真client.disconnect關閉傳輸，再以真restore恢復；未模擬作業系統網路切換。",
+        "視窗尺寸與DOM命中檢查不代表實機觸控、FPS或耗電；確認視窗由CDP接受／取消，未使用系統分享或傳送訊息。"
+      ]
+    },
+    "tools/dev-tests/lobbybrake-browser-before.json": {
+      "startedAt": "2026-11-16T08:17:33.626Z",
+      "before": true,
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-raceplus-work",
+      "localOnly": true,
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "before_has_no_wait_cancel_retry_or_host_management_controls",
+          "status": "PASS",
+          "details": {
+            "sockets": 0,
+            "room": null,
+            "absent": true
+          }
+        }
+      ],
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [],
+      "screenshots": [],
+      "dialogs": [],
+      "sourceHashes": {
+        "src/multiplayer-client.ts": "ce6abf7a78ee8ecf94392104e3ee7744fd566175f0d7616804c9b682e9f9a235",
+        "src/multiplayer-game.ts": "87e7ddbe6ca1732dae933966c30521617631ee59dcc4c4c612dfb627b6a87377",
+        "src/multiplayer-ui.ts": "2ecd510277ff30dde2b3e45d299afc8a1c7fba57e9b9a72044f58cca9e3f8269",
+        "src/multiplayer.css": "00acb03019de735e23edeb220e8330af6397373fd545a653cc44b7cc4764594a",
+        "shared/multiplayer-protocol.ts": "bd75bbf3975aaab8e99966d083b72ece209893f343c3b0069a011a2639a53464",
+        "server/room-service.mjs": "c7c26c27cd3e47c9a0983ab7a78ab86f84adac74a9dd4cdad10eb950efdb9ba2",
+        "multiplayer.html": "68bb89c00d66646b6cac00eb694a7e8d90ec20319f1efab74f4f457a4ef324a1"
+      },
+      "scriptSha256": "c0b2824d7f472223e1bcc46c1a0a4562997ffb987f8902f348628ec0def333ca",
+      "build": "f8ca4b1d251c",
+      "backend": {
+        "host": "127.0.0.1",
+        "port": 60932,
+        "realService": true
+      },
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 3,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:17:36.637Z",
+          "params": {
+            "browserContextId": "717148207D514B9F49E07173D788F6BF"
+          },
+          "completedAt": "2026-11-16T08:17:36.653Z"
+        },
+        "host": {
+          "label": "host",
+          "id": 31,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:17:36.632Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:17:36.635Z"
+        }
+      },
+      "interceptionCancellations": [
+        {
+          "label": "host",
+          "url": "http://127.0.0.1:4330/data/city.json",
+          "requestId": "interception-job-1673.0",
+          "networkId": "15340.17",
+          "cancellation": {
+            "requestId": "15340.17",
+            "timestamp": 628903.608187,
+            "type": "Fetch",
+            "errorText": "net::ERR_ABORTED",
+            "canceled": true
+          },
+          "cdpError": "Error: host: {\"code\":-32602,\"message\":\"Invalid InterceptionId.\"}"
+        }
+      ],
+      "sourceUnchangedDuringTests": true,
+      "cleanupComplete": true,
+      "transport": {
+        "upgrades": 0,
+        "rejected503": 0,
+        "held": 0,
+        "forwarded": 0
+      },
+      "contexts": 1,
+      "completedAt": "2026-11-16T08:17:36.674Z",
+      "limitations": [
+        "新版使用本機三個隔離Chrome contexts與真WebSocket，不是外網、跨裝置或手機實機。",
+        "HTTP upgrade proxy只安排503／握手等待並轉發真後端；不測Render實際冷啟動秒數或服務方案。",
+        "玩家離線案例由真client.disconnect關閉傳輸，再以真restore恢復；未模擬作業系統網路切換。",
+        "視窗尺寸與DOM命中檢查不代表實機觸控、FPS或耗電；確認視窗由CDP接受／取消，未使用系統分享或傳送訊息。"
+      ]
+    },
+    "tools/dev-tests/lobbybrake-assist-browser-result.json": {
+      "startedAt": "2026-11-16T08:18:59.112Z",
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "origin": "http://127.0.0.1:4332",
+      "before": false,
+      "status": "PASS",
+      "localOnly": true,
+      "cases": [
+        {
+          "name": "same_real_GP_grip_position_speed_produces_earlier_warning_and_updated_line",
+          "status": "PASS",
+          "details": {
+            "fixture": {
+              "index": 1108,
+              "speed": 92.90895462036133
+            },
+            "ahead": 1141,
+            "dry": {
+              "grip": 1,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d60eeee5",
+                "version": 3,
+                "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+              }
+            },
+            "wet": {
+              "grip": 0.7028011494516478,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "煞車！",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d91affe5",
+                "version": 4,
+                "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+              }
+            },
+            "adjustedTarget": 80.81790924072266,
+            "originalTargetsUnchanged": true
+          }
+        },
+        {
+          "name": "in_box_out_hide_braking_warning_and_return_to_track_restores_it",
+          "status": "PASS",
+          "details": {
+            "phases": [
+              {
+                "grip": 0.7028011494516478,
+                "speed": 92.90895462036133,
+                "index": 2564,
+                "ahead": 2597,
+                "originalTarget": 95,
+                "warning": "",
+                "pit": "in",
+                "colors": {
+                  "fingerprint": "d91affe5",
+                  "version": 4,
+                  "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+                }
+              },
+              {
+                "grip": 0.7028011494516478,
+                "speed": 92.90895462036133,
+                "index": 2564,
+                "ahead": 2597,
+                "originalTarget": 95,
+                "warning": "",
+                "pit": "box",
+                "colors": {
+                  "fingerprint": "d91affe5",
+                  "version": 4,
+                  "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+                }
+              },
+              {
+                "grip": 0.7028011494516478,
+                "speed": 92.90895462036133,
+                "index": 2564,
+                "ahead": 2597,
+                "originalTarget": 95,
+                "warning": "",
+                "pit": "out",
+                "colors": {
+                  "fingerprint": "d91affe5",
+                  "version": 4,
+                  "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+                }
+              }
+            ],
+            "racing": {
+              "grip": 0.7028011494516478,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "煞車！",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d91affe5",
+                "version": 4,
+                "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+              }
+            }
+          }
+        },
+        {
+          "name": "three_mobile_viewports_keep_warning_and_touch_controls_accessible",
+          "status": "PASS",
+          "details": [
+            {
+              "width": 390,
+              "height": 844,
+              "documentWidth": 390,
+              "warning": {
+                "left": 132,
+                "right": 258,
+                "top": 388.234375,
+                "bottom": 436.234375,
+                "width": 126,
+                "height": 48,
+                "text": "煞車！",
+                "shown": true
+              },
+              "controls": [
+                {
+                  "id": "brake",
+                  "left": 268,
+                  "right": 376,
+                  "top": 722,
+                  "bottom": 830,
+                  "width": 108,
+                  "height": 108,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-l",
+                  "left": 14,
+                  "right": 107.5999984741211,
+                  "top": 736.4000244140625,
+                  "bottom": 830,
+                  "width": 93.5999984741211,
+                  "height": 93.5999755859375,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-r",
+                  "left": 120.19999694824219,
+                  "right": 213.79998779296875,
+                  "top": 736.4000244140625,
+                  "bottom": 830,
+                  "width": 93.59999084472656,
+                  "height": 93.5999755859375,
+                  "reachable": true
+                }
+              ]
+            },
+            {
+              "width": 844,
+              "height": 390,
+              "documentWidth": 844,
+              "warning": {
+                "left": 359,
+                "right": 485,
+                "top": 179.390625,
+                "bottom": 227.390625,
+                "width": 126,
+                "height": 48,
+                "text": "煞車！",
+                "shown": true
+              },
+              "controls": [
+                {
+                  "id": "brake",
+                  "left": 726,
+                  "right": 830,
+                  "top": 272,
+                  "bottom": 376,
+                  "width": 104,
+                  "height": 104,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-l",
+                  "left": 14,
+                  "right": 102,
+                  "top": 288,
+                  "bottom": 376,
+                  "width": 88,
+                  "height": 88,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-r",
+                  "left": 112,
+                  "right": 200,
+                  "top": 288,
+                  "bottom": 376,
+                  "width": 88,
+                  "height": 88,
+                  "reachable": true
+                }
+              ]
+            },
+            {
+              "width": 844,
+              "height": 220,
+              "documentWidth": 844,
+              "warning": {
+                "left": 359,
+                "right": 485,
+                "top": 101.1875,
+                "bottom": 149.1875,
+                "width": 126,
+                "height": 48,
+                "text": "煞車！",
+                "shown": true
+              },
+              "controls": [
+                {
+                  "id": "brake",
+                  "left": 726,
+                  "right": 830,
+                  "top": 102,
+                  "bottom": 206,
+                  "width": 104,
+                  "height": 104,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-l",
+                  "left": 14,
+                  "right": 102,
+                  "top": 118,
+                  "bottom": 206,
+                  "width": 88,
+                  "height": 88,
+                  "reachable": true
+                },
+                {
+                  "id": "steer-r",
+                  "left": 112,
+                  "right": 200,
+                  "top": 118,
+                  "bottom": 206,
+                  "width": 88,
+                  "height": 88,
+                  "reachable": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leaving_GP_for_real_time_trial_restores_original_line_and_warning_threshold",
+          "status": "PASS",
+          "details": {
+            "tt": {
+              "grip": 0.7028011494516478,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d60eeee5",
+                "version": 5,
+                "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+              }
+            },
+            "originalLineRestored": true
+          }
+        }
+      ],
+      "sourceHashes": {
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+        "src/world.ts": "24fd219e4a85b76ba67e0fa4f9a26a4341cb2f70200b63d84b8c450c999f392a",
+        "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+        "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/style.css": "9d6b72d3edf2351682fd433f90d25e9196f2e2eba0f72690fe22275c3c7dc8c5",
+        "src/braking-assist.ts": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f"
+      },
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [
+        {
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "warning": {
+            "left": 132,
+            "right": 258,
+            "top": 388.234375,
+            "bottom": 436.234375,
+            "width": 126,
+            "height": 48,
+            "text": "煞車！",
+            "shown": true
+          },
+          "controls": [
+            {
+              "id": "brake",
+              "left": 268,
+              "right": 376,
+              "top": 722,
+              "bottom": 830,
+              "width": 108,
+              "height": 108,
+              "reachable": true
+            },
+            {
+              "id": "steer-l",
+              "left": 14,
+              "right": 107.5999984741211,
+              "top": 736.4000244140625,
+              "bottom": 830,
+              "width": 93.5999984741211,
+              "height": 93.5999755859375,
+              "reachable": true
+            },
+            {
+              "id": "steer-r",
+              "left": 120.19999694824219,
+              "right": 213.79998779296875,
+              "top": 736.4000244140625,
+              "bottom": 830,
+              "width": 93.59999084472656,
+              "height": 93.5999755859375,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "warning": {
+            "left": 359,
+            "right": 485,
+            "top": 179.390625,
+            "bottom": 227.390625,
+            "width": 126,
+            "height": 48,
+            "text": "煞車！",
+            "shown": true
+          },
+          "controls": [
+            {
+              "id": "brake",
+              "left": 726,
+              "right": 830,
+              "top": 272,
+              "bottom": 376,
+              "width": 104,
+              "height": 104,
+              "reachable": true
+            },
+            {
+              "id": "steer-l",
+              "left": 14,
+              "right": 102,
+              "top": 288,
+              "bottom": 376,
+              "width": 88,
+              "height": 88,
+              "reachable": true
+            },
+            {
+              "id": "steer-r",
+              "left": 112,
+              "right": 200,
+              "top": 288,
+              "bottom": 376,
+              "width": 88,
+              "height": 88,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "warning": {
+            "left": 359,
+            "right": 485,
+            "top": 101.1875,
+            "bottom": 149.1875,
+            "width": 126,
+            "height": 48,
+            "text": "煞車！",
+            "shown": true
+          },
+          "controls": [
+            {
+              "id": "brake",
+              "left": 726,
+              "right": 830,
+              "top": 102,
+              "bottom": 206,
+              "width": 104,
+              "height": 104,
+              "reachable": true
+            },
+            {
+              "id": "steer-l",
+              "left": 14,
+              "right": 102,
+              "top": 118,
+              "bottom": 206,
+              "width": 88,
+              "height": 88,
+              "reachable": true
+            },
+            {
+              "id": "steer-r",
+              "left": 112,
+              "right": 200,
+              "top": 118,
+              "bottom": 206,
+              "width": 88,
+              "height": 88,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "screenshots": [
+        "assist-after-wet.png",
+        "assist-390x844.png",
+        "assist-844x390.png",
+        "assist-844x220.png"
+      ],
+      "cleanup": {
+        "browserContextDisposed": true,
+        "previewClosed": true
+      },
+      "scriptSha256": "6a5b7d565af663d58f5d56b55da3113e00c703a2dfcc9bf7f0e1c035e77a2368",
+      "referenceModelHash": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f",
+      "build": "c220d98a7f5c",
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 3,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:19:05.513Z",
+          "params": {
+            "browserContextId": "7466B5B19F660260344FBF157D1BC08E"
+          },
+          "completedAt": "2026-11-16T08:19:05.583Z"
+        },
+        "assist": {
+          "label": "assist",
+          "id": 86,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:19:05.508Z",
+          "params": {
+            "expression": "(() => {\n    const g=__gp,c=g.car,t=g.track,i=c.pos.i,ahead=(i+Math.round(c.v*.7/t.ds))%t.N;\n    return{grip:c.gripMul,speed:c.v,index:i,ahead,originalTarget:t.vTarget[ahead],warning:document.getElementById('warn').textContent,\n      pit:g.field.me.pit?.ph??null,colors:__lobbybrakeColors()};\n  })()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:19:05.511Z"
+        }
+      },
+      "comparison": {
+        "fixture": {
+          "index": 1108,
+          "speed": 92.90895462036133
+        },
+        "ahead": 1141,
+        "dry": {
+          "grip": 1,
+          "speed": 92.90895462036133,
+          "index": 1108,
+          "ahead": 1141,
+          "originalTarget": 95,
+          "warning": "",
+          "pit": null,
+          "colors": {
+            "fingerprint": "d60eeee5",
+            "version": 3,
+            "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+          }
+        },
+        "wet": {
+          "grip": 0.7028011494516478,
+          "speed": 92.90895462036133,
+          "index": 1108,
+          "ahead": 1141,
+          "originalTarget": 95,
+          "warning": "煞車！",
+          "pit": null,
+          "colors": {
+            "fingerprint": "d91affe5",
+            "version": 4,
+            "geometry": "53b79e90-e24c-4c3b-b68f-63047d910f3a"
+          }
+        },
+        "adjustedTarget": 80.81790924072266
+      },
+      "sourceUnchanged": true,
+      "completedAt": "2026-11-16T08:19:05.592Z",
+      "limitations": [
+        "只連本機 preview 與既有 CDP；新隔離 browser context，銷毀後不影響一般 Chrome 或玩家存檔。",
+        "透過真 GP／TT 選單起跑，胎種、磨耗、濕度、車速、位置與進站階段由測試安排；其他車移遠避免碰撞。",
+        "提示由真 step(0) 與既有 rAF／真 DOM 更新，線色讀取真 Three.js geometry color buffer；參考模型只用來選擇前後版比較點。",
+        "時間固定、低解析 render；截圖用真 renderer 額外繪製當前 scene。桌面 Chrome 模擬 viewport，未驗證手機實機、實際駕駛安全速度、實際進站、FPS、耗電或延遲。",
+        "before 模式只跑相同胎況／位置／速度的單一對照；新版另驗進站、三種版面、離開 GP。"
+      ]
+    },
+    "tools/dev-tests/lobbybrake-assist-browser-before.json": {
+      "startedAt": "2026-11-16T08:18:46.245Z",
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-raceplus-work",
+      "origin": "http://127.0.0.1:4332",
+      "before": true,
+      "status": "PASS",
+      "localOnly": true,
+      "cases": [
+        {
+          "name": "same_real_GP_grip_position_speed_produces_earlier_warning_and_updated_line",
+          "status": "PASS",
+          "details": {
+            "fixture": {
+              "index": 1108,
+              "speed": 92.90895462036133
+            },
+            "ahead": 1141,
+            "dry": {
+              "grip": 1,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d60eeee5",
+                "version": 0,
+                "geometry": "19c0d4d7-af37-44d5-8f74-f3125d0a16a3"
+              }
+            },
+            "wet": {
+              "grip": 0.7028011494516478,
+              "speed": 92.90895462036133,
+              "index": 1108,
+              "ahead": 1141,
+              "originalTarget": 95,
+              "warning": "",
+              "pit": null,
+              "colors": {
+                "fingerprint": "d60eeee5",
+                "version": 0,
+                "geometry": "19c0d4d7-af37-44d5-8f74-f3125d0a16a3"
+              }
+            },
+            "adjustedTarget": 80.81790924072266,
+            "originalTargetsUnchanged": true
+          }
+        }
+      ],
+      "sourceHashes": {
+        "src/main.ts": "4c647d962447aabfd0dc405c351f39448100c2be5e13af3bc3bdb8d276e086b3",
+        "src/world.ts": "24ee12a022a7364a81855bc65f03a73e16c05dd7ea4a0aa35dd9f0a8c5ffe2c7",
+        "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+        "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/style.css": "9d6b72d3edf2351682fd433f90d25e9196f2e2eba0f72690fe22275c3c7dc8c5"
+      },
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [],
+      "screenshots": [
+        "assist-before-wet.png"
+      ],
+      "cleanup": {
+        "browserContextDisposed": true,
+        "previewClosed": true
+      },
+      "scriptSha256": "6a5b7d565af663d58f5d56b55da3113e00c703a2dfcc9bf7f0e1c035e77a2368",
+      "referenceModelHash": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f",
+      "build": "f8ca4b1d251c",
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 3,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:18:51.797Z",
+          "params": {
+            "browserContextId": "4EE09CCC532DBF44548136CFB9D67C33"
+          },
+          "completedAt": "2026-11-16T08:18:51.847Z"
+        },
+        "assist": {
+          "label": "assist",
+          "id": 47,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:18:51.785Z",
+          "params": {
+            "expression": "__gp.renderer.setPixelRatio(.15);__gp.renderer.setSize(160,90,false)",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:18:51.796Z"
+        }
+      },
+      "comparison": {
+        "fixture": {
+          "index": 1108,
+          "speed": 92.90895462036133
+        },
+        "ahead": 1141,
+        "dry": {
+          "grip": 1,
+          "speed": 92.90895462036133,
+          "index": 1108,
+          "ahead": 1141,
+          "originalTarget": 95,
+          "warning": "",
+          "pit": null,
+          "colors": {
+            "fingerprint": "d60eeee5",
+            "version": 0,
+            "geometry": "19c0d4d7-af37-44d5-8f74-f3125d0a16a3"
+          }
+        },
+        "wet": {
+          "grip": 0.7028011494516478,
+          "speed": 92.90895462036133,
+          "index": 1108,
+          "ahead": 1141,
+          "originalTarget": 95,
+          "warning": "",
+          "pit": null,
+          "colors": {
+            "fingerprint": "d60eeee5",
+            "version": 0,
+            "geometry": "19c0d4d7-af37-44d5-8f74-f3125d0a16a3"
+          }
+        },
+        "adjustedTarget": 80.81790924072266
+      },
+      "sourceUnchanged": true,
+      "completedAt": "2026-11-16T08:18:51.864Z",
+      "limitations": [
+        "只連本機 preview 與既有 CDP；新隔離 browser context，銷毀後不影響一般 Chrome 或玩家存檔。",
+        "透過真 GP／TT 選單起跑，胎種、磨耗、濕度、車速、位置與進站階段由測試安排；其他車移遠避免碰撞。",
+        "提示由真 step(0) 與既有 rAF／真 DOM 更新，線色讀取真 Three.js geometry color buffer；參考模型只用來選擇前後版比較點。",
+        "時間固定、低解析 render；截圖用真 renderer 額外繪製當前 scene。桌面 Chrome 模擬 viewport，未驗證手機實機、實際駕駛安全速度、實際進站、FPS、耗電或延遲。",
+        "before 模式只跑相同胎況／位置／速度的單一對照；新版另驗進站、三種版面、離開 GP。"
+      ]
+    },
+    "tools/dev-tests/raceplus-browser-result.json": {
+      "startedAt": "2026-11-16T08:20:50.512Z",
+      "before": false,
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "localOnly": true,
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "invite_prefills_without_connecting_or_joining",
+          "status": "PASS",
+          "details": {
+            "code": "ABC234",
+            "sockets": 0,
+            "room": null,
+            "hint": "已帶入朋友的房間碼。確認車手暱稱後，按「加入房間」。"
+          }
+        },
+        {
+          "name": "invite_copy_share_and_manual_fallback_use_clean_url",
+          "status": "PASS",
+          "details": {
+            "invite": "http://127.0.0.1:4325/multiplayer.html?room=6988DW",
+            "legacyCode": "6988DW",
+            "copyFailureFallback": true,
+            "shareCancelledWithoutCopy": true
+          }
+        },
+        {
+          "name": "lobby_invite_controls_reachable_in_three_viewports",
+          "status": "PASS",
+          "details": {
+            "viewports": 3
+          }
+        },
+        {
+          "name": "real_ws_carries_lap_metadata_and_hud_best_lap",
+          "status": "PASS",
+          "details": {
+            "best": "最快圈 0:45.000"
+          }
+        },
+        {
+          "name": "results_show_total_best_gap_and_selectable_lap_rows",
+          "status": "PASS",
+          "details": {
+            "results": "1. 車手（你）3 圈 · 最快 0:44.000 · 冠軍2:15.0002. 車手3 圈 · 最快 0:45.000 · 落後冠軍 +2.500 秒2:17.500",
+            "own": "第 1 圈0:45.000第 2 圈0:46.000較上圈慢 1.000 秒第 3 圈0:44.000最快圈 · 較上圈快 2.000 秒",
+            "other": "第 1 圈0:47.000第 2 圈0:45.000最快圈 · 較上圈快 2.000 秒第 3 圈0:45.500較上圈慢 0.500 秒"
+          }
+        },
+        {
+          "name": "results_controls_and_laps_reachable_in_three_viewports",
+          "status": "PASS",
+          "details": {
+            "viewports": 3
+          }
+        },
+        {
+          "name": "rematch_clears_laps_and_reuses_correct_room_invite",
+          "status": "PASS",
+          "details": {
+            "cleared": true
+          }
+        }
+      ],
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [
+        {
+          "stage": "raceplus-lobby",
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "controls": [
+            {
+              "id": "mp-copy",
+              "width": 96,
+              "height": 48,
+              "left": 257,
+              "right": 353,
+              "top": 301.28125,
+              "bottom": 349.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-copy-link",
+              "width": 153,
+              "height": 44,
+              "left": 37,
+              "right": 190,
+              "top": 371.28125,
+              "bottom": 415.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-share-link",
+              "width": 153,
+              "height": 44,
+              "left": 200,
+              "right": 353,
+              "top": 371.28125,
+              "bottom": 415.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-invite-url",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 398.28125,
+              "bottom": 446.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-room-track",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 397.5625,
+              "bottom": 445.5625,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-target",
+              "width": 282,
+              "height": 48,
+              "left": 54,
+              "right": 336,
+              "top": 410.140625,
+              "bottom": 458.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 136,
+              "height": 48,
+              "left": 54,
+              "right": 190,
+              "top": 470.140625,
+              "bottom": 518.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 136,
+              "height": 48,
+              "left": 200,
+              "right": 336,
+              "top": 470.140625,
+              "bottom": 518.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-ready",
+              "width": 153,
+              "height": 48,
+              "left": 37,
+              "right": 190,
+              "top": 616.328125,
+              "bottom": 664.328125,
+              "reachable": true
+            },
+            {
+              "id": "mp-start",
+              "width": 153,
+              "height": 48,
+              "left": 200,
+              "right": 353,
+              "top": 616.328125,
+              "bottom": 664.328125,
+              "reachable": true
+            },
+            {
+              "id": "mp-leave",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 674.328125,
+              "bottom": 722.328125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "raceplus-lobby",
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-copy",
+              "width": 96,
+              "height": 48,
+              "left": 555,
+              "right": 651,
+              "top": 171.28125,
+              "bottom": 219.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-copy-link",
+              "width": 224,
+              "height": 44,
+              "left": 193,
+              "right": 417,
+              "top": 173.28125,
+              "bottom": 217.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-share-link",
+              "width": 224,
+              "height": 44,
+              "left": 427,
+              "right": 651,
+              "top": 173.28125,
+              "bottom": 217.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-invite-url",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 171.28125,
+              "bottom": 219.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-room-track",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 170.5625,
+              "bottom": 218.5625,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-target",
+              "width": 424,
+              "height": 48,
+              "left": 210,
+              "right": 634,
+              "top": 171.046875,
+              "bottom": 219.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 207,
+              "height": 48,
+              "left": 210,
+              "right": 417,
+              "top": 171.046875,
+              "bottom": 219.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 207,
+              "height": 48,
+              "left": 427,
+              "right": 634,
+              "top": 171.046875,
+              "bottom": 219.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-ready",
+              "width": 146,
+              "height": 48,
+              "left": 193,
+              "right": 339,
+              "top": 236.140625,
+              "bottom": 284.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-start",
+              "width": 146,
+              "height": 48,
+              "left": 349,
+              "right": 495,
+              "top": 236.140625,
+              "bottom": 284.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-leave",
+              "width": 146,
+              "height": 48,
+              "left": 505,
+              "right": 651,
+              "top": 236.140625,
+              "bottom": 284.140625,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "raceplus-lobby",
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-copy",
+              "width": 96,
+              "height": 48,
+              "left": 555,
+              "right": 651,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-copy-link",
+              "width": 224,
+              "height": 44,
+              "left": 193,
+              "right": 417,
+              "top": 88.28125,
+              "bottom": 132.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-share-link",
+              "width": 224,
+              "height": 44,
+              "left": 427,
+              "right": 651,
+              "top": 88.28125,
+              "bottom": 132.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-invite-url",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-room-track",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 85.5625,
+              "bottom": 133.5625,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-target",
+              "width": 424,
+              "height": 48,
+              "left": 210,
+              "right": 634,
+              "top": 86.046875,
+              "bottom": 134.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-transfer",
+              "width": 207,
+              "height": 48,
+              "left": 210,
+              "right": 417,
+              "top": 86.046875,
+              "bottom": 134.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-host-kick",
+              "width": 207,
+              "height": 48,
+              "left": 427,
+              "right": 634,
+              "top": 86.046875,
+              "bottom": 134.046875,
+              "reachable": true
+            },
+            {
+              "id": "mp-ready",
+              "width": 146,
+              "height": 48,
+              "left": 193,
+              "right": 339,
+              "top": 86.140625,
+              "bottom": 134.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-start",
+              "width": 146,
+              "height": 48,
+              "left": 349,
+              "right": 495,
+              "top": 86.140625,
+              "bottom": 134.140625,
+              "reachable": true
+            },
+            {
+              "id": "mp-leave",
+              "width": 146,
+              "height": 48,
+              "left": 505,
+              "right": 651,
+              "top": 86.140625,
+              "bottom": 134.140625,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "raceplus-results",
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "controls": [
+            {
+              "id": "mp-lap-driver",
+              "width": 316,
+              "height": 48,
+              "left": 37,
+              "right": 353,
+              "top": 463.1875,
+              "bottom": 511.1875,
+              "reachable": true
+            },
+            {
+              "id": "mp-rematch",
+              "width": 153,
+              "height": 48,
+              "left": 37,
+              "right": 190,
+              "top": 697.28125,
+              "bottom": 745.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-result-leave",
+              "width": 153,
+              "height": 48,
+              "left": 200,
+              "right": 353,
+              "top": 697.28125,
+              "bottom": 745.28125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "raceplus-results",
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-lap-driver",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 171.1875,
+              "bottom": 219.1875,
+              "reachable": true
+            },
+            {
+              "id": "mp-rematch",
+              "width": 224,
+              "height": 48,
+              "left": 193,
+              "right": 417,
+              "top": 236.28125,
+              "bottom": 284.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-result-leave",
+              "width": 224,
+              "height": 48,
+              "left": 427,
+              "right": 651,
+              "top": 236.28125,
+              "bottom": 284.28125,
+              "reachable": true
+            }
+          ]
+        },
+        {
+          "stage": "raceplus-results",
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "controls": [
+            {
+              "id": "mp-lap-driver",
+              "width": 458,
+              "height": 48,
+              "left": 193,
+              "right": 651,
+              "top": 86.1875,
+              "bottom": 134.1875,
+              "reachable": true
+            },
+            {
+              "id": "mp-rematch",
+              "width": 224,
+              "height": 48,
+              "left": 193,
+              "right": 417,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            },
+            {
+              "id": "mp-result-leave",
+              "width": 224,
+              "height": 48,
+              "left": 427,
+              "right": 651,
+              "top": 86.28125,
+              "bottom": 134.28125,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "screenshots": [
+        "raceplus-lobby-390x844.png",
+        "raceplus-lobby-844x390.png",
+        "raceplus-lobby-844x220.png",
+        "raceplus-results-390x844.png",
+        "raceplus-results-844x390.png",
+        "raceplus-results-844x220.png"
+      ],
+      "build": "c220d98a7f5c",
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 6,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:21:13.247Z",
+          "params": {
+            "browserContextId": "FBB3C2B33EC27B7E34FD5FABCD87902B"
+          },
+          "completedAt": "2026-11-16T08:21:13.299Z"
+        },
+        "host": {
+          "label": "host",
+          "id": 207,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:21:13.178Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:21:13.187Z"
+        },
+        "guest": {
+          "label": "guest",
+          "id": 139,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:21:13.188Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:21:13.197Z"
+        }
+      },
+      "completedAt": "2026-11-16T08:21:13.331Z",
+      "limitations": [
+        "本機兩個隔離Chrome contexts與真WebSocket，非外網或手機實機。",
+        "圈速資料由私有測試server安排一致狀態，未在browser完整駕駛三圈；真Car/過線計時另由raceplus-laps-regression驗證。",
+        "剪貼簿與系統分享使用替身，未呼叫系統分享或發送訊息。"
+      ]
+    },
+    "tools/dev-tests/raceplus-strategy-browser-result.json": {
+      "startedAt": "2026-11-16T08:21:21.066Z",
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "origin": "http://127.0.0.1:4327",
+      "before": false,
+      "localOnly": true,
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "selected_tyre_pointer_event_changes_live_strategy_and_matches_model",
+          "status": "PASS",
+          "details": {
+            "hard": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。",
+            "hardModel": {
+              "input": {
+                "laneLength": 300,
+                "limit": 22.22222222222222,
+                "racingTime": 3.157052980451474,
+                "lapTime": 60,
+                "wear": 0.2,
+                "lapsRemaining": 6,
+                "current": 1,
+                "next": 2,
+                "wetness": 0,
+                "safetyCar": false,
+                "queueSeconds": 0
+              },
+              "range": {
+                "min": 13.864661035450911,
+                "max": 22.72673830005546
+              },
+              "text": "13.9～22.7 秒"
+            },
+            "rain": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上雨胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 31.8～56.0 秒。下圈進站淨代價 28.1～47.4 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選雨胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。",
+            "rainModel": {
+              "input": {
+                "laneLength": 300,
+                "limit": 22.22222222222222,
+                "racingTime": 3.157052980451474,
+                "lapTime": 60,
+                "wear": 0.2,
+                "lapsRemaining": 6,
+                "current": 1,
+                "next": 3,
+                "wetness": 0,
+                "safetyCar": false,
+                "queueSeconds": 0
+              },
+              "range": {
+                "min": 31.76660180443003,
+                "max": 55.95767587899159
+              },
+              "text": "31.8～56.0 秒"
+            }
+          }
+        },
+        {
+          "name": "observed_wetness_changes_estimate_and_active_pit_uses_locked_tyre_status",
+          "status": "PASS",
+          "details": {
+            "dry": {
+              "input": {
+                "laneLength": 300,
+                "limit": 22.22222222222222,
+                "racingTime": 3.157052980451474,
+                "lapTime": 60,
+                "wear": 0.2,
+                "lapsRemaining": 6,
+                "current": 1,
+                "next": 3,
+                "wetness": 0,
+                "safetyCar": false,
+                "queueSeconds": 0
+              },
+              "range": {
+                "min": 31.76660180443003,
+                "max": 55.95767587899159
+              },
+              "text": "31.8～56.0 秒"
+            },
+            "wet": {
+              "input": {
+                "laneLength": 300,
+                "limit": 22.22222222222222,
+                "racingTime": 3.157052980451474,
+                "lapTime": 60,
+                "wear": 0.2,
+                "lapsRemaining": 6,
+                "current": 1,
+                "next": 3,
+                "wetness": 0.8,
+                "safetyCar": false,
+                "queueSeconds": 0
+              },
+              "range": {
+                "min": -15.838169026274041,
+                "max": 9.996953987887622
+              },
+              "text": "-15.8～10.0 秒"
+            },
+            "phases": [
+              {
+                "phase": "in",
+                "text": "進站限速行駛中，本次鎖定換上硬胎。當下濕度 80%・路面大致穩定。匯回賽道後恢復進站方案比較；本次實際停站結果以完成作業為準。"
+              },
+              {
+                "phase": "box",
+                "text": "停站換胎中，本次鎖定換上硬胎。當下濕度 80%・路面大致穩定。匯回賽道後恢復進站方案比較；本次實際停站結果以完成作業為準。"
+              },
+              {
+                "phase": "out",
+                "text": "出站中，本次鎖定換上硬胎。當下濕度 80%・路面大致穩定。匯回賽道後恢復進站方案比較；本次實際停站結果以完成作業為準。"
+              }
+            ]
+          }
+        },
+        {
+          "name": "strategy_panel_scrolls_and_summary_can_close_in_three_mobile_viewports",
+          "status": "PASS",
+          "details": [
+            {
+              "width": 390,
+              "height": 844,
+              "documentWidth": 390,
+              "panel": {
+                "left": 170,
+                "right": 380,
+                "top": 198,
+                "bottom": 432
+              },
+              "summary": {
+                "width": 208,
+                "height": 52,
+                "top": 199,
+                "bottom": 251
+              },
+              "detail": {
+                "height": 180,
+                "clientHeight": 180,
+                "scrollHeight": 432,
+                "top": 251,
+                "bottom": 431,
+                "moved": true,
+                "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+              }
+            },
+            {
+              "width": 844,
+              "height": 390,
+              "documentWidth": 844,
+              "panel": {
+                "left": 170,
+                "right": 614,
+                "top": 64,
+                "bottom": 220
+              },
+              "summary": {
+                "width": 442,
+                "height": 44,
+                "top": 65,
+                "bottom": 109
+              },
+              "detail": {
+                "height": 110,
+                "clientHeight": 110,
+                "scrollHeight": 202,
+                "top": 109,
+                "bottom": 219,
+                "moved": true,
+                "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+              }
+            },
+            {
+              "width": 844,
+              "height": 220,
+              "documentWidth": 844,
+              "panel": {
+                "left": 170,
+                "right": 614,
+                "top": 64,
+                "bottom": 200
+              },
+              "summary": {
+                "width": 442,
+                "height": 44,
+                "top": 65,
+                "bottom": 109
+              },
+              "detail": {
+                "height": 90,
+                "clientHeight": 90,
+                "scrollHeight": 202,
+                "top": 109,
+                "bottom": 199,
+                "moved": true,
+                "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+              }
+            }
+          ]
+        }
+      ],
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [
+        {
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "panel": {
+            "left": 170,
+            "right": 380,
+            "top": 198,
+            "bottom": 432
+          },
+          "summary": {
+            "width": 208,
+            "height": 52,
+            "top": 199,
+            "bottom": 251
+          },
+          "detail": {
+            "height": 180,
+            "clientHeight": 180,
+            "scrollHeight": 432,
+            "top": 251,
+            "bottom": 431,
+            "moved": true,
+            "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+          }
+        },
+        {
+          "width": 844,
+          "height": 390,
+          "documentWidth": 844,
+          "panel": {
+            "left": 170,
+            "right": 614,
+            "top": 64,
+            "bottom": 220
+          },
+          "summary": {
+            "width": 442,
+            "height": 44,
+            "top": 65,
+            "bottom": 109
+          },
+          "detail": {
+            "height": 110,
+            "clientHeight": 110,
+            "scrollHeight": 202,
+            "top": 109,
+            "bottom": 219,
+            "moved": true,
+            "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+          }
+        },
+        {
+          "width": 844,
+          "height": 220,
+          "documentWidth": 844,
+          "panel": {
+            "left": 170,
+            "right": 614,
+            "top": 64,
+            "bottom": 200
+          },
+          "summary": {
+            "width": 442,
+            "height": 44,
+            "top": 65,
+            "bottom": 109
+          },
+          "detail": {
+            "height": 90,
+            "clientHeight": 90,
+            "scrollHeight": 202,
+            "top": 109,
+            "bottom": 199,
+            "moved": true,
+            "text": "目前中胎 80%。濕度 0%・路面大致穩定。含本圈尚餘 6 圈，建議硬胎；本次估計換上硬胎（你指定）。本圈進站完整損失 18.3～24.6 秒，估計出站 P1～P22；扣除後續新胎收益後，全程淨代價 13.9～22.7 秒。下圈進站淨代價 12.7～22.2 秒。依已觀察圈速、胎耗及目前差距估算；名次不包含對手未來進站或超車。停站作業估計 2.2～5.5 秒，包含進出減速、煞停、加速與暖胎範圍。假設維持目前行駛狀態。排隊與放行變化保留額外 0～2 秒；重大失誤可能超出範圍。比較目前中性胎與已選硬胎，依當下濕度 0% 分別估算抓地及胎耗。近期胎耗樣本不足，使用胎種基礎耗損；轉向與交通會影響實際結果。假設目前濕度維持；未預測未來雨勢。胎種抓地對圈速的影響為模型估計，尚未逐圖校準；錯胎可能增加全程代價。"
+          }
+        }
+      ],
+      "screenshots": [
+        "strategy-390x844.png",
+        "strategy-844x390.png",
+        "strategy-844x220.png"
+      ],
+      "sourceHashes": {
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+        "src/strategy.ts": "9163db21e6a806c1eb23f72b062b868039046db36d9cb387e335cfad666e5848",
+        "src/style.css": "9d6b72d3edf2351682fd433f90d25e9196f2e2eba0f72690fe22275c3c7dc8c5",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32"
+      },
+      "scriptSha256": "c015793612de01b89bfd2388fc163319432aab80fc72ab5b3dfa5909937b9a63",
+      "build": "c220d98a7f5c",
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 3,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:21:27.068Z",
+          "params": {
+            "browserContextId": "12709AFD6DCBDEC2478C415EFAA4DC9B"
+          },
+          "completedAt": "2026-11-16T08:21:27.139Z"
+        },
+        "strategy": {
+          "label": "strategy",
+          "id": 97,
+          "method": "Page.captureScreenshot",
+          "startedAt": "2026-11-16T08:21:26.986Z",
+          "params": {
+            "format": "png"
+          },
+          "completedAt": "2026-11-16T08:21:27.064Z"
+        }
+      },
+      "sourceUnchanged": true,
+      "completedAt": "2026-11-16T08:21:27.153Z",
+      "limitations": [
+        "只連本機preview與既有CDP，以新隔離context測試；沒有操作玩家存檔或正式站。",
+        "車手胎種/磨耗/濕度/進站階段由測試安排，按鈕走真pointerdown與UI；既有真rAF callback更新HUD。",
+        "起跑燈使用測試時鐘；HUD比較時維持零dt，不驗證完整駕駛、實際進站時間、模型誤差或統計涵蓋率。",
+        "viewport為桌面Chrome模擬，內容捲動為DOM操作，非手機實機/觸控手勢/耗電/FPS測量。",
+        "before模式只執行指定胎舊行為對照；新版另驗雨勢、進站狀態及三種版面。"
+      ]
+    },
+    "tools/dev-tests/next6-multiplayer-browser-result.json": {
+      "startedAt": "2026-11-16T08:21:33.752Z",
+      "before": false,
+      "project": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lobbybrake-work",
+      "cases": [
+        {
+          "name": "stable_snapshots_reuse_lobby_rows_and_skip_hidden_lists",
+          "status": "PASS",
+          "details": {
+            "sameRow": true,
+            "creates": 0,
+            "mutations": 0,
+            "hiddenResults": 0,
+            "hiddenBoard": 0
+          }
+        },
+        {
+          "name": "server_deadline_reaches_real_browser_and_uses_finish_grace",
+          "status": "PASS",
+          "details": {
+            "text": "最後完賽 1:00",
+            "deadlineDelta": 59968.64990234375
+          }
+        },
+        {
+          "name": "fps_preference_is_saved_and_new_control_is_reachable",
+          "status": "PASS",
+          "details": [
+            {
+              "width": 390,
+              "height": 844,
+              "scrollWidth": 390,
+              "control": {
+                "width": 99,
+                "height": 44,
+                "top": 12,
+                "bottom": 56,
+                "hit": true
+              },
+              "deadline": "最後完賽 1:00"
+            },
+            {
+              "width": 844,
+              "height": 390,
+              "scrollWidth": 844,
+              "control": {
+                "width": 109,
+                "height": 44,
+                "top": 12,
+                "bottom": 56,
+                "hit": true
+              },
+              "deadline": "最後完賽 1:00"
+            },
+            {
+              "width": 844,
+              "height": 220,
+              "scrollWidth": 844,
+              "control": {
+                "width": 109,
+                "height": 44,
+                "top": 12,
+                "bottom": 56,
+                "hit": true
+              },
+              "deadline": "最後完賽 1:00"
+            }
+          ]
+        },
+        {
+          "name": "finish_timeout_reason_is_rendered_then_rematch_clears_deadline",
+          "status": "PASS",
+          "details": {
+            "text": "1. 車手3 圈 · 最快 0:00.333 · 冠軍0:01.0002. 車手（你）0 圈 · 超過完賽期限DNF",
+            "resetDeadline": null
+          }
+        },
+        {
+          "name": "fps_preference_is_restored_after_reload",
+          "status": "PASS",
+          "details": {
+            "restoredValue": "30"
+          }
+        }
+      ],
+      "exceptions": [],
+      "externalRequests": [],
+      "layouts": [
+        {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "control": {
+            "width": 99,
+            "height": 44,
+            "top": 12,
+            "bottom": 56,
+            "hit": true
+          },
+          "deadline": "最後完賽 1:00"
+        },
+        {
+          "width": 844,
+          "height": 390,
+          "scrollWidth": 844,
+          "control": {
+            "width": 109,
+            "height": 44,
+            "top": 12,
+            "bottom": 56,
+            "hit": true
+          },
+          "deadline": "最後完賽 1:00"
+        },
+        {
+          "width": 844,
+          "height": 220,
+          "scrollWidth": 844,
+          "control": {
+            "width": 109,
+            "height": 44,
+            "top": 12,
+            "bottom": 56,
+            "hit": true
+          },
+          "deadline": "最後完賽 1:00"
+        }
+      ],
+      "localOnly": true,
+      "status": "PASS",
+      "build": "c220d98a7f5c",
+      "lastCdpCommands": {
+        "browser": {
+          "label": "browser",
+          "id": 6,
+          "method": "Target.disposeBrowserContext",
+          "startedAt": "2026-11-16T08:21:57.169Z",
+          "params": {
+            "browserContextId": "F2BDAB2C9834744EB5FB79F7F42D260E"
+          },
+          "completedAt": "2026-11-16T08:21:57.724Z"
+        },
+        "host": {
+          "label": "host",
+          "id": 225,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:21:56.503Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:21:56.504Z"
+        },
+        "guest": {
+          "label": "guest",
+          "id": 94,
+          "method": "Runtime.evaluate",
+          "startedAt": "2026-11-16T08:21:56.505Z",
+          "params": {
+            "expression": "__mp.client?.leave()",
+            "returnByValue": true,
+            "awaitPromise": true
+          },
+          "completedAt": "2026-11-16T08:21:56.640Z"
+        }
+      },
+      "completedAt": "2026-11-16T08:21:57.729Z",
+      "limitations": [
+        "本機同機兩個獨立Chrome contexts，非外網或手機實機。",
+        "以私有測試RoomService安排已完賽狀態及期限，不增加產品作弊介面。",
+        "量測DOM重建次數，不代表FPS、耗電已量測改善。"
+      ]
+    },
+    "tools/dev-tests/multiplayer-maps-fixed-summary.json": {
+      "completedAt": "2026-11-16T08:23:09.533Z",
+      "status": "PASS",
+      "build": "c220d98a7f5c",
+      "code": 0,
+      "signal": null,
+      "historyPreserved": true,
+      "sourceUnchanged": true,
+      "sourceHashes": {
+        "src/main.ts": "757fd95d78aea9d235bff40315f7cd2b4138ef16f918d25574ba288f13f23cf3",
+        "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+        "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+        "src/rivals.ts": "4d48d70df33f8b2af9e26921ab1af7426d2086f769f5b13f9d112b6d53c2332d",
+        "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32"
+      },
+      "output": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n",
+      "evidence": "tools/dev-tests/multiplayer-maps-fixed-evidence-1794817340966-e0aa5d77",
+      "origin": "http://127.0.0.1:4318",
+      "productionUsed": false
+    },
+    "tools/dev-tests/multiplayer-node-summary.json": {
+      "startedAt": "2026-11-16T08:13:03.157Z",
+      "completedAt": "2026-11-16T08:14:55.170Z",
+      "productHash": "a877800df9e2026a5ed0b19e36736f18e4cceb35bb5c9ab3e0f0daa5388fd56c",
+      "sourceUnchangedDuringTests": true,
+      "oldSummaryPreserved": true,
+      "historicalSummarySha256": null,
+      "hashIncludes": [
+        "src/",
+        "api/",
+        "shared/",
+        "server/ (excluding node_modules)",
+        "index.html",
+        "multiplayer.html",
+        "vite.config.ts",
+        "package.json",
+        "package-lock.json",
+        "tools/build-multiplayer-physics.mjs"
+      ],
+      "results": [
+        {
+          "name": "platform-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "1a2c9a3897fa71add354efe8d18564982484330e7f05962d51d6612c3e25c9c9",
+          "error": null
+        },
+        {
+          "name": "mission-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "5431e467f29c3dcbf769798ac08f07829d40d3b8279b17dddd35e77fdba93a4c",
+          "error": null
+        },
+        {
+          "name": "save-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "a15d37f242da9c12e65067de367ef35f35c2d1e9ec4a432c7598576ab981b161",
+          "error": null
+        },
+        {
+          "name": "racing-state-audit",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "b7086ccccadd0c733a6dab904491f288058a2b0e92b48ec1d3f35c6c60c0fa4a",
+          "error": null
+        },
+        {
+          "name": "main-platform-integration",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "66d679ca1b48ee9b66053c59bbc3f68c866971774d78c5511960a2f4414732bd",
+          "error": null
+        },
+        {
+          "name": "leaderboard-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "4ac5c80f75c729b2c8eddc36c6f516d9bc5befd7f6ef456230fea0adf8f06ba1",
+          "error": null
+        },
+        {
+          "name": "main-racing-integration",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "c20d771665230a5cb12dc275e45d83437f5bf39843bd0b5bb83aad1248a6ae81",
+          "error": null
+        },
+        {
+          "name": "identity-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "88b4b83e065520406efbf5fb303749ed23fa0028c9c4314543dd0def9a703620",
+          "error": null
+        },
+        {
+          "name": "economy-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "496b3215baab96d778eda263aef92e61d9be23b7d237910cb3854281d8e50eb8",
+          "error": null
+        },
+        {
+          "name": "main-economy-integration",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "9db6fd9f1ba23815e2e9065d3e72bac61a0c5a2f0571c128cda9342c6196dd4f",
+          "error": null
+        },
+        {
+          "name": "static-ui-contract",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "0f6c88c9a6c3a20a25461ce3b5e62c808fd8b39121c9947c8f2dcc59b06f5db7",
+          "error": null
+        },
+        {
+          "name": "route-preview-audit",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "1468339337b04799f349f8e1184582a8eb678c7d494bf087783491a3898aeaa5",
+          "error": null
+        },
+        {
+          "name": "followup-racing-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "a54098652bf1ed0e6af2862be23d58424a2e8cc56e65ea39e303198edcc1747e",
+          "error": null
+        },
+        {
+          "name": "followup-radio-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "55a185745e560df738f6e11dd0b308e9486fba4625d1da8e700366bb712997d4",
+          "error": null
+        },
+        {
+          "name": "followup-platform-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "60c5e3c21bd53d33be0d09d5e1306b1aa18764c441e8ac010fba819a9535a601",
+          "error": null
+        },
+        {
+          "name": "followup-save-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "a964cda25fb0be6c171bcfa15e6f1789b1194701a7db7ed0aa4229207ad8580a",
+          "error": null
+        },
+        {
+          "name": "abcd-save-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "251182a1b634fcc3c67e01c387ee5f82d3cad6a5a2740ac9d8bc52e36c5419c9",
+          "error": null
+        },
+        {
+          "name": "abcd-street-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "eb55945e9c13b64a8c98992935e91cebce4935c58ef346bd8506077cc7062db0",
+          "error": null
+        },
+        {
+          "name": "abcd-racing-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "8b5da43f0e796149464e51a33d5b4fb5ee10112f839ecb27ae2ad928b6170528",
+          "error": null
+        },
+        {
+          "name": "abcd-conflict-integration",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "09880880ba8aa89f62bcb2fab422f98f8f748b91dda97a527585a0941cd83b6f",
+          "error": null
+        },
+        {
+          "name": "all-platform-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "5c258db8ad4fea36b5ca47ade97b99c4e86edf38c96185c000a90d855df041bf",
+          "error": null
+        },
+        {
+          "name": "all-racing-features",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "9770990ccda5fc6ea252b78f45a90e9941891a8fef4582a0643beb474e2dbadb",
+          "error": null
+        },
+        {
+          "name": "all-street-main",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "cd57b943bd7c74e8686f4880144fe28eb236d5279f28d886dec064d89538d906",
+          "error": null
+        },
+        {
+          "name": "all-street-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "b51182a5be38ca2930ea850fdde5dda115d7a84b2444dc0c23b05fa96f5100b4",
+          "error": null
+        },
+        {
+          "name": "all-navigation-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "aec180aa1ed908760e6cbbc2f29e87be66ae764440cc2fb43f527688b33f93aa",
+          "error": null
+        },
+        {
+          "name": "all-progress-regression",
+          "code": 0,
+          "signal": null,
+          "status": "PASS",
+          "historyPreserved": true,
+          "resultSha256": "70712c34899bd504ad16f504894d5769d0084562c54b5dca013bec94dcdc68a9",
+          "error": null
+        }
+      ],
+      "summary": {
+        "passed": 26,
+        "failed": 0
+      },
+      "status": "PASS",
+      "evidence": "tools/dev-tests/multiplayer-node-evidence-1794816783161-7287e920",
+      "limitations": [
+        "原 26 套隔離模組與本機 HTTP 回歸；多人真 WS、瀏覽器及固定三回歸另列，不代表正式服務或手機實機"
+      ]
+    }
+  },
+  "counts": {
+    "newNode": 68,
+    "priorRoundNode": 42,
+    "existingNode": 76,
+    "legacySuites": 26,
+    "browser": 28,
+    "beforeControls": 2,
+    "fixed": 3,
+    "deliveryFixture": 15
+  },
+  "fixedBaselines": {
+    "tt": "BOT lap2 54.425 hits=0 / aiHits 0",
+    "gp": "陳冠宇:162.0 / aiHits 8",
+    "pit": "陳冠宇:175.7 / aiHits 5"
+  },
+  "deliveryFixture": {
+    "file": "taipei-gp-lobbybrake-delivery-fixture-result.json",
+    "sha256": "cbb14cd3a97aba0f26abc7042005341645a34b1a3c9f7133e86f0a016f5b74f4",
+    "report": {
+      "fixtureRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\lobbybrake-delivery-fixtures-1794816277418",
+      "fullBaselineFixtureFiles": 515,
+      "originalProjectOpened": false,
+      "realBuildRun": false,
+      "realGitRun": false,
+      "checks": [
+        {
+          "name": "default preflight hashes everything but does not modify project or make backup/build",
+          "pass": true
+        },
+        {
+          "name": "apply+build backs up old files, preserves unknown, verifies output; already-applied rerun is safe",
+          "pass": true
+        },
+        {
+          "name": "dirty changed target refuses before any copy",
+          "pass": true
+        },
+        {
+          "name": "changed preserved baseline refuses",
+          "pass": true
+        },
+        {
+          "name": "new-file conflict is never overwritten",
+          "pass": true
+        },
+        {
+          "name": "path traversal/Windows alternate data stream/case duplicates rejected",
+          "pass": true
+        },
+        {
+          "name": "target parent junction cannot redirect a new file",
+          "pass": true
+        },
+        {
+          "name": "wrong branch/head/main/origin/cached remote or staged changes refuse",
+          "pass": true
+        },
+        {
+          "name": "tampered payload or missing preserved coverage refuse",
+          "pass": true
+        },
+        {
+          "name": "build failure records applied state and backup, never claims verified",
+          "pass": true
+        },
+        {
+          "name": "build mismatch or unknown file mutation prevents success",
+          "pass": true
+        },
+        {
+          "name": "one apply/build flag alone is refused",
+          "pass": true
+        },
+        {
+          "name": "non-PASS validation, stale build or mismatched validated source hash refuse",
+          "pass": true
+        },
+        {
+          "name": "core physics and historical round documents cannot be delivery targets",
+          "pass": true
+        },
+        {
+          "name": "wrong inventory identity/count or changed immutable before refuses without copying",
+          "pass": true
+        }
+      ],
+      "limitations": [
+        "Git state and npm.cmd build are controlled stubs; production Git/npm execution is reviewed, not invoked on the original project."
+      ],
+      "passed": 15,
+      "failed": 0
+    },
+    "tools": {
+      "Apply-TaipeiLobbyBrake.ps1": "311ab19c58c1dd46f24b6cfbd6d072070280b79bde3e7ec8c22fd256ee2cba24",
+      "apply-taipei-lobbybrake.mjs": "f5731183b5893c73f5f42432fae4609bc9c76618ae3381810a6665a861f3206a",
+      "prepare-taipei-lobbybrake-delivery.mjs": "e2661a18ec0082b34ba4b5a73a18dba77325fc0b0e74c7476f32be6b7d5648e1",
+      "test-taipei-lobbybrake-delivery.mjs": "faf0a6868424f72684847b5a5db9d1038e1b2faa95b432ae4074e65862e13594"
+    },
+    "coverage": "15 isolated fixtures exercise apply/test using stub Git and build; prepare/wrapper are statically reviewed and fingerprinted."
+  },
+  "aggregationTool": {
+    "file": "create-taipei-lobbybrake-validation.mjs",
+    "sha256": "cefb1dabe29c1248989d05656dc28c38e63f1805c7098c740e56e8bb67fc4bd6"
+  },
+  "productionUsed": false,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "originalApplyState": "Read DCISI/taipei-gp-lobbybrake-apply-result.json and verify manifest; this validation does not establish original-project application.",
+  "limitations": [
+    "只彙整已存在的本機結果，不啟動測試、不開原專案，也不操作部署。歷史 NEXT6 與 RACEPLUS 文件保留原始 bytes，並未當成本輪測試結果。",
+    "HTTP upgrade proxy 只模擬連線可用性，不代表 Render 冷啟動時間或外網品質；同機隔離 Chrome contexts 不代表手機實機或不同網路。",
+    "新等待協調器的功能回歸搭配真 client 與隔離時鐘；房主管理另由真 loopback WebSocket 與瀏覽器驗證。",
+    "GP 測試安排相同抓地力、位置與速度，以真 HUD 及幾何色彩 buffer 比較提示；不證明實際煞停距離、整圈成績、手機 FPS 或耗電。",
+    "所有報告 raw bytes、提供的 source/before/script hashes 及 summary copies 均核對；未自帶 script hash 的舊腳本只記錄本輪彙整時指紋。原 26 套另由相同 productHash 綁定產品來源。",
+    "固定三基準沿用原測試流程與數字；五項核心來源與物理 bundle 均保留。"
+  ]
+}

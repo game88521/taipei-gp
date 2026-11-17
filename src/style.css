@@ -1,3 +1,11 @@
+#tt-practice select, #tt-practice input[type='number'], #tt-practice button { min-height:44px; max-width:100%; margin:4px; }
+#tt-practice label { display:block; margin:8px 4px; }
+#practice-hud { position:fixed; z-index:45; top:70px; left:50%; translate:-50% 0; max-width:min(600px,calc(100vw - 24px)); background:#101826f0; border:1px solid #708499; border-radius:10px; padding:8px; text-align:center; color:#fff; font-size:13px; pointer-events:auto; }
+#practice-hud[hidden] { display:none; }
+#practice-status { display:block; }
+#practice-hud button { min-width:100px; min-height:44px; margin:4px; }
+#practice-hud[data-complete='false'] button { min-width:88px; }
+@media (max-height:280px) { #practice-hud { top:4px; max-width:52vw; font-size:11px; padding:4px; } #practice-hud button { margin:2px; } }
 :root {
   --bg: #0b0d14;
   --fg: #f4f4f6;
@@ -167,8 +175,13 @@ html:not([data-steer='buttons']) #steer-btns, html[data-steer='buttons'] #pad { 
   padding: 4px 18px;
   border-radius: 8px;
   opacity: 0;
+  z-index: 8;
+  pointer-events: none;
+  box-sizing: border-box;
+  text-align: center;
 }
 #warn.show { opacity: 1; animation: blink 0.35s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) { #warn.show { animation: none; } }
 .invalid-lap { color: #ffb36a; font-size: 20px !important; }
 #hud[data-mode='race'] #drift-coach { display: none !important; }
 @keyframes blink { 50% { opacity: 0.35; } }
@@ -306,6 +319,15 @@ h1 small { display: block; font: 700 13px var(--mono); letter-spacing: 5px; colo
 }
 @media (orientation: portrait) and (pointer: coarse) {
   #rotate { display: block; }
+}
+/* 駕駛時保留儀表空間；橫向握持提示在選單顯示。 */
+#hud:not(.hidden) ~ #rotate { display: none; }
+@media (max-height: 280px) and (min-width: 700px) {
+  /* 極矮橫向只留名次，避免右側名次表蓋住煞車與DRS。 */
+  #hud[data-mode='race'][data-kind='gp'] .gp-panel { top: max(10px, env(safe-area-inset-top)); right: 225px; width: 110px; }
+  #hud[data-mode='race'][data-kind='gp'] #board { display: none; }
+  #hud[data-mode='race'][data-kind='gp'] #pos { font-size: 24px; }
+  #hud[data-mode='race'][data-kind='gp'] #pos::after { font-size: 14px; }
 }
 
 /* 矮螢幕（手機橫向）縮小選單 */
@@ -476,6 +498,7 @@ html:not(.touch) #gas { display: none; }
 #sr-res-table th { color: var(--muted); font-size: 12px; text-align: left; padding: 4px 6px; }
 #sr-res-table td { padding: 5px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
 #sr-res-table tr.me td { background: rgba(225, 6, 0, 0.35); }
+#sr-result button { min-height: 44px; }
 #sr-ok { margin-top: 8px; }
 
 /* 畫質選單 */
@@ -574,6 +597,9 @@ html:not(.touch) #btn-drift { display: none; }
 }
 #wanted.show { display: block; animation: wanted 0.8s steps(2) infinite; }
 #wanted.cop { color: #8fd0ff; text-shadow: none; animation: none; font-size: 15px; letter-spacing: 1px; }
+#wanted.cop { white-space: pre-line; text-align: center; max-width: min(92vw, 640px); }
+#wanted.cop.escape-warn { color: #ffe08a; border: 1px solid #ad8538; }
+#wanted.cop.escape-urgent { color: #ff9c9c; border: 1px solid #e26868; }
 #wanted.bust { color: #ff4040; }
 @keyframes wanted { 50% { text-shadow: 0 0 8px rgba(60, 120, 255, 0.9); } }
 #btn-pursuit {
@@ -629,6 +655,12 @@ html:not(.touch) #btn-horn { display: none; }
   white-space: nowrap;
 }
 #hud[data-mode='race'] #btn-map, #hud[data-mode='race'] #nav-hud { display: none !important; }
+#nav-hud { white-space: pre-line; text-align: center; border-radius: 12px; max-width: min(76vw, 450px); pointer-events: none; line-height: 1.4; }
+#taxi-guidance { flex-basis: 100%; white-space: pre-line; text-align: center; font: 600 12px/1.4 var(--font); color: #8ff0ff; pointer-events: none; }
+@media (max-height: 480px) {
+  #nav-hud { font-size: 11px; padding: 3px 8px; max-width: 48vw; }
+  #wanted.cop { font-size: 11px; letter-spacing: 0; padding: 4px 8px; }
+}
 
 /* ---------------- 線上排行榜 */
 #lb-page { z-index: 6; }
@@ -1081,6 +1113,8 @@ html:not(.touch) #drs, html:not(.touch) #pit { bottom: calc(max(14px, env(safe-a
 #menu .opts label.rng #sens-val { width: auto; margin: 0; color: #d8dbe4; font: 700 12px var(--mono); }
 /* 勾選框做成開關 */
 #menu .opts label.sw { justify-content: space-between; flex-wrap: nowrap; cursor: pointer; }
+#menu .opts label.sw:has(#city-pursuit-sound),
+#menu .opts label.sw:has(#city-nav-sound) { min-height: 44px; }
 #menu .opts label.sw input {
   appearance: none;
   -webkit-appearance: none;
@@ -1424,6 +1458,16 @@ html.touch.tc-radio-top #radio { left: 50%; right: auto; top: calc(max(10px, env
 #hud[data-mode='race'][data-kind='gp'] #gp-strategy { display: block; }
 #gp-strategy summary { min-height: 44px; padding: 10px; cursor: pointer; }
 #strategy-advice { color: #ffd23a; }
+.racing-tools, .city-jobs, .city-jobs-panel { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.racing-tools summary { min-height: 44px; cursor: pointer; padding: 10px 0; }
+.racing-tools select, .city-jobs select, .city-jobs button { min-height: 44px; max-width: 100%; font: inherit; }
+.city-jobs-panel select { margin: 6px; color: var(--text); background: #172032; border: 1px solid #667088; border-radius: 8px; padding: 6px; }
+.city-jobs-panel p { font-size: 13px; line-height: 1.6; }
+.racing-tools .table-scroll { max-width: 100%; overflow-x: auto; }
+#season-custom-order li { padding: 5px 0; }
+#gp-race-analysis table, #tt-lap-coach table { white-space: nowrap; }
+#gp-race-analysis, #tt-lap-coach { text-align: left; }
+#season-new > .card { max-height: calc(100dvh - 32px); overflow-y: auto; }
 #strategy-detail { margin: 0; padding: 0 10px 10px; line-height: 1.6; max-height: min(180px, calc(100dvh - 250px)); overflow-y: auto; touch-action: pan-y; }
 html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { min-width: calc(44px / var(--tc-scale, 1)); min-height: calc(44px / var(--tc-scale, 1)); }
 #pit-tyre button { width: 44px; height: 44px; }
@@ -1451,6 +1495,7 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
 .feature-card[hidden], .feature-tools [hidden] { display: none; }
 .feature-tools, .feature-list { display: grid; gap: 10px; }
 .feature-tools button, .feature-card button, .feature-list button, #passport-page button, #taxi-order-page button, #drift-challenge-result button, #duel-pick button, #duel-pick select, #season-new button, #season-new select, #replay-ui button, #replay-ui select { min-height: 48px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+#duel-back, #taxi-order-back { min-width: 44px; }
 .feature-list button { text-align: left; padding: 12px; border: 1px solid #ffffff2c; border-radius: 12px; background: #1a2230; color: #eef2f8; }
 .feature-list button b, .feature-list button small { display: block; }
 .feature-list small { color: #b3bfce; line-height: 1.6; }
@@ -1498,7 +1543,7 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
   #gp-strategy { left: 170px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); width: calc(100vw - 400px); }
   /* 展開後改讀面板中的胎況、電量，替換同位置的小膠囊。 */
   #hud:has(#gp-strategy[open]) #tyre, #hud:has(#gp-strategy[open]) #batt { visibility: hidden; }
-  #strategy-detail { max-height: min(110px, calc(100dvh - 265px)); }
+  #strategy-detail { max-height: min(110px, max(44px, calc(100dvh - 130px))); }
   html.touch #hud[data-mode='race'][data-kind='gp'] #radio { left: 220px; right: auto; top: 240px; bottom: auto; translate: none; max-width: calc(100vw - 440px); max-height: 70px; overflow-y: auto; pointer-events: auto; touch-action: pan-y; font-size: 12px; }
 }
 @media (max-width: 640px) and (orientation: portrait) {
@@ -1513,5 +1558,5 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
   html.touch #btn-horn { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 210px * var(--tc-scale, 1)); }
   html.touch .speedo { bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 200px * var(--tc-scale, 1) + 90px); }
   html.touch #hud[data-mode='race'][data-kind='gp'] #radio { left: 50%; right: auto; top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--tc-lift, 0px) + 200px * var(--tc-scale, 1)); translate: -50% 0; max-width: calc(100vw - 28px); max-height: 70px; overflow-y: auto; pointer-events: auto; touch-action: pan-y; }
-  #rotate { top: 50%; font-size: 11px; }
+  #rotate { top: max(8px, env(safe-area-inset-top)); font-size: 11px; }
 }

@@ -2,6 +2,8 @@ import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto
 import { readFileSync } from 'node:fs';
 import { Car, buildMultiplayerTrackGeometry, getMultiplayerTrack, verifyMultiplayerTrackData, DEFAULT_MULTIPLAYER_TRACK_ID, resolveMultiplayerCollisions } from './physics.mjs';
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
+import { validSeriesTracks, seriesStandings, SERIES_POINTS } from '../shared/multiplayer-series.ts';
+import { DEFAULT_ROOM_RULES, parseRoomRules, defaultRoomRules } from '../shared/multiplayer-room-rules.ts';
 
 export const TICK_MS = 1000 / 60;
 export const SNAPSHOT_MS = 1000 / 20;
@@ -9,6 +11,7 @@ const COLORS = ['#ef5350', '#42a5f5', '#ffca28', '#66bb6a'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_SEQUENCE = 0x7fffffff;
 const MAX_BUFFERED_BYTES = 256 * 1024;
+const MAX_REMOVED_PLAYER_IDS = 64;
 const ERRORS = {
   BAD_MESSAGE: '無效的連線訊息。', INCOMPATIBLE_VERSION: '遊戲版本不同，請雙方更新後再加入。',
   ALREADY_JOINED: '請先離開目前房間。', ROOM_NOT_FOUND: '找不到房間，可能已關閉。',
@@ -20,6 +23,15 @@ const ERRORS = {
   STALE_MATCH: '這是上一場比賽的操作，已忽略。', RATE_LIMIT: '操作過於頻繁，請稍後再試。',
   INVALID_TRACK: '不支援這張連線賽道。', STALE_TRACK: '房間賽道已變更，請等待新賽道載入。',
   TRACK_UNAVAILABLE: '這張賽道暫時無法載入，請稍後重試。',
+  STALE_LOBBY: '房間狀態已變更，請確認最新大廳後再操作。',
+  INVALID_TARGET: '請選擇大廳中的其他有效車手；交棒對象必須已連線。',
+  REMOVED_BY_HOST: '房主已將你移出房間；可重新輸入房碼加入。',
+  INVALID_SERIES: '請依序選擇三至五張不重複的合法地圖。',
+  SERIES_ACTIVE: '系列賽進行中，請使用下一站，或先明確結束系列賽。',
+  SERIES_LOCKED: '系列賽名單已鎖定；原車手可續接，新車手請等系列結束。',
+  STALE_SERIES: '系列賽狀態已更新，請確認目前站次後再操作。',
+  RULES_UNSUPPORTED: '房內有車手的版本不支援此規則，請全員更新，或改回一般碰撞與60秒寬限。',
+  INVALID_RULES: '請選擇合法碰撞設定與30、60或120秒完賽寬限。',
 };
 
 function validName(value) {
@@ -126,6 +138,7 @@ export class RoomService {
     if (['create', 'join', 'resume'].includes(message.type)) {
       if (client.room) return this.fail(client, 'ALREADY_JOINED', message);
       if (!this.compatible(message)) return this.fail(client, 'INCOMPATIBLE_VERSION', message);
+      if (message.clientCapabilities !== undefined && (!isObject(message.clientCapabilities) || message.clientCapabilities.roomRules !== true)) return this.fail(client, 'BAD_MESSAGE', message);
       if (message.type === 'resume') return this.resume(client, message, now);
       const name = validName(message.name);
       if (!name) return this.fail(client, 'INVALID_NAME', message);
@@ -138,6 +151,7 @@ export class RoomService {
         let code;
         do { code = Array.from({ length: 6 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join(''); } while (this.rooms.has(code));
         const room = { code, hostId: '', phase: 'lobby', matchId: null, startAt: null, laps: message.laps,
+          lobbyRevision: 1, removedPlayerIds: new Set(), series: null, roomRules: { ...DEFAULT_ROOM_RULES },
           trackId, trackStamp: selected.descriptor.trackStamp, trackRevision: 1, track: selected.track,
           players: new Map(), createdAt: now, updatedAt: now, emptySince: null, simAt: null,
           lastSnapshotAt: now, firstFinishAt: null };
@@ -146,24 +160,110 @@ export class RoomService {
       if (!validCode(message.code)) return this.fail(client, 'ROOM_NOT_FOUND', message);
       const room = this.rooms.get(message.code);
       if (!room) return this.fail(client, 'ROOM_NOT_FOUND', message);
+      if (!defaultRoomRules(room.roomRules) && !message.clientCapabilities?.roomRules) return this.fail(client, 'RULES_UNSUPPORTED', message);
       this.expireDisconnected(room, now);
       if (room.phase !== 'lobby') return this.fail(client, 'ROOM_STARTED', message);
+      if (room.series?.locked) return this.fail(client, 'SERIES_LOCKED', message);
       if (room.players.size >= 4) return this.fail(client, 'ROOM_FULL', message);
       this.addPlayer(client, room, name, message, now); return;
     }
     const room = client.room, player = client.player;
     if (!room || !player) return this.fail(client, 'NOT_IN_ROOM', message);
     switch (message.type) {
+      case 'set-room-rules': {
+        if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
+        if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
+        if (room.series?.locked) return this.fail(client, 'SERIES_ACTIVE', message);
+        if (message.roomCode !== room.code || message.expectedLobbyRevision !== room.lobbyRevision) return this.fail(client, 'STALE_LOBBY', message);
+        const rules = parseRoomRules(message.roomRules);
+        if (!rules) return this.fail(client, 'INVALID_RULES', message);
+        if (!defaultRoomRules(rules) && [...room.players.values()].some(p => !p.supportsRoomRules)) return this.fail(client, 'RULES_UNSUPPORTED', message);
+        if (rules.collisions === room.roomRules.collisions && rules.finishGraceSeconds === room.roomRules.finishGraceSeconds) return;
+        room.roomRules = rules; room.lobbyRevision++; room.trackRevision++; room.updatedAt = now;
+        for (const p of room.players.values()) { this.resetPlayer(room, p, now); p.ready = false; p.loaded = false; }
+        this.broadcast(room, 'room', now); return;
+      }
       case 'leave': this.leave(client, now); this.send(client, { type: 'left' }); return;
+      case 'set-laps':
+      case 'configure-series':
+      case 'end-series': {
+        if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
+        if (room.phase !== 'lobby' && !(message.type === 'end-series' && room.phase === 'results')) return this.fail(client, 'INVALID_PHASE', message);
+        if (message.roomCode !== room.code || !Number.isSafeInteger(message.expectedLobbyRevision)
+          || message.expectedLobbyRevision !== room.lobbyRevision) return this.fail(client, 'STALE_LOBBY', message);
+        if (message.type === 'set-laps') {
+          if (![1, 3, 5].includes(message.laps)) return this.fail(client, 'BAD_MESSAGE', message);
+          if (room.laps === message.laps) return this.broadcast(room, 'room', now);
+          room.laps = message.laps; room.trackRevision++;
+          for (const p of room.players.values()) { this.resetPlayer(room, p, now); p.loaded = false; }
+        } else if (message.type === 'configure-series') {
+          if (room.series?.locked) return this.fail(client, 'SERIES_ACTIVE', message);
+          if (!validSeriesTracks(message.trackIds)) return this.fail(client, 'INVALID_SERIES', message);
+          // Validate and prepare all selected maps before any room mutation.
+          let selected; try { for (const id of message.trackIds) { const candidate = this.trackFor(id); if (id === message.trackIds[0]) selected = candidate; } }
+          catch { return this.fail(client, 'TRACK_UNAVAILABLE', message); }
+          this.changeTrack(room, message.trackIds[0], selected, now);
+          room.series = { id: randomUUID(), revision: 1, trackIds: [...message.trackIds], roundIndex: 0,
+            locked: false, complete: false, entrants: [], rounds: [], standings: [] };
+        } else room.series = null;
+        room.lobbyRevision++; room.updatedAt = now;
+        for (const p of room.players.values()) p.ready = false;
+        this.broadcast(room, 'room', now); return;
+      }
+      case 'next-series': {
+        if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
+        if (room.phase !== 'results') return this.fail(client, 'INVALID_PHASE', message);
+        const series = room.series;
+        if (message.roomCode !== room.code || !series || series.complete || message.matchId !== room.matchId
+          || !Number.isSafeInteger(message.expectedSeriesRevision) || message.expectedSeriesRevision !== series.revision) return this.fail(client, 'STALE_SERIES', message);
+        // Do not cut short an original driver's existing ten-second resume window.
+        this.expireDisconnected(room, now);
+        const available = [...room.players.values()].filter(p => p.connected);
+        if (available.length < 2 || [...room.players.values()].some(p => !p.connected && !p.expired)) return this.fail(client, 'NOT_READY', message);
+        const id = series.trackIds[series.roundIndex + 1];
+        let selected; try { selected = this.trackFor(id); } catch { return this.fail(client, 'TRACK_UNAVAILABLE', message); }
+        for (const p of [...room.players.values()]) if (!p.connected) room.players.delete(p.id);
+        series.roundIndex++; series.revision++;
+        this.changeTrack(room, id, selected, now); this.toLobby(room, now); return;
+      }
+      case 'kick-player':
+      case 'transfer-host': {
+        if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
+        if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
+        if (message.roomCode !== room.code || !Number.isSafeInteger(message.expectedLobbyRevision)
+          || message.expectedLobbyRevision !== room.lobbyRevision) return this.fail(client, 'STALE_LOBBY', message);
+        const target = typeof message.targetPlayerId === 'string' && message.targetPlayerId.length <= 128
+          ? room.players.get(message.targetPlayerId) : null;
+        if (!target || target.id === player.id || (message.type === 'transfer-host' && !target.connected)) return this.fail(client, 'INVALID_TARGET', message);
+        room.lobbyRevision++; room.updatedAt = now;
+        if (message.type === 'transfer-host') room.hostId = target.id;
+        else {
+          // Revoke the identity before notifying/closing its socket. Neither an
+          // in-flight resume nor the old close callback can restore the player.
+          room.removedPlayerIds.add(target.id);
+          if (room.removedPlayerIds.size > MAX_REMOVED_PLAYER_IDS) room.removedPlayerIds.delete(room.removedPlayerIds.values().next().value);
+          target.expired = true; target.token = null; target.input = { steer: 0, brake: true };
+          const removedClient = target.client;
+          target.client = null; target.connected = false; target.ready = false; target.loaded = false;
+          room.players.delete(target.id);
+          if (removedClient) {
+            removedClient.room = null; removedClient.player = null;
+            this.send(removedClient, { type: 'left', reason: 'kicked', roomCode: room.code, message: ERRORS.REMOVED_BY_HOST });
+            try { removedClient.ws.close(1000, 'Removed by host'); } catch { /* already closed */ }
+          }
+        }
+        this.broadcast(room, 'room', now); return;
+      }
       case 'select-track': {
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
         if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
+        if (room.series) return this.fail(client, 'SERIES_ACTIVE', message);
         if (!Number.isSafeInteger(message.expectedRevision) || message.expectedRevision !== room.trackRevision) return this.fail(client, 'STALE_TRACK', message);
         if (typeof message.trackId !== 'string' || !getMultiplayerTrack(message.trackId)) return this.fail(client, 'INVALID_TRACK', message);
         if (message.trackId === room.trackId) { this.broadcast(room, 'room', now); return; }
         let selected; try { selected = this.trackFor(message.trackId); } catch { return this.fail(client, 'TRACK_UNAVAILABLE', message); }
         room.trackId = message.trackId; room.trackStamp = selected.descriptor.trackStamp; room.track = selected.track; room.trackRevision++;
-        room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now;
+        room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now; room.lobbyRevision++;
         for (const p of room.players.values()) { this.resetPlayer(room, p, now); p.ready = false; p.loaded = false; }
         this.broadcast(room, 'room', now); return;
       }
@@ -181,6 +281,11 @@ export class RoomService {
         if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
         if (!this.currentSelection(room, message)) return this.fail(client, 'STALE_TRACK', message);
         if (room.players.size < 2 || [...room.players.values()].some((p) => !p.connected || !p.loaded || !p.ready)) return this.fail(client, 'NOT_READY', message);
+        if (room.series && !room.series.locked) {
+          room.series.locked = true; room.series.revision++;
+          room.series.entrants = [...room.players.values()].map(p => ({ playerId: p.id, name: p.name, color: p.color }));
+          room.series.standings = seriesStandings(room.series.entrants, []);
+        }
         room.phase = 'countdown'; room.matchId = randomUUID(); room.startAt = now + 3000; room.simAt = room.startAt;
         room.firstFinishAt = null; room.updatedAt = now;
         for (const p of room.players.values()) this.resetPlayer(room, p, now);
@@ -188,6 +293,7 @@ export class RoomService {
       case 'reset':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
         if (room.phase !== 'results') return this.fail(client, 'INVALID_PHASE', message);
+        if (room.series) return this.fail(client, 'SERIES_ACTIVE', message);
         for (const p of [...room.players.values()]) if (!p.connected) room.players.delete(p.id);
         this.toLobby(room, now); return;
       case 'input':
@@ -211,13 +317,36 @@ export class RoomService {
     return car;
   }
 
+  changeTrack(room, id, selected, now) {
+    if (id === room.trackId) return;
+    room.trackId = id; room.trackStamp = selected.descriptor.trackStamp; room.track = selected.track; room.trackRevision++;
+    room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null;
+    for (const p of room.players.values()) { this.resetPlayer(room, p, now); p.ready = false; p.loaded = false; }
+  }
+
+  recordSeriesRound(room) {
+    const series = room.series;
+    if (!series?.locked || !room.matchId || series.rounds.some(round => round.matchId === room.matchId)) return;
+    const classified = this.snapshot(room).players;
+    const entrants = new Map(series.entrants.map(entrant => [entrant.playerId, entrant]));
+    const current = classified.filter(p => entrants.has(p.id));
+    const missing = series.entrants.filter(entrant => !current.some(p => p.id === entrant.playerId));
+    const results = [...current.map((p, index) => ({ playerId: p.id, name: p.name, color: p.color, rank: index + 1,
+      finishMs: p.finishMs, dnf: p.finishMs === null, points: p.finishMs === null ? 0 : SERIES_POINTS[index] })),
+      ...missing.map((entrant, index) => ({ ...entrant, rank: current.length + index + 1, finishMs: null, dnf: true, points: 0 }))];
+    series.rounds.push({ matchId: room.matchId, trackId: room.trackId, laps: room.laps, results });
+    series.standings = seriesStandings(series.entrants, series.rounds);
+    series.complete = series.rounds.length === series.trackIds.length; series.revision++;
+  }
+
   addPlayer(client, room, name, request, now) {
     const used = new Set([...room.players.values()].map((p) => p.slot));
     const slot = [0, 1, 2, 3].find((n) => !used.has(n));
     const player = { id: randomUUID(), token: randomBytes(32).toString('hex'), name, slot,
-      color: COLORS[slot], ready: false, loaded: false, connected: true, client, disconnectedAt: null, expired: false,
+      color: COLORS[slot], ready: false, loaded: false, connected: true, client, disconnectedAt: null, expired: false, supportsRoomRules: request.clientCapabilities?.roomRules === true,
       car: this.newCar(room, slot), ackSeq: -1, receivedSeq: -1, input: { steer: 0, brake: true }, lastInputAt: now,
-      completedLaps: 0, distance: 0, nextGate: 1, finishMs: null, dnf: false, joinedAt: now };
+      completedLaps: 0, distance: 0, nextGate: 1, finishMs: null, lapTimesMs: [], bestLapMs: null, lastLapElapsedMs: 0,
+      dnf: false, dnfReason: null, joinedAt: now };
     client.room = room; client.player = player; room.players.set(player.id, player);
     room.hostId ||= player.id; room.updatedAt = now; room.emptySince = null;
     this.welcome(client, request, now); this.broadcast(room, 'room', now);
@@ -234,7 +363,8 @@ export class RoomService {
     const room = this.rooms.get(request.code);
     if (!room) return this.fail(client, 'ROOM_NOT_FOUND', request);
     const player = room.players.get(request.playerId);
-    if (!player) return this.fail(client, 'INVALID_SESSION', request);
+    if (!player) return this.fail(client, room.removedPlayerIds.has(request.playerId) ? 'REMOVED_BY_HOST' : 'INVALID_SESSION', request);
+    if (!defaultRoomRules(room.roomRules) && !request.clientCapabilities?.roomRules) return this.fail(client, 'RULES_UNSUPPORTED', request);
     if (player.expired || (!player.connected && now - player.disconnectedAt >= this.disconnectMs)) {
       this.expireDisconnected(room, now); return this.fail(client, 'SESSION_EXPIRED', request);
     }
@@ -245,28 +375,31 @@ export class RoomService {
     if (previous && previous !== client) {
       previous.room = null; previous.player = null; this.send(previous, { type: 'left' }); previous.ws.close(1000, 'Session resumed');
     }
-    player.client = client; player.connected = true; player.disconnectedAt = null; player.loaded = false; player.ready = false;
+    player.client = client; player.connected = true; player.disconnectedAt = null; player.loaded = false; player.ready = false; player.supportsRoomRules = request.clientCapabilities?.roomRules === true;
     player.input = { steer: 0, brake: true }; player.lastInputAt = now; player.receivedSeq = player.ackSeq;
     client.room = room; client.player = player; room.emptySince = null; room.updatedAt = now;
-    if (!room.players.get(room.hostId)?.connected) room.hostId = player.id;
+    if (!room.players.get(room.hostId)?.connected && room.hostId !== player.id) { room.hostId = player.id; room.lobbyRevision++; }
     this.welcome(client, request, now); this.broadcast(room, 'room', now);
   }
 
   resetPlayer(room, player, now) {
     player.car = this.newCar(room, player.slot); player.ackSeq = -1; player.receivedSeq = -1; player.input = { steer: 0, brake: true };
     player.lastInputAt = now; player.completedLaps = 0; player.distance = 0; player.nextGate = 1;
-    player.finishMs = null; player.dnf = false;
+    player.finishMs = null; player.lapTimesMs = []; player.bestLapMs = null; player.lastLapElapsedMs = 0;
+    player.dnf = false; player.dnfReason = null;
   }
 
   toLobby(room, now) {
     room.phase = 'lobby'; room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now;
+    room.lobbyRevision++;
     for (const player of room.players.values()) { this.resetPlayer(room, player, now); player.ready = false; }
     this.electHost(room); this.broadcast(room, 'room', now);
   }
 
   electHost(room) {
     if (room.players.get(room.hostId)?.connected) return;
-    room.hostId = [...room.players.values()].find((p) => p.connected)?.id ?? room.players.keys().next().value ?? '';
+    const nextHost = [...room.players.values()].find((p) => p.connected)?.id ?? room.players.keys().next().value ?? '';
+    if (nextHost !== room.hostId) { room.hostId = nextHost; room.lobbyRevision++; }
   }
 
   disconnect(client) {
@@ -287,7 +420,7 @@ export class RoomService {
     client.room = null; client.player = null;
     if (!room || !player) return;
     player.client = null; player.connected = false; player.loaded = false; player.token = null; player.expired = true;
-    player.disconnectedAt = now; player.dnf = player.finishMs === null; player.input = { steer: 0, brake: true };
+    player.disconnectedAt = now; this.markDnf(player, 'left'); player.input = { steer: 0, brake: true };
     if (room.phase === 'lobby' || room.phase === 'countdown') room.players.delete(player.id);
     this.electHost(room); room.updatedAt = now;
     if (![...room.players.values()].some((p) => p.connected)) room.emptySince ??= now;
@@ -299,18 +432,34 @@ export class RoomService {
     let changed = false;
     for (const player of [...room.players.values()]) {
       if (player.connected || player.expired || now - player.disconnectedAt < this.disconnectMs) continue;
-      player.expired = true; player.token = null; player.dnf = player.finishMs === null; changed = true;
+      player.expired = true; player.token = null; this.markDnf(player, 'disconnect-expired'); changed = true;
       if (room.phase === 'lobby') room.players.delete(player.id);
     }
     if (changed) { this.electHost(room); if (!this.maybeFinish(room, now)) this.broadcast(room, 'room', now); }
   }
 
+  markDnf(player, reason) {
+    if (player.finishMs !== null || player.dnf) return;
+    player.dnf = true; player.dnfReason = reason;
+  }
+
+  graceMs(room) { return room.roomRules.finishGraceSeconds === 60 ? this.finishGraceMs : room.roomRules.finishGraceSeconds * 1000; }
+
+  deadline(room) {
+    if (room.startAt === null) return { deadlineAt: null, deadlineReason: null };
+    const race = room.startAt + this.raceLimitMs;
+    const finish = room.firstFinishAt === null ? Infinity : room.firstFinishAt + this.graceMs(room);
+    return finish < race ? { deadlineAt: finish, deadlineReason: 'finish-timeout' }
+      : { deadlineAt: race, deadlineReason: 'race-timeout' };
+  }
+
   maybeFinish(room, now) {
     if (room.phase !== 'racing') return false;
     const players = [...room.players.values()];
-    if (now - room.startAt < this.raceLimitMs && (room.firstFinishAt === null || now - room.firstFinishAt < this.finishGraceMs) && !players.every((p) => p.dnf || p.finishMs !== null)) return false;
-    for (const player of players) if (player.finishMs === null) player.dnf = true;
-    room.phase = 'results'; room.updatedAt = now; this.broadcast(room, 'room', now); return true;
+    if (now - room.startAt < this.raceLimitMs && (room.firstFinishAt === null || now - room.firstFinishAt < this.graceMs(room)) && !players.every((p) => p.dnf || p.finishMs !== null)) return false;
+    const { deadlineReason } = this.deadline(room);
+    for (const player of players) this.markDnf(player, deadlineReason);
+    room.phase = 'results'; room.updatedAt = now; this.recordSeriesRound(room); this.broadcast(room, 'room', now); return true;
   }
 
   simulate(room, at) {
@@ -326,7 +475,7 @@ export class RoomService {
     }
     // Every car first advances against the same step. Resolve contacts once for the room,
     // then use each final pose for progress and finish gates, including cars pushed by others.
-    resolveMultiplayerCollisions(track, moving.filter(({ player }) => player.connected && player.loaded)
+    if (room.roomRules.collisions) resolveMultiplayerCollisions(track, moving.filter(({ player }) => player.connected && player.loaded)
       .map(({ player, previous }) => ({ id: String(player.slot), car: player.car, previous })));
     for (const { player, s } of moving) {
       let delta = player.car.pos.s - s;
@@ -336,12 +485,16 @@ export class RoomService {
       const gate = (player.completedLaps + player.nextGate / 3) * length;
       if (delta > 0 && before < gate && player.distance + 1e-8 >= gate) {
         if (player.nextGate === 3) {
+          // Use the same authoritative sub-step crossing for each completed lap
+          // and the final result; client wall clocks never enter this calculation.
+          const fraction = Math.max(0, Math.min(1, (gate - before) / delta));
+          const elapsed = Math.max(0, at - room.startAt - TICK_MS * (1 - fraction));
+          const lapMs = elapsed - player.lastLapElapsedMs;
+          player.lapTimesMs.push(lapMs); player.lastLapElapsedMs = elapsed;
+          player.bestLapMs = player.bestLapMs === null ? lapMs : Math.min(player.bestLapMs, lapMs);
           player.completedLaps++; player.nextGate = 1;
           if (player.completedLaps >= room.laps) {
-            // Interpolate within the authoritative step, independent of arrival
-            // times of inputs, snapshots or any client wall clock.
-            const fraction = Math.max(0, Math.min(1, (gate - before) / delta));
-            player.finishMs = Math.max(0, at - room.startAt - TICK_MS * (1 - fraction));
+            player.finishMs = elapsed;
             player.car.v = 0; room.firstFinishAt ??= at;
           }
         } else player.nextGate++;
@@ -359,7 +512,7 @@ export class RoomService {
         // A busy server must not run an unbounded catch-up loop. A prolonged
         // pause aborts the match rather than silently changing race speed.
         if (at - room.simAt > 5000) {
-          for (const p of room.players.values()) if (p.finishMs === null) p.dnf = true;
+          for (const p of room.players.values()) this.markDnf(p, 'server-stall');
           this.maybeFinish(room, at);
         } else {
           let steps = 0;
@@ -385,10 +538,14 @@ export class RoomService {
       return b.distance - a.distance || a.slot - b.slot;
     }).map((p, index) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready, loaded: p.loaded, connected: p.connected,
       car: p.car.snapshot(), ackSeq: p.ackSeq, completedLaps: p.completedLaps, progress: Math.max(0, p.distance),
-      finishMs: p.finishMs === null ? null : Math.round(p.finishMs * 1000) / 1000, dnf: p.dnf, rank: index + 1 }));
+      finishMs: p.finishMs === null ? null : Math.round(p.finishMs * 1000) / 1000,
+      lapTimesMs: p.lapTimesMs.map(ms => Math.round(ms * 1000) / 1000),
+      bestLapMs: p.bestLapMs === null ? null : Math.round(p.bestLapMs * 1000) / 1000,
+      dnf: p.dnf, dnfReason: p.dnfReason ?? null, rank: index + 1 }));
     return { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP,
       trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision,
-      code: room.code, hostId: room.hostId, phase: room.phase, matchId: room.matchId, startAt: room.startAt,
+      code: room.code, hostId: room.hostId, hostManagement: { lobbyRevision: room.lobbyRevision }, capabilities: { lobbyOptions: true, championship: true, roomRules: true }, roomRules: { ...room.roomRules },
+      series: room.series ? structuredClone(room.series) : null, phase: room.phase, matchId: room.matchId, startAt: room.startAt, ...this.deadline(room),
       laps: room.laps, serverTime: now, trackLength: room.track.length, players };
   }
 

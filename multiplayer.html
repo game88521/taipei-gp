@@ -9,11 +9,12 @@
 </head>
 <body>
   <div id="mp-scene" aria-hidden="true"></div>
-  <header class="mp-header"><a id="mp-home" href="/">← 台北街道賽</a><span id="mp-connection" role="status">尚未連線</span></header>
+  <header class="mp-header"><a id="mp-home" href="/">← 台北街道賽</a><div class="mp-header-settings"><div class="mp-quality-settings"><label class="mp-frame-setting">畫面<select id="mp-fps" aria-label="畫面更新率"><option value="60">60 FPS</option><option value="30">30 FPS · 省電</option></select></label><label class="mp-frame-setting">畫質<select id="mp-quality" aria-label="多人畫質"><option value="auto">自動</option><option value="standard">固定標準</option><option value="economy">固定省電</option></select></label></div><span id="mp-quality-status" aria-live="off"></span><span id="mp-connection" role="status">尚未連線</span></div></header>
   <main id="mp-panel" class="mp-panel">
     <div class="mp-heading"><span class="mp-eyebrow">PRIVATE RACE</span><h1>和朋友，一起上場。</h1><p>台北與 23 條大獎賽賽道 / 2～4 位車手 / 即時競速</p></div>
     <p id="mp-loading" class="mp-hint" role="status">正在準備賽道…</p>
     <p id="mp-message" class="mp-message" role="status" aria-live="polite"></p>
+    <section id="mp-entry-wait" class="mp-entry-wait" hidden aria-label="連線等待"><p id="mp-entry-progress" class="mp-hint" aria-live="off"></p><button id="mp-cancel-connect" class="mp-wide">取消連線</button></section>
     <section id="mp-entry" aria-label="建立或加入房間">
       <label class="mp-field">車手暱稱<input id="mp-name" maxlength="16" value="車手" autocomplete="nickname" /></label>
       <label class="mp-field mp-track-field">比賽地圖<select id="mp-track" aria-describedby="mp-track-help"></select></label>
@@ -21,29 +22,46 @@
       <div class="mp-create-row"><label class="mp-field">比賽圈數<select id="mp-laps"><option value="1">1 圈 · 衝刺</option><option value="3" selected>3 圈 · 短賽</option><option value="5">5 圈 · 耐力</option></select></label><button id="mp-create" class="mp-primary" disabled>建立私人房</button></div>
       <div class="mp-divider">已有朋友開房？</div>
       <div class="mp-join-row"><label class="mp-field">六碼房間碼<input id="mp-code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="輸入房間碼" /></label><button id="mp-join" disabled>加入房間</button></div>
+      <p id="mp-invite-hint" class="mp-hint" role="status"></p>
       <button id="mp-restore" class="mp-wide" hidden>重新連回上一個房間</button>
+      <button id="mp-entry-retry" class="mp-wide" hidden>重試剛才的連線</button>
       <p class="mp-note">自動油門，方向鍵 / WASD 轉向，下鍵或空白鍵煞車。車輛會互相碰撞，擦撞會推擠、追撞會影響速度；撞牆也會減速。</p>
     </section>
     <section id="mp-room" hidden aria-label="房間大廳">
       <div class="mp-room-top"><div><span class="mp-eyebrow">把房間碼交給朋友</span><strong id="mp-room-code"></strong></div><button id="mp-copy">複製房間碼</button></div>
+      <div class="mp-invite-actions"><button id="mp-copy-link">複製邀請連結</button><button id="mp-share-link">分享邀請</button></div>
+      <label class="mp-field mp-invite-field">邀請連結<input id="mp-invite-url" type="text" readonly aria-describedby="mp-invite-help" /></label>
+      <p id="mp-invite-help" class="mp-hint">朋友開啟後會帶入房碼，確認暱稱即可加入；也能手動輸入六碼。連結沿用目前遊戲網址。</p>
       <p id="mp-room-description" class="mp-hint"></p>
+      <p id="mp-rules-description" class="mp-hint"></p>
+      <section id="mp-room-rules" class="mp-rules-fields" hidden aria-label="私人房規則"><label class="mp-field">碰撞規則<select id="mp-collisions"><option value="on">一般碰撞</option><option value="off">無碰撞練習</option></select></label><label class="mp-field">第一位完賽後寬限<select id="mp-finish-grace"><option value="30">30 秒</option><option value="60" selected>60 秒</option><option value="120">120 秒</option></select></label><p class="mp-hint">房主可於大廳修改；全員重新準備。系列第一站起跑後固定，舊版本車手需更新才能使用不同規則。</p></section>
+      <label id="mp-room-laps-field" class="mp-field" hidden>比賽圈數<select id="mp-room-laps"><option value="1">1 圈 · 衝刺</option><option value="3">3 圈 · 短賽</option><option value="5">5 圈 · 耐力</option></select><small>房主可修改；修改後全員重新準備。</small></label>
       <label class="mp-field mp-track-field">比賽地圖<select id="mp-room-track" aria-describedby="mp-map-policy"></select></label>
       <p id="mp-map-policy" class="mp-hint">只有房主能在大廳換地圖；換圖後所有人需要重新準備。</p>
       <p id="mp-map-status" class="mp-map-status" role="status" aria-live="polite"></p>
       <ol id="mp-players" class="mp-player-list"></ol>
+      <section id="mp-host-controls" class="mp-host-controls" hidden aria-label="房主管理"><label class="mp-field">管理車手<select id="mp-host-target"></select></label><div class="mp-actions"><button id="mp-host-transfer">交棒房主</button><button id="mp-host-kick">移出大廳</button></div><p class="mp-hint">交棒後你仍會留在房間；移出的朋友可重新輸入房碼加入。</p></section>
       <div class="mp-actions"><button id="mp-ready" class="mp-primary">我準備好了</button><button id="mp-start">全員就緒後開始</button><button id="mp-leave">離開房間</button></div>
       <p class="mp-note">至少 2 人，所有車手準備完成後由房主開始。離開大廳的房主會自動交棒。</p>
+      <section id="mp-series-setup" class="mp-series-section" hidden aria-label="建立迷你錦標賽"><h3>迷你錦標賽</h3><p class="mp-hint">依序跑 3～5 張不同地圖，累計 10／6／4／3 分，DNF 為 0 分。第一站起跑後鎖定車手名單。</p><label class="mp-field">站數<select id="mp-series-count"><option value="3">3 站</option><option value="4">4 站</option><option value="5">5 站</option></select></label><div id="mp-series-route" class="mp-series-route"></div><button id="mp-series-create" class="mp-wide">設定系列賽路線</button></section>
     </section>
+    <section id="mp-series-summary" class="mp-series-section" hidden aria-label="系列賽總成績"><h3 id="mp-series-title"></h3><p id="mp-series-route-text" class="mp-hint"></p><ol id="mp-series-standings" class="mp-player-list"></ol><details><summary>歷場成績</summary><div id="mp-series-history"></div></details><p class="mp-note">同分依各名次次數、已完賽總時間及原車手名單順序排名。離房或被移除仍保留已得積分，缺席後續站為 DNF。重新連線期限沿用 10 秒；系列資料只保留在目前房間。</p><button id="mp-series-end" class="mp-wide" hidden>結束系列，回到單場模式</button></section>
     <section id="mp-results" hidden aria-label="比賽成績">
       <span class="mp-eyebrow">RACE CLASSIFICATION</span><h2>方格旗，下一場見。</h2><p id="mp-result-track" class="mp-hint"></p><ol id="mp-results-list" class="mp-player-list"></ol>
+      <p id="mp-result-rules" class="mp-hint"></p>
+      <section class="mp-lap-section" aria-label="逐圈成績"><h3>逐圈成績</h3><label class="mp-field">查看車手<select id="mp-lap-driver"></select></label><p id="mp-laps-summary" class="mp-hint"></p><ol id="mp-laps-list" class="mp-lap-list"></ol></section>
       <div class="mp-actions"><button id="mp-rematch" class="mp-primary">再來一場</button><button id="mp-result-leave">離開房間</button></div>
       <p id="mp-results-note" class="mp-note"></p>
     </section>
     <button id="mp-map-retry" class="mp-wide" hidden>重試載入地圖</button>
+    <details id="mp-history" class="mp-history"><summary>近期多人戰績</summary><p id="mp-history-status" class="mp-hint" role="status"></p><div class="mp-actions"><button id="mp-history-export">匯出 JSON</button><button id="mp-history-clear">清除近期戰績</button></div><p class="mp-note">最多20場單場與10筆系列，只保存在這個瀏覽器。含暱稱，不含房碼或續接憑證；不會恢復對戰房間。</p><div id="mp-history-list"></div></details>
   </main>
   <section id="mp-hud" hidden aria-label="即時比賽狀態">
-    <div class="mp-race-stats"><b id="mp-position">P1</b><span id="mp-race-track"></span><span id="mp-lap">1 / 3 圈</span><time id="mp-time">0:00.000</time></div>
+    <div class="mp-race-stats"><b id="mp-position">P1</b><span id="mp-race-track"></span><span id="mp-race-rules" class="mp-rules-badge"></span><span id="mp-lap">1 / 3 圈</span><time id="mp-time">0:00.000</time><span id="mp-last-lap" class="mp-last-lap"></span><span id="mp-deadline" class="mp-deadline" aria-live="off"></span></div>
     <ol id="mp-board" class="mp-board"></ol><p id="mp-race-message" class="mp-race-message" role="status"></p>
+    <p id="mp-network-warning" class="mp-network-warning" role="status"></p>
+    <details id="mp-awareness" class="mp-awareness"><summary>賽道與近車</summary><div class="mp-awareness-body"><div id="mp-track-mini"></div><p id="mp-car-gaps"></p><p id="mp-nearby"></p><small>位置與公尺差來自伺服器；不是秒差。觀戰時以目標車為中心。</small></div></details>
+    <label id="mp-spectator-field" class="mp-spectator-field" hidden>觀戰車手<select id="mp-spectator" aria-label="選擇觀戰車手"></select></label>
     <div class="mp-race-actions"><button id="mp-camera" aria-label="切換鏡頭">鏡頭</button><button id="mp-sound" aria-pressed="false">開啟音效</button><button id="mp-race-leave">離開比賽</button></div>
     <div class="mp-speed"><b id="mp-speed">0</b><small>km/h</small></div>
     <div id="mp-controls" class="mp-controls"><div id="mp-pad" aria-label="拖曳轉向"><span>◀</span><i id="mp-pad-dot"></i><span>▶</span></div><div class="mp-steer"><button id="mp-left" aria-label="左轉">◀</button><button id="mp-right" aria-label="右轉">▶</button></div><button id="mp-brake">煞車</button><button id="mp-gas" hidden>油門</button></div>

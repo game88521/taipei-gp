@@ -4,8 +4,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { stripTypeScriptTypes } from 'node:module';
 import * as THREE from 'three';
-export async function loadGameModules(root) {
-  const context = vm.createContext({ console, URLSearchParams, location: { search: '' }, performance,
+export async function loadGameModules(root, options = {}) {
+  const math = Object.create(Math); if (options.random) math.random = options.random;
+  const context = vm.createContext({ console, Math: math, URLSearchParams, location: { search: options.search ?? '' }, performance,
     setTimeout, clearTimeout, AbortController, DOMException, fetch, URL, TextDecoder, Response, Request, Headers });
   const modules = new Map();
   const synthetic = (id, values) => new vm.SyntheticModule(Object.keys(values), function () { for (const [k, v] of Object.entries(values)) this.setExport(k, v); }, { context, identifier: id });
@@ -16,7 +17,7 @@ export async function loadGameModules(root) {
       if (id === 'three') return synthetic(id, THREE);
       if (id.includes('three/')) return synthetic(id, await import(id));
       if (id.endsWith('/f1model.ts')) return synthetic(id, { TEAMS: teams, makeF1: () => ({ root: new THREE.Group(), body: new THREE.Group(), steer: [], spin: [] }), setLod() {}, setTyre() {} });
-      if (id.endsWith('/world.ts')) return synthetic(id, { canvasTex() { throw Error('測試不應建立畫面'); } });
+      if (id.endsWith('/world.ts')) return synthetic(id, { canvasTex() { throw Error('測試不應建立畫面'); }, bakedShadowMaterial() { throw Error('測試不應建立車模陰影'); }, blobTexture() { throw Error('測試不應建立車模畫布'); } });
       if (id.endsWith('.json')) return synthetic(id, { default: JSON.parse(await readFile(id, 'utf8')) });
       const source = await readFile(id, 'utf8');
       return new vm.SourceTextModule(stripTypeScriptTypes(source, { mode: 'transform', sourceUrl: id }), { context, identifier: id });

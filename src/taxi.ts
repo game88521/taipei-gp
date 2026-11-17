@@ -5,9 +5,9 @@ import { pedParts } from './models';
 import { ROAD_Y } from './surface';
 import { routeRemaining, sameRoadLevel } from './mission';
 import { randomUuid } from './identity';
-import { parseTaxiCheckpoint, parseTaxiSettledIds, type TaxiCheckpoint, type TaxiOrder, type TaxiPosition, type TaxiSettlement } from './street-taxi-state';
+import { parseTaxiCheckpoint, parseTaxiSettledIds, tourCompletionBonus, type TaxiCheckpoint, type TaxiOrder, type TaxiTour, type TaxiTourOrder, type TaxiPosition, type TaxiSettlement } from './street-taxi-state';
 export { parseTaxiCheckpoint, parseTaxiSettledIds } from './street-taxi-state';
-export type { TaxiCheckpoint, TaxiOrder, TaxiPosition, TaxiSettlement } from './street-taxi-state';
+export type { TaxiCheckpoint, TaxiOrder, TaxiTourOrder, TaxiPosition, TaxiSettlement } from './street-taxi-state';
 
 // 計程車任務：去地標前載乘客 → 限時送到另一個地標 → 照台北跳表收車資（提早到有小費、撞車扣小費）
 
@@ -19,6 +19,7 @@ export interface TaxiSummary {
   timeLimit: number; timeLeft: number; junctions: number; driveSeconds: number; waitSeconds: number;
   fare: number; tipBeforeDeduction: number; collisionDeduction: number; hits: number; bonus: number; total: number;
   status: 'riding' | 'delivered' | 'timeout';
+  tour?: { completed: number; total: number; completionBonus: number };
 }
 /** 路口是 Router 原始路網的交會節點；提供平均停等緩衝，不聲稱預測實際燈號。 */
 export function taxiTimeBudget(length: number, junctions: number, condition = 1) {
@@ -40,6 +41,8 @@ export class TaxiJob {
   private jobId = '';
   private destination: Stop | null = null;
   private offers = new Map<string, TaxiOrder>();
+  private tourOffers = new Map<string, TaxiTourOrder>();
+  private tour: TaxiTour | null = null;
   private settled: string[] = [];
   private settlement: TaxiSettlement | null = null;
   phase: Phase = 'off';
@@ -105,13 +108,20 @@ export class TaxiJob {
 
   get tripSummary(): TaxiSummary | null {
     if (this.phase !== 'ride' || !this.target) return null;
-    const fare = fareOf(Math.max(this.odo, this.routeLen)), tipBeforeDeduction = this.relaxed ? 0 : Math.max(0, Math.round(this.timeLeft * 2));
-    const collisionDeduction = Math.min(tipBeforeDeduction, this.hits * 10), bonus = !this.relaxed && this.streak + 1 >= 3 ? 50 : 0;
+    const fare = fareOf(this.tour ? this.tour.distance : Math.max(this.odo, this.routeLen)), tipBeforeDeduction = this.relaxed ? 0 : Math.max(0, Math.round(this.timeLeft * 2));
+    const collisionDeduction = Math.min(tipBeforeDeduction, this.hits * 10), bonus = this.tour ? tourCompletionBonus(this.tour.stops.length) : !this.relaxed && this.streak + 1 >= 3 ? 50 : 0;
     return { id: this.jobId, relaxed: this.relaxed, from: this.from, to: this.target.nm, distance: this.routeLen, driven: this.odo, remaining: this.remaining,
       timeLimit: this.timeLimit, timeLeft: Math.max(0, this.timeLeft), junctions: this.junctions,
       driveSeconds: this.budget.driveSeconds, waitSeconds: this.budget.waitSeconds,
       fare, tipBeforeDeduction, collisionDeduction, hits: this.hits, bonus,
-      total: fare + tipBeforeDeduction - collisionDeduction + bonus, status: 'riding' };
+      total: fare + tipBeforeDeduction - collisionDeduction + bonus, status: 'riding',
+      ...(this.tour ? { tour: { completed: this.tour.next, total: this.tour.stops.length, completionBonus: bonus } } : {}) };
+  }
+
+  get tourProgress() {
+    return this.tour ? { completed: this.phase === 'seek' ? 0 : this.tour.next, total: this.tour.stops.length,
+      stop: this.phase === 'seek' ? null : this.tour.stops[this.tour.next].nm,
+      names: this.tour.stops.map((s) => s.nm), completionBonus: tourCompletionBonus(this.tour.stops.length) } : null;
   }
 
   start(px: number, pz: number, py?: number) {
@@ -119,6 +129,7 @@ export class TaxiJob {
     this.phase = 'seek';
     this.streak = 0;
     this.relaxed = false;
+    this.tour = null;
     this.pickNext(px, pz, py);
   }
 
@@ -128,7 +139,7 @@ export class TaxiJob {
     this.route = null;
     this.routeYs = null;
     this.remaining = 0;
-    this.jobId = ''; this.destination = null; this.offers.clear();
+    this.jobId = ''; this.destination = null; this.offers.clear(); this.tourOffers.clear(); this.tour = null;
     this.beam.visible = this.person.visible = false;
   }
 
@@ -142,7 +153,8 @@ export class TaxiJob {
     if (this.phase === 'off' || !this.target || !this.jobId || this.settled.includes(this.jobId)) return null;
     return parseTaxiCheckpoint({ v: 1, id: this.jobId, phase: this.phase, from: this.from, target: this.target,
       destination: this.destination, relaxed: this.relaxed, position: car, timeLeft: Math.max(0, this.timeLeft), timeLimit: this.timeLimit,
-      odo: this.odo, hits: this.hits, streak: this.streak, routeLen: this.routeLen, junctions: this.junctions, condition: this.condition });
+      odo: this.odo, hits: this.hits, streak: this.streak, routeLen: this.routeLen, junctions: this.junctions, condition: this.condition,
+      ...(this.tour ? { tour: this.tour } : {}) });
   }
   /** 使用目前路網重算，不讀入存檔金錢、不用離線牆鐘扣時。car應先還原checkpoint.position。 */
   resume(raw: unknown, car: TaxiPosition, settledIds: unknown = this.settled): { ok: true } | { ok: false; error: string } {
@@ -158,19 +170,30 @@ export class TaxiJob {
     if (!route || !Number.isFinite(route.length)) return { ok: false, error: '原行程目前沒有可行路線。' };
     if (cp.phase === 'seek' && destination && !this.router.route(target.x, target.z, destination.x, destination.z, target.y - ROAD_Y, destination.y - ROAD_Y))
       return { ok: false, error: '原目的地目前無法抵達，請重新接單。' };
+    let tour: TaxiTour | null = null;
+    if (cp.tour) {
+      const pickup = this.places.find((p) => p.nm === cp.from), stops = cp.tour.stops.map(find);
+      if (!pickup || stops.some((s) => !s)) return { ok: false, error: '觀光停靠點已變更，請重新接單。' };
+      const plan = this.planTour(pickup, stops as Stop[]);
+      if (!plan || Math.abs(plan.distance - cp.tour.distance) > 1)
+        return { ok: false, error: '觀光路線已變更或無法抵達，請重新接單。' };
+      tour = { stops: (stops as Stop[]).map((s) => ({ ...s })), next: cp.tour.next, distance: plan.distance };
+    }
     this.settled = settled; this.phase = cp.phase; this.jobId = cp.id; this.from = cp.from;
     this.target = { ...target }; this.destination = destination ? { ...destination } : null; this.relaxed = cp.relaxed;
     this.timeLeft = cp.timeLeft; this.timeLimit = cp.timeLimit; this.odo = cp.odo; this.hits = cp.hits; this.streak = cp.streak;
-    this.condition = cp.condition; this.junctions = cp.junctions; this.routeLen = cp.routeLen;
+    this.condition = cp.condition; this.junctions = cp.junctions; this.routeLen = tour && cp.phase === 'ride' ? tour.distance : cp.routeLen;
+    this.tour = tour;
     this.budget = taxiTimeBudget(cp.routeLen, cp.junctions, cp.condition);
     this.route = route.path; this.routeYs = route.ys; this.remaining = route.length;
-    this.lastX = car.x; this.lastZ = car.z; this.wait = 0; this.remainingT = 0; this.offers.clear(); this.settlement = null;
+    this.lastX = car.x; this.lastZ = car.z; this.wait = 0; this.remainingT = 0; this.offers.clear(); this.tourOffers.clear(); this.settlement = null;
     return { ok: true };
   }
 
   /** 最多三張可預知目的地的訂單；距離/報酬來自真Router，預估含準時小費上限且非保證收入。 */
   previewOrders(px: number, pz: number, py?: number, count = 3): TaxiOrder[] {
     this.offers.clear();
+    this.tourOffers.clear();
     if (this.phase === 'ride') return [];
     const wanted = Math.max(1, Math.min(3, Math.floor(count) || 3));
     const pickups = [...this.places].sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz)).slice(0, 8);
@@ -202,12 +225,68 @@ export class TaxiJob {
     if (!route || !ride) return false;
     this.phase = 'seek'; this.target = { ...order.pickup }; this.from = order.from; this.destination = { ...order.destination };
     this.relaxed = relaxed; this.jobId = order.id; this.timeLeft = this.timeLimit = 0; this.odo = this.hits = 0;
+    this.tour = null; this.tourOffers.clear();
     this.route = route.path; this.routeYs = route.ys; this.routeLen = this.remaining = route.length;
     this.wait = this.remainingT = 0; this.offers.clear(); return true;
   }
 
+  /** 明確按下預覽才建立觀光單；不消耗原隨機單的Math.random序列。 */
+  previewTours(px: number, pz: number, py?: number, count = 3): TaxiTourOrder[] {
+    this.tourOffers.clear();
+    if (this.phase === 'ride' || !Number.isInteger(count) || count < 3 || count > 5) return [];
+    const pickups = [...this.places].sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz)).slice(0, 3);
+    for (const pickup of pickups) {
+      const toPickup = this.router.route(px, pz, pickup.x, pickup.z, py, pickup.y - ROAD_Y);
+      if (!this.validTourLeg(toPickup)) continue;
+      const stops: Stop[] = [], used = new Set([pickup.nm]); let from = pickup;
+      for (let k = 0; k < count; k++) {
+        const candidates = this.places.filter((s) => !used.has(s.nm) && Math.hypot(s.x - from.x, s.z - from.z) >= 100)
+          .sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z)).slice(0, 6);
+        const next = candidates.find((s) => this.validTourLeg(this.router.route(from.x, from.z, s.x, s.z, from.y - ROAD_Y, s.y - ROAD_Y)));
+        if (!next) break;
+        stops.push(next); used.add(next.nm); from = next;
+      }
+      if (stops.length !== count) continue;
+      const plan = this.planTour(pickup, stops); if (!plan) continue;
+      const estimatedFare = fareOf(plan.distance), tourBonus = tourCompletionBonus(count);
+      const order: TaxiTourOrder = { id: randomUuid(), from: pickup.nm, to: stops[stops.length - 1].nm,
+        pickup: { ...pickup }, destination: { ...stops[stops.length - 1] }, pickupDistance: toPickup!.length,
+        distance: plan.distance, timeLimit: 0, estimatedFare, estimatedTotal: estimatedFare + tourBonus,
+        junctions: plan.junctions, tourStops: stops.map((s) => ({ ...s })), tourBonus };
+      this.tourOffers.set(order.id, order);
+      return [{ ...order, pickup: { ...order.pickup }, destination: { ...order.destination }, tourStops: order.tourStops.map((s) => ({ ...s })) }];
+    }
+    return [];
+  }
+  private validTourLeg(route: ReturnType<Router['route']>) {
+    return !!route && Number.isFinite(route.length) && route.length >= 0 && route.length <= 30000;
+  }
+  private planTour(pickup: Stop, stops: Stop[]) {
+    let from = pickup, distance = 0, junctions = 0;
+    for (const stop of stops) {
+      const leg = this.router.route(from.x, from.z, stop.x, stop.z, from.y - ROAD_Y, stop.y - ROAD_Y);
+      if (!this.validTourLeg(leg) || leg!.length <= 0) return null;
+      distance += leg!.length; junctions += leg!.junctions; from = stop;
+    }
+    return distance > 0 && distance <= 100000 ? { distance, junctions } : null;
+  }
+  acceptTour(id: string, px: number, pz: number, py?: number): boolean {
+    const order = this.tourOffers.get(id);
+    if (!order || this.phase === 'ride') return false;
+    const route = this.router.route(px, pz, order.pickup.x, order.pickup.z, py, order.pickup.y - ROAD_Y);
+    const plan = this.planTour(order.pickup, order.tourStops);
+    if (!this.validTourLeg(route) || !plan || Math.abs(plan.distance - order.distance) > 1) return false;
+    this.phase = 'seek'; this.target = { ...order.pickup }; this.from = order.from; this.destination = { ...order.destination };
+    this.tour = { stops: order.tourStops.map((s) => ({ ...s })), next: 0, distance: plan.distance };
+    this.relaxed = true; this.jobId = id; this.timeLeft = this.timeLimit = this.odo = this.hits = 0;
+    this.junctions = plan.junctions; this.route = route!.path; this.routeYs = route!.ys; this.routeLen = this.remaining = route!.length;
+    this.wait = this.remainingT = 0; this.offers.clear(); this.tourOffers.clear(); this.settlement = null;
+    return true;
+  }
+
   /** 找下一位乘客：離玩家 250~800 m 的地標 */
   private pickNext(px: number, pz: number, py?: number) {
+    this.tour = null;
     this.jobId = randomUuid(); this.destination = null; this.timeLeft = this.timeLimit = 0; this.odo = this.hits = 0;
     const cand = this.places.filter((p) => { const d = Math.hypot(p.x - px, p.z - pz); return d > 250 && d < 800; });
     const p = (cand.length ? cand : this.places)[Math.floor(this.rand() * (cand.length || this.places.length))];
@@ -226,18 +305,18 @@ export class TaxiJob {
     const cand = this.places.filter((p) => { const d = Math.hypot(p.x - px, p.z - pz); return d > 600 && d < 1600 && p.nm !== this.from; });
     const fallback = this.places.filter((p) => p.nm !== this.from && Math.hypot(p.x - px, p.z - pz) > 12);
     const pool = cand.length ? cand : fallback;
-    const p = this.destination ?? pool[Math.floor(this.rand() * pool.length)];
+    const p = this.tour?.stops[0] ?? this.destination ?? pool[Math.floor(this.rand() * pool.length)];
     if (!p) { this.stop(); return false; }
     this.target = p;
     const r = this.router.route(px, pz, p.x, p.z, py, p.y - ROAD_Y);
     if (this.destination && !r) { this.stop(); return false; }
     this.route = r?.path ?? null;
     this.routeYs = r?.ys ?? null;
-    this.routeLen = r?.length ?? Math.hypot(p.x - px, p.z - pz) * 1.3;
-    this.junctions = r?.junctions ?? 0;
+    this.routeLen = this.tour?.distance ?? r?.length ?? Math.hypot(p.x - px, p.z - pz) * 1.3;
+    if (!this.tour) this.junctions = r?.junctions ?? 0;
     this.budget = taxiTimeBudget(this.routeLen, this.junctions, this.condition);
     this.timeLimit = this.timeLeft = this.relaxed ? 0 : this.budget.total;
-    this.remaining = this.routeLen;
+    this.remaining = r?.length ?? this.routeLen;
     this.odo = 0;
     this.hits = 0;
     this.lastX = px;
@@ -281,17 +360,27 @@ export class TaxiJob {
     if (this.phase === 'seek') {
       const from = this.target.nm;
       if (this.board(car.x, car.z, car.y) === false) return '⚠️ 這張訂單目前沒有可行目的地，請重新接單';
-      return `🚕 乘客上車：${from} → ${this.target!.nm}（${this.relaxed ? '休閒不限時，無限時小費及連單獎勵' : `限時 ${Math.round(this.timeLimit)} 秒`}）`;
+      return `🚕 乘客上車：${from} → ${this.target!.nm}（${this.tour ? `觀光第1／${this.tour.stops.length}站，休閒不限時，全部完成才結算` : this.relaxed ? '休閒不限時，無限時小費及連單獎勵' : `限時 ${Math.round(this.timeLimit)} 秒`}）`;
+    }
+    if (this.tour && this.tour.next + 1 < this.tour.stops.length) {
+      const previous = this.target.nm, next = this.tour.stops[this.tour.next + 1];
+      const route = this.router.route(car.x, car.z, next.x, next.z, car.y, next.y - ROAD_Y);
+      if (!this.validTourLeg(route)) { this.stop(); return '⚠️ 下一個觀光停靠點無法抵達，行程取消，沒有獎金或罰款。'; }
+      this.tour.next++; this.target = { ...next }; this.wait = this.remainingT = 0;
+      this.route = route!.path; this.routeYs = route!.ys; this.remaining = route!.length;
+      return `📍 已停靠 ${previous}（${this.tour.next}／${this.tour.stops.length}），下一站 ${next.nm}；全部完成才結算。`;
     }
     // 送達：跳表＋小費（提早每秒 2 元，撞一次扣 10 元，最低 0）
-    const meter = fareOf(Math.max(this.odo, this.routeLen));
+    const meter = fareOf(this.tour ? this.tour.distance : Math.max(this.odo, this.routeLen));
     const tip = this.relaxed ? 0 : Math.max(0, Math.round(this.timeLeft * 2) - this.hits * 10);
     this.streak = this.relaxed ? 0 : this.streak + 1;
-    const bonus = !this.relaxed && this.streak >= 3 ? 50 : 0;
+    const bonus = this.tour ? tourCompletionBonus(this.tour.stops.length) : !this.relaxed && this.streak >= 3 ? 50 : 0;
     const total = meter + tip + bonus;
     this.lastTrip = { ...this.tripSummary!, bonus, total, remaining: 0, status: 'delivered' };
+    if (this.lastTrip.tour) this.lastTrip.tour.completed = this.lastTrip.tour.total;
     if (this.settle('delivered', total)) { this.money += total; this.trips++; }
-    const msg = `💰 送達 ${this.target.nm}！車資 ${meter} ＋ 小費 ${tip}${bonus ? ` ＋ 連續準時 ${bonus}` : ''} ＝ NT$ ${total}`;
+    const msg = this.tour ? `💰 觀光 ${this.tour.stops.length} 站全部完成！固定車資 ${meter} ＋ 行程獎金 ${bonus} ＝ NT$ ${total}`
+      : `💰 送達 ${this.target.nm}！車資 ${meter} ＋ 小費 ${tip}${bonus ? ` ＋ 連續準時 ${bonus}` : ''} ＝ NT$ ${total}`;
     if (this.destination) this.stop();
     else { this.phase = 'seek'; this.pickNext(car.x, car.z, car.y); }
     return msg;

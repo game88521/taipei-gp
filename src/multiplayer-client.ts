@@ -1,8 +1,9 @@
 import {
-  PROTOCOL_VERSION, PHYSICS_VERSION,
+  PROTOCOL_VERSION, PHYSICS_VERSION, validSeries, validSeriesTracks,
   type ClientMessage, type ServerMessage, type RoomSnapshot,
 } from '../shared/multiplayer-protocol';
 import { CATALOG_STAMP, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../shared/multiplayer-tracks';
+import { parseRoomRules, type MultiplayerRoomRules } from '../shared/multiplayer-room-rules';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
@@ -20,7 +21,7 @@ interface PendingEntry {
 const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const } };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -171,6 +172,34 @@ export class MultiplayerClient {
     }
     return this.command({ type: 'select-track', trackId, expectedRevision: this._room?.trackRevision ?? 0 });
   }
+  setLaps(laps: 1 | 3 | 5) {
+    const room = this.lobbyOptions('lobbyOptions');
+    return !!room && [1, 3, 5].includes(laps) && this.command({ type: 'set-laps', laps, roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  setRoomRules(rules: MultiplayerRoomRules) {
+    const room = this._room, parsed = parseRoomRules(rules);
+    if (!parsed || !room?.capabilities?.roomRules || !room.hostManagement || room.hostId !== this._selfId || room.phase !== 'lobby' || room.series?.locked) return false;
+    return this.command({ type: 'set-room-rules', roomRules: parsed, roomCode: room.code, expectedLobbyRevision: room.hostManagement.lobbyRevision });
+  }
+  configureSeries(trackIds: string[]) {
+    const room = this.lobbyOptions('championship');
+    if (!room || room.series?.locked || !validSeriesTracks(trackIds)) return false;
+    return this.command({ type: 'configure-series', trackIds: [...trackIds], roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  endSeries() {
+    const room = this._room;
+    if (!room?.capabilities?.championship || !room.hostManagement || !room.series || room.hostId !== this._selfId || !['lobby', 'results'].includes(room.phase)) return false;
+    return this.command({ type: 'end-series', roomCode: room.code, expectedLobbyRevision: room.hostManagement.lobbyRevision });
+  }
+  nextSeries() {
+    const room = this._room;
+    if (!room?.capabilities?.championship || !room.series || room.series.complete || !room.matchId || room.phase !== 'results' || room.hostId !== this._selfId) return false;
+    return this.command({ type: 'next-series', roomCode: room.code, matchId: room.matchId, expectedSeriesRevision: room.series.revision });
+  }
+  private lobbyOptions(capability: 'lobbyOptions' | 'championship') {
+    const room = this._room;
+    return room?.phase === 'lobby' && room.hostManagement && room.capabilities?.[capability] && room.hostId === this._selfId ? room : null;
+  }
   trackLoaded(selection: Pick<RoomSnapshot, 'trackId' | 'trackStamp' | 'trackRevision'>, generation = this._connectionGeneration) {
     const room = this._room;
     if (generation !== this._connectionGeneration || !room || room.trackId !== selection.trackId || room.trackStamp !== selection.trackStamp || room.trackRevision !== selection.trackRevision) return false;
@@ -185,10 +214,25 @@ export class MultiplayerClient {
   }
   start() { return this.command({ type: 'start', trackRevision: this._room?.trackRevision ?? 0 }); }
   reset() { return this.command({ type: 'reset' }); }
+  kickPlayer(targetPlayerId: string) { return this.hostCommand('kick-player', targetPlayerId); }
+  transferHost(targetPlayerId: string) { return this.hostCommand('transfer-host', targetPlayerId); }
+
+  private hostCommand(type: 'kick-player' | 'transfer-host', targetPlayerId: string) {
+    const room = this._room, target = room?.players.find(player => player.id === targetPlayerId);
+    if (!room?.hostManagement || room.phase !== 'lobby' || room.hostId !== this._selfId) {
+      this._error = '只有房主能在支援管理功能的大廳操作。'; this.notify(); return false;
+    }
+    if (!target || target.id === this._selfId || (type === 'transfer-host' && !target.connected)) {
+      this._error = '請選擇其他有效車手；交棒對象必須仍在線上。'; this.notify(); return false;
+    }
+    return this.command({ type, targetPlayerId, roomCode: room.code, expectedLobbyRevision: room.hostManagement.lobbyRevision });
+  }
 
   /** 最多約 30 次／秒；緊急煞車不等待下一個傳送時槽。 */
   sendInput(steer: number, brake: boolean) {
     if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
+    const self = this._room.players.find(player => player.id === this._selfId);
+    if (!self || self.dnf || self.finishMs !== null) return false;
     const now = clock();
     if (now - this.lastInputAt < 1000 / 30 && !(brake && !this.lastInputBrake)) return false;
     if ((this.socket?.bufferedAmount ?? 0) > 65536) {
@@ -316,7 +360,13 @@ export class MultiplayerClient {
       this.acceptRoom(message.room, message.type === 'snapshot'); return;
     }
     if (message.type === 'left') {
-      this.leave(); return;
+      if (message.reason === 'kicked') {
+        if (typeof message.roomCode !== 'string' || message.roomCode !== this._room?.code) return;
+        this.clearSession(); this._room = this._snapshot = null; this._selfId = null;
+        this.lastRoomTime = -Infinity; this.retiredMatches.clear(); this.disconnect();
+        this._error = '房主已將你移出房間；可重新輸入房碼加入。'; this.notify();
+      } else this.leave();
+      return;
     }
     throw new Error('伺服器與遊戲通訊版本不相容，請重新載入。');
   }
@@ -326,15 +376,44 @@ export class MultiplayerClient {
     const descriptor = typeof room.trackId === 'string' ? getMultiplayerTrack(room.trackId) : undefined;
     if (!descriptor || room.trackStamp !== descriptor.trackStamp || !Number.isSafeInteger(room.trackRevision) || Number(room.trackRevision) < 1) throw new Error('伺服器提供的地圖版本不一致，請更新後重新連線。');
     if (typeof room.code !== 'string' || typeof room.hostId !== 'string' || !['lobby', 'countdown', 'racing', 'results'].includes(String(room.phase)) || !finite(room.serverTime) || !finite(room.trackLength) || room.trackLength <= 0 || ![1, 3, 5].includes(Number(room.laps)) || (room.matchId !== null && typeof room.matchId !== 'string') || (room.startAt !== null && !finite(room.startAt)) || !Array.isArray(room.players) || room.players.length < 1 || room.players.length > 4) throw new Error('房間資料格式不正確，請重新連線。');
+    if ('hostManagement' in room && (!object(room.hostManagement) || !Number.isSafeInteger(room.hostManagement.lobbyRevision) || Number(room.hostManagement.lobbyRevision) < 1)) throw new Error('房主管理版本格式不正確，請重新連線。');
+    if ('capabilities' in room && (!object(room.capabilities) || room.capabilities.lobbyOptions !== true || room.capabilities.championship !== true || !object(room.hostManagement))) throw new Error('房間功能能力格式不正確，請重新連線。');
+    const rulesCap = object(room.capabilities) ? room.capabilities.roomRules : undefined;
+    if ((rulesCap !== undefined && rulesCap !== true) || (rulesCap === true ? !parseRoomRules(room.roomRules) : 'roomRules' in room)) throw new Error('房間規則能力與設定不一致，請更新後重新連線。');
+    if ('series' in room && room.series !== null && (!object(room.capabilities) || room.capabilities.championship !== true || !validSeries(room.series, String(room.trackId), String(room.phase), room.matchId as string | null, Number(room.laps)))) throw new Error('系列賽成績格式不正確，請重新連線。');
+    // Additive v2: absent metadata means an older server. If provided, validate
+    // the complete pair rather than silently displaying an untrusted deadline.
+    if ('deadlineAt' in room || 'deadlineReason' in room) {
+      const validDeadline = room.deadlineAt === null && room.deadlineReason === null && room.phase === 'lobby'
+        || finite(room.deadlineAt) && finite(room.startAt) && room.deadlineAt >= room.startAt && room.phase !== 'lobby'
+          && (room.deadlineReason === 'race-timeout' || room.deadlineReason === 'finish-timeout');
+      if (!validDeadline) throw new Error('比賽截止時間格式不正確，請重新連線。');
+    }
     const ids = new Set<string>();
     for (const player of room.players) {
       if (!object(player) || typeof player.id !== 'string' || ids.has(player.id) || typeof player.name !== 'string' || player.name.length > 64 || typeof player.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(player.color) || typeof player.ready !== 'boolean' || typeof player.loaded !== 'boolean' || typeof player.connected !== 'boolean' || typeof player.dnf !== 'boolean' || !finite(player.ackSeq) || !Number.isSafeInteger(player.ackSeq) || player.ackSeq < -1 || !finite(player.completedLaps) || !finite(player.progress) || !finite(player.rank) || (player.finishMs !== null && !finite(player.finishMs)) || !object(player.car) || !object(player.car.pos) || !['x', 'z', 'h', 'v', 'steer'].every(key => finite((player.car as Record<string, unknown>)[key])) || !['i', 's', 'lat'].every(key => finite((player.car as { pos: Record<string, unknown> }).pos[key]))) throw new Error('車手狀態格式不正確，請重新連線。');
+      if ('dnfReason' in player && (player.dnfReason === null ? player.dnf
+        : !player.dnf || player.finishMs !== null || typeof player.dnfReason !== 'string' || !['race-timeout', 'finish-timeout', 'disconnect-expired', 'left', 'server-stall'].includes(player.dnfReason))) throw new Error('未完賽原因格式不正確，請重新連線。');
+      // Older v2 servers omit both fields. If either is present, require the
+      // complete, bounded and internally consistent server timing record.
+      if ('lapTimesMs' in player || 'bestLapMs' in player) {
+        const times = player.lapTimesMs;
+        if (!Array.isArray(times) || typeof room.laps !== 'number' || !Number.isInteger(player.completedLaps) || player.completedLaps < 0 || player.completedLaps > room.laps
+          || times.length !== player.completedLaps || times.length > 5 || [...times].some(ms => !finite(ms) || ms <= 0 || ms > 86_400_000)
+          || ((room.phase === 'lobby' || room.phase === 'countdown') && times.length > 0)
+          || (times.length === 0 ? player.bestLapMs !== null : !finite(player.bestLapMs) || Math.abs(player.bestLapMs - Math.min(...times)) > 0.001)
+          || (player.completedLaps === room.laps && player.finishMs === null)
+          || (player.finishMs !== null && (player.completedLaps !== Number(room.laps) || player.finishMs <= 0 || player.finishMs > 86_400_000
+            || Math.abs(times.reduce<number>((sum, ms) => sum + ms, 0) - player.finishMs) > 0.003))) throw new Error('逐圈成績格式不正確，請重新連線。');
+      }
       ids.add(player.id);
     }
   }
   private acceptRoom(room: RoomSnapshot, snapshot: boolean) {
     if (this.credentials && room.code !== this.credentials.code) return;
     const previousRoom = this._room;
+    if (previousRoom?.hostManagement && room.hostManagement && room.hostManagement.lobbyRevision < previousRoom.hostManagement.lobbyRevision) return;
+    if (previousRoom?.series && room.series?.id === previousRoom.series.id && room.series.revision < previousRoom.series.revision) return;
     if (previousRoom && room.trackRevision < previousRoom.trackRevision) return;
     const changedTrack = !!previousRoom && room.trackRevision !== previousRoom.trackRevision;
     if (previousRoom && !changedTrack && (room.trackId !== previousRoom.trackId || room.trackStamp !== previousRoom.trackStamp)) throw new Error('地圖更新順序不正確，請重新連線。');

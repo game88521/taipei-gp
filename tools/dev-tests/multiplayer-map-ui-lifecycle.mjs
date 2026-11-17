@@ -7,35 +7,64 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import vm from 'node:vm';
 import { MULTIPLAYER_TRACKS, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../../shared/multiplayer-tracks.ts';
+import { validSeriesTracks } from '../../shared/multiplayer-protocol.ts';
+import { spectatorTarget } from '../../src/multiplayer-spectator.ts';
+import { MultiplayerNetworkWindow } from '../../src/multiplayer-network.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const source = await readFile(resolve(root, 'src/multiplayer-game.ts'), 'utf8');
+const uiSource = await readFile(resolve(root, 'src/multiplayer-ui.ts'), 'utf8');
+const pacingSource = await readFile(resolve(root, 'src/frame-pacing.ts'), 'utf8');
+const inviteSource = await readFile(resolve(root, 'src/multiplayer-invite.ts'), 'utf8');
+const entrySource = await readFile(resolve(root, 'src/multiplayer-entry.ts'), 'utf8');
+const qualitySource = await readFile(resolve(root, 'src/multiplayer-quality.ts'), 'utf8');
+const seriesUiSource = await readFile(resolve(root, 'src/multiplayer-series-ui.ts'), 'utf8');
+const spectatorSource = await readFile(resolve(root, 'src/multiplayer-spectator.ts'), 'utf8');
+const helpersCode = [uiSource, pacingSource, inviteSource, entrySource, qualitySource, seriesUiSource, spectatorSource].map(text => stripTypeScriptTypes(text, { mode: 'transform' })
+  .replace(/^import[^\n]*\r?\n/gm, '').replace(/\bexport /g, '')).join('\n');
+const addedModules = [
+  ['shared/multiplayer-room-rules.ts', 'DEFAULT_ROOM_RULES,parseRoomRules,roomRulesText'],
+  ['src/multiplayer-awareness.ts', 'MultiplayerAwareness'],
+  ['src/multiplayer-history.ts', 'MultiplayerHistory'],
+  ['src/multiplayer-history-ui.ts', 'MultiplayerHistoryPanel'],
+];
+const addedSources = await Promise.all(addedModules.map(async ([file, exports]) => ({ file, exports, source: await readFile(resolve(root, file), 'utf8') })));
+const addedHelpersCode = addedSources.map(m => `Object.assign(globalThis,(()=>{${stripTypeScriptTypes(m.source,{mode:'transform'}).replace(/^import[^\n]*\r?\n/gm,'').replace(/\bexport /g,'')}\nreturn {${m.exports}};})());`).join('\n');
 const hash = value => createHash('sha256').update(value).digest('hex');
+export const controllerFixtureHashes = { game: hash(source), ui: hash(uiSource), invite: hash(inviteSource), pacing: hash(pacingSource), entry: hash(entrySource), quality: hash(qualitySource), seriesUi: hash(seriesUiSource), spectator: hash(spectatorSource) };
+for (const m of addedSources) controllerFixtureHashes[m.file] = hash(m.source);
 const code = stripTypeScriptTypes(source, { mode: 'transform' })
   .replace(/^import[^\n]*\r?\n/gm, '')
   .replace('import.meta.env.VITE_MULTIPLAYER_URL', "'ws://127.0.0.1:4320/ws'");
 const report = { createdAt: new Date().toISOString(), gameSourceSha256: hash(source), localOnly: true, productionUsed: false, playerStorageTouched: false, cases: [], limitations: ['真控制器與隔離DOM／場景工作；不證明WebGL畫面、實際網路或手機操作。'] };
 const selection = (trackId, trackRevision = 1) => ({ trackId, trackStamp: getMultiplayerTrack(trackId).trackStamp, trackRevision });
 const same = (a, b) => !!a && !!b && a.trackId === b.trackId && a.trackStamp === b.trackStamp && a.trackRevision === b.trackRevision;
-function room(trackId, trackRevision = 1, extra = {}) {
+export function room(trackId, trackRevision = 1, extra = {}) {
   return { ...selection(trackId, trackRevision), code: 'ABC234', hostId: 'self', phase: 'lobby', laps: 3, matchId: null, startAt: null, players: [
     { id: 'self', name: '甲', color: '#ff3300', loaded: false, ready: false, connected: true, dnf: false, finishMs: null, completedLaps: 0, rank: 1 },
     { id: 'guest', name: '乙', color: '#22ccff', loaded: true, ready: true, connected: true, dnf: false, finishMs: null, completedLaps: 0, rank: 2 },
   ], ...extra };
 }
-function environment() {
+export function environment(options = {}) {
   class Element {
     hidden = false; disabled = false; value = ''; textContent = ''; dataset = {}; style = {}; children = []; listeners = new Map();
     constructor(tag = 'div') { this.tag = tag; }
-    appendChild(child) { this.children.push(child); }
-    append(...children) { this.children.push(...children); }
-    replaceChildren(...children) { this.children = children; }
+    appendChild(child) { return this.insertBefore(child, null); }
+    append(...children) { for (const child of children) this.appendChild(child); }
+    insertBefore(child, anchor) {
+      if (child === anchor) return child;
+      child.remove(); const index = anchor === null ? this.children.length : this.children.indexOf(anchor);
+      if (index < 0) throw new Error('DOM anchor not found');
+      this.children.splice(index, 0, child); child.parentNode = this; return child;
+    }
+    remove() { if (this.parentNode) { const parent = this.parentNode; parent.children.splice(parent.children.indexOf(this), 1); this.parentNode = null; } }
+    replaceChildren(...children) { for (const child of [...this.children]) child.remove(); this.append(...children); }
     addEventListener(type, listener) { this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]); }
     dispatch(type) { for (const listener of this.listeners.get(type) ?? []) listener({ preventDefault() {} }); }
-    setAttribute() {} blur() {}
+    setAttribute() {} blur() {} select() { this.selected = true; } click() { this.dispatch('click'); }
   }
   const elements = new Map();
-  const document = { hidden: false, activeElement: null, hasFocus: () => true, addEventListener() {}, createElement: tag => new Element(tag), getElementById(id) {
+  const document = { hidden: false, activeElement: null, body: new Element('body'), hasFocus: () => true, addEventListener() {}, createElement: tag => new Element(tag), createElementNS: (_ns, tag) => new Element(tag), getElementById(id) {
     if (!elements.has(id)) elements.set(id, new Element()); return elements.get(id);
   } };
   document.getElementById('mp-laps').value = '3'; document.getElementById('mp-name').value = '甲';
@@ -44,6 +73,7 @@ function environment() {
     room = null; selfId = null; status = 'idle'; error = null; rttMs = null; hasSavedSession = false; connectionGeneration = 0;
     listeners = []; acks = []; commands = []; disconnects = 0; snapshots = [];
     constructor() { Client.instance = this; }
+    connect() { return options.connect ? options.connect(this) : Promise.resolve(); }
     subscribe(listener) { this.listeners.push(listener); listener(this); }
     onSnapshot(listener) { this.snapshots.push(listener); }
     notify() { for (const listener of this.listeners) listener(this); }
@@ -52,16 +82,27 @@ function environment() {
     }
     trackLoaded(value, generation) { this.acks.push({ ...value, generation }); this.notify(); return true; }
     ready(value) { this.commands.push({ type: 'ready', value }); }
+    async create(name, laps, trackId) { this.commands.push({ type: 'create', name, laps, trackId }); }
+    async join(code, name) { this.commands.push({ type: 'join', code, name }); }
     start() { this.commands.push({ type: 'start' }); }
     selectTrack(trackId) { this.commands.push({ type: 'select-track', trackId }); }
+    setLaps(laps) { this.commands.push({ type: 'set-laps', laps }); return true; }
+    setRoomRules(roomRules) { this.commands.push({ type: 'set-room-rules', roomRules }); return true; }
+    configureSeries(trackIds) { this.commands.push({ type: 'configure-series', trackIds: [...trackIds] }); return true; }
+    nextSeries() { this.commands.push({ type: 'next-series' }); return true; }
+    endSeries() { this.commands.push({ type: 'end-series' }); return true; }
+    reset() { this.commands.push({ type: 'reset' }); return true; }
+    kickPlayer(targetPlayerId) { this.commands.push({ type: 'kick-player', targetPlayerId }); return true; }
+    transferHost(targetPlayerId) { this.commands.push({ type: 'transfer-host', targetPlayerId }); return true; }
     sendInput() { return false; }
     serverNow() { return 1700000000000; }
-    disconnect() { this.disconnects++; }
+    disconnect() { this.disconnects++; options.disconnected?.(this); }
     leave() { this.update(null, 'idle', this.connectionGeneration + 1); }
   }
   class Scene {
     static instance;
     contextLost = false; ready = false; active = null; jobs = []; requested = null; accepted = []; car = { v: 0 };
+    network = new MultiplayerNetworkWindow();
     renderer = { setAnimationLoop: callback => { this.frameLoop = callback; } };
     constructor() { Scene.instance = this; }
     matchesMap(value) { return this.ready && same(this.active, value); }
@@ -76,25 +117,30 @@ function environment() {
       this.requested = job; this.jobs.push(job); return promise;
     }
     accept(value) { this.accepted.push(value); }
-    frame() {} toggleCamera() {} recordInput() {}
+    frame() {} toggleCamera() {} recordInput() {} setQuality(level) { this.qualityLevel = level; }
+    setSpectatorTarget(id) { this.spectatorId = spectatorTarget(Client.instance.room, Client.instance.selfId, id); }
   }
   class Input { read() { return { steer: 0, brake: false }; } }
   class Sound { engine() {} start() { return true; } setEngine() {} unlock() {} }
-  const context = vm.createContext({ MultiplayerClient: Client, MultiplayerScene: Scene, Input, Sound, MULTIPLAYER_TRACKS, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack,
-    document, HTMLElement: Element, Error, location: { hostname: '127.0.0.1', protocol: 'http:', reload() {} }, performance, console,
-    addEventListener() {}, setInterval() {}, confirm: () => true, navigator: { clipboard: { writeText: async () => {} } },
+  const context = vm.createContext({ MultiplayerClient: Client, MultiplayerScene: Scene, Input, Sound, MULTIPLAYER_TRACKS, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack, validSeriesTracks,
+    document, HTMLElement: Element, Error, URL, URLSearchParams,
+    location: Object.assign(new URL(options.href ?? 'http://127.0.0.1:4319/multiplayer.html'), { reload() {} }), performance, console,
+    addEventListener() {}, setInterval() {}, clearInterval() {}, setTimeout, clearTimeout, confirm: options.confirm ?? (() => true),
+    navigator: { clipboard: 'clipboard' in options ? options.clipboard : { writeText: async () => {} }, share: options.share },
   });
+  if (options.localStorage) context.localStorage = options.localStorage;
   context.window = context;
-  vm.runInContext(code, context, { filename: 'multiplayer-game.real.ts' });
+  vm.runInContext(helpersCode + '\n' + addedHelpersCode + '\n' + code, context, { filename: 'multiplayer-game.real.ts' });
   const flush = async () => { for (let n = 0; n < 12; n++) await Promise.resolve(); };
   const scene = Scene.instance, client = Client.instance;
-  return { ui: id => document.getElementById(id), client, scene, mp: context.__mp, flush };
+  return { ui: id => document.getElementById(id), client, scene, mp: context.__mp, flush, context };
 }
 async function test(name, run) {
   try { const details = await run(); report.cases.push({ name, status: 'PASS', details }); }
   catch (error) { report.cases.push({ name, status: 'FAIL', error: error.stack ?? String(error) }); }
 }
 
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 await test('入口／大廳均提供24圖，預覽未完成不可建房，完成後解鎖', async () => {
   const env = environment();
   assert.equal(env.ui('mp-track').children.length, 24); assert.equal(env.ui('mp-room-track').children.length, 24);
@@ -174,3 +220,4 @@ report.summary = { passed: report.cases.filter(item => item.status === 'PASS').l
 await writeFile(resolve(root, 'tools/dev-tests/shots-multiplayer-map-ui-lifecycle.json'), JSON.stringify(report, null, 2) + '\n');
 for (const item of report.cases) console.log(`${item.status} ${item.name}${item.error ? '\n' + item.error : ''}`);
 console.log(JSON.stringify(report.summary)); if (report.summary.failed) process.exitCode = 1;
+}

@@ -9,6 +9,7 @@ import { parseDriftChallengeRecords, type DriftChallengeRecords } from './drift'
 import { parseStreetChallengeRecords, parseStreetSeriesCheckpoint, type StreetChallengeRecords, type StreetSeriesCheckpoint } from './street-series';
 import { parseTaxiCheckpoint, parseTaxiSettledIds, type TaxiCheckpoint } from './street-taxi-state';
 import { parsePlayerProgress, type PlayerProgress } from './player-progress';
+import { parsePoliceCareer, type PoliceCareer } from './city-jobs-state';
 
 // ---------------------------------------------------------------- 存檔
 export interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
@@ -26,6 +27,7 @@ export interface Save {
   taxiJob?: TaxiCheckpoint | null;
   taxiSettled?: string[];
   progress?: PlayerProgress;
+  policeCareer?: PoliceCareer;
 }
 const LAST_GOOD_KEY = KEY + '-last-good';
 const RECOVERY_ORIGINAL_KEY = KEY + '-recovery-original';
@@ -47,7 +49,7 @@ interface GoodSnapshot { at: number; raw: string }
 const recovery: SaveRecoveryState = { blocked: false, reason: null, dropped: [], message: '', originalRaw: null, originalArchived: false, archiveError: null, hasSnapshot: false, snapshotAt: null };
 /** 設定可回退預設值；金錢、收藏、紀錄及進度的任何已知資料損失都必須先由玩家救援。缺少可選欄位不視為損壞。 */
 export function criticalSaveDrops(dropped: readonly string[]): string[] {
-  const critical = new Set(['best', 'sectors', 'ghost', 'gpBest', 'trackV', 'playerId', 'taxi', 'ledger', 'stats', 'ach', 'owned', 'paints', 'paint', 'street', 'circuits', 'records', 'damage', 'season', 'seasonHistory', 'freePos', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress']);
+  const critical = new Set(['best', 'sectors', 'ghost', 'gpBest', 'trackV', 'playerId', 'taxi', 'ledger', 'stats', 'ach', 'owned', 'paints', 'paint', 'street', 'circuits', 'records', 'damage', 'season', 'seasonHistory', 'freePos', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer']);
   return dropped.filter((field) => critical.has(field.split('.')[0]));
 }
 let lastGood: GoodSnapshot | null = null, reloadRequired = false, originalObserved = false;
@@ -402,6 +404,8 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
   }
   take('progress', parsePlayerProgress(src.progress));
   if (src.progress === null) dropped.push('progress');
+  take('policeCareer', parsePoliceCareer(src.policeCareer));
+  if (src.policeCareer === null) dropped.push('policeCareer');
   if (src.stats && typeof src.stats === 'object') {
     const stats: Record<string, number> = {};
     for (const [k, val] of Object.entries(src.stats as Record<string, unknown>)) if (isNum(val, 0, 1e12) && k.length <= 40 && Object.keys(stats).length < 80) stats[k] = val;
@@ -487,7 +491,7 @@ export function stampOf(id: string, rules = activeRules): string | undefined { r
 export function playerIdentity(): string { if (!save.playerId || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(save.playerId)) { save.playerId = randomUuid(); writeSave(); } return save.playerId; }
 export function prepareImportedSave(s: Save, dropped: string[] = []): { save: Save; preserved: string[] } {
   const current = serializedSave(), out = { ...s }, preserved: string[] = [];
-  for (const k of ['season', 'seasonHistory', 'freePos', 'records', 'damage', 'ledger', 'playerId', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress'] as const) if ((s[k] === undefined || dropped.some((name) => name === k || name.startsWith(k + '.'))) && current[k] !== undefined) { Object.assign(out, { [k]: current[k] }); preserved.push(k); }
+  for (const k of ['season', 'seasonHistory', 'freePos', 'records', 'damage', 'ledger', 'playerId', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer'] as const) if ((s[k] === undefined || dropped.some((name) => name === k || name.startsWith(k + '.'))) && current[k] !== undefined) { Object.assign(out, { [k]: current[k] }); preserved.push(k); }
   return { save: out, preserved };
 }
 /**

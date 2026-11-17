@@ -11,22 +11,24 @@ const before = process.env.GP_ALL_BASELINE_DIR ?? resolve(root, '../taipei-gp-al
 const cityModule = await import(await pureUrl(root, 'citydata.ts'));
 const city = cityModule.decodeCity(JSON.parse(await readFile(resolve(root, 'public/data/city.json'), 'utf8')));
 const { ROAD_Y } = await import(await pureUrl(root, 'surface.ts'));
+const { CityGuidance } = await import(await pureUrl(root, 'city-guidance.ts'));
 const report = { before, root, cases: [], browserUsed: false, playerStorageTouched: false };
 async function test(name, fn) { try { const detail = await fn(); report.cases.push({ name, status: 'PASS', detail }); } catch (e) { report.cases.push({ name, status: 'FAIL', error: String(e.stack).replace(/data:text\/javascript;base64,[\w+/=]+/g, '[module]').slice(0, 3000) }); } }
 async function version(base) {
   const { Router } = await import(await pureUrl(base, 'router.ts')), mission = await import(await pureUrl(base, 'mission.ts'));
   const code = stripTypeScriptTypes(await readFile(resolve(base, 'src/main.ts'), 'utf8'), { mode: 'transform' });
-  const node = parseAst(code).body.find((n) => n.type === 'FunctionDeclaration' && n.id?.name === 'updateNav');
-  return { Router, router: new Router(city), mission, update: code.slice(node.start, node.end) };
+  const ast = parseAst(code), node = ast.body.find((n) => n.type === 'FunctionDeclaration' && n.id?.name === 'updateNav'), helper = ast.body.find((n) => n.type === 'FunctionDeclaration' && n.id?.name === 'showCityGuidance');
+  return { Router, router: new Router(city), mission, update: code.slice(node.start, node.end), helper: helper ? code.slice(helper.start, helper.end) : '' };
 }
 const old = await version(before), current = await version(root), N = city.net.nodes, Y = city.net.y ?? [];
 function exercise(v, sample, shift = 0, height = 0) {
   let calls = 0;
   const end = sample.route.path.at(-1), nav = { x: end[0], z: end[1], y: sample.route.ys.at(-1) + ROAD_Y, nm: sample.name, path: sample.route.path, ys: sample.route.ys, t: 0 };
   const ctx = vm.createContext({ nav, router: { route(...args) { calls++; return v.router.route(...args); } }, fcar: { x: sample.x + shift, z: sample.z, y: sample.y + height }, ROAD_Y,
+    cityGuidance: new CityGuidance(), groundH: cityModule.groundH, state: 'free', save: { opts: {} }, sound: { beep() {} },
     streetRacing: () => false, taxiOn: () => false, navArrows: { update() {} }, performance: { now: () => 0 }, ...v.mission,
     $: () => ({ style: {}, textContent: '' }), toast() {} });
-  vm.runInContext(v.update, ctx);
+  if (v.helper) vm.runInContext(v.helper, ctx); vm.runInContext(v.update, ctx);
   for (let i = 0; i < 40; i++) ctx.updateNav(0.25);
   return { calls, path: ctx.nav?.path, nav: ctx.nav };
 }

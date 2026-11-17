@@ -15,6 +15,17 @@ if (root === before) throw Error('before 不可指向受測工作副本');
 const frameSource = await readFile(resolve(root, 'src/frame-pacing.ts'), 'utf8');
 const frame = await import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(frameSource, { mode: 'transform' })).toString('base64')}`);
 const hash = (s) => createHash('sha256').update(s).digest('hex');
+function findPoliceUpdate(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.type === 'IfStatement' && node.test.type === 'Identifier' && node.test.name === 'police'
+    && JSON.stringify(node.consequent).includes('"name":"update"')) return node;
+  for (const value of Object.values(node)) {
+    for (const child of Array.isArray(value) ? value : [value]) {
+      const match = findPoliceUpdate(child); if (match) return match;
+    }
+  }
+  return null;
+}
 async function mainSource(base) {
   const raw = await readFile(resolve(base, 'src/main.ts'), 'utf8'), code = stripTypeScriptTypes(raw, { mode: 'transform' }), ast = parseAst(code);
   const node = ast.body.find((n) => n.type === 'ExpressionStatement' && n.expression.type === 'CallExpression' && n.expression.callee?.type === 'MemberExpression' && n.expression.callee.object?.name === 'renderer' && n.expression.callee.property?.name === 'setAnimationLoop');
@@ -24,7 +35,7 @@ async function mainSource(base) {
   return { hash: hash(raw), code: code.slice(callback.start, callback.end), body: callback.body.body, fullCode: code,
     fn(name) { const f = fnNode(name); if (!f) throw Error(`找不到真main函式 ${name}`); return code.slice(f.start, f.end); },
     policeBlock() {
-      const block = fnNode('freeStep').body.body.find((n) => n.type === 'IfStatement' && n.test.type === 'Identifier' && n.test.name === 'police');
+      const block = findPoliceUpdate(fnNode('freeStep'));
       if (!block) throw Error('找不到freeStep直接if(police)區塊'); return code.slice(block.start, block.end);
     },
   };
@@ -93,7 +104,7 @@ function harness(source = current, options = {}) {
     BOT: options.bot ?? false, SIM: 0, state: options.state ?? 'race', mode: options.state === 'free' ? 'free' : 'race', raceKind: 'gp', mapOpen: options.map ?? false,
     ctxLostNow: false, holdRender: false, STEP: 1 / 120, composer: null, scene: {}, camera: { position: { x: 0, z: 0 } },
     renderer: { render: () => events.renders.push(now) }, bigmap: { draw() { events.bigmaps++; } },
-    sr: null, streetRacing: () => false, taxiOn: () => false, taxi: null, nav: null,
+    sr: null, streetRacing: () => false, streetResultOpen: () => false, taxiOn: () => false, taxi: null, nav: null,
     fcar: { x: 0, z: 0, y: 0, h: 0, deck: null }, surface: null, CEIL: 1, CIRCUIT: null,
     step: (dt) => events.steps.push(dt), freeStep: (dt) => events.freeSteps.push(dt), updateCountdown() {},
     tickRain: (dt) => events.rain.push(dt), applyWeather() {}, weather: { stepPicked() {}, update() {}, sunI: 1, hemiI: 1 },
@@ -170,9 +181,11 @@ await test('真main警方AST before/after：罰款文案符合實扣，50/200/30
       writeSave() {}, refreshGarage() {}, toast: (text) => toasts.push(text), sound: { beep() {} },
       streetRacing: () => false, chosen: { id: 'sedan' }, FREE_SIM: false, WANTED_TEST: false,
       trafficHit: 0, pedHit: false, dt: 0.02, fcar: {}, collider: null, NO_TRAFFIC: false, traffic: null, policeLog: [],
-      police: { stars: 1, update: () => ({ money: delta, msg }) },
+      police: { stars: 1, update: () => ({ money: delta, msg, playerImpact: 0 }), consumeDutyResult: () => null }, cityJobsUi: undefined, impact: 0, carHit: 0,
     });
     for (const name of ['money', 'setMoney']) vm.runInContext(source.fn(name), context);
+    // New career observer is executed with a no-result police fixture; original economy assertions stay unchanged.
+    if (source.fullCode.includes('function syncPoliceCareer(')) vm.runInContext(source.fn('syncPoliceCareer'), context);
     vm.runInContext(source.policeBlock(), context);
     return { money: taxi.money, persistedMoney: save.taxi.money,
       ledger: save.ledger.map(({ amount, balance, reason }) => ({ amount, balance, reason })), toasts, stats };

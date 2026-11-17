@@ -7,7 +7,9 @@ import { makeF1, TEAMS } from './f1model';
 // 街頭比賽的對手也開 F1：每位車手固定一支車隊塗裝（TEAMS 的索引）
 const RIVAL_TEAM: Record<string, number> = { 阿翔: 1, 小美: 5, 黑豹: 7, 老K: 2, 阿凱: 3, 阿哲: 4, 小雨: 6, 鐵牛: 0 };
 import type { Traffic } from './traffic';
-import { FreeCar } from './freecar';
+import { DEFAULT_SPEC, FreeCar } from './freecar';
+import { vehicleById } from './vehicles';
+import { isClassStreetRule, streetPerformance } from './street-performance';
 import { TOWER_101 } from './track';
 import { ROAD_Y } from './surface';
 import { sameRoadLevel, streetRecordKey } from './mission';
@@ -79,6 +81,8 @@ export interface Rival {
   color: string;
   top: number;
   corner: number;
+  accel?: number;
+  decel?: number;
   s: number;
   v: number;
   lat: number; // 離路線中心的橫向位置（右正）
@@ -293,6 +297,10 @@ export class StreetRace {
       model.root.visible = true;
       const scale = STREET_DIFFICULTY[this.options.difficulty];
       const r: Rival = { name, color, top: top * scale.top, corner: corner * scale.corner, s: slots[k][0], v: 0, lat: slots[k][1], blockedFor: 0, stunned: 0, done: null, pos: { x: 0, z: 0, y: 0, h: 0, v: 0 }, model, ox: 0, oz: 0, ovx: 0, ovz: 0, oh: 0, ow: 0 };
+      if (isClassStreetRule(this.options.rules)) {
+        const profile = streetPerformance(this.options.carId === 'street-f1' ? DEFAULT_SPEC : vehicleById(this.options.carId).spec, k, duel);
+        r.top = profile.top * scale.top; r.corner = profile.corner * scale.corner; r.accel = profile.accel; r.decel = profile.decel;
+      }
       this.placeRival(r);
       return r;
     });
@@ -430,7 +438,7 @@ export class StreetRace {
     if (r.stunned > 0) { r.stunned -= dt; want = Math.min(want, r.v * 0.98); }
     this.knock(r, dt);
     // 加速 7.5 m/s²、減速 12 m/s²
-    r.v = want > r.v ? Math.min(want, r.v + 7.5 * dt) : Math.max(want, r.v - 12 * dt);
+    r.v = want > r.v ? Math.min(want, r.v + (r.accel ?? 7.5) * dt) : Math.max(want, r.v - (r.decel ?? 12) * dt);
     r.s += r.v * dt;
     this.placeRival(r);
   }

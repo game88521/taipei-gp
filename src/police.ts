@@ -5,6 +5,7 @@ import type { Router } from './router';
 import type { Traffic } from './traffic';
 import { buildPlayerVehicle, vehicleById, type PlayerVehicle } from './vehicles';
 import { sameRoadLevel } from './mission';
+import { POLICE_DUTIES, newPoliceCareer, parsePoliceCareer, policeDutyRating, type PoliceCareer, type PoliceDifficulty, type PoliceDutyResult } from './city-jobs-state';
 
 // 警察追逐（GTA 風）：撞車、撞人、闖紅燈、撞警車會累積通緝（最多 5 星），星數越多警車越多越快；
 // 警車照路網追過來，近了直接衝撞；停在警車旁邊 3 秒＝被逮捕（罰款）；離所有警車夠遠撐 7 秒＝甩掉（LOSE_DIST／LOSE_TIME）。
@@ -81,6 +82,26 @@ export function bumpCars(a: FreeCar, b: FreeCar): number {
 }
 
 export class Police {
+  private career = newPoliceCareer();
+  private dutyDifficulty: PoliceDifficulty = 'standard';
+  private dutyCollisions = 0;
+  private dutyCollisionCool = 0;
+  private dutyStarted = false;
+  private dutyReward = 0;
+  private dutyResult: PoliceDutyResult | null = null;
+  private pendingDutyResult: PoliceDutyResult | null = null;
+  get dutyCareer(): PoliceCareer { return { ...(this.career ?? newPoliceCareer()) }; }
+  setDutyCareer(raw: unknown) { if (!this.suspect) this.career = parsePoliceCareer(raw) ?? newPoliceCareer(); }
+  setDutyDifficulty(value: PoliceDifficulty) {
+    if (this.suspect || typeof value !== 'string' || !Object.hasOwn(POLICE_DUTIES, value)) return false;
+    this.career = { ...this.dutyCareer, difficulty: value }; return true;
+  }
+  get dutySummary() {
+    const difficulty = this.suspect ? this.dutyDifficulty : this.dutyCareer.difficulty;
+    return { difficulty, ...POLICE_DUTIES[difficulty], collisions: this.dutyCollisions ?? 0, active: !!this.suspect };
+  }
+  get lastDutyResult() { return this.dutyResult ? { ...this.dutyResult } : null; }
+  consumeDutyResult() { const result = this.pendingDutyResult; this.pendingDutyResult = null; return result ?? null; }
   heat = 0;
   stars = 0;
   units: Unit[] = [];
@@ -206,18 +227,22 @@ export class Police {
     const at = this.roadPointNear(p.x + Math.sin(p.h) * 90, p.z + Math.cos(p.h) * 90, 0, p.h);
     if (!at) return null;
     const car = new FreeCar();
-    car.spec = SUSPECT_SPEC;
+    this.dutyDifficulty = this.dutyCareer.difficulty;
+    const duty = POLICE_DUTIES[this.dutyDifficulty];
+    car.spec = duty.speed === 1 ? SUSPECT_SPEC : { ...SUSPECT_SPEC, vmax: SUSPECT_SPEC.vmax * duty.speed };
     car.place(at[0], at[1], at[2]);
     this.suspectPv.setPaint(this.suspectPaint[Math.floor(Math.random() * this.suspectPaint.length)]);
     this.suspect = { car, pv: this.suspectPv, path: null, repath: 0, stuck: 0, reverse: 0 };
-    this.suspectHp = 100;
-    this.pursuitT = 180; this.arrestT = 0; this.escapeT = 0;
+    this.suspectHp = duty.hp;
+    this.pursuitT = duty.seconds; this.arrestT = 0; this.escapeT = 0;
+    this.dutyCollisions = this.dutyCollisionCool = this.dutyReward = 0; this.dutyStarted = false;
     this.suspectDistance = Math.hypot(car.x - p.x, car.z - p.z);
     this.lastPursuitReason = null;
     if (!this.pickGoal(this.suspect, p)) {
       this.endPursuit('cancelled');
       return '⚠️ 附近找不到安全逃跑路線，請換個路口再追緝';
     }
+    this.dutyStarted = true;
     return '🎯 嫌犯出現！撞到它停下來';
   }
 
@@ -292,9 +317,9 @@ export class Police {
     return c.update(dt, steer, throttle, brake, col);
   }
 
-  /** 每步更新；crimesOn = false 時（街頭比賽、自己開警車）不會被通緝。回傳要顯示的訊息與金額變化 */
-  update(dt: number, p: FreeCar, col: Collider | null, traffic: Traffic | null, crimesOn: boolean): { msg: string | null; money: number } {
-    let msg: string | null = null, money = 0;
+  /** 每步更新；只回報玩家接觸的最大撞擊，不含警車彼此或警車撞車流。 */
+  update(dt: number, p: FreeCar, col: Collider | null, traffic: Traffic | null, crimesOn: boolean, externalPlayerImpact = 0): { msg: string | null; money: number; playerImpact: number } {
+    let msg: string | null = null, money = 0, playerImpact = 0;
     this.crashCool = Math.max(0, this.crashCool - dt);
     // 闖紅燈：開進號誌路口那一刻是紅燈、速度夠快
     const copNear = this.units.some((u) => sameRoadLevel(u.car, p) && Math.hypot(u.car.x - p.x, u.car.z - p.z) < 15); // 被警車撞進路口不算闖紅燈
@@ -303,7 +328,7 @@ export class Police {
       if (s && s.id !== this.lastSignal && s.red && p.v > 8 && !copNear) msg = this.crime(0.6, '闖紅燈') ?? msg;
       this.lastSignal = s ? s.id : null;
     }
-    if (!crimesOn && this.wanted && !this.suspect) { this.clear(); return { msg: null, money: 0 }; }
+    if (!crimesOn && this.wanted && !this.suspect) { this.clear(); return { msg: null, money: 0, playerImpact }; }
 
     // ---- 被通緝：警車
     if (this.wanted) {
@@ -339,6 +364,7 @@ export class Police {
         const tx = u.car.x - p.x, tz = u.car.z - p.z, tl = Math.hypot(tx, tz) || 1;
         const toward = (p.vx * tx + p.vz * tz) / tl, copToward = -(u.car.vx * tx + u.car.vz * tz) / tl;
         const hit = bumpCars(p, u.car);
+        playerImpact = Math.max(playerImpact, hit);
         if (hit > 4 && crimesOn && toward > 6 && toward > copToward) msg = this.crime(0.4, '撞警車') ?? msg;
       }
       for (let i = 0; i < this.units.length; i++) for (let j = i + 1; j < this.units.length; j++) bumpCars(this.units[i].car, this.units[j].car);
@@ -349,7 +375,7 @@ export class Police {
         b.age += dt;
         for (const c of b.cops) {
           c.car.update(dt, 0, false, true, col); // 停著（被撞會被推動）
-          bumpCars(p, c.car);
+          playerImpact = Math.max(playerImpact, bumpCars(p, c.car));
           if (sameRoadLevel(c.car, p)) {
             const d = Math.hypot(c.car.x - p.x, c.car.z - p.z);
             nearest = Math.min(nearest, d); arrestNearest = Math.min(arrestNearest, d);
@@ -408,16 +434,18 @@ export class Police {
     // ---- 自己當警察：嫌犯車
     const s = this.suspect;
     if (s) {
+      const duty = POLICE_DUTIES[this.dutyDifficulty ?? 'standard'];
+      this.dutyCollisionCool = Math.max(0, (this.dutyCollisionCool ?? 0) - dt);
       this.pursuitT -= dt;
       const d = Math.hypot(s.car.x - p.x, s.car.z - p.z);
       this.suspectDistance = d;
       if (this.suspectHp > 0) {
         if ((!s.goal || Math.hypot(s.goal[0] - s.car.x, s.goal[1] - s.car.z) < 40) && !this.pickGoal(s, p)) {
           this.endPursuit('cancelled');
-          return { msg: '⚠️ 嫌犯路線中斷，本次追緝取消（無獎金或罰款）', money };
+          return { msg: '⚠️ 嫌犯路線中斷，本次追緝取消（無獎金或罰款）', money, playerImpact };
         }
         const hurt = this.suspectHp < 50 ? 0.5 + this.suspectHp / 100 : 1; // 耐久剩一半以下：越來越慢
-        const wall = this.drive(s, s.goal![0], s.goal![1], SUSPECT_SPEC.vmax * (d < 60 ? 1 : 0.8) * hurt, dt, col, false, Infinity, traffic);
+        const wall = this.drive(s, s.goal![0], s.goal![1], SUSPECT_SPEC.vmax * duty.speed * (d < 60 ? 1 : 0.8) * hurt, dt, col, false, Infinity, traffic);
         if (wall > 4) this.suspectHp = Math.max(0, this.suspectHp - wall * 3); // 自己撞牆也會受傷
         if (traffic) {
           const th = traffic.collidePlayer(s.car);
@@ -426,24 +454,42 @@ export class Police {
         }
       } else s.car.update(dt, 0, false, true, col); // 撞壞了：停下來
       const hit = bumpCars(p, s.car);
+      playerImpact = Math.max(playerImpact, hit);
+      // 0.8秒內的持續接觸算同一次；在逮捕結算前納入本步所有玩家撞擊。
+      if (Math.max(playerImpact, externalPlayerImpact) > 4 && this.dutyCollisionCool <= 0) {
+        this.dutyCollisions = (this.dutyCollisions ?? 0) + 1; this.dutyCollisionCool = 0.8;
+      }
       if (hit > 2) this.suspectHp = Math.max(0, this.suspectHp - hit * 9); // 玩家撞它
       // 逮捕：嫌犯停下來（撞壞或被逼停）、警車貼在旁邊
       if (d < 12 && sameRoadLevel(s.car, p) && Math.abs(s.car.v) < 3) this.arrestT += dt; else this.arrestT = Math.max(0, this.arrestT - dt);
       if (d > 450) this.escapeT += dt; else this.escapeT = 0;
       if (this.arrestT > 1) {
-        const reward = 400 + Math.round(Math.max(0, this.pursuitT) * 2);
+        const reward = duty.base + Math.round(Math.max(0, this.pursuitT) * duty.perSecond);
+        this.dutyReward = reward;
         money = reward;
         msg = `✅ 逮捕嫌犯！獎金 NT$ ${reward}`;
         this.endPursuit('arrested');
       } else if (this.escapeT > 8 || this.pursuitT <= 0) {
-        msg = this.pursuitT <= 0 ? '💨 追緝超時，嫌犯逃脫（180 秒內未完成逮捕）' : '💨 跟丟嫌犯（距離超過 450 m 持續 8 秒）';
+        msg = this.pursuitT <= 0 ? `💨 追緝超時，嫌犯逃脫（${duty.seconds} 秒內未完成逮捕）` : '💨 跟丟嫌犯（距離超過 450 m 持續 8 秒）';
         this.endPursuit(this.pursuitT <= 0 ? 'timeout' : 'distance');
       }
     }
-    return { msg, money };
+    return { msg, money, playerImpact };
   }
 
   endPursuit(reason: 'arrested' | 'distance' | 'timeout' | 'cancelled' = 'cancelled') {
+    if (this.suspect && this.dutyStarted) {
+      const career = this.dutyCareer, success = reason === 'arrested', countedFailure = reason === 'distance' || reason === 'timeout';
+      const consecutive = success ? Math.min(1e7, career.consecutive + 1) : 0;
+      this.career = { ...career, completed: Math.min(1e7, career.completed + (success ? 1 : 0)),
+        failed: Math.min(1e7, career.failed + (countedFailure ? 1 : 0)), consecutive,
+        bestConsecutive: Math.max(career.bestConsecutive, consecutive) };
+      const difficulty = this.dutyDifficulty, duty = POLICE_DUTIES[difficulty];
+      this.dutyResult = { difficulty, status: reason, collisions: this.dutyCollisions,
+        elapsed: Math.max(0, Math.min(duty.seconds, duty.seconds - this.pursuitT)), reward: success ? this.dutyReward : 0,
+        rating: success ? policeDutyRating(this.dutyCollisions, difficulty) : null, consecutive };
+      this.pendingDutyResult = { ...this.dutyResult }; this.dutyStarted = false;
+    }
     if (this.suspect) this.lastPursuitReason = reason;
     if (this.suspect) this.suspect.pv.model.root.visible = false;
     this.suspect = null;

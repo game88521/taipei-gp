@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { parseAst } from 'rolldown/parseAst';
+import { pureUrl } from './pure-module-loader.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const compile = (s) => stripTypeScriptTypes(s, { mode: 'transform' });
 const url = (s) => `data:text/javascript;base64,${Buffer.from(s).toString('base64')}`;
@@ -14,6 +15,7 @@ const raw = await readFile(resolve(root, 'src/main.ts'), 'utf8'), code = compile
 const drift = await import(url(compile(await readFile(resolve(root, 'src/drift.ts'), 'utf8'))));
 const identity = url(compile(await readFile(resolve(root, 'src/identity.ts'), 'utf8')));
 const series = await import(url(compile(await readFile(resolve(root, 'src/street-series.ts'), 'utf8')).replace("'./identity'", JSON.stringify(identity))));
+const streetPerformanceHelpers = await import(await pureUrl(root, 'street-performance.ts'));
 const fnNode = (name) => { const n = ast.body.find((q) => q.type === 'FunctionDeclaration' && q.id?.name === name); assert.ok(n, `找不到真main.${name}`); return n; };
 const fn = (name) => { const n = fnNode(name); return code.slice(n.start, n.end); };
 const report = { mainHash: createHash('sha256').update(raw).digest('hex'), checks: [], browserUsed: false,
@@ -27,8 +29,10 @@ function harness(extra = {}) {
     return nodes.get(id);
   };
   const context = vm.createContext({ console, $, document: { createElement: () => ({ appendChild() {}, textContent: '', className: '' }) },
-    save: {}, stats: { earned: 0, trips: 0, streetWins: 0 }, mode: 'free', state: 'free', BOT: false, CIRCUIT: null,
-    writeSave() {}, toast() {}, sound: { beep() {} }, ...extra });
+    ...streetPerformanceHelpers, save: {}, stats: { earned: 0, trips: 0, streetWins: 0 }, mode: 'free', state: 'free', BOT: false, CIRCUIT: null, police: null,
+    writeSave() {}, toast() {}, sound: { beep() {}, engine() {}, sirenAt() {} },
+    menu: $('menu'), clock: { getDelta() { return 0; } }, hideMenu() {}, saveFreePos() {}, ...extra });
+  vm.runInContext(fn('streetRulesLabel'), context);
   return { context, $, load(...names) { for (const name of names) vm.runInContext(fn(name), context); } };
 }
 const freeStep = fnNode('freeStep');
@@ -83,7 +87,9 @@ await check('真showStreetResult重複呼叫僅一次獎金/勝場/系列完成�
   const h = harness({ sr, srShown: false, seriesRace: true, streetSeries: { active: true, checkpoint: { next: 1 }, finish() { seriesFinishes++; return true; } },
     STREET_DIFFICULTY: series.STREET_DIFFICULTY, recordStreetResult: series.recordStreetResult, updateStreetSeriesUi() {}, vehicleById: (id) => ({ id, name: id }),
     fmt: (n) => String(n), fmtNT: (n) => String(n), fmtDelta: (n) => String(n), earn(n) { paid += n; } });
-  h.context.save.street = { 'duel:route': 5 }; h.load('showStreetResult'); h.context.showStreetResult(); h.context.showStreetResult();
+  h.context.save.street = { 'duel:route': 5 };
+  for (const name of ['streetResultOpen', 'resumeStreetResult']) if (ast.body.some((n) => n.type === 'FunctionDeclaration' && n.id?.name === name)) h.load(name);
+  h.load('showStreetResult'); h.context.showStreetResult(); h.context.showStreetResult();
   assert.equal(paid, 600); assert.equal(seriesFinishes, 1); assert.equal(h.context.stats.streetWins, 1);
   assert.equal(h.context.save.street['duel:route'], 5); assert.equal(h.context.save.streetChallenge[result.key].best, 20);
 });

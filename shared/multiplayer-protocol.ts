@@ -1,5 +1,8 @@
 import catalog from './multiplayer-catalog.json' with { type: 'json' };
 import type { CarState } from '../src/car';
+import type { MultiplayerSeries } from './multiplayer-series';
+import type { MultiplayerRoomRules } from './multiplayer-room-rules';
+export { validSeries, validSeriesTracks } from './multiplayer-series.ts';
 
 export type { CarState };
 export const PROTOCOL_VERSION = 2;
@@ -15,6 +18,8 @@ export const MULTIPLAYER_TICK_HZ = 60;
 export const MULTIPLAYER_SNAPSHOT_HZ = 20;
 export type MultiplayerLaps = 1 | 3 | 5;
 export type RoomPhase = 'lobby' | 'countdown' | 'racing' | 'results';
+export type DeadlineReason = 'race-timeout' | 'finish-timeout';
+export type DnfReason = DeadlineReason | 'disconnect-expired' | 'left' | 'server-stall';
 
 export interface Compatibility {
   version: number;
@@ -41,16 +46,30 @@ export interface RoomPlayer {
   progress: number;
   /** Server elapsed milliseconds, never a client-provided time. */
   finishMs: number | null;
+  /** Additive v2 pair: completed-lap milliseconds measured at server finish gates. */
+  lapTimesMs?: number[];
+  bestLapMs?: number | null;
   dnf: boolean;
+  /** Additive v2 metadata. Older servers omit the reason. */
+  dnfReason?: DnfReason | null;
   rank: number;
 }
 
 export interface RoomSnapshot extends Compatibility, TrackSelection {
   code: string;
   hostId: string;
+  /** Additive v2 capability; absent on older servers. Commands bind this lobby generation. */
+  hostManagement?: { lobbyRevision: number };
+  /** Optional additive capabilities. Older servers omit these controls. */
+  capabilities?: { lobbyOptions: true; championship: true; roomRules?: true };
+  roomRules?: MultiplayerRoomRules;
+  series?: MultiplayerSeries | null;
   phase: RoomPhase;
   matchId: string | null;
   startAt: number | null;
+  /** Server deadline, including the existing leader-finish grace period. */
+  deadlineAt?: number | null;
+  deadlineReason?: DeadlineReason | null;
   laps: MultiplayerLaps;
   serverTime: number;
   trackLength: number;
@@ -58,11 +77,18 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
 }
 
 type Request = { requestId?: string };
+type ClientCapabilities = { clientCapabilities?: { roomRules: true } };
 export type ClientMessage =
-  | ({ type: 'create'; name: string; laps: MultiplayerLaps; trackId?: string } & Compatibility & Request)
-  | ({ type: 'join'; code: string; name: string } & Compatibility & Request)
-  | ({ type: 'resume'; code: string; playerId: string; token: string } & Compatibility & Request)
+  | ({ type: 'create'; name: string; laps: MultiplayerLaps; trackId?: string } & Compatibility & Request & ClientCapabilities)
+  | ({ type: 'join'; code: string; name: string } & Compatibility & Request & ClientCapabilities)
+  | ({ type: 'resume'; code: string; playerId: string; token: string } & Compatibility & Request & ClientCapabilities)
+  | { type: 'set-room-rules'; roomRules: MultiplayerRoomRules; roomCode: string; expectedLobbyRevision: number }
   | { type: 'select-track'; trackId: string; expectedRevision: number }
+  | { type: 'kick-player' | 'transfer-host'; targetPlayerId: string; roomCode: string; expectedLobbyRevision: number }
+  | { type: 'set-laps'; laps: MultiplayerLaps; roomCode: string; expectedLobbyRevision: number }
+  | { type: 'configure-series'; trackIds: string[]; roomCode: string; expectedLobbyRevision: number }
+  | { type: 'end-series'; roomCode: string; expectedLobbyRevision: number }
+  | { type: 'next-series'; roomCode: string; matchId: string; expectedSeriesRevision: number }
   | ({ type: 'track-loaded' } & TrackSelection)
   | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string }
   | { type: 'start'; trackRevision: number }
@@ -76,4 +102,4 @@ export type ServerMessage =
   | { type: 'room' | 'snapshot'; room: RoomSnapshot }
   | ({ type: 'error'; code: string; message: string } & Request)
   | { type: 'pong'; sentAt: number; serverTime: number }
-  | { type: 'left' };
+  | { type: 'left'; reason?: 'kicked'; roomCode?: string; message?: string };

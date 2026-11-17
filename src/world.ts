@@ -150,11 +150,40 @@ function ribbon(t: Track, o: RibbonOpt): THREE.BufferGeometry {
   return g;
 }
 
+/** 共用原網格；胎況改變時只更新既有 color buffer，不重新生成 geometry。 */
+function makeAssistLine(t: Track) {
+  const red = new THREE.Color('#ff2a2a'), yellow = new THREE.Color('#ffd23a'), green = new THREE.Color('#2aff7a');
+  const color = (targets: ArrayLike<number>, i: number) => {
+    const at = Number.isFinite(targets[i]) && targets[i] >= 0 ? targets[i] : t.vTarget[i];
+    const j = (i + 2) % t.N, ahead = Number.isFinite(targets[j]) && targets[j] >= 0 ? targets[j] : t.vTarget[j];
+    if (ahead < at - 0.15) return red;
+    if (at < VMAX * 0.93) return yellow;
+    return green;
+  };
+  const mesh = new THREE.Mesh(
+    ribbon(t, { a: -0.45, b: 0.45, ya: 0.04, yb: 0.04, along: 10, color: (i) => color(t.vTarget, i) }),
+    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 }),
+  );
+  const update = (targets: ArrayLike<number>) => {
+    const colors = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+    const values = targets.length === t.N ? targets : t.vTarget;
+    for (let i = 0; i < t.N; i++) {
+      const a = color(values, i), b = color(values, (i + 1) % t.N), offset = i * 6;
+      // ribbon 的兩個三角形：i,i,j / i,j,j。
+      for (let v = 0; v < 6; v++) { const c = v === 2 || v >= 4 ? b : a; colors.setXYZ(offset + v, c.r, c.g, c.b); }
+    }
+    colors.needsUpdate = true;
+  };
+  return { mesh, update };
+}
+
 export interface World {
   sky: THREE.Mesh;
   /** 遠山：跟著天空水平移動，但山腳固定在地面高度（每格由 main 設 y = -鏡頭高度） */
   mountains: THREE.Group;
   assist: THREE.Mesh;
+  /** 只重上色既有輔助線；呼叫者負責因子快取與更新頻率。 */
+  updateAssist: (targets: ArrayLike<number>) => void;
   race: THREE.Group;
   ground: THREE.Mesh;
   sun: THREE.DirectionalLight;
@@ -390,19 +419,7 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
   }
 
   // ---- 行車輔助線：綠 = 可以全油門，黃 = 彎中，紅 = 該煞車
-  const red = new THREE.Color('#ff2a2a'), yellow = new THREE.Color('#ffd23a'), green = new THREE.Color('#2aff7a');
-  const assist = new THREE.Mesh(
-    ribbon(t, {
-      a: -0.45, b: 0.45, ya: 0.04, yb: 0.04, along: 10,
-      color: (i) => {
-        const ahead = t.vTarget[(i + 2) % t.N];
-        if (ahead < t.vTarget[i] - 0.15) return red;
-        if (t.vTarget[i] < VMAX * 0.93) return yellow;
-        return green;
-      },
-    }),
-    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -80 }),
-  );
+  const { mesh: assist, update: updateAssist } = makeAssistLine(t);
   race.add(assist);
 
   // ---- 起跑線（棋盤格）
@@ -544,5 +561,5 @@ export function buildWorld(scene: THREE.Scene, t: Track, adsIn?: string[], title
     });
   };
   const setStartLights = (n: number) => startLights.forEach((m, k) => m.color.set(k < n ? '#ff1a12' : '#2a0606'));
-  return { sky, mountains, assist, race, ground, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains, lamps: lampMeshes, setStartLights };
+  return { sky, mountains, assist, updateAssist, race, ground, sun, sunDir, hemi, sunDisc, clouds, setSky, setMountains, lamps: lampMeshes, setStartLights };
 }
