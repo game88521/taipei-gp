@@ -586,6 +586,8 @@ export class MultiplayerClient {
         const times = player.lapTimesMs;
         const validLaps=practice&&object(player.voyager)?player.voyager.validLaps:summitQual&&object(player.summit)?player.summit.validLaps:null;
         const bestTimes=summitQual||practice?validLaps:times;
+        // Each authoritative lap and the total are independently rounded to 0.001 ms.
+        const lapTotalTolerance = Math.max(0.003, (player.completedLaps + 1) * 0.0005) + 1e-7;
         if (!Array.isArray(times) || !Array.isArray(bestTimes) || typeof room.laps !== 'number' || !Number.isInteger(player.completedLaps) || player.completedLaps < 0 || player.completedLaps > (timeTrial || elimination || summitTimed || practice ? 128 : room.laps)
           || times.length !== player.completedLaps || times.length > (timeTrial || elimination || summitTimed || practice ? 128 : 5) || [...times].some(ms => !finite(ms) || ms <= 0 || ms > 86_400_000)
           || ((room.phase === 'lobby' || room.phase === 'countdown') && times.length > 0)
@@ -594,7 +596,7 @@ export class MultiplayerClient {
           || (!timeTrial && !elimination && !summitTimed && !practice && player.completedLaps === room.laps && player.finishMs === null)
           || (player.finishMs !== null && (timeTrial||summitQual||practice ? !bestTimes.length || player.finishMs !== player.bestLapMs
             : (!summitEndurance&&player.completedLaps !== Number(room.laps)) || summitEndurance&&(player.finishMs<Number(summit!.durationSeconds)*1000||player.finishMs>Number(summit!.durationSeconds)*1000+120000) || player.finishMs <= 0 || player.finishMs > 86_400_000
-            || Math.abs(times.reduce<number>((sum, ms) => sum + ms, 0) - (object(evo) && evo.mode === 'pursuit' ? Number(player.netFinishMs) : player.finishMs)) > 0.003))) throw new Error('逐圈成績格式不正確，請重新連線。');
+            || Math.abs(times.reduce<number>((sum, ms) => sum + ms, 0) - (object(evo) && evo.mode === 'pursuit' ? Number(player.netFinishMs) : player.finishMs)) > lapTotalTolerance))) throw new Error('逐圈成績格式不正確，請重新連線。');
       }
       if (object(evo) && evo.mode === 'pursuit' && (player.finishMs !== null
         ? !finite(player.netFinishMs) || player.netFinishMs <= 0 || Math.abs(player.finishMs - player.netFinishMs - Number((evo.releaseDelays as Record<string, unknown>)[player.id] ?? 0) * 1000) > 0.003

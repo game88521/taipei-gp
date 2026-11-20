@@ -1,0 +1,2148 @@
+{
+  "schema": 1,
+  "status": "PASS",
+  "completedAt": "2026-11-20T07:28:30.139Z",
+  "baseline": "9f39d05a0cc9c658911f6bbcccdff438b6548bc9",
+  "branch": "fix/version-audit-20261120",
+  "build": "ca2f03b4217a",
+  "localOnly": true,
+  "deliveryState": {
+    "originalProjectModified": false,
+    "committed": false,
+    "pushed": false,
+    "deployed": false,
+    "statement": "These fixes exist only in the audit worktree; production does not contain them."
+  },
+  "summary": {
+    "NodePASS": 72,
+    "BrowserPASS": 34,
+    "FixedBaselinePASS": 3,
+    "totalPASS": 109,
+    "FAIL": 0
+  },
+  "buildEvidence": {
+    "command": "npm run build",
+    "exitCodeObserved": 0,
+    "path": "../version-audit-build-final.log",
+    "encoding": "utf16le",
+    "sha256": "978adc50af91d71c5f159c4b6cabad885109260551efc93ec05fdb6c307855c5",
+    "swSha256": "027dee8c07242723af28533e3847d62e003a95f16001ed61e2357d658d7ef49d"
+  },
+  "fixedBaselines": {
+    "status": "PASS",
+    "command": "GP_CDP_PORT=9334 GP_TEST_ORIGIN=http://127.0.0.1:4317 bash chain-stab.sh",
+    "path": "tools/dev-tests/chain-stab-out.txt",
+    "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a",
+    "raw": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n"
+  },
+  "diffCheck": "PASS",
+  "preservedOriginalHandoffBytes": 77368,
+  "deliveryFiles": [
+    {
+      "path": "src/multiplayer-client.ts",
+      "bytes": 54232,
+      "sha256": "8cb53c409a264d33dc148dd33dd99a03b83a4c0f1e30baddca9cd80e9b5ebcab"
+    },
+    {
+      "path": "src/odyssey-city-road.ts",
+      "bytes": 1756,
+      "sha256": "639b163eadd5aa7e8f8e17ac538812e0c0618325113cde7bb0691c5b9933e609"
+    },
+    {
+      "path": "src/summit-city-ui.ts",
+      "bytes": 24062,
+      "sha256": "56a716fadc8d9be900b281ab4e46a7b85d4af42adc6b2f414a7456f0cd475d3e"
+    },
+    {
+      "path": "src/summit-replay-bookmarks.ts",
+      "bytes": 2729,
+      "sha256": "119bf70b09c14c97f20ba967a1f684c9b9500746702b65bc0b54121ec723f340"
+    },
+    {
+      "path": "src/summit-splitscreen.ts",
+      "bytes": 13752,
+      "sha256": "7673ad1721b6da55e6defec480421aaf76766c637dbb5d535215c39501017d5f"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-timing-regression.mjs",
+      "bytes": 6590,
+      "sha256": "e634ec43b88c6e7c65b29acb33ab96e9c7a3619a02075791ab540d931e444bee"
+    },
+    {
+      "path": "tools/dev-tests/replay-bookmark-recovery-models.mjs",
+      "bytes": 3865,
+      "sha256": "1922d8fa696c61bd03774e85395e0656a1e8c9290d083fbe0375c8f55f8734ef"
+    },
+    {
+      "path": "tools/dev-tests/version-audit-city-traffic.mjs",
+      "bytes": 6064,
+      "sha256": "0553d88252c2a366393f28a60bfe7fbbb057b65434d63dbf607a8a4ccaaaad63"
+    },
+    {
+      "path": "tools/dev-tests/version-audit-split-history.mjs",
+      "bytes": 4762,
+      "sha256": "d97ac9d8c2e87318b7f4b05ebc0095018b32005402d08f0bde26a8e45893333c"
+    },
+    {
+      "path": "HANDOFF.md",
+      "bytes": 78785,
+      "sha256": "a5977d5e7f5bfc9219a9ecc218a0f4ccb32c65ef265f72f87f85156b4cd038c0"
+    },
+    {
+      "path": "VERSION_AUDIT_FIXES.md",
+      "bytes": 4914,
+      "sha256": "9c75a9f7529c6773baaeed9d5c16c71ad7d7b905380c6973d12200bbe6a4bd64"
+    }
+  ],
+  "validationFileExcludedFromOwnHash": true,
+  "sourceHashes": {
+    "api/leaderboard.js": "b41f08ffb64f6ea470af24127754c6e6243b3aaf381c7fb84055fba6601c2d7a",
+    "index.html": "eb6eb731e5dbe2fc3cf8c0d9c198f268be598c694fe34c4dc8b9486b1f7d30aa",
+    "multiplayer.html": "0f2deeb03acbd02ac3c3c76cce88455c81c4466f8b19d1c276dbf66bc69f88c5",
+    "package-lock.json": "91bf530b94633b7da3347839f436e131901ace78eb3a47c2ba3bd295fd8371fa",
+    "package.json": "a39d27ebcc4e92f3ccc6c021345bbc673d44f262291e9c52669b2c0c7486bfe2",
+    "server/Dockerfile": "dd006331a6529311da1dc24fd3f2a7877f707efcacb2e67d4121a46cdd0cecd1",
+    "server/Dockerfile.dockerignore": "9564556f5324f7ff42566a789ae85aaf31d82a2ab42171f543da58228825d6c7",
+    "server/README.md": "145f48f94236922c85762a96ca36ce1cf4ce8abc79540780f2c4671abbdec475",
+    "server/atlas-racing-service.mjs": "d6ad10b16ed44f79cd9f1e57ec392adafd1be63e90c33faa043e782a89c25ffe",
+    "server/atlas-runtime.mjs": "dac27c56792b8871a6521e9f02ff069a9cba06061058212f7c37d2b1731bad8d",
+    "server/horizon-service.mjs": "2b3e9be430d678d58cfb435ad948c4bea4dcbc0a4b91cb6a3cbb34c76a782983",
+    "server/index.mjs": "b0d0e271a7ac44845e46e8a0d9eceb670b1b9c3e87bc3f15b63fd27ca98d5636",
+    "server/nexus-arena-service.mjs": "4c06b23a1f48823b2c2e2ed13cd3ce01358a98d7740f7690e179c52c34fc8b2d",
+    "server/nexus-coop-service.mjs": "bb2461ac34091f53f98cdba1b64d03fcca0993b362da4500771157c33974a0a9",
+    "server/nexus-replay-service.mjs": "7b8f419ffe77c105ea11740054ab1ac09fc3ec6f907b05d259b7c4addd7fb930",
+    "server/odyssey-diagnostics.mjs": "202f3382738f1f9b83b018c2ad91609957ac331958211213586a7b5b49ccf647",
+    "server/odyssey-racing-service.mjs": "aeffbfbea52d86bf5b783042541039c45f9e022d8d21000b2f065569216e983b",
+    "server/package-lock.json": "ee9da6fe8f75b858973710abcab4833e8f1b2f3507596c634a8b118dd5d317f9",
+    "server/package.json": "69978617dab09520a883d911497aed198bea367ef4b743a7025ccf9852045544",
+    "server/physics-entry.ts": "dac6378595e21d623d0a075a649adfae242760e5648d99b97f0a8c6374f6ad84",
+    "server/physics.mjs": "83e8719214c953924093ccc989c398320290b9db50f319ac459ccc3bef45ffbc",
+    "server/room-service.mjs": "ba8448930cac993b943538a177502dc76899c50f6a5cd444ca3be298cf3b2f5b",
+    "server/series-checkpoint.mjs": "7cd25f49513f7a3133a0ed335d745e43512392626bf8665106e67e79ddf7b558",
+    "server/summit-city-physics-entry.ts": "9009027ef0af9257190ded94b581498ba31be3ec1592331857fa2d23d4b6ccc4",
+    "server/summit-city-physics.mjs": "9d857f732b80727d47f185a44e5c72fe933defb59074507450f9e8be75046e52",
+    "server/summit-city-race-service.mjs": "9a913fbea137302b6c79c0ee2ed192955aee5097f6fa86fb9d61625f0c255e5e",
+    "server/summit-city-specs.d.ts": "982d687daa93895fe8ccb2e9e8925677a339b531c8acaf86477ee30a54dcb7dc",
+    "server/summit-events-service.mjs": "dbce6433fb4596d9d65bde4d41e3c179cd82a510526efec69bd44f76b9ffc5ef",
+    "server/summit-racing-service.mjs": "8977e8f77dbb33a43cc0242da2392fc01dcb4b650c748268838d1aeae0949913",
+    "server/voyager-racing-service.mjs": "a9d6c1597150f0b978a55b96b7afde32b66a78ff71ff40bad86e9e264e0f03e5",
+    "shared/atlas-city-contact.ts": "a5edc18fa556fc51b000029b6d36914f2c4fecfdabe7525578290695bbbefb60",
+    "shared/atlas-racing.ts": "33519e9cf95622bfedb5f42795088da7ac8cd914f688d6dd0470dcbeebf443c2",
+    "shared/circuit-catalog.ts": "1b87913760f8a2b4c746f6180f63f75cec5f2f70e267d460b2fb15f93974215e",
+    "shared/lap-proof.js": "eab0fe24d3109b1ce66d8a76de1acb3a628569d1aee16e3c18bb8586257dced5",
+    "shared/multiplayer-arena.ts": "81921169da1b3f26d79539e8eb3328296133adf67a82e6630d800a181524e743",
+    "shared/multiplayer-catalog.json": "3ca9e19901fd22ac0c50e7b6dc30c9f39e63a08a61fd6cfe9d51210f4adf4801",
+    "shared/multiplayer-collisions.ts": "727a55ea3850ebeac9d5a95b1d59ee2100813217b5c2926ad80ed8862e155479",
+    "shared/multiplayer-evolution.ts": "e0dfdf860728d82b5d6c9e4db6c64489f6ed2a9894add915812ed58aef437f4c",
+    "shared/multiplayer-horizon.ts": "f145b71b10d1d1be040e0201459726eb4c7de96c6d344a5a19af5979c775aa0d",
+    "shared/multiplayer-protocol.md": "5db6c6dd9afc9a72ffb5e62756f54e67a4f076a830498e29f6f3af50512f450b",
+    "shared/multiplayer-protocol.ts": "a25a2de41c24b191983eb738c6b21ad8309dc4372deedb775f2c6f100c13f556",
+    "shared/multiplayer-room-rules.ts": "028f52a4fcb3e69d7f88461f089e10a4d12ff4a1b487bce7ff3319bbcb451dc7",
+    "shared/multiplayer-series.ts": "1ee127f971d0dbf37a2316a52d93f85634eb07e2f8b9df0d1535e5e87c2de794",
+    "shared/multiplayer-track-fingerprint.ts": "25c95743417becd4e907db6dd6a2d5630f5870722089a8c75ca9ce6d83023cb5",
+    "shared/multiplayer-track-recipe.ts": "39c4dadb91f2b84b652e32b198194b0d7daeeb066f8e13eacabb193b0958e3c6",
+    "shared/multiplayer-tracks.ts": "8f915e8ea1b4abd7ef370d46d2c43a66564257c88308dc42d2b9fb40b5feefc9",
+    "shared/nexus-coop-city.json": "fd98bdc8cbdd21c116e170ccb06ac130633b384c5f56be7d4e96e6a0de9254ec",
+    "shared/nexus-coop.ts": "476c8437fe939302a12c1b5a592d33e78b9d8782bcb68953c3947ebb30907f4e",
+    "shared/nexus-replay.ts": "f0d0c953165235d9856ed2560e682f9dfdff4836c803a957b4ec961ae4073bb2",
+    "shared/odyssey-coop.ts": "e1b001cdaa7e467a04d1ee97ca8318d4f368c42ad96549001d61293927f40852",
+    "shared/odyssey-racing.ts": "c8116f9a40a0b67119bef3a83753c2c3c262ea45172439e92c0847c6f7d867d5",
+    "shared/summit-city-race.ts": "c3aa721954a82688815a91685f6d806f4cf134675bde7d0497df197cb8df0a78",
+    "shared/summit-racing.ts": "9c3662557c19d791d4b6e001107dab28ccb6c831c6c6ac4b6e023a96e9a3d5f0",
+    "shared/taipei-track.json": "7c352a1cb7b71872e393bc34d9155fca00d2ff88a7a686d1e2aad32c241be94f",
+    "shared/voyager-racing.ts": "fd017e13274973fdcd7c732802a7d768fb83646ff38cd3006f944fc4d92dad70",
+    "splitscreen.html": "9ed9525a80dc52e57700dbeabfe8b1e1a3d11eb32e21a5fc3e430bf175aefa0c",
+    "src/achievements.ts": "2df72a9b905caa28145842a11a0db24de2d47e9d50d44d95a6548edb6cb3c13b",
+    "src/atlas-backup-ui.ts": "d182d769d58fcba622ea1bfe8a73150425cc419536af9445ea9219de9667df53",
+    "src/atlas-backup-validators.ts": "963abbb397125f2746453f4b182bd309f1fd52f3f4928d88470ec9baa9ff8548",
+    "src/atlas-backup.ts": "76b2c5af834bbe1344acccaac67f142f1360390ee61908624a3d026d7b5480ce",
+    "src/atlas-coop-history.ts": "9223d316bf8b10167da78e7b6fefa08be9fa21fdd0eccaef79fb83f275500581",
+    "src/atlas-coop-prediction.ts": "7630bc7e0352a66d8532649fe460e3ee108bb2da9eb7b560f1f3adc20b865e7a",
+    "src/atlas-modes.ts": "8cdbeb60758dd7ee6852fa1ff941c929a2ce493773c3022c4855ccf1d66ad509",
+    "src/atlas-platform.css": "99344882b2b1133bbdb690d137d37aa0f2ce4972fd4af2edb5ea3786a96287ec",
+    "src/atlas-platform.ts": "50636e0f707fd578abacb33e987375a771febd1cb3911373198903e688ea0c13",
+    "src/atlas-profile-db.ts": "1a363fb78f1b48e3c878e120f05233a938ee48ddc311596345be93a2ff311b34",
+    "src/atlas-racing-ui.ts": "d8ca84ceacdfbf2a3ec07265255f592aa6c650a5bb26fcd26f1a66aa7f664063",
+    "src/atlas-storage-lease.ts": "380118c679c83dd01785040787a058b54e9ccfb06f4dab1c5cad11283cf941f7",
+    "src/audio.ts": "23c3968548eddd2abeae619dec8a42382b7944030d908c06b50d35549267ada5",
+    "src/bigmap.ts": "91e4c3c887031b55e3f1013cb4e8fd23d8248d887f5c8b7d90df3c87343efa47",
+    "src/boot.ts": "03877838d3da0f8770aaeab8bf1b39342a76c74941c273cc787cdb19b8f028bf",
+    "src/bounded-recording.ts": "c99337949f127a524b39dbbf4de7f56204720ec31e07f3e55ed64e295ddf762f",
+    "src/braking-assist.ts": "bdf5b3f17fecac58db969008da221f58bce7168ece784ae32c1342179ee0800f",
+    "src/breakables.ts": "24f1866d28dbb8b1f365ed7d6eeb01bef8209d0d5ddffb48d2a84f978db67fd5",
+    "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+    "src/carModel.ts": "cdbdb639f1e98642091a801a239d26d062b147f88e387f42afa7f1535cb8d253",
+    "src/circuitenv.ts": "c3d579aee5dbcf2dd0afcd793f9c7204e2235dd1901699f70f4a8b51c1de20eb",
+    "src/circuits.ts": "ceb6abdcd6e8de5d779395ff2020f7e43d1a3a039e33755e4a7b2f47a1299bfd",
+    "src/city-entry-intent.ts": "bb46b2fe37e3f0db4f0606a336a6f1d5aacb4bd065d14272ae89e843b4be0355",
+    "src/city-guidance.ts": "800c6244616c1ac9a53d4c1195dcb71f9727e82a9ad42fe57fc0bc035e871516",
+    "src/city-jobs-state.ts": "dc4fe35ee3e891bac8a37fe6ef2a7f18f75272c45c4bc22997de08ed947b2b9f",
+    "src/city-jobs-ui.ts": "721c5358e341d08894324f3141bb819298a5e60c6f0777de44c731c258fb5162",
+    "src/city.ts": "8ddcbb40cc04fa02aecf05061dcfc59f091229ad082b070c1dc86194e218f1a9",
+    "src/citydata.ts": "711a9faf67038e6f6680d10b858f58eb7982bf38b7e0eb12661a508ebb90fa42",
+    "src/cockpit.ts": "736d8b3c501fd643d0311fc95b194bbb4db894ecfc9b2040b82510422afe58e9",
+    "src/controls-ui.ts": "f009164d0cdf05864834ca421286fe8c0582e03e2d27e9324eadfeeab325f3f3",
+    "src/controls.css": "266d2721c880b2c12ef1c22084719971af4ae510ad3c0174defd30144db8d3bc",
+    "src/damage.ts": "02db413ae7f86e00d67b05628468a237edc43038ec13a328b8f07caddf9cfb85",
+    "src/data/track.json": "0b05d7ff3338a9e02abfd8b2ab9e34f1bdf939b1058a0a49d9f10dd077ea2297",
+    "src/decor.ts": "89613d0ae0914ec39a20ea5ddecc9b2efb2aef36373a41329908a18567ff1867",
+    "src/drift.ts": "9db782508e3c60256ddd57ba253e8fdf84994b10914353457e1fc894715de9f9",
+    "src/economy.ts": "47186c8773635c1c070179c18b22f259eb46f32afc1b401cb4567f6bd059d44b",
+    "src/elevated.ts": "f7c442d4acbe42639143333ff7442fd66443f2a34a5d2fb717ae5bba040013ca",
+    "src/enginevoice.ts": "cc23a42d32fc71888fab9d13b262bc7024e8c82c6f950c8be575b5aad0ad9c6e",
+    "src/evolution-ai.ts": "3f37c2082c1fc8919c9c15b413bf8f851afc247c57be287c4b6819c4cd1fd0dc",
+    "src/evolution-challenges.ts": "eb0097d44eaef1f5d74a059cabe5a4907a490d5edffca0dbad02746c0ac6a72c",
+    "src/evolution-city-models.ts": "1299afe6b9ceebd4f8c34227dcb455b5aa3be5045c6d1df3f5ec4a622e96257a",
+    "src/evolution-city-ui.ts": "f476943f31fffd97d9249844a6249e5862f247ea5d4952e479fff0d4a56ec01d",
+    "src/evolution-city.css": "9bfb0be44603d8e14a9f47e2ed7340de1a161c4def917f38275ee169c0c9cb73",
+    "src/evolution-ghost-share.ts": "c49c9d2464129c3efe5fe90eeda8353bad42e6d597a8d625092f0025365653d9",
+    "src/evolution-racing-ui.ts": "341326d02f446bae68081301beee2d404a2be88919269dfc4a78962a7db9edbc",
+    "src/f1model.ts": "5607b3269e4886ffab31583f79bae39bf2f5294cf3f3cbec8274108ee805e8d7",
+    "src/filler.ts": "f437b0d935810dde4da750ae6886f6763daf3c9251756e69cbad037ed1f887a7",
+    "src/frame-pacing.ts": "51fa7e9db183ef48eaf21e55fed08cfca28dc7ca1d20458d677ae4ec8912c46d",
+    "src/freecar.ts": "99813a7aec638eb6a7c8c5d3b4bc1cb07ea4730f024cebce15db274280847cfb",
+    "src/garage3d.ts": "dd278459d61469f1beea62a67fd8a16756673a91005d61d4249f6ff527ed003d",
+    "src/graphics.ts": "0fb5de4c66338dd3e4b50c86917733b91718da9e69b1db0e21b8897952df071d",
+    "src/horizon-appearance.ts": "682dfb2036479f184107eee59966a4f00a67e2163227aa9424229df98f5b05fe",
+    "src/horizon-cargo.ts": "1fbe8da364961e636bf7baae753b9d6fd6d37a00f163f6959bc04fad11170b13",
+    "src/horizon-city-models.ts": "5445b52ae389d04369468cfb4c566e13d0e4ff35078724de9311bd8c2956b19f",
+    "src/horizon-city-ui.ts": "df108e8b4c05b360960b41d55cd49874aeb97b471e0a4ce9bd7d6d2fac744a1d",
+    "src/horizon-city.css": "41eeec67babac72121986618078de90ff90217e9dab644bde3609c4fdc787261",
+    "src/horizon-controls.ts": "4188af89fc64b647cfd70643a740c57dccd1a4ba60b73e7bc2b254e92667f18f",
+    "src/horizon-racing-ui.ts": "49c16d73a5d18c6ece565410508e910a5439571d4f0447ace423fd779a2bb411",
+    "src/horizon-racing.css": "d5ba8d706ec8ca53f66a4722103362dda972327d8293d81592ec3759b660b0f8",
+    "src/horizon-racing.ts": "365d91ee72b82a4e27379461ce35b8791705a516ca77d0d9faf09a0fdd5d0344",
+    "src/hud-notices.ts": "c29aa2c488179f6cb82742a5c17c3491a2c8ae92003b4c1c879102b171255968",
+    "src/identity.ts": "a1c7febc4099429234239f5738768ed2e2db0c0a413f2e22ffd14004e8a76f21",
+    "src/input.ts": "e94b4e5e191cb7c4e8b6b89c445a260d13151b87c7183f2ba02e56cc1e800609",
+    "src/install.ts": "9f601c71037e72f1d4f85393a541589df9f8e7473bd421ab56980bd74647a471",
+    "src/landmarks3d.ts": "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+    "src/lap-proof.ts": "f7df86a9e18de1b4bf20bb3c006e5cdccab8bc0f084dd32d424c9ed67f7367a7",
+    "src/leaderboard-ui.ts": "0a90d21d293ae6a7ba520190c5b2d5fb5f2984846b69bf4e648b2dcd1a683559",
+    "src/loading.ts": "bf118918c7104cb339fad8165caf5d85e1b38ce1a352e414a341363839798af2",
+    "src/main.ts": "33a83c657810c0f31cac913abe6efadfd208bc7afa2ef7d877a5f55bdcab4e5a",
+    "src/minimap.ts": "5d006dc4974532312dc2e040431fb39cff238dcee63e36623c4826797e4f437b",
+    "src/mission.ts": "e3c6b8010114996378f6bea20c4bd99e38d0f59e891ad33587a9eb0023a02d58",
+    "src/models.ts": "f5f792c319ef5b2a442cccd6cac2d1a79059f5038d5203a8c903833312856dc7",
+    "src/multiplayer-arena-ui.ts": "c267a0fe05020a5b0abced36e6770fb39c353a702d47af07865c942e4bc00510",
+    "src/multiplayer-arena-visuals.ts": "de1c7ddfc07348691754a44eb2de39419cb00ab25f9214ac97188835e07ea390",
+    "src/multiplayer-arena.css": "0c22965c0c27690c4407ba5a61bbaf14d821cdb641dceebd0ec5fe6c6e5edbb0",
+    "src/multiplayer-awareness.ts": "06ef848033330c583467cb3d881a97325d0f9951ab129bb237fa3b41be1169d9",
+    "src/multiplayer-client.ts": "8cb53c409a264d33dc148dd33dd99a03b83a4c0f1e30baddca9cd80e9b5ebcab",
+    "src/multiplayer-collision-feedback.ts": "68fc5166500c7db8b1b63ea3a4ce32ce1fab790e357ddfaf8d7bc18abe3e800a",
+    "src/multiplayer-entry.ts": "7cf3b4c39a379893f09b25e37a207386d9496b8c829c930b533ddb3a3aec735d",
+    "src/multiplayer-evolution-ui.ts": "3d4dfdd346d8e1dd33c0f24254ca14c3a38a2c1e13be86b6e5fd7cf614de580e",
+    "src/multiplayer-game.ts": "1ac0e11d3dd59c3fe57d6334ff2088e96ee4fbd08938f5fc0dd384f21f9c9a7f",
+    "src/multiplayer-history-ui.ts": "478e41b0b0cdeaf4335ededde25928b95d48e4314db621099ec0b15bc0a032f2",
+    "src/multiplayer-history.ts": "67626c22d8229e7b9677744bdda63ca9b031a22d4442c63b7408dab9b8715f54",
+    "src/multiplayer-horizon-ui.ts": "5b8c998a9d735c048dd1e80eb4af205dd879e2ea4077d5289371e28ed7c1454e",
+    "src/multiplayer-horizon.css": "3de3df9bf710f8cfd55e10f2af058a464f5c0bb6aa3a1ef0b14bef01cfb4ce62",
+    "src/multiplayer-invite.ts": "094ec3008c1df99a5e9c64e1a7708746d4874eba7463d79872da9bb104fa2a63",
+    "src/multiplayer-network.ts": "6da877f370bb131c315edf21f6b7e0853afab386dc99ce177e3d92ece349b538",
+    "src/multiplayer-presets.ts": "3b9e4b87d145c728912ad4179b8651731e66bc55d727d92e713af6d1df0043e4",
+    "src/multiplayer-quality.ts": "09f934b227983f98f26d07d1e0fdc57cd114cdae299681eed8c1d92c61d5b8ad",
+    "src/multiplayer-scene-resources.ts": "30c7b2a21099445c2f53c1cb5a21be824b2175123b906d10dad3adcca4fd7234",
+    "src/multiplayer-scene.ts": "ee659903ec256fa88fa2db0b3d303e079dc842de63dcb22840ce894dc44a6490",
+    "src/multiplayer-series-ui.ts": "bff4bba55afd10b4a2cb1b1fa67268a4b71acac613ccfda59ac1afefe9bcd1da",
+    "src/multiplayer-spectator.ts": "1b9259300f5bcc7661882615d96ef77b9e12495fc132f0a7963993390588fb1c",
+    "src/multiplayer-track-loader.ts": "6416be138f0d3a562d7725c9d687e0a8003d6c0a465772dd977fbf75e94b986d",
+    "src/multiplayer-ui.ts": "897fd5a59d508141555242ec4c82f939de04fcc483feba19329d4a900bf59ca2",
+    "src/multiplayer.css": "225d9c9ee996e8d8b0cda6877ca8ea2f6aae3dd327695dadf53cae3ba43b6f7c",
+    "src/network.ts": "11714727330fb4f6447ac7e677b98c9fe668b83d9f7565499f89ef4e21386fb2",
+    "src/nexus-coop-client.ts": "35c48dbea19ee1c9fd345eb60c9c0566055e90c1c3460c9c2e10fec22b09ad3d",
+    "src/nexus-coop-ui.ts": "aba7afffd3f10e0c0fb98672203e611a58fe9272ee519609de477c5a449487ca",
+    "src/nexus-coop.css": "76cbe6baa7c0b6959c8caf01e0562f604a8786a7bdf991a6a639f7c496927494",
+    "src/nexus-replay-library.ts": "3bc8b7ed6c68cbfee9e3ac987be4c17db13a43bce8e0fee22bd94fdc8db4693b",
+    "src/nexus-replay-ui.ts": "f62d7252b8029e1a80ceba1a6b307ebee73ea9ee01b4fa3fed371575154dc43e",
+    "src/nexus-replay.css": "8c9c003562ed10df13db189415112c40ba35f5c30d6322fbdced403e252ba987",
+    "src/nexus-workshop-ui.ts": "fce8dd5cb1267aeadb834cf4673d626d7075d5088de524bfb22018e35aa440c9",
+    "src/nexus-workshop.css": "eb59ed768cdba41d6663083e2e2b90cce357613dcf61fe1551549988af2be650",
+    "src/nexus-workshop.ts": "977a7ef986dd2f3f970ade65f2f1a02d097258819d18afd9a0e0f96203775e4c",
+    "src/odyssey-city-models.ts": "76343f25a01d60ba7240b2f525964561843222e9d54b8f33b7cb0144492049e3",
+    "src/odyssey-city-road.ts": "639b163eadd5aa7e8f8e17ac538812e0c0618325113cde7bb0691c5b9933e609",
+    "src/odyssey-city-ui.ts": "bc04d2ea27ef6dfd71eb6f9088382704707afb28b58ec4dd9290bd45ebd1ad09",
+    "src/odyssey-city.css": "fb7a26c95594a6756743eec0e05a25a4ec416d1b74355072ee8d1d619c7db728",
+    "src/odyssey-coop-quick.ts": "602bcb1d34b115aabdbb16b9c68a06b53b56636360befe34d95ef58dbb1f8d0c",
+    "src/odyssey-diagnostics.ts": "7f93b9a96f07ff9a027a22ca1af0c28f7e0b8039d3b275d9e1058c5be1c97a10",
+    "src/odyssey-gamepad.ts": "4fa6b16ebaf5b9f0411c4529257074d6bd7de2906b3dd0f2e70210494fb24d43",
+    "src/odyssey-network.css": "46b5119af4d04a5051895e50defb912987d22ae015b47e3d17e22cc23525ab9f",
+    "src/odyssey-pad-settings.ts": "25cb251f53ebc9767f5421cb6b6b8fcc8367a9b694e2fe6bf4b1aeb7ade036db",
+    "src/odyssey-racing-ui.ts": "04212eea3a32d8099d6731363b066eddaeefee00b169798f05f2e1368ff0a9b6",
+    "src/odyssey-replay-notes-ui.ts": "cccd5be6989089a5575464f3b2a2828253e5d5bfa862e13fde2f4356b20180d1",
+    "src/odyssey-replay-notes.ts": "d1a3f37642b4c98ca5bd95b0e2e203892fe400a9b5fee29b6362735bb4694fce",
+    "src/odyssey-workshop.css": "561540c47795776a79dfbba2cb2e8fb6347e431f450523084ab4053bdca43515",
+    "src/offline-manager.ts": "57f89321bd7e0ef3a308b0b2980c99ab7ec9c7794aca40f59376f8ba8340a1de",
+    "src/peds.ts": "c914965a5a024af2bd0c8ceed3755325cd75d0eea1952bb8abdcade72d19a080",
+    "src/pedzone.ts": "dd80d1094efe84b6b06beb72350848cc371327231b27fff41da0371ff9632070",
+    "src/physicstest.ts": "bdd84638483c4eb4329e4736ae219dbd829d1d2c622a5b869ef5f22a97d710fb",
+    "src/pit-calibration.ts": "1693919e20902403c73e219c650184197144e6550bb1d8c588dc20444ef81b87",
+    "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+    "src/platform-tools.ts": "caee743939e2348c5255536998fbcfc5c1b2fed802e38ff56cac35fd80eca735",
+    "src/player-progress.ts": "93d43f5c6d8f2e727fe2cb00d2165e69a04a74c92519bbc6fc3c9a3cebfb19c2",
+    "src/podium.ts": "0dbc99dd19c310b0e125a9f81282320377826d82e24d588f80936bc7a5d595cb",
+    "src/police-warning.ts": "13129f46debbf6ae3d7a1ac8119d49461a0ff39a04386e9e72aee60b28807e9b",
+    "src/police.ts": "2fbfa633055400490e59d95dd50b38c3af2629c8bcad02d13a67e2a24e7cf264",
+    "src/practice-entry.ts": "3515291fa64554ff6d1e6441f9a13712b67d71f42d108fa599e06d3f98491377",
+    "src/quality.ts": "dad59f0b33981ec2dcb95345e56cc4cb60109c28ec03fc8d0bf3d98ce030eb4a",
+    "src/race-analysis.ts": "641efe925b881d7c46b375963371e48496548493a90a4f2fa08ba77c196c1de1",
+    "src/race-state.ts": "d336ce00e9bfed4e81ffc7c4c03e5dec7dc177dcbc05d5cb7ea2decb938e4dd8",
+    "src/race-timing.ts": "ed69242243a9b0de843fdfa854030fc0e341e317fff704cb3c6a7ddae5fc2375",
+    "src/racing-laps.ts": "7c306ec3d9e654949205021a54e620ee5e2d1d866f7fc03e03edc8185cd6c116",
+    "src/racing-replay.ts": "7b20b892e4f07eded3f69b3a420bd02e5750c3f49b9b75b2852f7f00674ced9f",
+    "src/racing-tools-ui.ts": "916f67f747fc4572962a1e911f3e22b62e633e261aca6a0f9a320918ea30f8e4",
+    "src/radio.ts": "15159e15a21ed5ece020578f2441ec550a21e4ab25b60f5d152d3428d62d492f",
+    "src/rainfx.ts": "67317e314d5c9302291cb0b6638ca6f8201f356d7b36eb253231436de447b5cc",
+    "src/rivals.ts": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+    "src/riverside.ts": "d06a7281d1eac06566bb6d274f5f35fa36a1b0ea4c882708a4ae84aa69380d4d",
+    "src/route-preview.ts": "501673dd7824ddd8d7c333d2796df37a4a96afb7e04b7184f87b14f8ad60cc26",
+    "src/router.ts": "63c0a3db693e40ae3a188339bd54f615d66d67b743e68a890bb0df5d0f0b8e8e",
+    "src/save-recovery-ui.ts": "2e575f1d663e3a60ee9d1bec95cbdf2eb09758594a494bba72d718646a138419",
+    "src/save-writer-ui.ts": "fd52ada06c0ba813a08b52fd22ca8e8ee44a650517093026d60f6e60864c83e3",
+    "src/save.ts": "d1c577d0c01bcff8d75566f48e2164a4dcf2b58b8bb43ada87500b7f6e5eb5db",
+    "src/season-editor.ts": "0221e5af0de9cff82b727b969625a826aad1dc7c89c66339ebff511934a839cc",
+    "src/season.ts": "035258dd3b0760d8aed00aeabba6b90dfb1f1fffcc205033bf62dfb98c89e585",
+    "src/strategy.ts": "42a7ffd3a154219456669b682e5e04f81e4188022a6b57ab92747777e6e8a224",
+    "src/street-performance.ts": "53c38da7cdbde3a686e017b12c8f1d0aa0463d8915e0006be889c6c4d787484a",
+    "src/street-series.ts": "4e9632915dabfbc26491fe3cd44f4134ded585be12fd162cbd678d0b2efc68f6",
+    "src/street-taxi-state.ts": "496159adf001c173117db8ea47c8534aca1fcbd5b012af549943b001f263d265",
+    "src/streetrace.ts": "32902becc4ed0a9b56f3afa9bd113798eaafbf70ac29f22af06a6dc15294e9c4",
+    "src/style.css": "97b3c14819119e2dee39381ca171f5d2a9783aa7b299db0982b21c81e6f7ecd6",
+    "src/summit-city-duty.ts": "623a3913e6f3f2819f417a7f9ff1c7e0cc362df2706d0740423ae4e09042cb87",
+    "src/summit-city-race-client.ts": "8720be2b5c4294b39c3146633d1016c97cb70e0121ed0b1dbb91b8826d164add",
+    "src/summit-city-race-ui.ts": "eb0764f145315b4aa3618d222ea9b05ab2d55a31f40c78b43284b8ccd0b645ba",
+    "src/summit-city-race.css": "55038259b228171b0678c297cc1913ee873a2151746ede848c7d7b3dfabbf629",
+    "src/summit-city-ui.ts": "56a716fadc8d9be900b281ab4e46a7b85d4af42adc6b2f414a7456f0cd475d3e",
+    "src/summit-city.css": "73bd427b5403f38a18f72f8c755b4a089f65a00a1f1edd1ffa85f35bc653c536",
+    "src/summit-coop-dispatch.ts": "42149902dc200914819d2604a94c64f721331a886224ee85b2e2263bf07d9092",
+    "src/summit-duty-vehicle.ts": "d9916b975237353501a4df3e39aac344adacb4954782b6c3e2abec80972a3608",
+    "src/summit-lazy-city.ts": "206ede00392a5d0fb2355341f05b5a40ea9cc9f807f3f211e6db1ce8ae194523",
+    "src/summit-lazy-replay.ts": "efd0a968af02cc8c55237f68b3f7ed88a66bd897f7e0c230f945267a1f0c1aa8",
+    "src/summit-lazy.ts": "de52c3ecd4016fe90b9a2c2f72e56e3942cc48581ec6acac347403f442639338",
+    "src/summit-navigation-ui.ts": "8805e048a753b38a33c7b0ab9751645ed48a4ca71aba2f90a5f54a10bea80b62",
+    "src/summit-navigation.ts": "b0cf32ce13d4f770b812185ad6f73b38bbb1b74f724170428942d17c885fd74d",
+    "src/summit-racing-ui.ts": "e871bccc7d1812260b1bf10ade29571cf352a6bc0af6c962dd253fb0a004731e",
+    "src/summit-racing-visuals.ts": "92885667bf3c536400f068610d3a699fed5d60c2022bc059bd74b19434f6b13b",
+    "src/summit-racing.css": "1dbfb2f7d58d3c238dc524047374ac07a2dd9dcd0e64069454fad2e0e96f44fc",
+    "src/summit-replay-bookmarks.ts": "119bf70b09c14c97f20ba967a1f684c9b9500746702b65bc0b54121ec723f340",
+    "src/summit-split-input.ts": "daa72ff35375c3d05812a7935b45ee49404368e57030f25c7cc6aac1428928e6",
+    "src/summit-split-race.ts": "0c50a2c492423aa7d2160ea911c626c35773b22ce9bcbe273962e162dafa8278",
+    "src/summit-splitscreen.css": "5993f1afd7eb79dc036d2b28fc63ada09f377f797b349d5a1557beffd5ecf907",
+    "src/summit-splitscreen.ts": "7673ad1721b6da55e6defec480421aaf76766c637dbb5d535215c39501017d5f",
+    "src/surface.ts": "1b98bba6eb7fdcb1e2d2a5fdd0e62de8b533b219214f3b5e543dcff95c96a3bb",
+    "src/sw-template.js": "8ed02bbaa6980fc897b6db39c8a886bd9897ab3d5cdd3703561912b8a4fd64ad",
+    "src/taxi.ts": "bfb4bfdf4e2045ae8674b8bfaa3b629fed1f8fb4f5243c37680cfaf308bc0f4e",
+    "src/tilegen.ts": "8ec4523b7d17e3865c5a621de22b7839e9c3638a57a620186905ce6a29f51ad0",
+    "src/tilepool.ts": "d70fa7c1979bdcc3ce71a11afaabda236a66d55363ea40ca89b0bfce4398f336",
+    "src/tileworker.ts": "7185c09cfa14913c7976576828efbe7e821630334cc2e237c41efe35574058be",
+    "src/touch-layout.ts": "bd31c36023bdfce61af398a55a23e851ba2bb1d800f9eddba4818cd074a71968",
+    "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+    "src/traffic.ts": "27df73c6505d76365a2f959d5e482146778d8df48759f8ba561b36d2bf03eb1d",
+    "src/trains.ts": "f75c82c3406a6bcf3ca50cdfff1ba49be3f6fbb309c26836de7b60f5d1b4bc60",
+    "src/tt-coach.ts": "46fe7f08edf30487a1e9f8f62048f41c9ee41b2f812f68d9ad5a762e1cb0875e",
+    "src/tt-practice.ts": "ebeaa2dda60170bf24787992c19241b6ff2cfcd6966c9c268afaaaddef2a807e",
+    "src/tunnel.ts": "7b735ed633d4597a9cab5424215d0543009a9ea5289386be802fc418635ec9ec",
+    "src/vehicles.ts": "3b436170f2ca39076bf41222a5c3d5c89618ebc97fa024447d2dfe627c9846b7",
+    "src/voyager-city-prediction.ts": "4aefd3ec5c3088cfc403a93af103aa04e0a00b73c52a69bc385bcb5e62e87e86",
+    "src/voyager-comfort.ts": "b1be5403389434a7061f51d62ae366b42ea897c4d7c88abb3a04f13b5e02ea3c",
+    "src/voyager-offline-packs.ts": "090a6b365586544c3d2ed69d1bd3b2ee17d4f5743df244e416538de90cc14990",
+    "src/voyager-photo.ts": "451d7cd3154e7e462c743076ebc8027855b6578b40f50618d6c14129d276e7cc",
+    "src/voyager-platform.css": "3bf58950ad516acfd46d8b5c7f3d0c432ada374f9c7a714bf22f1ac6b5991038",
+    "src/voyager-racing-ui.ts": "1de18525628f7ce9c31bf0c479c25b948b456655262d49212c655b76179ed976",
+    "src/voyager-racing.css": "72ed3aadaf276dca5d3b50cbebfff4ca982f43db73065347b12f051b426f9893",
+    "src/voyager-result-data.ts": "f26b39998070e254a6ba4477703d6a20e96c8f647f2fc3b60b7a08b034bf8d25",
+    "src/voyager-workshop-ghost.ts": "d9cdf233cf4206c16a441244487a041e1fbe08f6ef99155bf67db806c2800893",
+    "src/weather.ts": "b2c01078f6b0a9e83933c969e910ea99e4adeffa2373e5dac88828aaa5235fa0",
+    "src/world.ts": "24fd219e4a85b76ba67e0fa4f9a26a4341cb2f70200b63d84b8c450c999f392a",
+    "tools/dev-tests/multiplayer-timing-regression.mjs": "e634ec43b88c6e7c65b29acb33ab96e9c7a3619a02075791ab540d931e444bee",
+    "tools/dev-tests/odyssey-city-models.mjs": "ea002342592d93df6f6f3fe60a127ef29774906efe1a4b3440cfa72a36dc1cea",
+    "tools/dev-tests/odyssey-network-node.mjs": "2e8d9a6b53c61b9dd801cef56fa455398a77c62bafef63a034929fc59fde8226",
+    "tools/dev-tests/odyssey-offline-build.mjs": "50e3f67020bc7d3674915780eafb6d205cb6e8084b463fb1c1cea2eb587a5b1a",
+    "tools/dev-tests/odyssey-racing-node.mjs": "55edf88fc6e0be85fedf3bf015a4a0af107f85bb57901a28ab6e0d8461d0ec3d",
+    "tools/dev-tests/odyssey-workshop-node.mjs": "e8d4ccecb71af6cce895707b200b7a4e2385d0f391ac23265864a8e8e1f3db21",
+    "tools/dev-tests/replay-bookmark-recovery-models.mjs": "1922d8fa696c61bd03774e85395e0656a1e8c9290d083fbe0375c8f55f8734ef",
+    "tools/dev-tests/version-audit-city-traffic.mjs": "0553d88252c2a366393f28a60bfe7fbbb057b65434d63dbf607a8a4ccaaaad63",
+    "vite.config.ts": "d4eb04076f5013c081a42866afc3f5ad4dcddce519ba13340cbee1a488c6c55a",
+    "tools/dev-tests/odyssey-city-browser.mjs": "299d73fe7525666c4ab5428ec759975fbbb283957c8f20e9f02f85d82e3e1de2",
+    "tools/dev-tests/odyssey-network-browser.mjs": "2a9b958a557abf85eff770469bffeb551439c1c76d1b782c2bde2861aaa58140",
+    "tools/dev-tests/odyssey-racing-browser.mjs": "6a56e280746a09829fb8c1b086e5531957989e53cac74c2523d4e6fd1b56f13a",
+    "tools/dev-tests/odyssey-workshop-browser.mjs": "4cf3f1428c336b52dad7b3837ac4f6fe35aabda310109bdb35cd9d670b822742",
+    "tools/dev-tests/odyssey-workshop-replay-browser.mjs": "31e954fba670eeeda6565c74992ff2fb0961b35b5b24f9a62315343fbd09232d",
+    "tools/dev-tests/version-audit-split-history.mjs": "d97ac9d8c2e87318b7f4b05ebc0095018b32005402d08f0bde26a8e45893333c"
+  },
+  "phases": [
+    {
+      "phase": "node",
+      "status": "PASS",
+      "startedAt": "2026-11-20T07:08:22.339Z",
+      "completedAt": "2026-11-20T07:08:34.427Z",
+      "sourceUnchanged": true,
+      "sourceFilesRechecked": 266,
+      "rawSummary": {
+        "path": "../version-audit-final-evidence/node-summary.json",
+        "sha256": "68e34fba379f829283d3d4e6038d567a3340ef4d758c90d6d6432e878682cfed"
+      },
+      "PASS": 72,
+      "FAIL": 0,
+      "suites": [
+        {
+          "name": "version-audit-city-traffic",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:22.427Z",
+          "completedAt": "2026-11-20T07:08:23.655Z",
+          "PASS": 3,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "隱藏勤務不更新渲染矩陣；可見時8台真AI有車身與陰影",
+              "status": "PASS",
+              "details": {
+                "agents": 8,
+                "bodies": 8,
+                "shadows": 8
+              }
+            },
+            {
+              "name": "可見frame同步最新位置；暫停隱藏不推進物理，恢復可見會刷新矩陣",
+              "status": "PASS"
+            },
+            {
+              "name": "退出後scene與agents清空、共用geometry/material及instance各釋放一次，晚到frame無效",
+              "status": "PASS",
+              "details": {
+                "releasedResources": 39
+              }
+            }
+          ],
+          "limitations": [
+            "Node驗證真Traffic的instance數量、矩陣與釋放事件；未建立WebGL，不代替勤務UI瀏覽器整合測試或真人試駕。"
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/version-audit-city-traffic-result.json",
+            "sha256": "6ac2641b932ddcf8d1ab56e7dcb5c56e4c6db6e8f1f06bb734ccaa22fa28b8f6"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/version-audit-city-traffic.stdout.txt",
+            "sha256": "264da4f72377171876c80980cb3dd41bf382612ac45ebd540e4e5793e7f4a580"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/version-audit-city-traffic.stderr.txt",
+            "sha256": "b09a92168501cb10641cde232fbe504412e273aea97e42425f48122f95aa4c45"
+          }
+        },
+        {
+          "name": "replay-bookmark-recovery-models",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:23.656Z",
+          "completedAt": "2026-11-20T07:08:23.864Z",
+          "PASS": 4,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "損壞JSON保留原文，新書籤可於本頁新增刪除",
+              "status": "PASS",
+              "details": {
+                "originalPreserved": true,
+                "storageWrites": 0,
+                "warning": "書籤資料無法讀取，原資料未覆寫；新書籤只保留在本頁。"
+              }
+            },
+            {
+              "name": "getItem丟例外時停止覆寫未知原資料",
+              "status": "PASS",
+              "details": {
+                "originalPreserved": true,
+                "storageWrites": 0,
+                "warning": "書籤資料無法讀取，原資料未覆寫；新書籤只保留在本頁。"
+              }
+            },
+            {
+              "name": "可解析但結構錯誤的原資料維持保護",
+              "status": "PASS",
+              "details": {
+                "originalPreserved": true,
+                "storageWrites": 0,
+                "warning": "舊書籤格式無效，原資料已保留；新書籤僅留在本頁。"
+              }
+            },
+            {
+              "name": "正常資料仍可保存，原有及新書籤皆可重載",
+              "status": "PASS",
+              "details": {
+                "originalMarksPreserved": 1,
+                "newMarkReloaded": true,
+                "storageWrites": 2
+              }
+            }
+          ],
+          "limitations": [],
+          "reportArtifact": {
+            "path": "tools/dev-tests/replay-bookmark-recovery-models-result.json",
+            "sha256": "b79642edab19f650ca6b867cb9d1c3a95126d27452362d24f7dab921cadf6c4f"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/replay-bookmark-recovery-models.stdout.txt",
+            "sha256": "dbe5569a9ac227391f0fd3704d1bdb1755b01eea821f755bc3fe665cc1d38b18"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/replay-bookmark-recovery-models.stderr.txt",
+            "sha256": "bf6069f882e04babf657f9a39ee8ec018ef318b5b975de2c55dc216ca7159873"
+          }
+        },
+        {
+          "name": "multiplayer-timing-regression",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:23.864Z",
+          "completedAt": "2026-11-20T07:08:24.481Z",
+          "PASS": 4,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "13 independently rounded authoritative laps remain connected and retain results",
+              "status": "PASS",
+              "details": {
+                "laps": 13,
+                "finishMs": 637000.006,
+                "lapSumMs": 637000,
+                "roundingDifferenceMs": 0.006000000052154064
+              }
+            },
+            {
+              "name": "128-lap boundary accepts accumulated rounding and rejects excess tolerance",
+              "status": "PASS",
+              "details": {
+                "laps": 128,
+                "differenceMs": 0.06299999996554106
+              }
+            },
+            {
+              "name": "invalid total, unfinished driver, excessive lap count and non-finite timings stay rejected",
+              "status": "PASS",
+              "details": {
+                "rejected": 17
+              }
+            },
+            {
+              "name": "ordinary and pursuit results keep legacy timing and missing-field compatibility",
+              "status": "PASS",
+              "details": {
+                "modes": [
+                  "race",
+                  "pursuit"
+                ],
+                "legacyTimingOmission": true
+              }
+            }
+          ],
+          "limitations": [],
+          "stdout": {
+            "path": "../version-audit-final-evidence/multiplayer-timing-regression.stdout.txt",
+            "sha256": "31b8a2c1d64f41eae69681b488ed62d2444bec9b1ba3035677410b68f0f93f30"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/multiplayer-timing-regression.stderr.txt",
+            "sha256": "3ea142d5c75e4c84ccb47619493278b0fae62823f067160b18ab0216b24aa272"
+          }
+        },
+        {
+          "name": "odyssey-network-node",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:24.481Z",
+          "completedAt": "2026-11-20T07:08:26.513Z",
+          "PASS": 15,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "1 診斷HTTP契約：精確CORS、no-store、只回本次來源與公開版本",
+              "status": "PASS"
+            },
+            {
+              "name": "1 未放行Origin僅讀自身false，WS仍403不建立房間",
+              "status": "PASS"
+            },
+            {
+              "name": "1 拒絕缺Origin／非exact／null、非GET及query來源冒充",
+              "status": "PASS"
+            },
+            {
+              "name": "1 rate limit不信任forwarded IP，滿額429且窗口到期恢復",
+              "status": "PASS"
+            },
+            {
+              "name": "1 真WS ping/pong診斷不加入房間且關閉即釋放",
+              "status": "PASS"
+            },
+            {
+              "name": "1 URL導出不洩漏帳密／query／fragment，HTTPS拒絕ws",
+              "status": "PASS"
+            },
+            {
+              "name": "1 parser只選公開欄，拒絕錯誤schema/長版本；已取消不發請求",
+              "status": "PASS"
+            },
+            {
+              "name": "5 真WS固定短句指定隊友與貨單，server產生ID/期限且parser接受",
+              "status": "PASS"
+            },
+            {
+              "name": "5 只有收件人可確認，原寄件人/第三人不能代確認",
+              "status": "PASS"
+            },
+            {
+              "name": "5 未滿三秒拒絕重送，拒絕自由文字/偽造發件者/未知貨單/自己為收件者",
+              "status": "PASS"
+            },
+            {
+              "name": "5 廣播可被其他隊友確認，重複acks或偽造期限不能通過parser",
+              "status": "PASS"
+            },
+            {
+              "name": "5 20秒到期後不可確認，斷線來源/目標立即移除舊訊息",
+              "status": "PASS"
+            },
+            {
+              "name": "5 最多8則保留，不擠掉尚未到期的重要訊息",
+              "status": "PASS"
+            },
+            {
+              "name": "5 結算清空快訊與新一輪不沿用舊訊息",
+              "status": "PASS"
+            },
+            {
+              "name": "5 舊合作v4進房明確拒絕，未知版本不建立新席位",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-network-node-result.json",
+            "sha256": "5fad6fb75c56080dba5883f55c6e2e3cbd8454645c3241e03d460023b4792e8a"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-network-node.stdout.txt",
+            "sha256": "ecf63fa2870c5cb6d608857b6e99ad5e64083c236f6a6598d244bb213ed59604"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-network-node.stderr.txt",
+            "sha256": "1dabccfeb7c1b6e46cd29a27a62d76ca3d052335aade785821f6388a66a77d8a"
+          }
+        },
+        {
+          "name": "odyssey-city-models",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:26.513Z",
+          "completedAt": "2026-11-20T07:08:27.960Z",
+          "PASS": 15,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "03 停靠儀表旋轉座標、25m邊界與角度環繞",
+              "status": "PASS",
+              "details": {
+                "visible": true,
+                "distance": 3.6055512754639896,
+                "lateral": 3,
+                "longitudinal": 1.9999999999999998,
+                "angle": 0.10000000000000009,
+                "speed": 5,
+                "level": true,
+                "routeComplete": true,
+                "dwell": 1.5,
+                "radius": 5,
+                "angleLimit": 0.35
+              }
+            },
+            {
+              "name": "03 儀表保留同層、檢查點與原1.5秒停靠條件",
+              "status": "PASS"
+            },
+            {
+              "name": "11 一般道路只允許南城公車，真路徑相同且每段增加號誌緩衝",
+              "status": "PASS",
+              "details": {
+                "meters": 2595.2239444461384,
+                "closed": [
+                  195,
+                  372
+                ],
+                "road": [
+                  285,
+                  540
+                ]
+              }
+            },
+            {
+              "name": "11 紅燈停等不罰、一次進入不連罰、離開後再進入另計",
+              "status": "PASS"
+            },
+            {
+              "name": "11 道路扣分上限100、封路不採計號誌",
+              "status": "PASS"
+            },
+            {
+              "name": "04/11 真FreeCar走完兩站，逐站早晚與急煞/碰撞/號誌原因可重算總分",
+              "status": "PASS",
+              "details": {
+                "score": 78,
+                "expected": 78,
+                "details": {
+                  "v": 1,
+                  "environment": "road",
+                  "items": [
+                    {
+                      "name": "fixture站1",
+                      "stage": "stop",
+                      "startedAt": 0,
+                      "endedAt": 39.60833333333173,
+                      "impacts": 1,
+                      "integrityLost": 0,
+                      "losses": [
+                        {
+                          "reason": "harsh-motion",
+                          "points": 2.2280238916746384
+                        },
+                        {
+                          "reason": "red-light",
+                          "points": 8
+                        },
+                        {
+                          "reason": "collision",
+                          "points": 5.400000000000006
+                        },
+                        {
+                          "reason": "arrival-time",
+                          "points": 6.750000000000028
+                        }
+                      ],
+                      "arrival": {
+                        "actual": 15.999999999999732,
+                        "due": 100,
+                        "delta": -84.00000000000027
+                      }
+                    },
+                    {
+                      "name": "fixture站2",
+                      "stage": "stop",
+                      "startedAt": 39.60833333333173,
+                      "endedAt": 76.95833333334065,
+                      "impacts": 0,
+                      "integrityLost": 0,
+                      "losses": [
+                        {
+                          "reason": "harsh-motion",
+                          "points": 2.231175592865611
+                        },
+                        {
+                          "reason": "arrival-time",
+                          "points": 14.281250000000313
+                        }
+                      ],
+                      "arrival": {
+                        "actual": 55.74999999999748,
+                        "due": 200,
+                        "delta": -144.25000000000253
+                      }
+                    }
+                  ],
+                  "redLights": 1,
+                  "roadPenalty": 8
+                }
+              }
+            },
+            {
+              "name": "04 舊紀錄沒有明細仍完整往返，兩類紀錄分開且非法明細整份拒絕",
+              "status": "PASS"
+            },
+            {
+              "name": "04 上限30趟及1MB備份界線，逐站原始浮點值完整往返",
+              "status": "PASS"
+            },
+            {
+              "name": "12 絞盤只有信安街可選；其他案件與舊預設保持原流程",
+              "status": "PASS"
+            },
+            {
+              "name": "12 絞盤不靠計時自動完成、偏移阻擋、可進退、放開停止與確認門檻",
+              "status": "PASS",
+              "details": {
+                "seconds": 24.150000000000208,
+                "corrections": 1
+              }
+            },
+            {
+              "name": "12 無效dt/方向不推進平台，外側範圍受限",
+              "status": "PASS"
+            },
+            {
+              "name": "04/12 真FreeCar全救援：警示→定位→手動絞盤→確認固定→載回→卸車",
+              "status": "PASS",
+              "details": {
+                "v": 1,
+                "environment": "closed",
+                "items": [
+                  {
+                    "name": "前往現場",
+                    "stage": "approach",
+                    "startedAt": 0,
+                    "endedAt": 15.84999999999974,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": [
+                      {
+                        "reason": "harsh-motion",
+                        "points": 3.094820694600756
+                      }
+                    ]
+                  },
+                  {
+                    "name": "設置警示",
+                    "stage": "warning",
+                    "startedAt": 15.84999999999974,
+                    "endedAt": 17.85833333333296,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": []
+                  },
+                  {
+                    "name": "平台定位",
+                    "stage": "positioning",
+                    "startedAt": 17.85833333333296,
+                    "endedAt": 21.374999999999428,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": []
+                  },
+                  {
+                    "name": "絞盤裝載",
+                    "stage": "winch",
+                    "startedAt": 21.374999999999428,
+                    "endedAt": 33.1083333333321,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": []
+                  },
+                  {
+                    "name": "車輛固定",
+                    "stage": "securing",
+                    "startedAt": 33.1083333333321,
+                    "endedAt": 37.1166666666652,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": []
+                  },
+                  {
+                    "name": "滿載返回",
+                    "stage": "returning",
+                    "startedAt": 37.1166666666652,
+                    "endedAt": 53.50833333333094,
+                    "impacts": 1,
+                    "integrityLost": 8.95950091985118,
+                    "losses": [
+                      {
+                        "reason": "harsh-motion",
+                        "points": 1.4406823266562014
+                      },
+                      {
+                        "reason": "collision",
+                        "points": 7.200000000000003
+                      },
+                      {
+                        "reason": "cargo-collision",
+                        "points": 8
+                      },
+                      {
+                        "reason": "cargo-motion",
+                        "points": 0.9595009198511804
+                      }
+                    ]
+                  },
+                  {
+                    "name": "卸載交付",
+                    "stage": "unloading",
+                    "startedAt": 53.50833333333094,
+                    "endedAt": 57.516666666664044,
+                    "impacts": 0,
+                    "integrityLost": 0,
+                    "losses": []
+                  }
+                ],
+                "redLights": 0,
+                "roadPenalty": 0,
+                "winch": {
+                  "seconds": 10.733333333333364,
+                  "corrections": 1
+                }
+              }
+            },
+            {
+              "name": "04/12 中止/跳點不產生成績或偽造完成",
+              "status": "PASS"
+            },
+            {
+              "name": "11 真Traffic低密度獨立實例、同起點序列一致與dispose冪等",
+              "status": "PASS",
+              "details": {
+                "count": 8
+              }
+            },
+            {
+              "name": "11 長軸車尾碰撞超過舊9m範圍可偵測，舊預設仍保留",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "Node驗證真模型及真Traffic，只隔離未渲染陰影canvas介面；不建立WebGL或聲稱真人道路全程試駕。",
+            "完整勤務採明示兩段各100m直線，使用真FreeCar與原始gate／停靠規則，沒有注入完成結果。"
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-city-models-result.json",
+            "sha256": "9ff0a78a9b4cf95e1eebd2be63447df0e166332bcad923278b894187da6471d8"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-city-models.stdout.txt",
+            "sha256": "c9f1f836dd1a3cede2f79abbec24448bf3d5cec6884e16a37fb669b3bc5354ca"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-city-models.stderr.txt",
+            "sha256": "b98e8985b15449b4e684f945d9fa9d26d805d6254d9d320bf7e6f3d41b769d15"
+          }
+        },
+        {
+          "name": "odyssey-workshop-node",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:27.960Z",
+          "completedAt": "2026-11-20T07:08:28.853Z",
+          "PASS": 14,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "2 功能映射只接受唯一非駕駛保留鍵，舊駕駛設定不需遷移",
+              "status": "PASS"
+            },
+            {
+              "name": "2 啟動按住功能鍵不觸發，回中後每次按下只觸發一次",
+              "status": "PASS"
+            },
+            {
+              "name": "2 駕駛切選單時按住A不誤確認，換裝置／失焦／文字欄位均須重新回中",
+              "status": "PASS"
+            },
+            {
+              "name": "2 十字鍵選單／停用／非標準與搖桿未回中保護",
+              "status": "PASS"
+            },
+            {
+              "name": "8 註記嚴格綁完整回放內容，key順序不影響指紋而軌跡改動會改指紋",
+              "status": "PASS"
+            },
+            {
+              "name": "8 跨回放／越界／畸形／超量／控制字元一律拒絕，完整資料不變",
+              "status": "PASS"
+            },
+            {
+              "name": "8 A/B跨尾端及多圈大步進保留餘數，停用回到正常播放",
+              "status": "PASS"
+            },
+            {
+              "name": "6 五場滿額不自動刪舊，只有明確選擇完整舊內容才允許替換",
+              "status": "PASS"
+            },
+            {
+              "name": "6 其他頁刪除／改寫選取回放後舊確認失效，同ID不同內容不默默覆蓋",
+              "status": "PASS"
+            },
+            {
+              "name": "6 原未滿但另一頁先填到五場時重新拒絕，不超額或刪第三筆",
+              "status": "PASS"
+            },
+            {
+              "name": "7 任意S1/S2沿原NG2往返，真FreeCar通過60/150公尺分段後完成",
+              "status": "PASS",
+              "details": {
+                "elapsed": 17.731683405187034,
+                "segments": [
+                  4.416676527605859,
+                  4.993123730486979,
+                  8.321883147094196
+                ]
+              }
+            },
+            {
+              "name": "7 相同路線不同分段各自保存，倒序／重複／終點分段不接受",
+              "status": "PASS"
+            },
+            {
+              "name": "2/11 整包19分類包含兩新slot並嚴格驗證，漏一分類或混搭舊集合拒絕",
+              "status": "PASS"
+            },
+            {
+              "name": "2/11 舊15與17分類還原保留新pad／road完整bytes，新增空分類可明確清除",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "Gamepad uses explicit standard-pad samples; genuine controller hardware is not verified.",
+            "Replay save decisions are real product code; actual IndexedDB transactions and cross-page conflicts are verified separately by the Chrome suite.",
+            "Workshop result uses a declared straight road and real FreeCar; no city balance claim."
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-workshop-node-result.json",
+            "sha256": "f7c1ffee0ee22ac8f98d310baab0c438b6a07c00b0bdb9da498394cb1201a34d"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-node.stdout.txt",
+            "sha256": "e22ca13b2c2d39de05e3e54ac74d2c955983872acd23cb9dae3c80852125ca00"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-node.stderr.txt",
+            "sha256": "2ed2336f29cdae009b2ea6cce6ed6649ae8e2450765e6455eae55a089b41e525"
+          }
+        },
+        {
+          "name": "odyssey-racing-node",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:28.854Z",
+          "completedAt": "2026-11-20T07:08:32.999Z",
+          "PASS": 13,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "精確設定白名單與中段視窗，拒絕混合模式及額外欄位",
+              "status": "PASS"
+            },
+            {
+              "name": "真WS能力不足／非房主／過期／額外欄位不修改房規",
+              "status": "PASS"
+            },
+            {
+              "name": "衝刺拒絕城市圖／AI，強制一停拒絕普通賽及週末",
+              "status": "PASS"
+            },
+            {
+              "name": "四人真WS完整週末：排位→一圈衝刺→原三圈，發車與獨立積分",
+              "status": "PASS",
+              "details": {
+                "stages": 3,
+                "sprintLaps": 1,
+                "raceLaps": 3,
+                "championPoints": 13
+              }
+            },
+            {
+              "name": "衝刺實際Car逐gate完成一圈，未用圈數捷徑",
+              "status": "PASS",
+              "details": {
+                "steps": 7141,
+                "finishMs": 119011.9358540777
+              }
+            },
+            {
+              "name": "倒數取消保留衝刺階段與排位，短斷同席續接且不能加入新車手",
+              "status": "PASS"
+            },
+            {
+              "name": "中途離席結果DNF零分、不可替換車手；lobby名單改變整個週末重設",
+              "status": "PASS"
+            },
+            {
+              "name": "真換胎完成／純修復／提前或太晚作業，不能以pitStops冒充",
+              "status": "PASS",
+              "details": {
+                "pitStops": 3,
+                "qualifiedStopMs": 206033.3333333335
+              }
+            },
+            {
+              "name": "未有效換胎與DNF分開，結果／戰績／PNG不授予有效名次",
+              "status": "PASS",
+              "details": {
+                "classifiedWinner": "甲車手",
+                "unclassified": "車手1",
+                "dnf": "車手2"
+              }
+            },
+            {
+              "name": "新回放schema5保留匿名週末／停站，舊1～4仍讀；拒絕偽造狀態",
+              "status": "PASS",
+              "details": {
+                "schema": 5,
+                "legacyRead": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "frames": 2
+              }
+            },
+            {
+              "name": "Lobby leave resets the complete weekend and accepts a fresh roster",
+              "status": "PASS"
+            },
+            {
+              "name": "Expired resume resets the weekend; legacy watchers and locked-roster seat claims are rejected",
+              "status": "PASS"
+            },
+            {
+              "name": "Schema5 records actual mandatory tyre stop and resume; forged timing and mixed weather are rejected",
+              "status": "PASS",
+              "details": {
+                "schema": 5,
+                "qualifiedStopMs": 206033.3333333335,
+                "frames": 4
+              }
+            }
+          ],
+          "limitations": [
+            "非外網、真人平衡或真機FPS測試；生命周期、積分與維修視窗採明示fixture，另有一圈真Car逐gate案例。"
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-racing-node-result.json",
+            "sha256": "6eb324c08dcead60fe80111ca3c9a389347f8fe5190e7643f644c776e2415c4a"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-racing-node.stdout.txt",
+            "sha256": "2fe8b195c34c1efd7c14069bab888dd7ef749d8786ca613c6b63908bd945cad1"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-racing-node.stderr.txt",
+            "sha256": "7479ab6a91fcbeaa61e3bf828a42a4e4391e68bbaf544dbace99ec9024625db1"
+          }
+        },
+        {
+          "name": "odyssey-offline-build",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:08:32.999Z",
+          "completedAt": "2026-11-20T07:08:34.327Z",
+          "PASS": 4,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "離線兩包的每個實際檔案存在且長度／SHA一致，不含已刪CSS-only JS facade",
+              "status": "PASS",
+              "details": {
+                "checked": 526
+              }
+            },
+            {
+              "name": "離線包包含新手把／共用樣式與工坊分段入口依賴",
+              "status": "PASS"
+            },
+            {
+              "name": "SW預快取項目全部可讀，仍依版本更新",
+              "status": "PASS",
+              "details": {
+                "build": "ca2f03b4217a",
+                "precache": 79
+              }
+            },
+            {
+              "name": "固定競速核心與伺服器物理bundle逐byte保留",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-offline-build-result.json",
+            "sha256": "6976b3f6b2c94518dd22c9fdda6849c00f0b1d6106298c7195bcb7158e127ad8"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-offline-build.stdout.txt",
+            "sha256": "eefca824b108bcbeef7b599f3b3303e6f532ceededf394ac4da8c0450ea1df1f"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-offline-build.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ]
+    },
+    {
+      "phase": "browser",
+      "status": "PASS",
+      "startedAt": "2026-11-20T07:09:09.540Z",
+      "completedAt": "2026-11-20T07:10:47.889Z",
+      "sourceUnchanged": true,
+      "sourceFilesRechecked": 264,
+      "rawSummary": {
+        "path": "../version-audit-final-evidence/browser-summary.json",
+        "sha256": "3f301feae7b316a3ce6f15b3d33d9d498664d82301f6f9a5cc034bd8718495da"
+      },
+      "PASS": 34,
+      "FAIL": 0,
+      "suites": [
+        {
+          "name": "version-audit-split-history",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:09:09.600Z",
+          "completedAt": "2026-11-20T07:09:11.900Z",
+          "PASS": 2,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "Real BFCache history return reloads disposed entry through initialization",
+              "status": "PASS"
+            },
+            {
+              "name": "Keyboard and standard gamepad can start a real rendered race after return",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "Standard gamepad is an explicit navigator fixture; no real controller claim.",
+            "Actual browser history and BFCache are exercised; no deployed game requests."
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/version-audit-split-history-result.json",
+            "sha256": "003f107391338ac1fc3780dd6eac6f217d5a2235eb9b865cda42ea56a5843fa8"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/version-audit-split-history.stdout.txt",
+            "sha256": "3f3f5ad39c865f8dff5c1aa05dc54c583504506c4b61498c96626d4d2865a875"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/version-audit-split-history.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "name": "odyssey-city-browser",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:09:11.901Z",
+          "completedAt": "2026-11-20T07:09:32.842Z",
+          "PASS": 7,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "03/04 新入口與舊紀錄明示未保存明細，直橫版操作可達",
+              "status": "PASS"
+            },
+            {
+              "name": "03 真城市接班焦點回畫布、原生鍵盤真的驅動長軸公車",
+              "status": "PASS",
+              "details": {
+                "before": {
+                  "x": 467.04503853668064,
+                  "z": 518.299851223726
+                },
+                "after": {
+                  "x": 474.5195574095507,
+                  "z": 518.5239849109632
+                }
+              }
+            },
+            {
+              "name": "03/04 真停靠儀表、兩站開關門與逐站紀錄持久化",
+              "status": "PASS",
+              "details": {
+                "plan": {
+                  "name": "南城接駁線",
+                  "meters": 2595.2239444461384,
+                  "environment": "closed",
+                  "winch": false,
+                  "fixture": "兩段100m/7000m隔離位置、真FreeCar與gate/停靠/UI持久化"
+                },
+                "record": {
+                  "id": "duty-mwon25t2-bus",
+                  "kind": "bus",
+                  "name": "明示200m直線fixture",
+                  "seconds": 76.95833333334065,
+                  "score": 89,
+                  "stops": 2,
+                  "impacts": 0,
+                  "integrity": 100,
+                  "at": 1795158565094,
+                  "service": {
+                    "routeId": "south",
+                    "boarded": 36,
+                    "alighted": 36,
+                    "leftBehind": 4
+                  },
+                  "details": {
+                    "v": 1,
+                    "environment": "closed",
+                    "items": [
+                      {
+                        "name": "明示fixture站1",
+                        "stage": "stop",
+                        "startedAt": 0,
+                        "endedAt": 39.60833333333173,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 2.2280238916746384
+                          },
+                          {
+                            "reason": "arrival-time",
+                            "points": 6.750000000000028
+                          }
+                        ],
+                        "arrival": {
+                          "actual": 15.999999999999732,
+                          "due": 100,
+                          "delta": -84.00000000000027
+                        }
+                      },
+                      {
+                        "name": "明示fixture站2",
+                        "stage": "stop",
+                        "startedAt": 39.60833333333173,
+                        "endedAt": 76.95833333334065,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 2.231175592865611
+                          },
+                          {
+                            "reason": "arrival-time",
+                            "points": 14.281250000000313
+                          }
+                        ],
+                        "arrival": {
+                          "actual": 55.74999999999748,
+                          "due": 200,
+                          "delta": -144.25000000000253
+                        }
+                      }
+                    ],
+                    "redLights": 0,
+                    "roadPenalty": 0
+                  }
+                }
+              }
+            },
+            {
+              "name": "11 南城一般道路8車/號誌、封路車流狀態保持與暫停停時計",
+              "status": "PASS",
+              "details": {
+                "count": 8,
+                "stoppedClock": 1.9999999999999953,
+                "originalTrafficPreserved": true
+              }
+            },
+            {
+              "name": "04/11 一般道路成績另存、號誌fixture扣分明細與完成後清理",
+              "status": "PASS",
+              "details": {
+                "plan": {
+                  "name": "南城接駁線 · 一般道路",
+                  "meters": 2595.2239444461384,
+                  "environment": "road",
+                  "winch": false,
+                  "fixture": "兩段100m/7000m隔離位置、真FreeCar與gate/停靠/UI持久化"
+                },
+                "record": {
+                  "id": "duty-mwon27zl-bus",
+                  "kind": "bus",
+                  "name": "明示200m直線fixture",
+                  "seconds": 76.95833333334065,
+                  "score": 81,
+                  "stops": 2,
+                  "impacts": 0,
+                  "integrity": 100,
+                  "at": 1795158567921,
+                  "service": {
+                    "routeId": "south",
+                    "boarded": 36,
+                    "alighted": 36,
+                    "leftBehind": 4
+                  },
+                  "details": {
+                    "v": 1,
+                    "environment": "road",
+                    "items": [
+                      {
+                        "name": "明示fixture站1",
+                        "stage": "stop",
+                        "startedAt": 0,
+                        "endedAt": 39.60833333333173,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 2.2280238916746384
+                          },
+                          {
+                            "reason": "red-light",
+                            "points": 8
+                          },
+                          {
+                            "reason": "arrival-time",
+                            "points": 6.750000000000028
+                          }
+                        ],
+                        "arrival": {
+                          "actual": 15.999999999999732,
+                          "due": 100,
+                          "delta": -84.00000000000027
+                        }
+                      },
+                      {
+                        "name": "明示fixture站2",
+                        "stage": "stop",
+                        "startedAt": 39.60833333333173,
+                        "endedAt": 76.95833333334065,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 2.231175592865611
+                          },
+                          {
+                            "reason": "arrival-time",
+                            "points": 14.281250000000313
+                          }
+                        ],
+                        "arrival": {
+                          "actual": 55.74999999999748,
+                          "due": 200,
+                          "delta": -144.25000000000253
+                        }
+                      }
+                    ],
+                    "redLights": 1,
+                    "roadPenalty": 8
+                  }
+                },
+                "signal": "明示紅燈事件fixture"
+              }
+            },
+            {
+              "name": "12 真UI絞盤需要操作、偏移阻擋、長按收放、原生鍵盤入台及確認",
+              "status": "PASS",
+              "details": {
+                "plan": {
+                  "name": "信安街熄火救援 · 絞盤裝載",
+                  "meters": 2595.2239444461384,
+                  "environment": "closed",
+                  "winch": true,
+                  "fixture": "兩段100m/7000m隔離位置、真FreeCar與gate/停靠/UI持久化"
+                },
+                "record": {
+                  "id": "duty-mwon2b62-rescue",
+                  "kind": "rescue",
+                  "name": "明示200m直線fixture",
+                  "seconds": 63.783333333330354,
+                  "score": 98,
+                  "stops": 2,
+                  "impacts": 0,
+                  "integrity": 99.04049908014882,
+                  "at": 1795158572042,
+                  "rescue": {
+                    "caseId": "south-assist",
+                    "secured": true
+                  },
+                  "details": {
+                    "v": 1,
+                    "environment": "closed",
+                    "items": [
+                      {
+                        "name": "前往現場",
+                        "stage": "approach",
+                        "startedAt": 0,
+                        "endedAt": 15.84999999999974,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 3.094820694600756
+                          }
+                        ]
+                      },
+                      {
+                        "name": "設置警示",
+                        "stage": "warning",
+                        "startedAt": 15.84999999999974,
+                        "endedAt": 17.85833333333296,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": []
+                      },
+                      {
+                        "name": "平台定位",
+                        "stage": "positioning",
+                        "startedAt": 17.85833333333296,
+                        "endedAt": 21.374999999999428,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": []
+                      },
+                      {
+                        "name": "絞盤裝載",
+                        "stage": "winch",
+                        "startedAt": 21.374999999999428,
+                        "endedAt": 39.37499999999841,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": []
+                      },
+                      {
+                        "name": "車輛固定",
+                        "stage": "securing",
+                        "startedAt": 39.37499999999841,
+                        "endedAt": 43.383333333331514,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": []
+                      },
+                      {
+                        "name": "滿載返回",
+                        "stage": "returning",
+                        "startedAt": 43.383333333331514,
+                        "endedAt": 59.77499999999725,
+                        "impacts": 0,
+                        "integrityLost": 0.9595009198511804,
+                        "losses": [
+                          {
+                            "reason": "harsh-motion",
+                            "points": 1.4406823266562014
+                          },
+                          {
+                            "reason": "cargo-motion",
+                            "points": 0.9595009198511804
+                          }
+                        ]
+                      },
+                      {
+                        "name": "卸載交付",
+                        "stage": "unloading",
+                        "startedAt": 59.77499999999725,
+                        "endedAt": 63.783333333330354,
+                        "impacts": 0,
+                        "integrityLost": 0,
+                        "losses": []
+                      }
+                    ],
+                    "redLights": 0,
+                    "roadPenalty": 0,
+                    "winch": {
+                      "seconds": 17.99999999999962,
+                      "corrections": 1
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "11 重開一般道路不累積場景，退出還原車輛及兩類紀錄",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "只用本機preview與獨立context，不讀玩家瀏覽器存檔或正式站。",
+            "先真城市UI接班及鍵盤/8車流駕駛，再明示200m直線fixture走完勤務；fixture在7000m位置隔離城市牆壁/Surface，仍使用真FreeCar、gate、停靠/服務/損失及持久化。",
+            "道路全流程的單次紅燈事件為明示signal fixture，不宣稱真人穿越真城市全部路口；真Traffic生成、號誌幾何、碰撞與清理另行檢查。",
+            "390×844與844×390是桌面尺寸模擬，沒有真手機FPS/耗電/手把/長時間道路試駕。"
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-city-browser-result.json",
+            "sha256": "09691eee2465c3e573571d857f1019099db793215ec3b4b7bf9821d98e5a3cb2"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-city-browser.stdout.txt",
+            "sha256": "38e6ad8198c3164e4d4d57b1caa991369c425a21b189ce9426d23bbdb87d25c3"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-city-browser.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "name": "odyssey-network-browser",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:09:32.842Z",
+          "completedAt": "2026-11-20T07:09:46.530Z",
+          "PASS": 7,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "1 真UI診斷由玩家觸發，HTTP與WS通過且不建立房間",
+              "status": "PASS"
+            },
+            {
+              "name": "1 真跨來源未放行回應，UI明確顯示目前網址未獲放行",
+              "status": "PASS"
+            },
+            {
+              "name": "1 無法讀取回應不誤判403，取消不啟動重試（明示fetch fixture）",
+              "status": "PASS"
+            },
+            {
+              "name": "5 真合作UI建房、同房WS隊友準備並開始",
+              "status": "PASS"
+            },
+            {
+              "name": "5 真按鈕發送指定貨單短句，隊友確認後即顯示",
+              "status": "PASS"
+            },
+            {
+              "name": "5 真UI接收隊友廣播並確認，逾期自動清除",
+              "status": "PASS"
+            },
+            {
+              "name": "1/5 窄螢幕佈局可操作且離房後不殘留訊息",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "Desktop Chrome and one real WS peer, not two human devices. HTTP/WS configuration is remapped to ephemeral loopback ports; unreadable/cancel response uses an explicit rejected/pending fetch fixture."
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-network-browser-result.json",
+            "sha256": "b68d7498e2a578c10dd4eb0ac870d40a7a91843d42579ac89236a40bbf301397"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-network-browser.stdout.txt",
+            "sha256": "3fed794b7c8b05bb3d785dad99ed68d4ff11d63742f452c00aea43cba7760eaa"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-network-browser.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "name": "odyssey-racing-browser",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:09:46.530Z",
+          "completedAt": "2026-11-20T07:10:03.915Z",
+          "PASS": 6,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "真UI套用衝刺週末，手機選單可操作且一般賽事設定被鎖",
+              "status": "PASS"
+            },
+            {
+              "name": "真排位起跑與手機資訊流，完成後只有衝刺下一階段按鈕",
+              "status": "PASS",
+              "details": {
+                "layouts": [
+                  {
+                    "viewport": {
+                      "width": 390,
+                      "height": 844
+                    },
+                    "parent": "mp-summit-live",
+                    "information": "mp-race-information",
+                    "region": {
+                      "left": 12,
+                      "top": 110,
+                      "right": 378,
+                      "bottom": 554,
+                      "width": 366,
+                      "height": 444,
+                      "overflow": "auto",
+                      "scrollWidth": 366,
+                      "clientWidth": 366
+                    },
+                    "panel": {
+                      "left": 27.796875,
+                      "top": 383.484375,
+                      "right": 362.203125,
+                      "bottom": 422.484375,
+                      "width": 334.40625,
+                      "height": 39
+                    },
+                    "controlAreas": [
+                      {
+                        "left": 101,
+                        "top": 782,
+                        "right": 289,
+                        "bottom": 826,
+                        "width": 188,
+                        "height": 44
+                      },
+                      {
+                        "left": 300.859375,
+                        "top": 618.5,
+                        "right": 374,
+                        "bottom": 672,
+                        "width": 73.140625,
+                        "height": 53.5
+                      },
+                      {
+                        "left": 18,
+                        "top": 686,
+                        "right": 372,
+                        "bottom": 758,
+                        "width": 354,
+                        "height": 72
+                      }
+                    ],
+                    "text": "衝刺週末 · 三分鐘排位 · 固定名單2/4。取消倒數保留階段，不能換人續賽。",
+                    "strategyControls": []
+                  },
+                  {
+                    "viewport": {
+                      "width": 844,
+                      "height": 390
+                    },
+                    "parent": "mp-summit-live",
+                    "information": "mp-race-information",
+                    "region": {
+                      "left": 12,
+                      "top": 72,
+                      "right": 660,
+                      "bottom": 286,
+                      "width": 648,
+                      "height": 214,
+                      "overflow": "auto",
+                      "scrollWidth": 648,
+                      "clientWidth": 648
+                    },
+                    "panel": {
+                      "left": 27.796875,
+                      "top": 195.484375,
+                      "right": 644.203125,
+                      "bottom": 214.984375,
+                      "width": 616.40625,
+                      "height": 19.5
+                    },
+                    "controlAreas": [
+                      {
+                        "left": 320,
+                        "top": 331,
+                        "right": 524,
+                        "bottom": 375,
+                        "width": 204,
+                        "height": 44
+                      },
+                      {
+                        "left": 768.984375,
+                        "top": 247.203125,
+                        "right": 832,
+                        "bottom": 282,
+                        "width": 63.015625,
+                        "height": 34.796875
+                      },
+                      {
+                        "left": 18,
+                        "top": 303,
+                        "right": 826,
+                        "bottom": 375,
+                        "width": 808,
+                        "height": 72
+                      }
+                    ],
+                    "text": "衝刺週末 · 三分鐘排位 · 固定名單2/4。取消倒數保留階段，不能換人續賽。",
+                    "strategyControls": []
+                  }
+                ],
+                "qualifyingRows": 2
+              }
+            },
+            {
+              "name": "真UI三階段發車與總積分，結果列表在無變更時不重建",
+              "status": "PASS",
+              "details": {
+                "complete": true,
+                "standings": [
+                  {
+                    "id": "bf06cc39-158a-4de8-8a82-be39d6a0a66f",
+                    "sprintPoints": 3,
+                    "racePoints": 10,
+                    "points": 13,
+                    "rank": 1
+                  },
+                  {
+                    "id": "6f0fef3c-146e-4aac-9da1-cf5624e35bbd",
+                    "sprintPoints": 4,
+                    "racePoints": 6,
+                    "points": 10,
+                    "rank": 2
+                  }
+                ]
+              }
+            },
+            {
+              "name": "schema5真WS取得、保存至回放庫與實際3D播放，舊單機存檔保持",
+              "status": "PASS"
+            },
+            {
+              "name": "真UI強制一停與維修完成，直橫資訊不擋駕駛按鈕",
+              "status": "PASS",
+              "details": {
+                "qualifiedStopMs": 206033.33349609375,
+                "layouts": [
+                  {
+                    "viewport": {
+                      "width": 390,
+                      "height": 844
+                    },
+                    "parent": "mp-summit-live",
+                    "information": "mp-race-information",
+                    "region": {
+                      "left": 12,
+                      "top": 110,
+                      "right": 378,
+                      "bottom": 554,
+                      "width": 366,
+                      "height": 444,
+                      "overflow": "auto",
+                      "scrollWidth": 366,
+                      "clientWidth": 366
+                    },
+                    "panel": {
+                      "left": 27.796875,
+                      "top": 431.484375,
+                      "right": 362.203125,
+                      "bottom": 450.984375,
+                      "width": 334.40625,
+                      "height": 19.5
+                    },
+                    "controlAreas": [
+                      {
+                        "left": 101,
+                        "top": 782,
+                        "right": 289,
+                        "bottom": 826,
+                        "width": 188,
+                        "height": 44
+                      },
+                      {
+                        "left": 300.859375,
+                        "top": 618.5,
+                        "right": 374,
+                        "bottom": 672,
+                        "width": 73.140625,
+                        "height": 53.5
+                      },
+                      {
+                        "left": 18,
+                        "top": 686,
+                        "right": 372,
+                        "bottom": 758,
+                        "width": 354,
+                        "height": 72
+                      }
+                    ],
+                    "text": "✓ 中段有效換胎已完成（3:27）",
+                    "strategyControls": [
+                      {
+                        "id": "mp-summit-tyre",
+                        "width": 80.1875,
+                        "height": 44,
+                        "left": 99.1875,
+                        "right": 179.375,
+                        "top": 383.484375,
+                        "bottom": 427.484375,
+                        "viewportWidth": 390,
+                        "viewportHeight": 844,
+                        "hit": true,
+                        "scrollTop": 0
+                      },
+                      {
+                        "id": "mp-summit-pit",
+                        "width": 73.1875,
+                        "height": 44,
+                        "left": 183.375,
+                        "right": 256.5625,
+                        "top": 383.484375,
+                        "bottom": 427.484375,
+                        "viewportWidth": 390,
+                        "viewportHeight": 844,
+                        "hit": true,
+                        "scrollTop": 0
+                      },
+                      {
+                        "id": "mp-summit-pit-cancel",
+                        "width": 73.1875,
+                        "height": 44,
+                        "left": 260.5625,
+                        "right": 333.75,
+                        "top": 383.484375,
+                        "bottom": 427.484375,
+                        "viewportWidth": 390,
+                        "viewportHeight": 844,
+                        "hit": true,
+                        "scrollTop": 0
+                      }
+                    ]
+                  },
+                  {
+                    "viewport": {
+                      "width": 844,
+                      "height": 390
+                    },
+                    "parent": "mp-summit-live",
+                    "information": "mp-race-information",
+                    "region": {
+                      "left": 12,
+                      "top": 72,
+                      "right": 660,
+                      "bottom": 286,
+                      "width": 648,
+                      "height": 214,
+                      "overflow": "auto",
+                      "scrollWidth": 648,
+                      "clientWidth": 648
+                    },
+                    "panel": {
+                      "left": 27.796875,
+                      "top": 195.484375,
+                      "right": 644.203125,
+                      "bottom": 214.984375,
+                      "width": 616.40625,
+                      "height": 19.5
+                    },
+                    "controlAreas": [
+                      {
+                        "left": 320,
+                        "top": 331,
+                        "right": 524,
+                        "bottom": 375,
+                        "width": 204,
+                        "height": 44
+                      },
+                      {
+                        "left": 768.984375,
+                        "top": 247.203125,
+                        "right": 832,
+                        "bottom": 282,
+                        "width": 63.015625,
+                        "height": 34.796875
+                      },
+                      {
+                        "left": 18,
+                        "top": 303,
+                        "right": 826,
+                        "bottom": 375,
+                        "width": 808,
+                        "height": 72
+                      }
+                    ],
+                    "text": "✓ 中段有效換胎已完成（3:27）",
+                    "strategyControls": [
+                      {
+                        "id": "mp-summit-tyre",
+                        "width": 80.1875,
+                        "height": 44,
+                        "left": 99.1875,
+                        "right": 179.375,
+                        "top": 157.484375,
+                        "bottom": 201.484375,
+                        "viewportWidth": 844,
+                        "viewportHeight": 390,
+                        "hit": true,
+                        "scrollTop": 117
+                      },
+                      {
+                        "id": "mp-summit-pit",
+                        "width": 73.1875,
+                        "height": 44,
+                        "left": 185.765625,
+                        "right": 258.953125,
+                        "top": 157.484375,
+                        "bottom": 201.484375,
+                        "viewportWidth": 844,
+                        "viewportHeight": 390,
+                        "hit": true,
+                        "scrollTop": 117
+                      },
+                      {
+                        "id": "mp-summit-pit-cancel",
+                        "width": 73.1875,
+                        "height": 44,
+                        "left": 265.34375,
+                        "right": 338.53125,
+                        "top": 157.484375,
+                        "bottom": 201.484375,
+                        "viewportWidth": 844,
+                        "viewportHeight": 390,
+                        "hit": true,
+                        "scrollTop": 117
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "房規未完成不授有效名次，戰績與schema5停站狀態一致",
+              "status": "PASS",
+              "details": {
+                "classifiedWinner": "車手",
+                "unclassified": "Odyssey 對手",
+                "unclassifiedDnf": false
+              }
+            }
+          ],
+          "limitations": [
+            "真瀏覽器與本機WS對手；時間、結果與進站位置採明示fixture，另由Node逐gate真Car完成衝刺一圈。",
+            "尺寸模擬不代表真手機、外網真人碰撞平衡或FPS壓測。"
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-racing-browser-result.json",
+            "sha256": "d35fa9ce482922ace9db66c49c8f0fdfb6a36f6e4702971e8c0ea8ca54f5d30e"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-racing-browser.stdout.txt",
+            "sha256": "8bded7a4d3ba1763c81df3d0ba294677196de14479cb9f5f23129c6bafb3f09b"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-racing-browser.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "name": "odyssey-workshop-browser",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:10:03.916Z",
+          "completedAt": "2026-11-20T07:10:23.383Z",
+          "PASS": 6,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "2 真主選單十字鍵移動與A確認，B返回設定details",
+              "status": "PASS"
+            },
+            {
+              "name": "2 功能鍵真設定保存，重複分配不覆寫，切設定後仍需中立",
+              "status": "PASS"
+            },
+            {
+              "name": "7 真工坊從道路檢查點手選S1/S2，分享碼與草稿完整保留",
+              "status": "PASS"
+            },
+            {
+              "name": "7 分段修改可復原重做，重新匯入與窄螢幕圖面／44px選項可達",
+              "status": "PASS"
+            },
+            {
+              "name": "2 文字欄位有焦點時A／B與方向鍵不接管、不關閉編輯器",
+              "status": "PASS"
+            },
+            {
+              "name": "2 真駕駛鏡頭／暫停按鈕觸發一次，真分頁失焦返回不誤觸",
+              "status": "PASS",
+              "details": {
+                "realGameDomActions": true,
+                "realVisibilityAutoPause": true,
+                "physicalController": false
+              }
+            }
+          ],
+          "limitations": [
+            "Gamepad samples are explicitly injected into navigator.getGamepads; no physical controller claim.",
+            "Viewport emulation is not a real phone. Replay poses and local library population are explicit fixtures; actual product UI and IndexedDB are exercised."
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-workshop-browser-result.json",
+            "sha256": "45b5151556e1525b47710c0aab54cc24bbb447c60e373401c83a2af322962d7c"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-browser.stdout.txt",
+            "sha256": "39ef5cfbd21d86afa47bf569430f738a383d7b220f112bd8328d5cbda7478755"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-browser.stderr.txt",
+            "sha256": "6ff3f2d81068767ce48ea2a78a6dabfd322a12d646c59a4a133e0411e02d5487"
+          }
+        },
+        {
+          "name": "odyssey-workshop-replay-browser",
+          "status": "PASS",
+          "startedAt": "2026-11-20T07:10:23.383Z",
+          "completedAt": "2026-11-20T07:10:47.749Z",
+          "PASS": 6,
+          "FAIL": 0,
+          "cases": [
+            {
+              "name": "6 真回放匯入與保存五場，不改主存檔",
+              "status": "PASS"
+            },
+            {
+              "name": "6 第六場先取消完整保留，再真下載舊場並指定第三場替換",
+              "status": "PASS"
+            },
+            {
+              "name": "6 同源第二頁改寫選取內容使舊確認失效，四格競存只允許一頁填第五格",
+              "status": "PASS",
+              "details": {
+                "realIndexedDbTwoPageTransactions": true,
+                "statuses": [
+                  "full",
+                  "saved"
+                ]
+              }
+            },
+            {
+              "name": "8 真3D回放A/B反覆循環，手動拖曳停止循環，非法範圍不播放",
+              "status": "PASS",
+              "details": {
+                "wraps": 2,
+                "samples": [
+                  1470.7999997138977,
+                  1587.5999999046326,
+                  1659.1999998092651,
+                  1723.1999998092651,
+                  1789.1999998092651,
+                  1860,
+                  1992,
+                  1047.1999998092651,
+                  1285.5999999046326,
+                  1327.5999999046326,
+                  1377.1999998092651,
+                  1443.5999999046326,
+                  1509.5999999046326,
+                  1576.3999996185303,
+                  1643.5999999046326,
+                  1734,
+                  1780.3999996185303,
+                  1844,
+                  1910.3999996185303,
+                  1976.7999997138977,
+                  1043.5999999046326,
+                  1135.1999998092651,
+                  1177.1999998092651,
+                  1245.5999999046326,
+                  1310,
+                  1376.7999997138977
+                ]
+              }
+            },
+            {
+              "name": "8 真書籤與註記下載，錯識別碼／指紋匯入不改書籤或A/B",
+              "status": "PASS"
+            },
+            {
+              "name": "8 有效註記先完整驗證後合併，保留既有書籤、不自動播放且手機控制可達",
+              "status": "PASS"
+            }
+          ],
+          "limitations": [
+            "Gamepad samples are explicitly injected into navigator.getGamepads; no physical controller claim.",
+            "Viewport emulation is not a real phone. Replay poses and local library population are explicit fixtures; actual product UI and IndexedDB are exercised."
+          ],
+          "reportArtifact": {
+            "path": "tools/dev-tests/odyssey-workshop-replay-browser-result.json",
+            "sha256": "3b1048f8ce481279ef62b1cd69a15c14fa30195c6886d90f0a618f30b9b26e83"
+          },
+          "stdout": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-replay-browser.stdout.txt",
+            "sha256": "f33629a9059433e4f34a0aa984132fccffc6957c4b6238d34843de21cde462cd"
+          },
+          "stderr": {
+            "path": "../version-audit-final-evidence/odyssey-workshop-replay-browser.stderr.txt",
+            "sha256": "1dabccfeb7c1b6e46cd29a27a62d76ca3d052335aade785821f6388a66a77d8a"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No deployed game requests; Vercel/Render deployment, access protection and free-host capacity were not retested.",
+    "No physical phone, real gamepad, external-network human race or long-term load test.",
+    "Timing counterexample uses true RoomService snapshots with controlled valid lap timings. 22 natural true-Car endurance runs did not reproduce it.",
+    "Split-history regression exercises real BFCache and WebGL; navigator gamepad data is an explicit fixture.",
+    "City traffic regression uses true Traffic instances/matrices and resource events in Node, not a real driver or WebGL traffic screenshot.",
+    "Workshop overlap suspicion was invalid because the original fixture skipped decodeCity; all workshop changes were reverted.",
+    "Raw reports/screenshots remain local artifacts. Only explicit deliveryFiles plus VERSION_AUDIT_VALIDATION.json belong to this change."
+  ]
+}

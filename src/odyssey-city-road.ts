@@ -22,6 +22,11 @@ export class RoadDutyTraffic {
   signal(car: FreeCar) {
     return this.traffic.signalAt(car.x, car.z, Math.sin(car.h), Math.cos(car.h), car.y);
   }
+  frame(dt: number, visible: boolean) {
+    if (this.disposed) return;
+    this.root.visible = visible;
+    if (visible) this.traffic.render(dt);
+  }
   dispose() {
     if (this.disposed) return; this.disposed = true;
     const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();

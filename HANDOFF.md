@@ -1,3 +1,26 @@
+<!-- version-audit-release-20261120 -->
+# 2026-11-20 修正版發布準備
+
+Rex 已明確要求「幫我上修正版」，授權將本次 4 項修正提交並推送 main，以既有 Vercel Git 整合更新 https://taipei-gp.vercel.app/，並同步多人分支。產品仍是已通過 109 項檢查的相同 5 個前端檔案，沒有變更伺服器或契約。
+
+本段是提交前的發布準備紀錄；實際推送、提交 SHA、Vercel Production 結果與正式網址核對，請查工作區 DCISI/taipei-version-audit-release-receipt.json 及 TAIPEI_VERSION_AUDIT_RELEASE.md。未有成功收據前，不能只由本段宣稱已部署。
+
+以下 VERSION_AUDIT_VALIDATION.json 與檢查交接文字保留檢查封版時狀態；其中「尚未 commit／push／上線」及 HANDOFF 原雜湊指封版當時。發布只在其前新增本段說明；原檢查證據與其他交付檔不改寫。正式環境公開 WSS 設定會影響 build 雜湊，發布建置另行記錄，不冒稱等於原本機 ca2f03b4217a。
+
+以下完整保留檢查封版紀錄。
+
+<!-- version-audit-20261120-start -->
+# 2026-11-20 最新：版本檢查，4 項修正尚未上線
+
+本輪以原專案 main／multiplayer-test 的提交 `9f39d05a0cc9c658911f6bbcccdff438b6548bc9` 建立隔離 worktree `DCISI/taipei-gp-version-audit-20261120`，分支 `fix/version-audit-20261120`，build **ca2f03b4217a**。已修正一般道路公車隱形車流、分割畫面 BFCache 返回不能再起跑、書籤讀取失敗後覆寫原資料，以及多圈成績取整被誤拒絕。詳見 [VERSION_AUDIT_FIXES.md](./VERSION_AUDIT_FIXES.md)。
+
+Node 8 套 **72 案**、瀏覽器 6 套 **34 案**、固定基準 **3 案**全數通過，證據見 [VERSION_AUDIT_VALIDATION.json](./VERSION_AUDIT_VALIDATION.json)。物理核心未改，三個基準保持 54.425／162.0／175.7 與 aiHits 0／8／5。工坊選點疑點經解碼後路網核對已排除，未保留相關修改。真手機／實體手把／外網真人及長期負載未驗。
+
+**修正只在此隔離工作目錄，尚未 commit、套入原專案、push 或部署。** 原專案與正式版本不包含這 4 項修正；不要把以下舊段落的「最新／尚未提交」當成本輪狀態。後續發布應先檢查此分支的明確檔案清單，保留測試證據，依 Rex 明確指示才 push；不要重跑歷史 Apply／Publish。
+<!-- version-audit-20261120-end -->
+
+以下原文件完整保留，各輪狀態以當時時間理解。
+
 <!-- odyssey-current-start -->
 # 2026-11-20 最新：Odyssey 十二項改善與新玩法
 

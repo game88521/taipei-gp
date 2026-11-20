@@ -163,5 +163,8 @@ function frame(now: number) {
 }
 requestAnimationFrame(frame);
 addEventListener('pagehide',()=>{disposed=true;generation++;controller?.abort();releaseMap();renderer?.dispose();input.reset();},{once:true});
+// A BFCache restore revives the document after pagehide has disposed its scene
+// and animation loop. Re-enter through normal initialization before starting.
+addEventListener('pageshow',event=>{if(event.persisted&&disposed)location.reload();});
 // Same read-only local diagnostics pattern as __gp / __mp; no network or finish shortcut.
 (window as unknown as {__split:unknown}).__split={get race(){return race;},get input(){return input;},get resources(){return renderer?.info.memory??null;},get loading(){return loading;},get scenes(){return scene?1:0;}};
