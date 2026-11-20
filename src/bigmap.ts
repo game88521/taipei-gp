@@ -13,6 +13,7 @@ export class BigMap {
   private ptrs = new Map<number, { x: number; y: number }>();
   private moved = 0;
   private pinch0 = 0;
+  private lifecycle = new AbortController();
   onPick: (x: number, z: number) => void = () => {};
   constructor(private c: HTMLCanvasElement, net: RoadNet, private marks: Landmark[]) {
     this.g = c.getContext('2d')!;
@@ -57,7 +58,7 @@ export class BigMap {
     b.setLineDash([]); b.strokeStyle = '#14171f'; b.lineWidth = 4.6; deckLine(1);
     b.strokeStyle = '#ef7a62'; b.lineWidth = 2.8; deckLine(1);
     // 拖曳、縮放、點選
-    c.addEventListener('pointerdown', (e) => { c.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.moved = 0; if (this.ptrs.size === 2) this.pinch0 = this.pinchDist(); });
+    c.addEventListener('pointerdown', (e) => { c.setPointerCapture(e.pointerId); this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.moved = 0; if (this.ptrs.size === 2) this.pinch0 = this.pinchDist(); }, { signal: this.lifecycle.signal });
     c.addEventListener('pointermove', (e) => {
       const p = this.ptrs.get(e.pointerId);
       if (!p) return;
@@ -68,7 +69,7 @@ export class BigMap {
       }
       p.x = e.clientX; p.y = e.clientY;
       if (this.ptrs.size === 2) { const d = this.pinchDist(); if (this.pinch0) this.setZoom(this.zoom * (d / this.pinch0)); this.pinch0 = d; this.moved = 99; }
-    });
+    }, { signal: this.lifecycle.signal });
     const up = (e: PointerEvent) => {
       if (this.ptrs.size === 1 && this.moved < 8) {
         const r = c.getBoundingClientRect();
@@ -77,10 +78,11 @@ export class BigMap {
       this.ptrs.delete(e.pointerId);
       if (this.ptrs.size < 2) this.pinch0 = 0;
     };
-    c.addEventListener('pointerup', up);
-    c.addEventListener('pointercancel', (e) => this.ptrs.delete(e.pointerId));
-    c.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
+    c.addEventListener('pointerup', up, { signal: this.lifecycle.signal });
+    c.addEventListener('pointercancel', (e) => this.ptrs.delete(e.pointerId), { signal: this.lifecycle.signal });
+    c.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, { passive: false, signal: this.lifecycle.signal });
   }
+  dispose() { this.lifecycle.abort(); this.ptrs.clear(); this.onPick = () => {}; this.base.width = this.base.height = 0; this.c.width = this.c.height = 0; }
   private pinchDist() { const [a, b] = [...this.ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); }
   /** 右邊選單蓋住的寬度（px）：「看得到的畫面中心」要往左挪一半 */
   side = 220;

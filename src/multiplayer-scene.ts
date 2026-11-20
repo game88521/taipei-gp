@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {getVoyagerComfort} from './voyager-comfort';
 import { Car } from './car';
 import { buildTrack, surfaceY, bankRoll, heightAt, locate, type Track } from './track';
 import { buildWorld, type World } from './world';
@@ -19,7 +20,11 @@ import type { CarModel } from './carModel';
 import type { CarState, RoomSnapshot } from '../shared/multiplayer-protocol';
 import { multiplayerCarsOverlap, resolveMultiplayerCollisions } from '../shared/multiplayer-collisions';
 import { spectatorTarget } from './multiplayer-spectator';
+import { horizonCollisionEligible } from '../shared/multiplayer-horizon';
 import { MultiplayerNetworkWindow } from './multiplayer-network';
+import { arenaDriver, arenaCollision } from '../shared/multiplayer-arena';
+import {summitPredict} from '../shared/summit-racing';
+import {SummitRacingVisuals} from './summit-racing-visuals';
 
 type Sample = { at: number; car: CarState };
 type VisualCar = { model: CarModel; name: THREE.Sprite; samples: Sample[] };
@@ -34,6 +39,7 @@ const lerpAngle = (a: number, b: number, f: number) => a + Math.atan2(Math.sin(b
 
 /** 獨立場景只預測自車，最終位置、計圈及成績一律由伺服器傳回。 */
 export class MultiplayerScene {
+  private summitVisuals=new SummitRacingVisuals();private weatherKey='';
   readonly network = new MultiplayerNetworkWindow();
   private visualTargets = new Map<string, number>();
   private currentTrack = buildTrack();
@@ -44,11 +50,14 @@ export class MultiplayerScene {
   get scene() { return this.mapScene?.scene ?? this.emptyScene; }
   readonly camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, .5, 5000);
   readonly renderer: THREE.WebGLRenderer;
+  replayPhotoFrame:(()=>void)|null=null;
+  replayPhotoSubject(){const visual=this.cars.get(this.watchingId??''),root=visual?.model.root;return root?{x:root.position.x,y:root.position.y,z:root.position.z,h:root.rotation.y}:{x:this.car.x,y:surfaceY(this.track,this.car.pos.i,this.car.pos.lat),z:this.car.z,h:this.car.h};}
   get world() { return this.mapScene?.world ?? null; }
   private cars = new Map<string, VisualCar>();
   private room: RoomSnapshot | null = null;
   private selfId: string | null = null;
   private matchId: string | null = null;
+  private arenaRevision=0;
   private correction = new THREE.Vector3();
   private authoritativeSelf: AuthoritativeCarSample | null = null;
   private collisionRecoveryUntil = -Infinity;
@@ -190,7 +199,7 @@ export class MultiplayerScene {
         } finally { onProgress(() => {}); }
       }
       if (!current()) return false;
-      draft.weather = new Weather(scene, world, 0);
+      draft.weather = new Weather(scene, world, 240);
       draft.weather.collect();
       const time = descriptor.circuit?.time ?? 'dusk';
       draft.weather.pick(time, true);
@@ -219,6 +228,7 @@ export class MultiplayerScene {
   }
 
   private resetPrediction() {
+    this.weatherKey='';
     this.network.reset(); this.visualTargets.clear();
     this.room = null; this.selfId = null; this.matchId = null;
     this.watchingId = null;
@@ -240,6 +250,7 @@ export class MultiplayerScene {
   }
 
   private releaseMap() {
+    this.summitVisuals.dispose();this.weatherKey='';
     if (this.mapScene) { this.mapScene.stream?.stream.dispose(); disposeMultiplayerScene(this.mapScene.scene); }
     this.mapScene = null; this.cars.clear(); this.selection = null;
     this.renderer.renderLists.dispose();
@@ -254,6 +265,7 @@ export class MultiplayerScene {
   dispose() {
     if (this.disposed) return;
     this.disposed = true; this.prepared = false; this.generation++; this.controller?.abort();
+    this.summitVisuals.dispose();
     this.renderer.setAnimationLoop(null);
     removeEventListener('resize', this.resize);
     this.renderer.domElement.removeEventListener('webglcontextlost', this.handleContextLost);
@@ -264,12 +276,15 @@ export class MultiplayerScene {
   accept(room: RoomSnapshot, selfId: string, now: number) {
     if (!this.matchesMap(room) || room.players.some(player => !Number.isInteger(player.car.pos.i) || player.car.pos.i < 0 || player.car.pos.i >= this.track.N)) return;
     const newMatch = room.matchId !== this.matchId;
+    const arenaChanged=(room.arena?.revision??0)!==this.arenaRevision;this.arenaRevision=room.arena?.revision??0;
+    if(arenaChanged){this.inputHistory=[];this.accumulator=0;}
     this.room = room; this.selfId = selfId;
     this.watchingId = spectatorTarget(room, selfId, newMatch ? null : this.watchingId);
     // 暫態 peer 與自車從同一份權威時間起步；絕不更動 room 快照或回傳位置。
     this.predictionAt = room.serverTime;
     this.predictionContact = false;
-    this.predictedPeers = new Map(room.players.filter(p => p.id !== selfId && p.connected && p.loaded && !p.dnf && p.finishMs === null)
+    this.predictedPeers = new Map(room.players.filter(p => p.id !== selfId && horizonCollisionEligible(p) && arenaCollision(p,room.serverTime) && !(p.summit?.pitUntil&&p.summit.pitUntil>room.serverTime) && !p.timeTrialDone
+      && !(room.evolution?.mode === 'pursuit' && room.startAt !== null && room.serverTime < room.startAt + (room.evolution.releaseDelays[p.id] ?? 0) * 1000))
       .map(p => [p.id, { ...p.car, pos: { ...p.car.pos } }]));
     if (newMatch) {
       this.network.reset(); this.visualTargets.clear();
@@ -301,7 +316,8 @@ export class MultiplayerScene {
       visual.samples = visual.samples.filter(s => s.at >= room.serverTime - 1000).slice(-24);
       if (player.id === selfId) {
         const oldX = this.car.x + this.correction.x, oldZ = this.car.z + this.correction.z;
-        const racing = room.phase === 'racing' && player.loaded && player.connected && player.finishMs === null && !player.dnf;
+        const racing = room.phase === 'racing' && horizonCollisionEligible(player) && arenaDriver(player) && !(player.summit?.pitUntil&&player.summit.pitUntil>room.serverTime) && !player.timeTrialDone
+          && !(room.evolution?.mode === 'pursuit' && room.startAt !== null && room.serverTime < room.startAt + (room.evolution.releaseDelays[player.id] ?? 0) * 1000);
         if (racing && room.roomRules?.collisions !== false && authoritativeCollisionChanged(this.track, this.authoritativeSelf, room.serverTime, player, room.players)) {
           this.collisionRecoveryUntil = now + MULTIPLAYER_COLLISION_FEEDBACK_MS;
           for (const peer of nearMultiplayerOpponents(this.track, player, room.players)) this.collisionVisualUntil.set(peer.id, this.collisionRecoveryUntil);
@@ -320,7 +336,7 @@ export class MultiplayerScene {
         }
         this.inputHistory = this.inputHistory.filter(s => s.at >= now - 500);
         const distance = Math.hypot(oldX - this.car.x, oldZ - this.car.z);
-        const immediate = newMatch || collisionCorrection || this.predictionContact || distance > 20;
+        const immediate = newMatch || arenaChanged || !!player.summit?.pitUntil || collisionCorrection || this.predictionContact || distance > 20;
         this.correction.set(immediate ? 0 : oldX - this.car.x, 0, immediate ? 0 : oldZ - this.car.z);
         this.authoritativeSelf = { at: room.serverTime, car: player.car };
         if (newMatch || !this.cameraReady) { this.resetCamera(); this.cameraReady = true; }
@@ -334,12 +350,30 @@ export class MultiplayerScene {
     this.inputHistory.push({ at, steer, brake });
     this.inputHistory = this.inputHistory.filter(s => s.at >= at - 500);
   }
+  /** Replay owns a separate scene: exact poses, no prediction, collisions or transport. */
+  presentReplay(room: RoomSnapshot, targetId: string, dt: number) {
+    if(!this.matchesMap(room)||room.players.some(p=>p.car.pos.i<0||p.car.pos.i>=this.track.N))return false;
+    this.accept(room,'replay-viewer',room.serverTime);
+    this.watchingId=room.players.some(p=>p.id===targetId)?targetId:room.players[0]?.id??null;
+    this.predictedPeers.clear();this.visualTargets.clear();this.collisionVisualUntil.clear();
+    for(const[id,visual]of this.cars){const player=room.players.find(p=>p.id===id);visual.samples=player?[{at:room.serverTime,car:player.car}]:[];}
+    this.frame(dt,room.serverTime,0,true,false,true,dt);return true;
+  }
   private predict(dt: number, steer: number, brake: boolean, now: number) {
+    const self=this.room?.players.find(p => p.id === this.selfId);
+    if (self?.timeTrialDone || self?.block?.ghost || self?.eliminated || self?.eliminationWinner || self?.arena?.active===false || self?.summit?.pitUntil&&self.summit.pitUntil>this.predictionAt || this.room?.spectators?.some(v=>v.id===this.selfId)) return;
     let remaining = Math.min(.18, Math.max(0, dt));
+    if (this.room?.evolution?.mode === 'pursuit' && this.room.startAt !== null && this.selfId) {
+      const releaseAt = this.room.startAt + (this.room.evolution.releaseDelays[this.selfId] ?? 0) * 1000;
+      const skipped = Math.min(remaining, Math.max(0, releaseAt - this.predictionAt) / 1000);
+      this.predictionAt += skipped * 1000; remaining -= skipped;
+    }
     while (remaining > .000001) {
       // 網路暫停時最多外推180ms，避免自車不停前進而對手停在過期的位置。
       const d = Math.min(1 / 60, remaining, Math.max(0, ((this.room?.serverTime ?? this.predictionAt) + 180 - this.predictionAt) / 1000));
+      if(this.room?.arena?.mode==='items')this.car.boost=(self?.arena?.boostUntil??0)>this.predictionAt?.35:0;
       if (d < .000001) break;
+      if(self&&this.room)summitPredict(this.car,this.room,self,this.predictionAt);
       const bodies = [{ id: this.selfId!, car: this.car, previous: { x: this.car.x, z: this.car.z, h: this.car.h } },
         ...[...this.predictedPeers].map(([id, car]) => ({ id, car, previous: { x: car.x, z: car.z, h: car.h } }))];
       this.car.update(d, this.track, steer, brake);
@@ -347,7 +381,7 @@ export class MultiplayerScene {
         peer.x += Math.sin(peer.h) * peer.v * d; peer.z += Math.cos(peer.h) * peer.v * d;
         locate(this.track, peer.x, peer.z, peer.pos);
       }
-      for (const contact of this.room?.roomRules?.collisions === false ? [] : resolveMultiplayerCollisions(this.track, bodies, d)) if (contact.a === this.selfId || contact.b === this.selfId) {
+      for (const contact of this.room?.roomRules?.collisions === false || !!self&&!arenaCollision(self,this.predictionAt) ? [] : resolveMultiplayerCollisions(this.track, bodies, d)) if (contact.a === this.selfId || contact.b === this.selfId) {
         this.predictionContact = true;
         this.correction.set(0, 0, 0);
         this.collisionVisualUntil.set(contact.a === this.selfId ? contact.b : contact.a, now + MULTIPLAYER_COLLISION_FEEDBACK_MS);
@@ -362,7 +396,7 @@ export class MultiplayerScene {
     const map = this.mapScene;
     if (!this.ready || !map) return;
     const me = this.room?.players.find(p => p.id === this.selfId);
-    if (this.room?.phase === 'racing' && me && me.finishMs === null && !me.dnf && canDrive) {
+    if (this.room?.phase === 'racing' && me && me.finishMs === null && !me.dnf && !me.timeTrialDone && canDrive) {
       this.accumulator += Math.min(dt, .1);
       while (this.accumulator >= 1 / 60) { this.predict(1 / 60, steer, brake, now); this.accumulator -= 1 / 60; }
     } else this.accumulator = 0;
@@ -399,17 +433,25 @@ export class MultiplayerScene {
       presented.set(id, { ...car, x: car.x + ox, z: car.z + oz, pos: { ...car.pos } });
     }
     // 校正偏移與插值也可能跨入車身；僅對呈現副本做最後分離，權威狀態不受影響。
-    const activeIds = new Set(this.room?.players.filter(p => p.connected && p.loaded && !p.dnf && p.finishMs === null).map(p => p.id));
+    const activeIds = new Set(this.room?.players.filter(p=>horizonCollisionEligible(p)&&arenaCollision(p,now)&&!(p.summit?.pitUntil&&p.summit.pitUntil>now)).map(p => p.id));
     if (this.room?.roomRules?.collisions !== false) resolveMultiplayerCollisions(this.track, [...presented].filter(([id]) => activeIds.has(id)).map(([id, car]) => ({ id, car })), 0);
     for (const [id, car] of presented) {
       const visual = this.cars.get(id)!;
+      visual.model.root.visible=this.room?.phase==='lobby'||this.room?.players.find(p=>p.id===id)?.arena?.active!==false;
+      const player=this.room?.players.find(p=>p.id===id),ghost=!!player?.block?.ghost||!!(player?.summit?.pitUntil&&player.summit.pitUntil>now);
+      if(visual.model.root.userData.horizonGhost!==ghost){visual.model.root.userData.horizonGhost=ghost;visual.model.root.traverse(object=>{
+        const mesh=object as THREE.Mesh;if(!mesh.material)return;for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){
+          material.userData.horizonOriginal??={transparent:material.transparent,opacity:material.opacity};
+          const original=material.userData.horizonOriginal;material.transparent=ghost||original.transparent;material.opacity=ghost?Math.min(.35,original.opacity):original.opacity;material.needsUpdate=true;
+        }
+      });}
       const y = surfaceY(this.track, car.pos.i, car.pos.lat);
       visual.model.root.position.set(car.x, y, car.z);
       visual.model.root.rotation.set(-Math.atan(this.track.grade[car.pos.i]), car.h, bankRoll(this.track, car.pos.i, car.pos.lat), 'YXZ');
       visual.model.body.rotation.z = car.steer * Math.min(1, car.v / 40) * .04;
       for (const wheel of visual.model.steer) wheel.rotation.y = -car.steer * .45;
       for (const wheel of visual.model.spin) wheel.rotation.x += car.v / .35 * viewDt;
-      visual.name.position.set(car.x, y + 3, car.z); visual.name.visible = id !== this.selfId;
+      visual.name.position.set(car.x, y + 3, car.z); visual.name.visible = id !== this.selfId&&visual.model.root.visible;
     }
     const viewCar = presented.get(this.watchingId ?? this.selfId ?? '') ?? this.car.snapshot();
     this.displayedSpeed = viewCar.v;
@@ -419,17 +461,21 @@ export class MultiplayerScene {
     const base = surfaceY(this.track, viewCar.pos.i, viewCar.pos.lat);
     const target = new THREE.Vector3(x - fx * back, base + up, z - fz * back);
     this.camera.position.lerp(target, Math.min(1, viewDt * 10)); this.camera.lookAt(x + fx * 6, heightAt(this.track, viewCar.pos.s + 6) + 1, z + fz * 6);
-    this.camera.fov = 62 + Math.min(10, viewCar.v / 9); this.camera.updateProjectionMatrix();
+    this.camera.fov = getVoyagerComfort().fixedFov ? 62 : 62 + Math.min(10, viewCar.v / 9); this.camera.updateProjectionMatrix();
     const lights = this.room?.phase === 'countdown' && this.room.startAt ? Math.max(1, 5 - Math.ceil((this.room.startAt - now) / 600)) : 0;
     map.world.setStartLights(lights);
     map.world.sky.position.copy(this.camera.position);
     map.world.mountains.position.y = -this.camera.position.y;
     map.circuit?.crowd.tick(viewDt, this.camera.position.x, this.camera.position.z);
+    this.summitVisuals.update(map.scene,this.track,this.room);
+    const summit=this.room?.summit,wet=this.room?.voyager?.settings.weather!=='legacy'&&this.room?.voyager?this.room.voyager.wet:summit?.settings.endurance&&summit.stage!=='qualifying'?summit.weather:null,weatherKey=wet===null?'default':String(Math.round(wet*50));
+    if(map.weather&&this.selection&&this.weatherKey!==weatherKey){this.weatherKey=weatherKey;const base=getMultiplayerTrack(this.selection.trackId)?.circuit?.time??'dusk';map.weather.pick(wet===null?base:base==='night'||base==='rainnight'?'night':'day',true);map.weather.rainLevel=wet??0;map.weather.apply(wet===null?base:base==='night'||base==='rainnight'?'night':'day',qualityFor('low').fogFar,null,null);}
     map.weather?.update(viewDt, this.camera.position);
     if (map.stream) {
       map.stream.stream.tick(viewDt); map.stream.trains.update(viewDt);
       if (now - this.cullAt > 400) { this.cullAt = now; const radius = this.qualityLevel === 'economy' ? 350 : 500; map.stream.cull(x, z, radius); map.stream.stream.update(x, z, radius); }
     }
+    if(this.replayPhotoFrame){this.replayPhotoFrame();map.world.sky.position.copy(this.camera.position);map.world.mountains.position.y=-this.camera.position.y;}
     this.renderer.render(this.scene, this.camera);
   }
 }

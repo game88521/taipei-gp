@@ -102,7 +102,9 @@ try {
   assert.equal(await Promise.race([oldStall.then(() => 'resolved', () => 'rejected'), sleep(35).then(() => 'pending')]), 'pending');
   await assert.rejects(network.fetchJsonWithRetry('/stalled', { timeoutMs: 20, idleTimeoutMs: 100, retries: 0 }), (e) => e.code === 'timeout');
   let streamCancelled = false;
-  globalThis.fetch = async () => new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"x":')); }, cancel() { streamCancelled = true; } }));
+  // 先完成 Node 首次 Response／串流建構，避免 fixture 冷初始化吃掉下載的總期限。
+  const stalledResponse = new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"x":')); }, cancel() { streamCancelled = true; } }));
+  globalThis.fetch = async () => stalledResponse;
   await assert.rejects(network.fetchJsonWithRetry('/body-stalled', { timeoutMs: 100, idleTimeoutMs: 15, retries: 0 }), (e) => e.code === 'idle');
   assert.equal(streamCancelled, true);
   let calls = 0;

@@ -44,14 +44,22 @@ export class MultiplayerSeriesPanel {
     get('mp-series-title').textContent = series.complete ? '系列賽總冠軍出爐' : `迷你錦標賽 · 第 ${series.roundIndex + 1} / ${series.trackIds.length} 站`;
     get('mp-series-route-text').textContent = series.trackIds.map((id, index) => `${index + 1}. ${getMultiplayerTrack(id)!.name}`).join(' → ');
     if (!series.locked) { const note = document.createElement('li'); note.textContent = '第一站起跑時鎖定目前車手名單。'; standings.appendChild(note); }
+    if (room?.evolution?.mode === 'teams' && room.evolution.teamStandings) {
+      for (const team of room.evolution.teamStandings) {
+        const li = document.createElement('li'), name = document.createElement('strong'), points = document.createElement('b');
+        li.dataset.team = team.team; name.textContent = `${team.rank}. ${team.team === 'red' ? '紅' : '藍'}隊`;
+        points.textContent = `${team.points} 分 · ${team.roundWins} 站勝`; li.append(name, points); standings.append(li);
+      }
+    }
     for (const row of series.standings) {
       const li = document.createElement('li'), name = document.createElement('span'), points = document.createElement('b');
-      name.className = 'mp-player-name'; name.textContent = `${row.rank}. ${row.name}${row.playerId === selfId ? '（你）' : ''}`;
+      const team = series.entrants.find(e => e.playerId === row.playerId)?.team;
+      name.className = 'mp-player-name'; name.textContent = `${row.rank}. ${row.name}${row.playerId === selfId ? '（你）' : ''}${team ? ` · ${team === 'red' ? '紅' : '藍'}隊` : ''}`;
       points.textContent = `${row.points} 分 · ${row.wins} 勝`; li.append(name, points); standings.appendChild(li);
     }
     for (const [index, round] of series.rounds.entries()) {
       const section = document.createElement('section'), heading = document.createElement('h4'), list = document.createElement('ol');
-      heading.textContent = `第 ${index + 1} 站 · ${getMultiplayerTrack(round.trackId)!.name} · ${round.laps} 圈`;
+      heading.textContent = `第 ${index + 1} 站 · ${getMultiplayerTrack(round.trackId)!.name} · ${round.mode === 'time-trial' ? '限時最快圈' : `${round.laps} 圈`}`;
       for (const result of round.results) { const li = document.createElement('li'); li.textContent = `${result.rank}. ${result.name} · ${result.dnf ? 'DNF' : `${(result.finishMs! / 1000).toFixed(3)} 秒`} · ${result.points} 分`; list.appendChild(li); }
       section.append(heading, list); history.appendChild(section);
     }

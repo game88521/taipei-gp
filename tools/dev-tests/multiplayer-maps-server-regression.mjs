@@ -69,6 +69,8 @@ await check('24圖目錄與跨Node/browser SHA256一致，整份資料含高度�
   return { maps: 24, gp: 23, shaVectors: 4, elevationTamperRejected: true };
 });
 await check('所有24圖可用真WS建房，圈長與起點來自該房track', () => withServer(async h => {
+  // 本案驗完整地圖目錄；離房後仍保留的房間須可容納24圖，預設12房另有容量專測。
+  assert.equal(h.service.maxRooms,MULTIPLAYER_TRACKS.length);
   const client = await h.open();
   for (const descriptor of MULTIPLAYER_TRACKS) {
     const welcome = await entry(client, { type: 'create', name: '試跑車手', laps: 1, trackId: descriptor.id });
@@ -80,8 +82,8 @@ await check('所有24圖可用真WS建房，圈長與起點來自該房track', (
     assert.equal(player.loaded, false);
     const mark = client.mark(); client.send({ type: 'leave' }); await client.until(value => value.type === 'left', mark);
   }
-  return { createdUsingRealSockets: 24, defaultRevision: 1 };
-}));
+  return { createdUsingRealSockets: 24, defaultRevision: 1,fixtureMaxRooms:h.service.maxRooms };
+}, {maxRooms:MULTIPLAYER_TRACKS.length}));
 await check('v1/錯catalog與不存在地圖均拒絕，不能建空房或穿越資料路徑', () => withServer(async h => {
   const client = await h.open();
   for (const fields of [{ version: 1 }, { catalogStamp: 'old' }, { catalogStamp: undefined }]) await error(client, { ...identity, ...fields, type: 'create', name: '車手', laps: 1 }, 'INCOMPATIBLE_VERSION');

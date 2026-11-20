@@ -19,7 +19,12 @@ export async function verifyRacingCore(project, historicalBefore) {
 
   const immutableBefore = path.resolve(project, '../taipei-gp-twelve-before-102e84eea8ea');
   assert.equal(hashes['src/rivals.ts'].before, digest(await readFile(path.join(immutableBefore, 'src/rivals.ts'))), '歷史rivals必須與十二項不可變before相同');
-  const resultPath = 'tools/dev-tests/twelve-racing-result.json', bytes = await readFile(path.join(project, resultPath));
+  // Isolated suite runners preserve reports under a unique evidence directory.
+  // A reviewed report may be supplied explicitly; all freshness and source checks below still apply.
+  const resultPath = process.env.GP_RACING_CORE_EVIDENCE ?? 'tools/dev-tests/twelve-racing-result.json';
+  const resultFile = path.resolve(project, resultPath), relative = path.relative(project, resultFile);
+  assert.ok(relative && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative), '長時對照證據必須位於本專案');
+  const bytes = await readFile(resultFile);
   const result = JSON.parse(bytes);
   assert.equal(result.status, 'PASS', '必須先執行本輪真長時物理回歸');
   assert.ok(result.cases.length >= 20 && result.cases.every(row => row.status === 'PASS'));

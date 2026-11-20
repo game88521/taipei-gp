@@ -10,21 +10,30 @@ import { MultiplayerNetworkWindow } from '../../src/multiplayer-network.ts';
 
 import { Car, buildTrack, multiplayerCarsOverlap, resolveMultiplayerCollisions } from '../../server/physics.mjs';
 import { spectatorTarget } from '../../src/multiplayer-spectator.ts';
+import { horizonCollisionEligible } from '../../shared/multiplayer-horizon.ts';
+import { arenaDriver, arenaCollision } from '../../shared/multiplayer-arena.ts';
+import { summitPredict } from '../../shared/summit-racing.ts';
+import { getMultiplayerTrack } from '../../shared/multiplayer-tracks.ts';
+import { qualityFor } from '../../src/quality.ts';
+import { getVoyagerComfort } from '../../src/voyager-comfort.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const before = path.resolve(project, '../taipei-gp-next6-before-57b09b2');
 const strip = source => stripTypeScriptTypes(source, { mode: 'transform' }).replace(/^import[\s\S]*?;\r?\n/gm, '').replace(/\bexport /g, '');
+const visualsContext = vm.createContext({ THREE, surfaceY: (t, i, lat) => t.py[i] + Math.max(-7, Math.min(7, lat)) * t.bank[i] });
+vm.runInContext(strip(await readFile(path.join(project, 'src/summit-racing-visuals.ts'), 'utf8')) + '\nglobalThis.Visuals = SummitRacingVisuals;', visualsContext);
+const SummitRacingVisuals = visualsContext.Visuals;
 const track = buildTrack();
 const trackSource = await readFile(path.join(project, 'src/track.ts'), 'utf8');
 const trackContext = vm.createContext({ Math });
 vm.runInContext(strip(trackSource.slice(trackSource.indexOf('export function locate('))) + '\nglobalThis.locate = locate;', trackContext);
-const feedbackContext = vm.createContext({ Math, multiplayerCarsOverlap });
+const feedbackContext = vm.createContext({ Math, multiplayerCarsOverlap, horizonCollisionEligible });
 vm.runInContext(strip(await readFile(path.join(project, 'src/multiplayer-collision-feedback.ts'), 'utf8'))
   + '\nglobalThis.feedback = { authoritativeCollisionChanged, nearMultiplayerOpponent, nearMultiplayerOpponents, collisionVisualTarget, MULTIPLAYER_COLLISION_FEEDBACK_MS, MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS };', feedbackContext);
 const pacingContext = vm.createContext({ Math });
 vm.runInContext(strip(await readFile(path.join(project, 'src/frame-pacing.ts'), 'utf8')) + '\nglobalThis.Pacer = RenderPacer;', pacingContext);
 async function sceneClass(root) {
-  const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, ...feedbackContext.feedback, Math, console, locate: trackContext.locate, multiplayerCarsOverlap, resolveMultiplayerCollisions, spectatorTarget,
+  const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, ...feedbackContext.feedback, Math, console, locate: trackContext.locate, multiplayerCarsOverlap, resolveMultiplayerCollisions, spectatorTarget, horizonCollisionEligible, arenaDriver, arenaCollision, summitPredict, SummitRacingVisuals, getMultiplayerTrack, qualityFor, getVoyagerComfort,
     surfaceY: (t, i, lat) => t.py[i] + Math.max(-7, Math.min(7, lat)) * t.bank[i], bankRoll: () => 0,
     heightAt: (t, s) => { const i = Math.floor((((s / t.ds) % t.N) + t.N) % t.N); return t.py[i]; },
   });
@@ -43,7 +52,7 @@ function fixture(Class, phase = 'racing') {
   const room = { phase, matchId: 'race', serverTime: 1000, startAt: 1000, players: [{ id: 'self', connected: true, loaded: true, dnf: false, finishMs: null, car: car.snapshot() }] };
   Object.assign(instance, {
     network: new MultiplayerNetworkWindow(), visualTargets: new Map(), currentTrack: track, car, prepared: true, disposed: false, contextLost: false,
-    room, selfId: 'self', matchId: 'race', accumulator: 0, predictionAt: 1000, predictedPeers: new Map(), predictionContact: false,
+    room, selfId: 'self', matchId: 'race', arenaRevision: 0, accumulator: 0, predictionAt: 1000, predictedPeers: new Map(), predictionContact: false, summitVisuals: new SummitRacingVisuals(), weatherKey: '',
     correction: new THREE.Vector3(.5, 0, -.5), authoritativeSelf: null, collisionRecoveryUntil: -Infinity, collisionVisualUntil: new Map(),
     inputHistory: [], lastSteer: 0, lastBrake: false, cars: new Map([['self', visual]]),
     camH: car.h, cameraReady: true, closeCamera: false, cullAt: 0, camera: new THREE.PerspectiveCamera(),

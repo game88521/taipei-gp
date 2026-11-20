@@ -1,0 +1,33 @@
+.voyager-racing-live{position:absolute;left:12px;top:145px;max-width:min(540px,calc(100vw - 24px));padding:8px 12px;background:#071522d9;color:#eefbff;border:1px solid #71d4df;border-radius:8px;pointer-events:auto;font-size:13px}.voyager-racing-live[hidden]{display:none}.voyager-racing-live p{margin:4px 0}.voyager-racing-live ol{margin:6px 0;padding-left:20px;max-height:120px;overflow:auto}.voyager-racing-live button{min-height:44px;padding:8px 12px;margin-right:8px}.voyager-racing-live button[hidden]{display:none}@media(max-width:600px){.voyager-racing-live{top:128px;font-size:11px;max-width:calc(100vw - 24px)}.voyager-racing-live ol{max-height:76px}}
+@media(max-height:450px){.voyager-racing-live{top:90px;max-height:105px;overflow:auto;font-size:11px;max-width:min(470px,calc(100vw - 24px))}.voyager-racing-live ol{max-height:52px}}
+
+/* Desktop retains the existing fixed panels. Phones share one clipping/scroll
+   region above the driving controls; no panel can cover another fixed panel. */
+#mp-race-information{display:contents}
+.voyager-race-info-hint{display:none}
+@media(max-width:600px),(max-height:500px){
+ #mp-hud #mp-race-information{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:start;gap:10px;position:fixed;top:calc(110px + env(safe-area-inset-top));bottom:calc(290px + env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));min-height:44px;overflow:auto;overscroll-behavior:contain;scroll-padding:8px;padding:2px;pointer-events:auto;touch-action:pan-y;scrollbar-gutter:stable;isolation:isolate}
+ #mp-race-information:focus-visible{outline:2px solid #69f5d0;outline-offset:2px}
+ #mp-hud #mp-race-information>.voyager-race-info-hint{display:block;grid-column:1/-1;margin:0;padding:6px 8px;background:#091522ee;color:#d9f7ff;border-radius:6px;font-size:calc(11px * var(--voyager-hud-scale));line-height:1.4}
+ #mp-hud #mp-race-information>:not(.voyager-race-info-hint){position:relative;inset:auto;transform:none;width:auto;min-width:0;max-width:none;max-height:none;margin:0;overflow:visible;grid-column:1/-1;box-sizing:border-box;overflow-wrap:anywhere;pointer-events:auto}
+ #mp-hud #mp-race-information>:is(.mp-race-stats,.mp-board){grid-column:auto;zoom:var(--voyager-hud-scale)}
+ #mp-hud #mp-race-information>.mp-race-stats{padding:10px;gap:5px}
+ #mp-race-information .mp-race-stats :is(#mp-race-track,.mp-last-lap){max-width:100%}
+ #mp-hud #mp-race-information>.mp-board{padding:8px}
+ #mp-hud #mp-race-information>:is(.voyager-racing-live,.summit-live,.mp-horizon-race,.mp-arena-live,.mp-awareness,.mp-spectator-field,.mp-race-message,.mp-network-warning){font-size:calc(13px * var(--voyager-hud-scale));line-height:1.5}
+ #mp-race-information .voyager-racing-live ol{max-height:none;overflow:visible}
+ #mp-race-information :is(.summit-strategy,.mp-spectator-field){justify-content:flex-start}
+ #mp-race-information :is(.summit-strategy button,.summit-strategy select,.mp-spectator-field select,.voyager-racing-live button,.mp-arena-live button){min-height:44px;min-width:44px;max-width:100%;font-size:inherit}
+ #mp-race-information .mp-arena-live p{font-size:inherit}
+ #mp-race-information .mp-awareness-body{padding-bottom:8px}
+ #mp-race-information .mp-awareness summary{min-height:44px}
+ body #mp-hud>.mp-speed{position:fixed;zoom:1;right:max(16px,env(safe-area-inset-right));bottom:calc(172px + env(safe-area-inset-bottom));max-width:160px;padding:2px 6px;white-space:nowrap;pointer-events:none}
+ #mp-hud>.mp-speed b{font-size:calc(45px * var(--voyager-hud-scale));line-height:1.1}
+ #mp-hud>.mp-speed small{font-size:calc(11px * var(--voyager-hud-scale))}
+}
+@media(max-height:500px) and (orientation:landscape){
+ #mp-hud #mp-race-information{top:calc(72px + env(safe-area-inset-top));bottom:calc(104px + env(safe-area-inset-bottom));right:calc(184px + env(safe-area-inset-right))}
+ body #mp-hud>.mp-speed{right:max(12px,env(safe-area-inset-right));bottom:calc(108px + env(safe-area-inset-bottom))}
+ #mp-hud>.mp-speed b{font-size:calc(28px * var(--voyager-hud-scale))}
+ #mp-hud>:is(.mp-controls,.mp-race-actions){bottom:calc(15px + env(safe-area-inset-bottom))}
+}

@@ -1,0 +1,158 @@
+{
+    "author":  "Rex \u003cgame88521@gmail.com\u003e",
+    "baselineBuild":  "205d0c8df91e",
+    "frozen":  true,
+    "sourceRoot":  "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-voyager-city",
+    "files":  [
+                  {
+                      "path":  "shared/summit-city-race.ts",
+                      "kind":  "product",
+                      "bytes":  5638,
+                      "sha256":  "c3aa721954a82688815a91685f6d806f4cf134675bde7d0497df197cb8df0a78",
+                      "beforeSha256":  "c1a9170f02edca465c2cc2a0ba02e46d897de93938e580f34b46583d2945ea5d"
+                  },
+                  {
+                      "path":  "shared/nexus-coop.ts",
+                      "kind":  "product",
+                      "bytes":  10708,
+                      "sha256":  "ad834a44c948367d1c3cf22a58f1287da71268b68eb0db262a60ba15239b47b0",
+                      "beforeSha256":  "b079d4176ed17f54c0d3a84b42758007e18a9a1a610332522c2c1dd63acd6c59"
+                  },
+                  {
+                      "path":  "server/summit-city-race-service.mjs",
+                      "kind":  "product",
+                      "bytes":  15911,
+                      "sha256":  "c322cf2a2977dada832c1a08e120b53b1f81cf1dbc1fc5e9cc08c0af1bba1ac9",
+                      "beforeSha256":  "c9c99a2f20585522785e09b936cf14000c119491ea4a5bc76ab58e167e498962"
+                  },
+                  {
+                      "path":  "server/nexus-coop-service.mjs",
+                      "kind":  "product",
+                      "bytes":  23329,
+                      "sha256":  "2a0a1b0037b80053e3ad76856314c074f609cdf27c79809e39504fc45b7555a2",
+                      "beforeSha256":  "1aaa377939e85de11aa5ecb57b108646e1994ded8aeb85aa14a4a7d02d8de03d"
+                  },
+                  {
+                      "path":  "src/summit-city-race-client.ts",
+                      "kind":  "product",
+                      "bytes":  8369,
+                      "sha256":  "8720be2b5c4294b39c3146633d1016c97cb70e0121ed0b1dbb91b8826d164add",
+                      "beforeSha256":  "0dbf2ed84d3d97e86b75f4a8ca5ba38385bb9e419054a27999c24028ddbdb2b1"
+                  },
+                  {
+                      "path":  "src/summit-city-race-ui.ts",
+                      "kind":  "product",
+                      "bytes":  16145,
+                      "sha256":  "eb0764f145315b4aa3618d222ea9b05ab2d55a31f40c78b43284b8ccd0b645ba",
+                      "beforeSha256":  "4c76653ffd70697817bdac8e6a4e001240f163365855a929d434a6087d885fec"
+                  },
+                  {
+                      "path":  "src/voyager-city-prediction.ts",
+                      "kind":  "product",
+                      "bytes":  3206,
+                      "sha256":  "4aefd3ec5c3088cfc403a93af103aa04e0a00b73c52a69bc385bcb5e62e87e86",
+                      "beforeSha256":  null
+                  },
+                  {
+                      "path":  "src/nexus-coop-client.ts",
+                      "kind":  "product",
+                      "bytes":  13270,
+                      "sha256":  "a90b6eb4a3419d15d285068809099dd774d406726975d091f307e66117b809e3",
+                      "beforeSha256":  "7d61bb9682d561acc1c4d22770f2a20a8fd5e95ce3980e2af81d10b597eb3f99"
+                  },
+                  {
+                      "path":  "src/nexus-coop-ui.ts",
+                      "kind":  "product",
+                      "bytes":  26601,
+                      "sha256":  "b2bd11c7ea38d8c18391b8e99065a6ecd80cda84f7890515f35af8cbb947e782",
+                      "beforeSha256":  "ae520559edcb8ea54454a3473ef607d9ec6ed816e4c412d0571c689d5b5d8e1e"
+                  },
+                  {
+                      "path":  "src/atlas-coop-history.ts",
+                      "kind":  "product",
+                      "bytes":  1636,
+                      "sha256":  "9223d316bf8b10167da78e7b6fefa08be9fa21fdd0eccaef79fb83f275500581",
+                      "beforeSha256":  "13fe2a4e20f954f24c119e39ad37ae671b088af366e82fdfdc2dfa4065d6758c"
+                  },
+                  {
+                      "path":  "tools/dev-tests/atlas-city-client.mjs",
+                      "kind":  "test",
+                      "bytes":  11400,
+                      "sha256":  "b6f706e6b4d961072c1c8161cdde039b1ce1fa95cbc54defbeae9ac403736a47",
+                      "beforeSha256":  "130a7f016693a697f7428f9a003615f2ad2307a8a3c0de4a0792658788f66c59"
+                  },
+                  {
+                      "path":  "tools/dev-tests/summit-city-race-client.mjs",
+                      "kind":  "test",
+                      "bytes":  8946,
+                      "sha256":  "c398089a3a1e4d9da1fcc9678c6afcd9879273f8424eea9028d1a45d48297274",
+                      "beforeSha256":  "c3fea73ce31269c876f24fa6931c21707440d03f57158bbc7c071a6ad335d0b0"
+                  },
+                  {
+                      "path":  "tools/dev-tests/summit-city-race-server.mjs",
+                      "kind":  "test",
+                      "bytes":  15468,
+                      "sha256":  "de08bb182c71415db412b1ef284dedc5e1670fab8373f3f6482ecb554dd644c6",
+                      "beforeSha256":  "f14a5b3f953b5d4e194345d29a1bab9e97fa52c54c5ea63af71ff42f1ee17a30"
+                  },
+                  {
+                      "path":  "tools/dev-tests/summit-city-race-browser.mjs",
+                      "kind":  "test",
+                      "bytes":  16742,
+                      "sha256":  "fbce51c9f16db53a5bc6185a7e58646db7b2dbde9c4db896170ebffe70235fad",
+                      "beforeSha256":  "1bbeba69b0dc3990e5dd6cb68b8f75625010333fa21bedc69b9d08d291472ec2"
+                  },
+                  {
+                      "path":  "tools/dev-tests/atlas-city-server.mjs",
+                      "kind":  "test",
+                      "bytes":  22296,
+                      "sha256":  "1b779b9ceb9bb5e9383c27f5263a11a4bff35e21801daa1cccf8fdea90197c78",
+                      "beforeSha256":  "15dfbf856b5951e43d3be29a617aa6a68fb5da2a7baa6b69517c0853808c3d4e"
+                  },
+                  {
+                      "path":  "tools/dev-tests/atlas-coop-history.mjs",
+                      "kind":  "test",
+                      "bytes":  9720,
+                      "sha256":  "1cf101205c818f6875fb097e540c85a03b3c7fa3273ca9c87a76c79a066c3bdc",
+                      "beforeSha256":  "8d85e5df6532a069aab3c99f80b2a9d29f866009af690430d1f9af53df50862d"
+                  },
+                  {
+                      "path":  "tools/dev-tests/voyager-city-models.mjs",
+                      "kind":  "test",
+                      "bytes":  8515,
+                      "sha256":  "b6524e72b04f06bf5ee20c49fd2d05c4a4c341d1e242bf01fe2a295e0b2d7f54",
+                      "beforeSha256":  null
+                  },
+                  {
+                      "path":  "tools/dev-tests/voyager-city-server.mjs",
+                      "kind":  "test",
+                      "bytes":  20379,
+                      "sha256":  "f2187c2609cac32a0f88322b5457109d391bccf339947a35c819eb9e97b56cb8",
+                      "beforeSha256":  null
+                  },
+                  {
+                      "path":  "tools/dev-tests/voyager-city-browser.mjs",
+                      "kind":  "test",
+                      "bytes":  18654,
+                      "sha256":  "8c6492fc5b1cfb1d4492a9f15930965a807dcbfaacfa79f4f9d10f02ad0be877",
+                      "beforeSha256":  null
+                  },
+                  {
+                      "path":  "VOYAGER_CITY.md",
+                      "kind":  "documentation",
+                      "bytes":  8179,
+                      "sha256":  "0f56a3517ff7ea9b40be36bdf18830362057e24a61082dcaab589fe3948e130f",
+                      "beforeSha256":  null
+                  }
+              ],
+    "mainHook":  "collider: () =\u003e collider",
+    "workshopHook":  "online.disabled = start.disabled || (def?.v===2 \u0026\u0026 !closed); update NG2 online title/summary",
+    "browserRunner":  "node tools/dev-tests/voyager-city-browser.mjs",
+    "browserStatus":  "NOT_RUN_BY_CHILD",
+    "fullBuildStatus":  "Only expected missing collider hook in main.ts; integration root owns final build/regressions",
+    "notes":  [
+                  "atlas-city-server test fixtures now await actual all-ready WS state before start; flat fixtures now explicitly carry NG1 definition/progress state required by new simulate.",
+                  "No original project, Atlas immutable evidence, main.ts, workshop UI, package/lock or deployment was modified.",
+                  "Latest result JSON files/evidence are local proof artifacts; root may re-run on integrated sources. They are not product files in this manifest."
+              ]
+}

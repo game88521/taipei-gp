@@ -8,6 +8,11 @@ import vm from 'node:vm';
 import { getMultiplayerTrack, MULTIPLAYER_TRACKS } from '../../shared/multiplayer-tracks.ts';
 import { DEFAULT_ROOM_RULES, roomRulesText } from '../../shared/multiplayer-room-rules.ts';
 import { MultiplayerHistory } from '../../src/multiplayer-history.ts';
+import { defaultControls, controlCodeLabel } from '../../src/input.ts';
+import { SUMMIT_TYRES } from '../../shared/summit-racing.ts';
+import {voyagerForecast} from '../../shared/voyager-racing.ts';
+import { ATLAS_AI_LEVELS, atlasPitMs } from '../../shared/atlas-racing.ts';
+import { odysseyStopWindow } from '../../shared/odyssey-racing.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const before = path.resolve(project, '../taipei-gp-next6-before-57b09b2');
@@ -19,6 +24,12 @@ const entrySource = await readFile(path.join(project, 'src/multiplayer-entry.ts'
 const seriesUiSource = await readFile(path.join(project, 'src/multiplayer-series-ui.ts'), 'utf8');
 const spectatorSource = await readFile(path.join(project, 'src/multiplayer-spectator.ts'), 'utf8');
 const historyUiSource = await readFile(path.join(project, 'src/multiplayer-history-ui.ts'), 'utf8');
+const evolutionUiSource = await readFile(path.join(project, 'src/multiplayer-evolution-ui.ts'), 'utf8');
+const arenaUiSource = await readFile(path.join(project, 'src/multiplayer-arena-ui.ts'), 'utf8');
+const summitUiSource = await readFile(path.join(project, 'src/summit-racing-ui.ts'), 'utf8');
+const voyagerUiSource=await readFile(path.join(project,'src/voyager-racing-ui.ts'),'utf8');
+const atlasUiSource = await readFile(path.join(project, 'src/atlas-racing-ui.ts'), 'utf8');
+const odysseyUiSource = await readFile(path.join(project, 'src/odyssey-racing-ui.ts'), 'utf8');
 const strip = source => stripTypeScriptTypes(source, { mode: 'transform' }).replace(/^import[^\n]*\r?\n/gm, '').replace(/\bexport /g, '');
 const report = { externalRequests: 0, storageTouched: false, cases: [], limitations: ['真控制器renderUi與UI模組配合隔離DOM計數，不是實際瀏覽器的FPS或手機耗電量。'] };
 async function test(name, exercise) {
@@ -40,6 +51,9 @@ function environment(source = currentSource) {
     set textContent(value) { metrics.writes++; this._text = String(value); for (const child of this.children) child.parentNode = null; this.children = []; }
     appendChild(child) { return this.insertBefore(child, null); }
     append(...children) { for (const child of children) this.appendChild(child); }
+    prepend(...children) { for (let i = children.length - 1; i >= 0; i--) this.insertBefore(children[i], this.children[0] ?? null); }
+    get options() { return this.children.filter(child => child.tagName === 'option'); }
+    get selectedOptions() { return this.options.filter(option => option.value === this.value); }
     insertBefore(child, anchor) {
       if (child === anchor) return child;
       child.remove(); const index = anchor === null ? this.children.length : this.children.indexOf(anchor);
@@ -47,20 +61,27 @@ function environment(source = currentSource) {
     }
     remove() { if (this.parentNode) { const parent = this.parentNode; parent.children.splice(parent.children.indexOf(this), 1); this.parentNode = null; } }
     replaceChildren(...children) { for (const child of [...this.children]) child.remove(); this.append(...children); }
-    blur() {} setAttribute() {}
+    blur() {} setAttribute() {} addEventListener() {}
   }
   const elements = new Map();
   const ui = id => { if (!elements.has(id)) elements.set(id, new Element()); return elements.get(id); };
   const document = { activeElement: null, getElementById: ui, createElement: tag => { metrics.created++; return new Element(tag); } };
-  const client = { room: room(), selfId: 'p0', status: 'connected', rttMs: 25, error: null, hasSavedSession: false };
-  const context = vm.createContext({ document, HTMLElement: Element, client, scene: { matchesMap: () => true, setSpectatorTarget() {} }, getMultiplayerTrack, MULTIPLAYER_TRACKS,
-    DEFAULT_ROOM_RULES, roomRulesText, MultiplayerHistory, recentHistory: new MultiplayerHistory(null),
+  const client = { room: room(), selfId: 'p0', status: 'connected', rttMs: 25, error: null, hasSavedSession: false, serverNow: () => 1_700_000_000_000 };
+  const context = vm.createContext({ document, HTMLElement: Element, client, scene: { matchesMap: () => true, setSpectatorTarget() {} }, voyagerForecast,getMultiplayerTrack, MULTIPLAYER_TRACKS,
+    evolutionPanel: { render() {} }, horizonPanel: { render() {} }, input: { release() {}, getControls: defaultControls }, canDrive: () => false, controlCodeLabel,
+    DEFAULT_ROOM_RULES, roomRulesText, MultiplayerHistory, recentHistory: new MultiplayerHistory(null), SUMMIT_TYRES, ATLAS_AI_LEVELS, atlasPitMs, odysseyStopWindow,
     URL, URLSearchParams, location: new URL('http://127.0.0.1:4319/multiplayer.html'),
     $: ui, time: ms => `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(3).padStart(6, '0')}`,
     sound: { engine() {} }, graphicsReady: true, busy: false, notice: '', mapLoading: false, mapError: '', mapProgress: '', previousPhase: '',
     entryFeedback: '', entryRetryKind: null, hostTargetKey: '', entryWait: { active: false, state: null },
   });
+  context.window = context; context.addEventListener = () => {};
   vm.runInContext(strip(uiSource) + '\n' + strip(inviteSource) + '\n' + strip(entrySource) + '\n' + strip(seriesUiSource) + '\n' + strip(spectatorSource) + '\nconst seriesPanel = new MultiplayerSeriesPanel(); let spectatorKey = "";\nglobalThis.helpers = { MultiplayerPlayerList, deadlineText, dnfLabel };', context);
+  vm.runInContext('Object.assign(globalThis,(()=>{' + strip(evolutionUiSource) + ';return {modeLabel,eventDescription,releaseRemaining};})());', context);
+  vm.runInContext('const arenaPanel=(()=>{' + strip(arenaUiSource) + ';return new MultiplayerArenaPanel(()=>client,input);})();', context);
+  vm.runInContext('Object.assign(globalThis,(()=>{' + strip(atlasUiSource) + ';return {AtlasRacingPanel};})());', context);
+  vm.runInContext('Object.assign(globalThis,(()=>{' + strip(odysseyUiSource) + ';return {OdysseyRacingPanel};})());', context);
+  vm.runInContext('const summitPanel=(()=>{' + strip(voyagerUiSource) + ';' + strip(summitUiSource) + ';return new SummitRacingPanel(()=>client);})();', context);
   vm.runInContext('const MultiplayerHistoryPanel=(function(){' + strip(historyUiSource) + ';return MultiplayerHistoryPanel;})();const historyPanel=new MultiplayerHistoryPanel(recentHistory,$("mp-history-list"),$("mp-history-status"));', context);
   vm.runInContext("const playerLists = { lobby: new MultiplayerPlayerList($('mp-players'), 'lobby'), results: new MultiplayerPlayerList($('mp-results-list'), 'results'), board: new MultiplayerPlayerList($('mp-board'), 'board') }; const lapList = new MultiplayerLapList($('mp-laps-list')); let lapDriverId = null, lapDriversKey = '';", context);
   const start = source.includes('function playerItem(') ? source.indexOf('function playerItem(') : source.indexOf('function renderUi(');

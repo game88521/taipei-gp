@@ -1,3 +1,110 @@
+<!-- odyssey-current-start -->
+# 2026-11-20 最新：Odyssey 十二項改善與新玩法
+
+本輪在 DCISI/taipei-gp-odyssey-work 完成本機封版，build **d376274301b9**，承接已套回但未提交的 Voyager bc5f6fdf669f。封版時尚未套回原專案，沒有 commit、push 或部署。這是封版時的紀錄；後續實際套回狀態以 DCISI 根目錄 TAIPEI_ODYSSEY_DELIVERY.md、本輪成功套用收據與獨立核對結果為準。
+
+固定編號：1連線自助診斷、2標準手把映射／選單、3停靠儀表、4勤務逐站明細、5合作快捷通訊／確認、6滿額回放明確替換、7手動S1／S2、8回放A／B與註記分享、9多人衝刺週末、10耐久強制一停、11南城一般道路公車、12救援絞盤裝載。入口與限制見 [ODYSSEY_FIXES.md](./ODYSSEY_FIXES.md)、城市／競速／工坊文件及 [ODYSSEY_MULTIPLAYER_CONTRACT.md](./ODYSSEY_MULTIPLAYER_CONTRACT.md)。
+
+證據見 [ODYSSEY_VALIDATION.md](./ODYSSEY_VALIDATION.md) 及JSON：newnode5、regression14、browser5、legacybrowser7、fixed1全部fresh PASS，本輪Node 61案、browser 84案、固定三與交付工具24案。真機、真手把、外網及長期負載尚未驗證，依最後人工驗收計畫處理。
+
+基準HEAD 67ce0881c91caddbdfcfb424e37ac74188862c0c，branch multiplayer-test，main 2dee076de30da52fe20b4d33faf659e6acf0aed3；封版器未操作Git。before完整840檔，inventory SHA256 7adacb81ddf0224eda92e40e029502de736f1ed64af979ae87fc26f96a5fd837。不要從HEAD覆蓋既有未提交成果或重跑歷史Apply。套用只使用本輪交付包，須先預檢／備份，再離線build、成功收據及獨立verifier。多人契約變更需前後端同步，不能只更新前端。
+
+AGENTS持續適用：繁體中文、虛構品牌、署名Rex <game88521@gmail.com>、不自行push、只測本機、手機實機最後。
+<!-- odyssey-current-end -->
+
+以下完整保留本輪開始前HANDOFF原bytes，各輪狀態以當時時間理解。
+
+<!-- voyager-current-start -->
+# 2026-11-19 最新：Voyager 十二項改善與新玩法
+
+本輪在DCISI/taipei-gp-voyager-work完成本機封版，build **bc5f6fdf669f**，承接已套回但未提交的Atlas 205d0c8df91e。尚未套回原專案，沒有commit、push或部署。來源／測試通過不等於成功套用或上線。
+
+證據沿用已明示：browser／legacy-browser共17套與Voyager Node沿用修補前原PASS報告，未重跑或改寫。產品與dist逐檔完全相同；完整測試inventory只允許platform-regression.mjs由已封存Atlas舊hash改為審查過的Response預先構造fixture，保留100ms總期限／15ms閒置期限與全部斷言。原25通過／1失敗及stderr保留FAIL；修補收據650eb54e59f703abf4ca44829183b4ad36c02f6617253b6120085692271a8c51後已重新執行build、固定三與資源／容量、完整legacy及24交付工具fixture。其餘entry／helper與測試hash均完全一致。
+
+功能入口見[VOYAGER_FIXES.md](./VOYAGER_FIXES.md)，證據見[VOYAGER_VALIDATION.md](./VOYAGER_VALIDATION.md)及JSON；契約與最後真機計畫各自另列。新Node74案、新舊browser128案、固定三與交付工具24案通過；確定性fixture不能替代外網真人／真機／長時壓測。
+
+基準HEAD 67ce0881c91caddbdfcfb424e37ac74188862c0c、branch multiplayer-test、main 2dee076de30da52fe20b4d33faf659e6acf0aed3未由封版器操作。before完整803檔，inventory SHA256 48406a86a3f67c5e3d3b24853648705193ba3805d7863db802478d6a401bb893。不可從HEAD覆蓋既有未提交成果，不要重跑歷史Apply。只使用本輪精確交付包，預檢、備份、離線build、逐檔驗證、成功收據與獨立verifier均須完成。
+
+城市city-race-v3／合作v4須前後端一起更新；賽道新增voyager-racing-v1能力，schema4回放仍讀舊1／2／3。VSC只記錄禁超車、不自動罰秒；照片僅單人暫停／已存回放，不停線上房。真手機、真手把、真人完整勤務、外網、長期負載與Docker仍未驗。
+
+AGENTS持續適用：繁體中文、虛構品牌、署名Rex <game88521@gmail.com>、不自行push、只測本機、實機最後。
+<!-- voyager-current-end -->
+
+以下完整保留本輪開始前HANDOFF原bytes，各輪狀態以當時時間理解。
+
+<!-- atlas-current-start -->
+# 2026-11-18 最新：Atlas 十二項改善與新玩法
+
+承接已套回且尚未提交的Summit build 8447a11b8964。本輪隔離副本DCISI/taipei-gp-atlas-work已完成十二項功能及本機封版，build **205d0c8df91e**。入口與行為見[ATLAS_FIXES.md](./ATLAS_FIXES.md)，實際報告見[ATLAS_VALIDATION.md](./ATLAS_VALIDATION.md)及JSON；容量比較另見[ATLAS_CAPACITY.md](./ATLAS_CAPACITY.md)，不能當作免費主機承載量。
+
+封版時尚未套回原專案、commit、push或部署。不要重跑歷史Apply，不可從Git HEAD覆蓋未提交成果。後續只使用本輪精確白名單交付包，預檢／備份／build／逐檔驗證與獨立成功收據均須完成；文件不等於已套用。Git基準67ce0881c91caddbdfcfb424e37ac74188862c0c，branch multiplayer-test，main 2dee076de30da52fe20b4d33faf659e6acf0aed3；封版器未操作Git。immutable before為taipei-gp-atlas-before-8447a11b8964，共761檔，庫存SHA256 d34e95d3dba67b3b4409808dbaebe20c7cfa231abb34d963592e5aa4f9a90cb0。
+
+前後端需同步：合作v3、城市競速city-race-v2，賽道多人另以atlasRacing能力與atlas-racing-v1啟用AI難度／損傷／旗號；v3回放仍讀舊v1／v2。NG1城市多人與NG2單人工坊不能混用。整包備份排除席位憑證，還原前確認下載與關閉其他遊戲頁；受中斷journal保護，不覆蓋首次救援原檔。
+
+真手機、真手把、真人完整勤務路線、外網、長期負載、玩法平衡與Docker實跑仍待[ATLAS_PHONE_TEST_PLAN.md](./ATLAS_PHONE_TEST_PLAN.md)。AGENTS持續：繁體中文、虛構品牌、署名Rex <game88521@gmail.com>、不自行push、只測本機、實機最後。
+本段是套用前封版快照；後續實際是否已套回，請從DCISI/TAIPEI_ATLAS_DELIVERY.md查本輪操作與結果，再核DCISI/taipei-gp-atlas-status.json（最近一次命令狀態）、DCISI/taipei-gp-atlas-apply-receipt.json（成功套用、備份及build的不可變收據），及DCISI/taipei-gp-atlas-original-verification.json（獨立唯讀verifier結果）。收據須與本輪manifest／build一致且獨立核對PASS；只有封版文件、preflight或零工作重建不能當作已套回證明。收據不存在或核對未通過時不要宣稱已套回，也不要重跑歷史Apply。
+
+城市競速修正收包wall時間比固定物理tick略新時，誤把有效油門當作idle而反覆阻尼；相同30Hz輸入／60Hz真FreeCar的5個模擬秒，+2ms相位由0.66458m恢復為93.21462m，並保留700ms過期與active:false煞停。另修正按脫困後焦點停在按鈕而阻擋鍵盤：產品會將焦點交回有標籤的遊戲畫布，瀏覽器案檢查焦點後才實際鍵盤駛過全部gates。原始29 PASS／1 FAIL對照（含前版來源hash）與修後Node／瀏覽器報告保存在ATLAS_VALIDATION.json的regression-before、atlas-city-server及summit-city-race-browser records；原始預期失敗不計入PASS總數。
+<!-- atlas-current-end -->
+
+以下完整保留本輪開始前的HANDOFF原bytes，各輪狀態以當時時間理解。
+
+<!-- summit-current-start -->
+# 2026-11-18最新：Summit十二項改善與新玩法
+
+承接已套回但尚未提交的Nexus build 64bc8f19a76a。本輪十二項在DCISI/taipei-gp-summit-work完成整合與本機驗證，build **8447a11b8964**。功能見[SUMMIT_FIXES.md](./SUMMIT_FIXES.md)，證據見[SUMMIT_VALIDATION.md](./SUMMIT_VALIDATION.md)／JSON。Summit Node 9套114案、browser28案；Nexus Node88案／browser29案／visibility6案；Horizon87案、Evolution91案、歷史33套393案、原26套與固定3通過。資源byte/gzip另列實測，不能當實機速度。
+
+封版時尚未套回原專案、commit、push或部署。不要重跑舊Apply或從HEAD覆蓋未提交成果；後續須以本輪成功套用收據與獨立核對為準，封版文件不等於成功套用。Git基準67ce0881c91caddbdfcfb424e37ac74188862c0c、branch multiplayer-test、main 2dee076de30da52fe20b4d33faf659e6acf0aed3均未由封版器操作。不可變before為DCISI/taipei-gp-summit-before-64bc8f19a76a，702檔inventory SHA256 cc9e643ca6015aaf74dd0247aeca99dcd4c179dafd4d974c690a83851e686cb6。
+
+前後端須同步更新：合作v2、城市競速city-race-v1與GP Summit／replay v2；exact Origin、/ws／/coop／/city-race共用連線上限。正賽大廳名單減少會清除整份排位並重新準備；續接新socket的耐久／道具序號可重新起算，舊socket仍失效。城市184tiles在listen前預熱，本機RSS約293MB不代表免費主機容量。真手機、真手把、外網真人、完整勤務路線、長期負載／平衡與Docker實跑未驗，最後按[SUMMIT_PHONE_TEST_PLAN.md](./SUMMIT_PHONE_TEST_PLAN.md)驗收。AGENTS持續：繁中、虛構品牌、署名Rex <game88521@gmail.com>、不自行push、只測本機、實機最後。
+<!-- summit-current-end -->
+
+以下完整保留歷史原bytes，各輪目前／尚未以當時時間理解。
+
+<!-- nexus-current-start -->
+# 2026-11-18最新：Nexus六項新玩法
+
+使用者指定的1～6為接力、合作配送、道具、賽事回放、挑戰分享碼及城市編輯器，已在DCISI/taipei-gp-nexus-work完成整合與本機驗證，build **64bc8f19a76a**。入口與範圍見[NEXUS_FIXES.md](./NEXUS_FIXES.md)，完整驗證見[NEXUS_VALIDATION.md](./NEXUS_VALIDATION.md)／JSON。新Node88案、封路顯示6案、browser29案、Horizon87案、Evolution91案、原26套、歷史33套393案、固定3與工具19項通過。
+
+上一輪Horizon已套回並獨立核對、尚未提交；不要從HEAD還原或重跑歷史Apply。本封版時本輪尚未套回原專案、commit、push或部署。後續實際套回狀態以DCISI/TAIPEI_NEXUS_DELIVERY.md、taipei-gp-nexus-status.json、不可變成功Apply收據與獨立verifier為準；此封版文不代替成功收據。Git HEAD 67ce0881c91caddbdfcfb424e37ac74188862c0c，branch multiplayer-test，main 2dee076de30da52fe20b4d33faf659e6acf0aed3均未動。
+
+不可變before DCISI/taipei-gp-nexus-before-999a1a3aa5b7，660檔inventory SHA256 ad0434d4cfee824963b4d4b3d8df1ec0301dbd62b8e1c034aaac98b6a6892c00；74個額外既有檔完整保留。使用新DCISI/Apply-TaipeiNexus.ps1：無旗標只預檢，-Apply -Build才備份套用及離線建置；verify-taipei-nexus-original.mjs需指定經核對manifest SHA。不能用預檢/latest代替成功套用證據。
+
+前後端需同步更新arena/replay/coop契約；共用server Origin限制，合作新增/coop WS路徑；不操作Render/Vercel/Origin或正式站。合作位置非完整權威物理，自訂路線不支援多人賽道房。真手機、真手把、外網真人、玩法平衡與長時間負載未驗，最後按[NEXUS_PHONE_TEST_PLAN.md](./NEXUS_PHONE_TEST_PLAN.md)驗收。AGENTS持續：繁中、虛構品牌、署名Rex <game88521@gmail.com>、不自行push、只測本機、實機最後。
+<!-- nexus-current-end -->
+
+以下完整保留歷史原bytes，各輪目前/尚未以當時時間理解。
+
+<!-- horizon-current-start -->
+# 2026-11-18最新：Horizon十二項
+
+使用者指定的1～12均已在DCISI/taipei-gp-horizon-work整合與本機驗證，build **999a1a3aa5b7**。項目與入口見[HORIZON_FIXES.md](./HORIZON_FIXES.md)，證據見[驗證](./HORIZON_VALIDATION.md)／JSON。新Node87案、browser30案、Evolution91案、原26套、歷史33套393案、固定3及交付工具19項通過。
+
+上一輪Evolution已套回原專案並獨立核對，仍未commit／push；不要用HEAD覆蓋或重跑舊Apply。本輪來源副本**尚未套回原專案，沒有commit、push或部署**。Git基準HEAD仍67ce0881c91caddbdfcfb424e37ac74188862c0c，branch multiplayer-test；main 2dee076de30da52fe20b4d33faf659e6acf0aed3未動。
+
+不可變before為DCISI/taipei-gp-horizon-before-b1f70bac2788，627檔inventory SHA256 4c0c6f912bf1f21ac9bdbe2742b0f56fd9619d408383d209c46905cc2ceff0b7。使用新DCISI/Apply-TaipeiHorizon.ps1，不帶旗標只預檢，-Apply -Build才備份、套用、離線建置及逐檔驗證；成功收據與verify-taipei-horizon-original.mjs才證明套回成功，預檢或latest不能代替。
+
+多人新增房規／觀眾／淘汰／格位需要前後端一起更新；本輪沒有操作Render／Vercel／Origin或任何正式站。跨重啟系列續賽沿用固定SERIES_RESUME_SECRET規則。真手機、真手把、外網真人完整賽事與長時間壓測未驗。AGENTS照常：繁中、虛構品牌、全部舊車免費、未獲明確授權不push、只測本機、實機最後。署名Rex <game88521@gmail.com>。
+<!-- horizon-current-end -->
+
+以下完整保留歷史原bytes；各輪「目前／尚未」以該輪時間點理解。
+
+<!-- evolution-current-start -->
+# 2026-11-17最新：Evolution十二項優化與新玩法
+
+使用者授權的1～12項已在DCISI/taipei-gp-evolution-work整合與本機驗證：AI安全並排／回場、多人站間簽名續賽、投票／隨機巡迴、自訂鍵位／手把、限時刷圈、讓秒追逐、四人2v2、GP三種挑戰、TT好友影子、自訂街賽賽曆、路段甩尾與易碎貨物配送。build **b1f70bac2788**；新Node91、browser31、原26套、legacy33套393案、固定3、交付fixture19通過。見[EVOLUTION_FIXES.md](./EVOLUTION_FIXES.md)與[驗證](./EVOLUTION_VALIDATION.md)／JSON。
+
+基準Git HEAD為67ce0881c91caddbdfcfb424e37ac74188862c0c、multiplayer-test，上一輪已commit並push；main為2dee076de30da52fe20b4d33faf659e6acf0aed3。本輪來源副本**尚未套回原專案、沒有commit、push或部署**。不要把下面舊段落的「尚未提交」當成目前基準狀態，也不要重跑舊Apply／Publish覆蓋現有成果。
+
+不可變before=DCISI/taipei-gp-evolution-before-d251460c360c，inventory591檔、SHA256 36d203784e512295d7b4c60e49a20cda4809731a158ef66a1599c841d78feacb。只用新的DCISI/Apply-TaipeiEvolution.ps1；不帶旗標先預檢，-Apply -Build才備份、套用、離線建置及逐檔驗證。成功收據=taipei-gp-evolution-apply-receipt.json；latest或失敗預檢不能代替成功收據，原專案須再由verify-taipei-evolution-original.mjs核對。
+
+多人須同步更新前後端，站間續賽需原瀏覽器席位能力；正式跨重啟需固定SERIES_RESUME_SECRET（32～4096 bytes），本輪未改真實環境或建立金鑰。四人loopback、受控成績與城市位置fixture不是外網真人完整賽事證據。手機實機、真手把、真人難度／長時穩定性仍待實測。
+
+AGENTS持續適用：繁體中文、虛構品牌、未獲當輪明確授權不push、只測本機、手機實機最後做。署名Rex <game88521@gmail.com>。本輪不改Render／Vercel／Origin。
+<!-- evolution-current-end -->
+
+以下原bytes完整保留此前交接；各段「目前／尚未」是當輪歷史。
+
 <!-- twelve-current-start -->
 # 2026-11-17 最新：十二項改善（Twelve）
 

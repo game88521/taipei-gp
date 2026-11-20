@@ -9,7 +9,9 @@ import { parseAst } from 'rolldown/parseAst';
 import { pureUrl } from './pure-module-loader.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const files = ['src/main.ts', 'src/city-jobs-ui.ts', 'src/city-jobs-state.ts', 'src/city-entry-intent.ts'];
+// The inactive real controller leaves the original callback behavior intact.
+const {VoyagerPhoto}=await import(await pureUrl(root,'voyager-photo.ts'));
+const files = ['src/main.ts', 'src/city-jobs-ui.ts', 'src/city-jobs-state.ts', 'src/city-entry-intent.ts', 'src/voyager-photo.ts'];
 const bytes = Object.fromEntries(await Promise.all(files.map(async f => [f, await readFile(path.join(root, f))])));
 const hash = b => createHash('sha256').update(b).digest('hex');
 const mainRaw = bytes['src/main.ts'].toString('utf8');
@@ -63,7 +65,7 @@ function fixture(real = after, options = {}) {
   let previews = 0;
   const taxi = { phase: 'off', previewTours() { return [{ id: `offer-${++previews}`, from: '起點', pickupDistance: 10, tourStops: [{ nm: '甲' }, { nm: '乙' }, { nm: '丙' }], distance: 1200, estimatedFare: 100, tourBonus: 240, estimatedTotal: 340 }]; },
     acceptTour(id) { events.accepts.push(id); if (options.throwAccept) throw Error('controlled failure'); if (options.rejectAccept) return false; this.phase = 'seek'; return true; } };
-  const ctx = vm.createContext({ $, cityEntryIntent: new CityEntryIntent(), state: 'paused', mode: 'free', taxiCheckpointPending: false, nav: null, camSnap: false,
+  const ctx = vm.createContext({ voyagerPhoto: new VoyagerPhoto({canOpen:()=>false}), nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, horizonUi: null, horizonCity: null, evolutionOwned: false, cityChallengeOpenToken: null, $, cityEntryIntent: new CityEntryIntent(), state: 'paused', mode: 'free', taxiCheckpointPending: false, nav: null, camSnap: false,
     fcar: { x: 100, z: 200, y: 0 }, chosen: { id: 'taxi' }, TOUCH: false, steerMode: 'tilt',
     sound: { start() { events.starts++; } }, input: { enableTilt: () => tilt }, document: { documentElement: {}, fullscreenElement: null, createElement: tag => new Element(tag) },
     taxi, finishDrift() {}, stopPolice() {}, sr: null, field: { hide() {} }, damage: { useVehicle() {} }, clock: { getDelta() {} },

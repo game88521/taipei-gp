@@ -12,6 +12,8 @@ import { parseAst } from 'rolldown/parseAst';
 import { pureUrl } from './pure-module-loader.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// The inactive real controller leaves the original callback behavior intact.
+const {VoyagerPhoto}=await import(await pureUrl(root,'voyager-photo.ts'));
 const before = resolve(process.argv.slice(2).find((a) => !a.startsWith('--')) ?? resolve(root, '../taipei-gp-next6-before-57b09b2'));
 const compile = (s) => stripTypeScriptTypes(s, { mode: 'transform' });
 const raw = await readFile(resolve(root, 'src/main.ts'), 'utf8');
@@ -52,12 +54,12 @@ function harness(module = current, extra = {}) {
   const sr = { active: route, phase: 'done', playerDone: 20, rivalDone: 25, duel: false, options, difficulty: 'standard', scopedRecordKey: 'key', validFinish: true,
     result: { ...options, key: 'key', time: 20, medal: 'gold' }, standings: () => [{ name: '你', isPlayer: true, done: 20 }, { name: '對手', done: 25 }],
     cancel() { calls.cancelled++; this.active = null; this.phase = 'idle'; }, challenges: [route] };
-  const context = vm.createContext({ console, $, document: { createElement: () => ({ appendChild() {}, textContent: '', className: '' }), querySelector: () => null },
+  const context = vm.createContext({ voyagerPhoto: new VoyagerPhoto({canOpen:()=>false}), summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, horizonUi: null, horizonCity: null, evolutionOwned: false, cityChallengeOpenToken: null, console, $, document: { createElement: () => ({ appendChild() {}, textContent: '', className: '' }), querySelector: () => null },
     sr, srShown: false, seriesRace: false, streetSeriesStartToken: null, streetSeries: { checkpoint: { id: 'series-a', rules: 'traffic' }, nextRouteId: 'a', active: true },
     state: 'free', pausedFrom: 'free', mode: 'free', BOT: false, CIRCUIT: null, NO_TRAFFIC: false, FREE_SIM: false, WANTED_TEST: false,
     ...performanceRules, cityEntryIntent: new CityEntryIntent(), cityJobsUi: undefined, racingTools: undefined, practiceRun: undefined, practiceUi: undefined, practiceIntent: 0,
     save: {}, stats: { earned: 0, trips: 0, streetWins: 0 }, chosen: { id: 'sedan' }, menu: $('menu'), hud: $('hud'),
-    clock: { getDelta() { calls.clocks++; return 0.1; } },
+    clock: { getDelta() { calls.clocks++; return 0.1; } }, input: { release() { calls.inputReleases = (calls.inputReleases ?? 0) + 1; } },
     sound: { engine(...a) { calls.engine.push(a); }, sirenAt(...a) { calls.siren.push(a); }, beep() {}, hit(...a) { calls.hits.push(a); } },
     writeSave() { calls.writes++; }, saveFreePos() { calls.saved++; }, saveSeasonCheckpoint() {},
     earn(n) { calls.paid += n; }, toast(...a) { calls.toasts.push(a); }, finishDrift() { calls.banks++; },
@@ -202,7 +204,7 @@ await check('before漏接警車撞擊；新版真管線只向音效/車損/甩�
   assert.equal(selected.length, 5); for (const n of selected) vm.runInContext(current.textOf(n), h.context);
   assert.deepEqual(h.calls.hits, [[20, 'car']]); assert.deepEqual(h.calls.damage, [8]); assert.deepEqual(h.calls.taxiHits, [8]); assert.equal(scorer.active, false);
   const dmg = nodes.find((n) => n.type === 'VariableDeclaration' && current.textOf(n).includes('const dmgHit'));
-  const equal = vm.createContext({ hardHit: 0, trafficHit: 0, knockHit: 8, impact: 8, carHit: 8 });
+  const equal = vm.createContext({ voyagerPhoto: new VoyagerPhoto({canOpen:()=>false}), summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, hardHit: 0, trafficHit: 0, knockHit: 8, impact: 8, carHit: 8 });
   vm.runInContext(current.textOf(dmg), equal); assert.equal(vm.runInContext('dmgHit', equal), 8, '車撞不能因恰與路燈同值而只算35%');
 });
 report.passed = report.checks.filter((c) => c.pass).length; report.failed = report.checks.length - report.passed;

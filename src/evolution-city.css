@@ -1,0 +1,14 @@
+#evolution-city-page { max-width: 800px; }
+#evolution-city-page section { border: 1px solid #4d5b76; border-radius: 12px; padding: 16px; margin: 16px 0; }
+#evolution-city-page p, #street-calendar p { line-height: 1.6; }
+#evolution-city-page select, #street-calendar select { display: block; min-height: 44px; max-width: 100%; background: #1a2333; color: white; font: inherit; margin: 8px 0; }
+#evolution-city-page button, #street-calendar button { min-width: 44px; min-height: 44px; margin: 4px; white-space: normal; }
+#evolution-city-page li, #street-calendar li { padding: 6px 0; overflow-wrap: anywhere; }
+#evolution-city-page li span, #street-calendar li span { display: block; }
+#route-drift-preview { display: block; width: min(100%, 360px); height: 160px; background: #101722; margin: 10px 0; border-radius: 8px; }
+#evolution-city-hud { position: absolute; top: max(75px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); max-width: min(560px, 70vw); max-height: 150px; overflow: auto; pointer-events: auto; padding: 8px; border-radius: 10px; background: #101725e8; font-size: 13px; touch-action: pan-y; }
+#evolution-city-hud[hidden] { display: none; }
+#evolution-city-hud p { margin: 0 0 4px; }
+#evolution-city-hud button { min-height: 44px; min-width: 44px; font-size: 12px; padding: 5px 8px; }
+@media(max-height:480px) { #evolution-city-hud { top: 65px; max-height: 110px; max-width: min(440px, 54vw); font-size: 11px; } }
+@media(max-width:640px) and (orientation:portrait) { #evolution-city-hud { top: 85px; max-width: calc(100vw - 24px); width: calc(100vw - 24px); max-height: 130px; } }

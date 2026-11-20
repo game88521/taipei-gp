@@ -24,7 +24,7 @@ const old = await version(before), current = await version(root), N = city.net.n
 function exercise(v, sample, shift = 0, height = 0) {
   let calls = 0;
   const end = sample.route.path.at(-1), nav = { x: end[0], z: end[1], y: sample.route.ys.at(-1) + ROAD_Y, nm: sample.name, path: sample.route.path, ys: sample.route.ys, t: 0 };
-  const ctx = vm.createContext({ nav, router: { route(...args) { calls++; return v.router.route(...args); } }, fcar: { x: sample.x + shift, z: sample.z, y: sample.y + height }, ROAD_Y,
+  const ctx = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, nav, router: { route(...args) { calls++; return v.router.route(...args); } }, fcar: { x: sample.x + shift, z: sample.z, y: sample.y + height }, ROAD_Y,
     cityGuidance: new CityGuidance(), groundH: cityModule.groundH, state: 'free', save: { opts: {} }, sound: { beep() {} },
     streetRacing: () => false, taxiOn: () => false, navArrows: { update() {} }, performance: { now: () => 0 }, ...v.mission,
     $: () => ({ style: {}, textContent: '' }), toast() {} });

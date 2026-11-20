@@ -1,0 +1,64 @@
+{
+    "files":  [
+                  {
+                      "path":  "src/summit-city-duty.ts",
+                      "sha256":  "a6820d654d48b608a9514247a300feb160cf9b4ca422bd2d4892955656602030",
+                      "baselineSha256":  "1e1271bed45eb585a535244dd1da288775f3699953dfd94ac05680240a2093e5",
+                      "bytes":  21081
+                  },
+                  {
+                      "path":  "src/summit-city-ui.ts",
+                      "sha256":  "6f293b03cc85149439c9947ed89fe1c32cce5b4279672094dbf2548478b3fe05",
+                      "baselineSha256":  "545df4b32adfc0fbbfd501712cab9a323d15ebcabbfac8fa993d0a2980db6873",
+                      "bytes":  18518
+                  },
+                  {
+                      "path":  "src/summit-duty-vehicle.ts",
+                      "sha256":  "d9916b975237353501a4df3e39aac344adacb4954782b6c3e2abec80972a3608",
+                      "baselineSha256":  "e42011d0334638021c7e05ffcf6d2af535bff77dc0c4e1cf10c88a9502840c4f",
+                      "bytes":  3795
+                  },
+                  {
+                      "path":  "src/summit-city.css",
+                      "sha256":  "73bd427b5403f38a18f72f8c755b4a089f65a00a1f1edd1ffa85f35bc653c536",
+                      "baselineSha256":  "69b92fc6259d932701f84c81e1818503314ef2419402d79f0d50d55b32da4480",
+                      "bytes":  2065
+                  },
+                  {
+                      "path":  "src/voyager-workshop-ghost.ts",
+                      "sha256":  "d9cdf233cf4206c16a441244487a041e1fbe08f6ef99155bf67db806c2800893",
+                      "baselineSha256":  null,
+                      "bytes":  8236
+                  },
+                  {
+                      "path":  "src/nexus-workshop-ui.ts",
+                      "sha256":  "e46a09bcd3eb925cb5663c7b48087bacda263bd300dc204d7b1addd2fd210a31",
+                      "baselineSha256":  "a17a00c16dd021e741c1983843effe02b0a87545c828311d2a11eb952e87b81d",
+                      "bytes":  38831
+                  },
+                  {
+                      "path":  "src/nexus-workshop.css",
+                      "sha256":  "eb59ed768cdba41d6663083e2e2b90cce357613dcf61fe1551549988af2be650",
+                      "baselineSha256":  "0adadbbaedf2b398b9cd0a1319702efa8c64257f859378114bd39e20509b1305",
+                      "bytes":  4623
+                  },
+                  {
+                      "path":  "tools/dev-tests/voyager-workshop-models.mjs",
+                      "sha256":  "2101902b4ced4d39c91e501d962a306a414eb6918f01d0ed3f68c9ea234ee6f2",
+                      "baselineSha256":  null,
+                      "bytes":  22367
+                  },
+                  {
+                      "path":  "tools/dev-tests/voyager-workshop-browser.mjs",
+                      "sha256":  "de733528e27938962ad92f2a8baf1c7ed5f2601c79949524ce62ea02fa8c7634",
+                      "baselineSha256":  null,
+                      "bytes":  22631
+                  },
+                  {
+                      "path":  "VOYAGER_WORKSHOP.md",
+                      "sha256":  "3a577f6c0e3def46d297df4d2a7143af350b15e8135911830344d1319c3f9daa",
+                      "baselineSha256":  null,
+                      "bytes":  6915
+                  }
+              ]
+}

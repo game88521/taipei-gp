@@ -104,9 +104,10 @@ async function run([name, resultName]) {
   if (result.status !== 'PASS') console.error(stdout + stderr + (failure ?? ''));
 }
 
-// 舊入口的毫秒級網路案例仍先單獨跑，不改 timeout 或斷言。
+// 毫秒級網路案例先單獨跑，避免同批物理VM佔用事件迴圈；不改 timeout 或斷言。
 await run(scripts[0]);
-for (let i = 1; i < scripts.length; i += 3) await Promise.all(scripts.slice(i, i + 3).map(run));
+await run(scripts.find(([name]) => name === 'leaderboard-regression'));
+for (let i = 1; i < scripts.length; i += 3) await Promise.all(scripts.slice(i, i + 3).filter(([name]) => name !== 'leaderboard-regression').map(run));
 const after = await productHash();
 const retainedSummary = await optionalRead(oldSummaryPath);
 const oldSummaryPreserved = oldSummary ? retainedSummary?.equals(oldSummary) === true : retainedSummary === null;

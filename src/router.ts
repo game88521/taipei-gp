@@ -1,12 +1,14 @@
 import { Grid, groundH, type CityData } from './citydata';
+import { PreferredCityRouter, type NavigationPreference } from './summit-navigation';
 
-interface RoadEdge { a: number; b: number; forward: boolean; backward: boolean; length: number; factor: number }
+interface RoadEdge { a: number; b: number; forward: boolean; backward: boolean; length: number; factor: number; elevated?: boolean }
 interface RoadSnap { edge: RoadEdge; t: number; x: number; z: number; y: number }
 
 // 導航：照真實路網（含單行方向）找最短路線，路口轉角平滑成弧線。
 // 高架、隧道也在路網裡（長途比較常走高架）；起點、終點吸附節點時比高度：在橋上就從橋上出發
 
 export class Router {
+  navigationPreference: NavigationPreference = 'legacy';
   private N: number[];
   private Y: number[];
   private adj = new Map<number, [number, number][]>();
@@ -14,8 +16,10 @@ export class Router {
   private tmp: number[] = [];
   private junctionNodes = new Set<number>();
   private edges = new Grid<RoadEdge>(80);
+  private preferred: PreferredCityRouter | null = null;
 
-  constructor(d: CityData) {
+  constructor(private data: CityData) {
+    const d = data;
     this.N = d.net.nodes;
     this.Y = d.net.y ?? [];
     const N = this.N;
@@ -35,7 +39,7 @@ export class Router {
         if (w.o !== -1) add(a, b);
         if (w.o !== 1) add(b, a);
         if (w.c <= 2) { snap.add(a); snap.add(b); }
-        if (w.c <= 2 && l > 0) candidates.push({ a, b, forward: w.o !== -1, backward: w.o !== 1, length: l, factor: w.e ? 0.75 : 1 });
+        if (w.c <= 2 && l > 0) candidates.push({ a, b, forward: w.o !== -1, backward: w.o !== 1, length: l, factor: w.e ? 0.75 : 1, elevated: !!w.e });
       }
     }
     for (const [n, ns] of neighbors) if (ns.size >= 3) this.junctionNodes.add(n);
@@ -92,6 +96,12 @@ export class Router {
     return -1;
   }
 
+  routeWithPreference(preference: NavigationPreference, x0: number, z0: number, x1: number, z1: number, y0?: number, y1?: number) {
+    if (preference === 'legacy') return this.route(x0, z0, x1, z1, y0, y1);
+    if (!['shortest', 'few-turns', 'avoid-elevated'].includes(preference)) return null;
+    const start = this.project(x0, z0, y0), end = this.project(x1, z1, y1); if (!start || !end) return null;
+    this.preferred ??= new PreferredCityRouter(this.data); return this.preferred.route(start, end, preference);
+  }
   /** 從 (x0, z0) 到 (x1, z1) 的路線（平滑後的點列、每點的路面高度）與長度；找不到回傳 null。y0、y1 = 起訖的高度（沒給 = 地面） */
   route(x0: number, z0: number, x1: number, z1: number, y0?: number, y1?: number): { path: [number, number][]; ys: number[]; length: number; junctions: number } | null {
     const start = this.project(x0, z0, y0), end = this.project(x1, z1, y1);

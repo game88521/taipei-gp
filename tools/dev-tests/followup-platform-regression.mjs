@@ -7,9 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import {pureUrl} from './pure-module-loader.mjs';
 import { parseAst } from 'rolldown/parseAst';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// Real inactive photo controller: no DOM, rendering or simulation branch is replaced.
+const {VoyagerPhoto}=await import(await pureUrl(root,'voyager-photo.ts'));
+
 const before = resolve(process.argv[2] ?? process.env.GP_FOLLOWUP_BASELINE_DIR ?? resolve(root, '../taipei-gp-followup-before-2dee076'));
 if (root === before) throw Error('before 不可指向受測工作副本');
 const frameSource = await readFile(resolve(root, 'src/frame-pacing.ts'), 'utf8');
@@ -99,7 +103,7 @@ function harness(source = current, options = {}) {
   let now = 0, delta = 1 / (options.hz ?? 120);
   const events = { steps: [], freeSteps: [], renders: [], visuals: [], rain: [], radio: [], stats: [], watches: 0, bigmaps: 0, garageDt: [] };
   const fps = { style: {}, textContent: '' };
-  const ctx = vm.createContext({ console, Math, Number, performance: { now: () => now }, clock: { getDelta: () => delta },
+  const ctx = vm.createContext({ voyagerPhoto:new VoyagerPhoto({canOpen:()=>false}), summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, Math, Number, performance: { now: () => now }, clock: { getDelta: () => delta },
     ...frame, framePacer: new frame.RenderPacer(), renderMeter: new frame.RenderMeter(), frameCapPref: options.cap ?? '30',
     BOT: options.bot ?? false, SIM: 0, state: options.state ?? 'race', mode: options.state === 'free' ? 'free' : 'race', raceKind: 'gp', mapOpen: options.map ?? false,
     ctxLostNow: false, holdRender: false, STEP: 1 / 120, composer: null, scene: {}, camera: { position: { x: 0, z: 0 } },
@@ -177,7 +181,7 @@ await test('真main警方AST before/after：罰款文案符合實扣，50/200/30
     const save = { taxi: { money: initial, trips: 0 }, ledger: [] }, taxi = { money: initial, trips: 0 }, toasts = [];
     const stats = { escapes: 0, maxEscaped: 0, busted: 0, arrests: 0, earned: 0 };
     const msg = delta < 0 ? '🚔 被逮捕了！罰款 NT$ 200' : '✅ 逮捕嫌犯！獎金 NT$ 400';
-    const context = vm.createContext({ Math, save, taxi, stats, recordTransaction: economy.recordTransaction,
+    const context = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, Math, save, taxi, stats, recordTransaction: economy.recordTransaction,
       writeSave() {}, refreshGarage() {}, toast: (text) => toasts.push(text), sound: { beep() {} },
       streetRacing: () => false, chosen: { id: 'sedan' }, FREE_SIM: false, WANTED_TEST: false,
       trafficHit: 0, pedHit: false, dt: 0.02, fcar: {}, collider: null, NO_TRAFFIC: false, traffic: null, policeLog: [],

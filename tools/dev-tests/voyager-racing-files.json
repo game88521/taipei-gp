@@ -1,0 +1,182 @@
+{
+  "status": "FROZEN_READY_FOR_ROOT_INTEGRATION",
+  "author": "Rex <game88521@gmail.com>",
+  "items": [
+    5,
+    6,
+    7
+  ],
+  "files": [
+    {
+      "path": "shared/voyager-racing.ts",
+      "sha256": "fd017e13274973fdcd7c732802a7d768fb83646ff38cd3006f944fc4d92dad70",
+      "bytes": 5847,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "server/voyager-racing-service.mjs",
+      "sha256": "f1ae1c53fcfddd283f3d0e1f9ae336e22648d35754fef929a8c43ec8ff1f08f1",
+      "bytes": 7745,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "src/voyager-racing-ui.ts",
+      "sha256": "248fbc28e5b427e77e42eed428ef011f9acc4777ad9f21400a23a03a848e2458",
+      "bytes": 7434,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "src/voyager-racing.css",
+      "sha256": "e3b064d39f39205e755f63c70fac084426d6fe9f024f0c0d6be70c98d780840c",
+      "bytes": 844,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "shared/summit-racing.ts",
+      "sha256": "528cf6a71357e6ecbb0c9e72e67e71a6b1e88237e759cf620b537efae0218217",
+      "bytes": 6359,
+      "change": "modified",
+      "baselineSha256": "2172c352bfc3ec410d9b1e1723e8c38ca2a55226d650cfe19b915b08a754e017"
+    },
+    {
+      "path": "server/summit-racing-service.mjs",
+      "sha256": "2359b8a19fc51d037063888af211ae97dc57a8682cd1d10eefd46a7797fc4184",
+      "bytes": 12927,
+      "change": "modified",
+      "baselineSha256": "35df18ead4e90cc8edc23cbb70c219091c7d926a442b64781bf0126288cac677"
+    },
+    {
+      "path": "server/room-service.mjs",
+      "sha256": "d58f340876e14a2afa0ad95d47dcf263ac9c25a5c91863d98831b4d753e340fb",
+      "bytes": 67702,
+      "change": "modified",
+      "baselineSha256": "40fc7069e04bffae2e3bf903337075c9ffaba8c4d1142ae12824f668c9527fde"
+    },
+    {
+      "path": "server/horizon-service.mjs",
+      "sha256": "22833800802c376fa3f760abcaefecdcaab9b77ab80f8483c64b2bd393b669c8",
+      "bytes": 13768,
+      "change": "modified",
+      "baselineSha256": "81b465c235c24bb5ce61396056dd47a8e0fc7e1402fb9e6de6def04698012fe3"
+    },
+    {
+      "path": "shared/multiplayer-protocol.ts",
+      "sha256": "d4a528ddafbbf5c3d46adc8d710501055054732d3c5519cfaecea0e74201c528",
+      "bytes": 8954,
+      "change": "modified",
+      "baselineSha256": "d4a4e3d46626a7f99e123635630f9035f217ac5cdc648e8f60f060abb64e79f2"
+    },
+    {
+      "path": "src/multiplayer-client.ts",
+      "sha256": "5a4a88ac6cdad11778273c4b1dfc6c33a481d2d75bbc161ffa9c9b5534adb864",
+      "bytes": 53261,
+      "change": "modified",
+      "baselineSha256": "d8a685a2f9b0c849aaf51af097c25935edfce70300d7d6f82214eb29ac812fdc"
+    },
+    {
+      "path": "src/multiplayer-scene.ts",
+      "sha256": "ac032d863169c051c19a30eff83ca018424567b2c3608e15d8390e96dfcaefa2",
+      "bytes": 30349,
+      "change": "modified",
+      "baselineSha256": "e2b8bd3e6b4b1e2a17c8174e3adce7a253e1b6b67603429fe926bf791ad7ff32"
+    },
+    {
+      "path": "src/summit-racing-visuals.ts",
+      "sha256": "92885667bf3c536400f068610d3a699fed5d60c2022bc059bd74b19434f6b13b",
+      "bytes": 1973,
+      "change": "modified",
+      "baselineSha256": "1289d449b8c36132c44062af5872f738788e9182657ba3ab77133a449d7c6986"
+    },
+    {
+      "path": "shared/nexus-replay.ts",
+      "sha256": "0d8b8083fdf2dda1500a687ef2866f628adb5f8fb0580c7a2546bcd558b1891f",
+      "bytes": 12045,
+      "change": "modified",
+      "baselineSha256": "e8ebda36fcb096412b58d2253a97b1c0f669fdc0d8a9cf6be61184f6a84da8d2"
+    },
+    {
+      "path": "server/nexus-replay-service.mjs",
+      "sha256": "8b517f200bbb00e770b4316fcb61f464b4bf7230a1815be278d93e0af56da189",
+      "bytes": 5302,
+      "change": "modified",
+      "baselineSha256": "a1c314f20d3e2528268c662229c9336b09024686b2bf4df86b3d0b1b563d80a4"
+    },
+    {
+      "path": "src/multiplayer-history.ts",
+      "sha256": "aee4b82d72b5454a686a6b7e6ecb8bfdb6175f23277d0ad1f970ba42293606e7",
+      "bytes": 14417,
+      "change": "modified",
+      "baselineSha256": "edd1ac28099e3d2deeaaf03fc8db1683e2dbf9253c031b7ce8d5450e0935d344"
+    },
+    {
+      "path": "src/multiplayer-history-ui.ts",
+      "sha256": "1671b862dc9ecea894a8465f54c933a4aaa2cc278da39d5f33d19b2831a05ebb",
+      "bytes": 4154,
+      "change": "modified",
+      "baselineSha256": "7370d1d979e83c89df827f29527f426a631cf3c1ce070cea26c3bae009f47111"
+    },
+    {
+      "path": "src/multiplayer-ui.ts",
+      "sha256": "85c91c6662d9c88d765a5156d7ceb71f1734de7a8b5aade9e5d92e5300802daf",
+      "bytes": 9873,
+      "change": "modified",
+      "baselineSha256": "57d2fedee60a2838651676ab561a87383853f437bb7ef4696fc3f4993b8d1729"
+    },
+    {
+      "path": "src/summit-racing-ui.ts",
+      "sha256": "e652d45df9adc192f38212d971537b83e261a24a1951477e2b9859a642cf0f8a",
+      "bytes": 11487,
+      "change": "modified",
+      "baselineSha256": "f22edd9bb760a1b631420fca5ad14e0d41ac4a81c1d633f4aeb91b5eb522d062"
+    },
+    {
+      "path": "tools/dev-tests/next6-multiplayer-ui.mjs",
+      "sha256": "3a9e3ffa78206d2239d10063a5ea549161939dc1a105a8c3d34cf8b48266c692",
+      "bytes": 12792,
+      "change": "modified",
+      "baselineSha256": "b54d6da8f167f8234a96184ed96abff4f25325a13c415ae708f61cc96051a1b9"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-map-ui-lifecycle.mjs",
+      "sha256": "fbc5d9717d61339f24677a203c2fc623372d3e8633425d00375b17f3fb60bd8b",
+      "bytes": 20442,
+      "change": "modified",
+      "baselineSha256": "70ea44c74c5b42ec9ea571f28b097d2956dc5b8393f60cbb24cd3fb6d645a3c3"
+    },
+    {
+      "path": "tools/dev-tests/voyager-racing-node.mjs",
+      "sha256": "2d2981d943a30a3f40bfc50147cc8f92646227a52a92edb79231b5a88500e4db",
+      "bytes": 15502,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "tools/dev-tests/voyager-racing-node-result.json",
+      "sha256": "79d9cd8f6cdab17e4e18404813561f8b6ad91cc22348dc1601fe59f7a5e951fb",
+      "bytes": 3424,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "tools/dev-tests/voyager-racing-browser.mjs",
+      "sha256": "f5b20046239542a5f4637cbdada2b77e6cff599ce8f8bfa06fe156bfcdae8f89",
+      "bytes": 12658,
+      "change": "added",
+      "baselineSha256": null
+    },
+    {
+      "path": "VOYAGER_RACING.md",
+      "sha256": "bdf551b70e95853e3e5456b9c108d78673e3064ea25f25caf0ea477883241713",
+      "bytes": 5025,
+      "change": "added",
+      "baselineSha256": null
+    }
+  ],
+  "manifestSelfExcluded": true,
+  "browserRun": false,
+  "rootBuildAndRegressionPending": true
+}

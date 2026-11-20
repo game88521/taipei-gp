@@ -68,6 +68,6 @@ Room 必含 `code`, `hostId`, `phase`, `matchId`, `startAt`, `laps`, `serverTime
 
 常用錯誤碼：`INCOMPATIBLE_VERSION`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `ROOM_STARTED`, `ALREADY_JOINED`, `INVALID_SESSION`, `SESSION_EXPIRED`, `HOST_ONLY`, `NOT_READY`, `INVALID_PHASE`, `STALE_MATCH`, `STALE_TRACK`, `INVALID_TRACK`, `TRACK_UNAVAILABLE`, `INVALID_NAME`, `BAD_MESSAGE`, `RATE_LIMIT`, `SERVER_FULL`。重連收到 session／房間失效錯誤後，客戶端應清除舊 session 並讓玩家重新加入。
 
-預設最多 50 房、256 sockets、同一實體來源 IP 16 sockets；每個訊息上限 4096 bytes，不使用壓縮。超大、binary、持續無效 JSON、限流或過慢的 socket 會關閉。每五秒 WebSocket ping，未回應的下一輪終止；這與應用層 ping 不同。
+預設最多 50 房、256 sockets、同一實體來源 IP 16 sockets；一般訊息上限 4096 bytes，不使用壓縮。Evolution `resume-series` 單一例外允許64KiB簽名token加最多2048 bytes封裝；傳輸層上限96KiB，應用層另嚴格限制。超大、binary、持續無效 JSON、限流或過慢的 socket 會關閉。每五秒 WebSocket ping，未回應的下一輪終止；這與應用層 ping 不同。新增玩法/票選/續賽規格見 [EVOLUTION_MULTIPLAYER_CONTRACT.md](../EVOLUTION_MULTIPLAYER_CONTRACT.md)。
 
 所有人離線六十秒後回收房間，大廳／結果三十分鐘無操作回收。資料只在單一 Node 程序記憶體；重新部署或程序重啟會終止房間。任何對戰結果都不寫入單人錢包、賽季、PB 或線上計時榜。

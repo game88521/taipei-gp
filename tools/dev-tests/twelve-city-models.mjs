@@ -26,7 +26,7 @@ const raw = await readFile(resolve(root, 'src/main.ts'), 'utf8'), main = stripTy
 const fn = (name) => { const n = ast.body.find((n) => n.type === 'FunctionDeclaration' && n.id?.name === name); assert.ok(n, name); return main.slice(n.start, n.end); };
 
 async function loader(base) {
-  const ctx = vm.createContext({ console, crypto: webcrypto, performance, URLSearchParams, location: { search: '' } });
+  const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, crypto: webcrypto, performance, URLSearchParams, location: { search: '' } });
   const cache = new Map(), teams = Array.from({ length: 11 }, () => ({ livery: { main: '#ff0000' } }));
   const model = () => ({ root: new THREE.Group(), body: new THREE.Group(), steer: [], spin: [] });
   const defaultSpec = (await import(await pureUrl(base, 'freecar.ts'))).DEFAULT_SPEC;
@@ -74,7 +74,7 @@ await check('4每秒短音最多一次，返回追蹤距離/勤務結束重設�
 });
 await check('4真main消費實際倒數/顏色，偏好關閉零短音且多次HUD不重播', () => {
   const nodes = { wanted: {}, 'btn-pursuit': { style: {} } }, played = [];
-  const ctx = vm.createContext({ $: (id) => nodes[id], cityJobsUi: null, state: 'free', save: { opts: { 'city-pursuit-sound': false } },
+  const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, $: (id) => nodes[id], cityJobsUi: null, state: 'free', save: { opts: { 'city-pursuit-sound': false } },
     policeEscapeWarning: new PoliceEscapeWarning(), canStartPursuit: () => false, sound: { beep: (...v) => played.push(v) },
     police: { suspect: {}, suspectDistance: 600, suspectHp: 80, dutySummary: { hp: 100 }, arrestProgress: 0, pursuitT: 140, escapeIn: 2.7 } });
   vm.runInContext(fn('updateWantedHud'), ctx); ctx.updateWantedHud(); assert.match(nodes.wanted.className, /escape-urgent/); assert.match(nodes.wanted.textContent, /2\.7 s/); assert.equal(played.length, 0);
@@ -119,7 +119,7 @@ await check('11相隔45m的兩個右轉各提示一次，同一彎重算則不�
 });
 await check('11真main導航顯示路層/距離，選配短音關閉時不播放，取消清除', () => {
   const nodes = new Map(), played = [], $ = (id) => { if (!nodes.has(id)) nodes.set(id, { style: {} }); return nodes.get(id); };
-  const ctx = vm.createContext({ $, cityGuidance: new CityGuidance(), fcar: { x: 10, z: 0, y: 9.75 }, ROAD_Y: -.25, groundH: ground,
+  const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, $, cityGuidance: new CityGuidance(), fcar: { x: 10, z: 0, y: 9.75 }, ROAD_Y: -.25, groundH: ground,
     state: 'free', save: { opts: { 'city-nav-sound': false } }, sound: { beep: (...v) => played.push(v) } });
   vm.runInContext(fn('showCityGuidance'), ctx); ctx.showCityGuidance([[0, 0], [100, 0], [100, 100]], [10, 10, 10], 'one', '測試');
   assert.match($('nav-hud').textContent, /右轉.*高架路段/); assert.equal(played.length, 0);
@@ -173,14 +173,14 @@ await check('12真StreetRace套用所選車性能與難度，統一街賽使用D
 });
 await check('12真main選項固定BOT原規則，車款/有無車流與class分開，系列續接接受class基底', () => {
   const nodes = { 'duel-difficulty': { value: 'hard' }, 'duel-car-mode': { value: 'selected' }, 'duel-opponents': { value: 'class' } };
-  const ctx = vm.createContext({ $: (id) => nodes[id], BOT: false, NO_TRAFFIC: false, chosen: { id: 'pickup' } }); vm.runInContext(fn('currentStreetOptions'), ctx);
+  const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, $: (id) => nodes[id], BOT: false, NO_TRAFFIC: false, chosen: { id: 'pickup' } }); vm.runInContext(fn('currentStreetOptions'), ctx);
   assert.deepEqual(clone(ctx.currentStreetOptions()), { carId: 'pickup', difficulty: 'hard', rules: 'traffic-class-v1' });
   ctx.NO_TRAFFIC = true; assert.equal(ctx.currentStreetOptions().rules, 'clear-class-v1'); ctx.BOT = true; assert.equal(ctx.currentStreetOptions().rules, 'clear'); assert.equal(ctx.currentStreetOptions().carId, 'street-f1');
 });
 await check('12真main續接class系列鎖原車/難度/規則，車流基底不符拒絕且釋放pending', async () => {
   for (const noTraffic of [true, false]) {
     const options = { id: 'series', carId: 'pickup', difficulty: 'hard', rules: 'clear-class-v1' }, route = { def: { id: 'next' } }, starts = [];
-    const ctx = vm.createContext({ ...performanceRules, state: 'paused', mode: 'free', streetSeriesStartToken: null,
+    const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, ...performanceRules, state: 'paused', mode: 'free', streetSeriesStartToken: null,
       streetResultOpen: () => false, streetSeries: { checkpoint: options, nextRouteId: 'next' }, sr: { active: null, challenges: [route] },
       userStart: async () => {}, ensureStreetSystems: async () => true, NO_TRAFFIC: noTraffic, chosen: { id: 'f1' },
       $: () => ({ classList: { add() {} } }), toast() {}, field: { hide() {} }, hideMenu() {}, clock: { getDelta() {} },

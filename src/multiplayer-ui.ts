@@ -3,6 +3,7 @@ import type { DnfReason, RoomPlayer, RoomSnapshot } from '../shared/multiplayer-
 const DNF_LABELS: Record<DnfReason, string> = {
   'race-timeout': '超過比賽時間', 'finish-timeout': '超過完賽期限',
   'disconnect-expired': '斷線逾期', left: '主動退出', 'server-stall': '伺服器暫停過久',
+  'time-trial-grace': '限時單圈寬限結束', 'time-trial-no-lap': '沒有有效完圈',
 };
 export const dnfLabel = (reason: DnfReason | null | undefined) => reason ? DNF_LABELS[reason] : '未完成';
 
@@ -12,6 +13,13 @@ export function setText(element: HTMLElement, value: string) {
 
 export function deadlineText(room: RoomSnapshot | null | undefined, serverNow: number): string {
   if (room?.phase !== 'racing' || room.deadlineAt == null) return '';
+  if(room.voyager?.settings.practiceSeconds){const seconds=Math.max(0,Math.ceil((room.deadlineAt-serverNow)/1000));return`練習剩餘 ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;}
+  if(room.summit?.durationSeconds&&room.startAt!==null){const cutoff=room.startAt+room.summit.durationSeconds*1000,qual=room.summit.stage==='qualifying',left=Math.max(0,Math.ceil(((qual||serverNow>=cutoff?room.deadlineAt:cutoff)-serverNow)/1000));return`${qual?'排位剩餘':serverNow>=cutoff?'完成這圈，最長寬限':'耐久剩餘'} ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;}
+  if (room.evolution?.mode === 'time-trial' && room.startAt !== null) {
+    const cutoff = room.startAt + room.evolution.durationSeconds * 1000;
+    const inGrace = serverNow >= cutoff, seconds = Math.max(0, Math.ceil(((inGrace ? room.deadlineAt : cutoff) - serverNow) / 1000));
+    return `${inGrace ? '最後有效圈寬限' : '最快圈賽剩餘'} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  }
   const seconds = Math.max(0, Math.ceil((room.deadlineAt - serverNow) / 1000));
   return `${room.deadlineReason === 'finish-timeout' ? '最後完賽' : '比賽剩餘'} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
@@ -21,12 +29,13 @@ type ListKind = 'lobby' | 'results' | 'board';
 const raceTime = (ms: number) => `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(3).padStart(6, '0')}`;
 
 /** Differences use authoritative finish times; unfinished players have no final gap. */
+export const odysseyRuleUnclassified=(room:RoomSnapshot,player:RoomPlayer)=>room.phase==='results'&&!!room.odyssey?.settings.mandatoryStop&&!player.dnf&&!!player.odyssey?.stopMissed;
 export function finishGapText(room: RoomSnapshot, player: RoomPlayer): string {
-  if (player.dnf || player.finishMs === null) return '';
-  const finishes = room.players.filter(p => !p.dnf && p.finishMs !== null).map(p => p.finishMs!);
+  if (player.dnf || player.finishMs === null || odysseyRuleUnclassified(room,player)) return '';
+  const finishes = room.players.filter(p => !p.dnf && p.finishMs !== null && !odysseyRuleUnclassified(room,p)).map(p => p.finishMs!);
   if (!finishes.length) return '';
   const gap = Math.max(0, player.finishMs - Math.min(...finishes));
-  return gap === 0 ? '冠軍' : `落後冠軍 +${(gap / 1000).toFixed(3)} 秒`;
+  return gap === 0 ? room.voyager?.settings.practiceSeconds?'練習最快':room.summit?.stage==='qualifying'?'桿位':'冠軍' : `${room.voyager?.settings.practiceSeconds||room.evolution?.mode === 'time-trial'||room.summit?.stage==='qualifying' ? '最快圈差' : '落後冠軍'} +${(gap / 1000).toFixed(3)} 秒`;
 }
 
 export function lapSummaryText(room: RoomSnapshot | null | undefined, playerId: string | null | undefined): string {
@@ -34,7 +43,7 @@ export function lapSummaryText(room: RoomSnapshot | null | undefined, playerId: 
   if (!player) return '';
   if (!player.lapTimesMs) return '伺服器未提供逐圈成績';
   if (!player.lapTimesMs.length) return '完成第一圈後顯示圈速';
-  return `第 ${player.lapTimesMs.length} 圈 ${raceTime(player.lapTimesMs.at(-1)!)} · 最快 ${raceTime(player.bestLapMs!)}`;
+  return `第 ${player.lapTimesMs.length} 圈 ${raceTime(player.lapTimesMs.at(-1)!)} · ${player.bestLapMs==null?'尚無有效圈':`最快 ${raceTime(player.bestLapMs)}`}`;
 }
 
 type LapRow = { root: HTMLLIElement; label: HTMLElement; time: HTMLElement; detail: HTMLElement };
@@ -55,11 +64,11 @@ export class MultiplayerLapList {
         root.append(label, time, detail); row = { root, label, time, detail }; this.rows.set(lap, row);
         this.element.append(root);
       }
-      const fastest = ms === player.bestLapMs;
+      const valid=room.voyager?.settings.practiceSeconds?player.voyager?.validLaps.includes(ms):room.summit?.stage!=='qualifying'||player.summit?.validLaps.includes(ms),fastest = valid&&ms === player.bestLapMs;
       if (row.root.dataset.fastest !== String(fastest)) row.root.dataset.fastest = String(fastest);
       setText(row.label, `第 ${lap + 1} 圈`); setText(row.time, raceTime(ms));
       const difference = lap === 0 ? '' : `${ms <= times[lap - 1] ? '較上圈快' : '較上圈慢'} ${(Math.abs(ms - times[lap - 1]) / 1000).toFixed(3)} 秒`;
-      setText(row.detail, [fastest ? '最快圈' : '', difference].filter(Boolean).join(' · '));
+      setText(row.detail, [!valid?'無效圈':fastest ? '最快圈' : '', difference].filter(Boolean).join(' · '));
     });
   }
 
@@ -95,16 +104,18 @@ export class MultiplayerPlayerList {
       const self = String(player.id === selfId);
       if (row.root.dataset.self !== self) row.root.dataset.self = self;
       if (this.kind === 'board') {
-        setText(row.marker, `P${player.rank}`); setText(row.name, player.name);
-        setText(row.status, player.dnf ? 'DNF' : player.finishMs !== null ? '🏁' : !player.connected ? '失聯' : `${Math.min(room.laps, player.completedLaps + 1)}/${room.laps}`);
+        setText(row.marker, odysseyRuleUnclassified(room,player)?'—':`P${player.rank}`); setText(row.name, player.name+(player.summit?.ai?' [AI]':''));
+        setText(row.status, player.eliminated ? `淘汰 P${player.eliminationRank}` : player.eliminationWinner ? '勝出' : player.block?.ghost ? '保護凍結' : player.dnf ? 'DNF' : room.voyager?.settings.practiceSeconds||room.evolution?.mode === 'time-trial'||room.summit?.stage==='qualifying' ? player.bestLapMs != null ? raceTime(player.bestLapMs) : '尚無有效圈' : player.finishMs !== null ? '🏁' : !player.connected ? '失聯' : room.summit?.settings.endurance?`${player.completedLaps}圈`:`${Math.min(room.laps, player.completedLaps + 1)}/${room.laps}`);
       } else {
         if (row.marker.dataset.color !== player.color) { row.marker.style.background = player.color; row.marker.dataset.color = player.color; }
         const results = this.kind === 'results';
-        setText(row.name, `${results ? player.rank + '. ' : ''}${player.name}${player.id === selfId ? '（你）' : ''}`);
+        const team = room.evolution?.teams[player.id], teamLabel = team ? ` · ${team === 'red' ? '紅' : '藍'}隊` : '';
+        setText(row.name, `${results&&!odysseyRuleUnclassified(room,player) ? player.rank + '. ' : ''}${player.name}${player.summit?.ai?' [AI]':''}${player.id === selfId ? '（你）' : ''}${teamLabel}`);
         setText(row.detail!, results ? [`${player.completedLaps} 圈`, player.bestLapMs == null ? '' : `最快 ${raceTime(player.bestLapMs)}`,
+          room.evolution?.mode === 'pursuit' && player.netFinishMs != null ? `淨跑 ${raceTime(player.netFinishMs)} · 讓 ${room.evolution.releaseDelays[player.id] ?? 0} 秒` : '',
           player.dnf ? dnfLabel(player.dnfReason) : finishGapText(room, player)].filter(Boolean).join(' · ')
-          : `${player.id === room.hostId ? '房主 · ' : ''}${player.connected ? '已連線' : '暫時失聯，等待重連'}`);
-        setText(row.status, results ? player.finishMs !== null ? raceTime(player.finishMs) : 'DNF' : !player.connected ? '等待重連' : !player.loaded ? '載入地圖中' : player.ready ? '已準備' : '準備中');
+          : `${player.id === room.hostId ? '房主 · ' : ''}${player.summit?.ai?'伺服器AI':player.connected ? '已連線' : '暫時失聯，等待重連'}${room.summit?.settings.weekend&&['race','sprint'].includes(room.summit.stage)?` · 發車P${(player.gridIndex??0)+1}`:''}${room.evolution?.mode === 'pursuit' ? ` · 延後 ${room.evolution.releaseDelays[player.id] ?? 0} 秒放行` : ''}`);
+        setText(row.status, results ? odysseyRuleUnclassified(room,player) ? '房規未完成（不列名次）' : player.eliminationWinner ? '淘汰賽勝出' : player.eliminated ? `淘汰 · 第${player.eliminationRank}名` : player.finishMs !== null ? `${room.voyager?.settings.practiceSeconds||room.evolution?.mode === 'time-trial'||room.summit?.stage==='qualifying' ? '最快 ' : room.evolution?.mode === 'pursuit' ? '共同 ' : ''}${raceTime(player.finishMs)}` : 'DNF' : !player.connected ? '等待重連' : !player.loaded ? '載入地圖中' : player.ready ? '已準備' : '準備中');
       }
       const atIndex = this.element.children[index] ?? null;
       if (atIndex !== row.root) this.element.insertBefore(row.root, atIndex);

@@ -10,6 +10,11 @@ import vm from 'node:vm';
 import * as protocol from '../../shared/multiplayer-protocol.ts';
 import * as registry from '../../shared/multiplayer-tracks.ts';
 import * as roomRules from '../../shared/multiplayer-room-rules.ts';
+import * as horizon from '../../shared/multiplayer-horizon.ts';
+import * as arena from '../../shared/multiplayer-arena.ts';
+import * as nexusReplay from '../../shared/nexus-replay.ts';
+import * as summit from '../../shared/summit-racing.ts';
+import * as atlas from '../../shared/atlas-racing.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const before = path.resolve(project, '../taipei-gp-lobbybrake-before-f8ca4b1d251c');
@@ -21,7 +26,12 @@ const compile = source => stripTypeScriptTypes(source, { mode: 'transform' })
   .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-protocol['"];?/, 'const {PROTOCOL_VERSION,PHYSICS_VERSION,validSeries,validSeriesTracks}=protocol;')
   .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-tracks['"];?/, 'const {CATALOG_STAMP,DEFAULT_MULTIPLAYER_TRACK_ID,getMultiplayerTrack}=registry;')
   .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-room-rules['"];?/, 'const {parseRoomRules}=roomRules;')
-  .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client=MultiplayerClient;';
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-horizon['"];?/, 'const {parseRoomPreset,parseHorizon,validateHorizonSnapshot}=horizon;')
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-arena['"];?/, 'const {validateArenaSnapshot}=arena;')
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/nexus-replay['"];?/, 'const {decodeMultiplayerReplay,validReplayDescriptor,REPLAY_MAX_CHARS,REPLAY_CHUNK_CHARS}=nexusReplay;')
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/summit-racing['"];?/, 'const {summitSettings,validateSummit}=summit;')
+  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/atlas-racing['"];?/, 'const {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas}=atlas;')
+    .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client=MultiplayerClient;';
 export class Storage {
   data = new Map(); writes = []; removals = [];
   getItem(key) { return this.data.get(key) ?? null; }
@@ -58,12 +68,12 @@ export function environment(options = {}) {
   }
   const schedule = (fn, ms, interval = 0) => { const id = next++; timers.set(id, { fn, at: now + ms, interval }); return id; };
   class FakeDate extends Date { static now() { return stamp + now; } }
-  const context = vm.createContext({ protocol, registry, roomRules, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now },
+  const context = vm.createContext({ protocol, registry, roomRules, horizon, arena, nexusReplay, summit, atlas, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now },
     sessionStorage: storage, location: { protocol: 'http:' }, console,
     setTimeout: (fn, ms) => schedule(fn, ms), clearTimeout: id => timers.delete(id),
     setInterval: (fn, ms) => schedule(fn, ms, ms), clearInterval: id => timers.delete(id),
   });
-  Object.defineProperty(context, 'localStorage', { get() { throw new Error('must not touch player localStorage'); } });
+  Object.defineProperty(context, 'localStorage', options.localStorage ? { value: options.localStorage } : { get() { throw new Error('must not touch player localStorage'); } });
   vm.runInContext(compile(source), context, { filename: 'multiplayer-client.real.ts' });
   const flush = async () => { for (let i = 0; i < 16; i++) await Promise.resolve(); };
   const advance = async ms => {

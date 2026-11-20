@@ -24,3 +24,5 @@ const output = path.join(root, 'shared/multiplayer-catalog.json'), text = JSON.s
 let previous; try { previous = await readFile(output, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 if (text !== previous) await writeFile(output, text);
 console.log(JSON.stringify({ maps: tracks.length, catalogStamp: catalog.catalogStamp, changed: previous !== text }));
+// Keep the city cooperation catalog bound to the current city during every normal build.
+await import('./build-nexus-coop-city.mjs');

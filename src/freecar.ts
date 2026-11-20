@@ -20,6 +20,8 @@ export interface Contact { nx: number; nz: number; depth: number }
 
 /** 每台車的性能：起步加速度、極速（m/s）、煞車減速度、側向抓地力（m/s²）、質量（一般轎車 = 1，撞車流時用） */
 export interface CarSpec { engine: number; vmax: number; brake: number; grip: number; mass: number }
+/** Optional long-wheelbase duty geometry. Undefined preserves every legacy constant and calculation. */
+export interface FreeCarGeometry { wheelbase: number; inertia: number; radius: number; offsets: readonly number[]; halfWidth: number; surfaceSpan: number }
 export const DEFAULT_SPEC: CarSpec = { engine: ENGINE, vmax: CAR_VMAX, brake: BRAKE, grip: GRIP, mass: 1 };
 
 export class FreeCar {
@@ -31,6 +33,7 @@ export class FreeCar {
   w = 0; // 角速度 dh/dt
   steer = 0;
   spec: CarSpec = DEFAULT_SPEC;
+  geometry?: FreeCarGeometry;
   /** 甩尾中（按住甩尾鍵）：側向抓地力降到約一半、轉向率上限放寬，車尾就甩得出去（打滿方向盤約 40°，不會原地打轉） */
   drift = false;
   /** 路面高度與垂直速度、車身俯仰（車頭抬起為正）與側傾（左邊抬起為正） */
@@ -80,6 +83,7 @@ export class FreeCar {
   jx = 0;
   jz = 0;
   contact(nx: number, nz: number, depth: number, cx: number, cz: number, ovx = 0, ovz = 0, e = 0.35, mu = 0.45, otherInvMass = 0): number {
+    const inertia = this.geometry?.inertia ?? INERTIA;
     // 先把車推出重疊（多推一點點，下一步才不會又黏住）
     this.x += nx * (depth + 0.01);
     this.z += nz * (depth + 0.01);
@@ -91,17 +95,17 @@ export class FreeCar {
     if (vn >= 0) return 0;
     const k = rz * nx - rx * nz; // 法向衝量對角速度的力臂
     // otherInvMass：對方的「質量倒數 ÷ 我的」；牆＝0（推不動）、同樣的車＝1（兩邊各吃一半）
-    const J = (-(1 + e) * vn) / (1 + (k * k) / INERTIA + otherInvMass);
+    const J = (-(1 + e) * vn) / (1 + (k * k) / inertia + otherInvMass);
     this.vx += J * nx;
     this.vz += J * nz;
-    this.w += (J * k) / INERTIA;
+    this.w += (J * k) / inertia;
     // 摩擦：沿接觸面的相對速度往 0 拉，上限 μ·J
     const tx = -nz, tz = nx, vt = pvx * tx + pvz * tz, kt = rz * tx - rx * tz;
-    let Jt = -vt / (1 + (kt * kt) / INERTIA + otherInvMass);
+    let Jt = -vt / (1 + (kt * kt) / inertia + otherInvMass);
     Jt = Math.max(-mu * J, Math.min(mu * J, Jt));
     this.vx += Jt * tx;
     this.vz += Jt * tz;
-    this.w += (Jt * kt) / INERTIA;
+    this.w += (Jt * kt) / inertia;
     // 這次碰撞自己吃到的速度變化（衝量 ÷ 自己的質量）；對方要吃反向的 × otherInvMass
     this.jx = J * nx + Jt * tx;
     this.jz = J * nz + Jt * tz;
@@ -139,7 +143,7 @@ export class FreeCar {
 
     // ---- 轉向：低速打得多、高速打得少（但反應一樣快）；受抓地力限制
     const maxSteer = 0.62 / (1 + Math.abs(vl) / 16);
-    let target = -(vl / WHEELBASE) * Math.tan(maxSteer * this.steer);
+    let target = -(vl / (this.geometry?.wheelbase ?? WHEELBASE)) * Math.tan(maxSteer * this.steer);
     const lim = (grip * (this.drift ? 1.45 : 1.05)) / Math.max(Math.abs(vl), 1);
     target = Math.max(-lim, Math.min(lim, target));
     // 側滑時輪胎抓不住，角速度回到目標比較慢（被撞歪會轉一下才回來）
@@ -167,22 +171,24 @@ export class FreeCar {
       }
       // 俯仰：車頭、車尾的路面高度差；側傾：左右；慢慢跟上，避免路面接縫抖動
       const ffx = Math.sin(this.h), ffz = Math.cos(this.h), q: SurfaceHit = { y: 0, seg: null };
-      const yf = surf(this.x + ffx * 1.45, this.z + ffz * 1.45, this.y, q).y, yb = surf(this.x - ffx * 1.45, this.z - ffz * 1.45, this.y, q).y;
-      const yl = surf(this.x + ffz * 0.8, this.z - ffx * 0.8, this.y, q).y, yr = surf(this.x - ffz * 0.8, this.z + ffx * 0.8, this.y, q).y;
+      const span = this.geometry?.surfaceSpan ?? 1.45, halfWidth = this.geometry?.halfWidth ?? .8;
+      const yf = surf(this.x + ffx * span, this.z + ffz * span, this.y, q).y, yb = surf(this.x - ffx * span, this.z - ffz * span, this.y, q).y;
+      const yl = surf(this.x + ffz * halfWidth, this.z - ffx * halfWidth, this.y, q).y, yr = surf(this.x - ffz * halfWidth, this.z + ffx * halfWidth, this.y, q).y;
       const k = Math.min(1, dt * 12);
-      this.pitch += (Math.atan2(Math.max(-1.2, Math.min(1.2, yf - yb)), 2.9) - this.pitch) * k;
-      this.roll += (Math.atan2(Math.max(-0.6, Math.min(0.6, yl - yr)), 1.6) - this.roll) * k;
+      this.pitch += (Math.atan2(Math.max(-1.2, Math.min(1.2, yf - yb)), span * 2) - this.pitch) * k;
+      this.roll += (Math.atan2(Math.max(-0.6, Math.min(0.6, yl - yr)), halfWidth * 2) - this.roll) * k;
     }
     this.touch = false;
     if (!col) return this.landed > 4 ? this.landed : 0;
     // ---- 與建築、樹幹碰撞：三個圓各自找接觸，逐一施加衝量
     let impact = 0;
     const nfx = Math.sin(this.h), nfz = Math.cos(this.h);
-    for (const off of OFFS) {
+    const radius = this.geometry?.radius ?? R;
+    for (const off of this.geometry?.offsets ?? OFFS) {
       const cx = this.x + nfx * off, cz = this.z + nfz * off;
-      for (const c of col.contacts(cx, cz, R, this.contacts, this.y)) {
+      for (const c of col.contacts(cx, cz, radius, this.contacts, this.y)) {
         this.touch = true;
-        impact = Math.max(impact, this.contact(c.nx, c.nz, c.depth, cx - c.nx * R, cz - c.nz * R));
+        impact = Math.max(impact, this.contact(c.nx, c.nz, c.depth, cx - c.nx * radius, cz - c.nz * radius));
       }
     }
     return Math.max(impact, this.landed > 4 ? this.landed : 0);
@@ -191,7 +197,7 @@ export class FreeCar {
   /** 車身三個圓的位置（給車流、對手做碰撞） */
   circles(): [number, number][] {
     const fx = Math.sin(this.h), fz = Math.cos(this.h);
-    return OFFS.map((o) => [this.x + fx * o, this.z + fz * o]);
+    return (this.geometry?.offsets ?? OFFS).map((o) => [this.x + fx * o, this.z + fz * o]);
   }
   static readonly RADIUS = R;
 }

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#101a28"/><title>同機雙人 · 台北街道賽</title></head>
+<body><main id="split-stage" aria-label="雙人賽道畫面"></main>
+<div id="split-huds" hidden><output id="split-p1"></output><output id="split-p2"></output><button id="split-pause" type="button">暫停</button></div>
+<section id="split-menu" class="split-overlay" role="dialog" aria-modal="true" aria-labelledby="split-title"><div class="split-card">
+<h1 id="split-title">同機雙人</h1><p>一個畫面、兩台賽車，24 張賽道。共用電腦，不需連線；使用雙標準手把，或鍵盤＋手把。</p>
+<p>鍵盤：W 油門、A／D 轉向、S／空白鍵煞車。手把：左搖桿轉向、RT／A 油門、LT／B 煞車。放開油門會減速。Esc／手把 Start 暫停。</p>
+<form id="split-form"><label>比賽地圖<select id="split-map"></select></label><label>比賽圈數<select id="split-laps"><option value="1">1 圈</option><option value="3">3 圈</option><option value="5">5 圈</option></select></label>
+<label>玩家 1 裝置<select id="split-device1"><option value="keyboard">鍵盤 WASD</option></select></label><label>玩家 2 裝置<select id="split-device2"></select></label>
+<button id="split-refresh" type="button">重新偵測手把</button><p id="split-status" role="status" aria-live="polite">先在手把按任一按鈕，再重新偵測。每位玩家選不同裝置。</p><button id="split-start" type="submit">準備並開始</button></form>
+<div id="split-running" hidden><p id="split-reason"></p><button id="split-resume" type="button">繼續比賽</button><button id="split-retire1" type="button">玩家 1 退賽</button><button id="split-retire2" type="button">玩家 2 退賽</button><button id="split-end" type="button">結束本場</button></div>
+<section id="split-results" hidden aria-labelledby="split-result-title"><h2 id="split-result-title" tabindex="-1">比賽結果</h2><ol id="split-result-list"></ol></section>
+<button id="split-new" type="button" hidden>重新選圖／再戰</button><p class="split-note">本模式成績獨立，沒有獎金或一般最快圈。每圈最多 5 分鐘；首車完賽後，其餘車輛有 90 秒完賽。切到背景、拔除手把會暫停。</p><a href="/">返回主選單</a>
+</div></section><script type="module" src="/src/summit-splitscreen.ts"></script></body></html>

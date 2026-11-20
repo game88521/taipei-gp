@@ -122,7 +122,7 @@ try {
   });
   await check('legacy_metadata_omission_hides_new_server_controls_and_preserves_room_play', async () => {
     for (const page of [host, guest]) { await page.evaluate('__mp.client.leave()'); await page.until('__mp.client.room===null'); await page.until('__mp.ready', 150000); }
-    const snapshot = app.service.snapshot.bind(app.service); app.service.snapshot = (...args) => { const room = snapshot(...args); delete room.capabilities; delete room.series; delete room.roomRules; return room; };
+    const snapshot = app.service.snapshot.bind(app.service); app.service.snapshot = (...args) => { const room = snapshot(...args); delete room.capabilities; delete room.series; delete room.roomRules; delete room.evolution; return room; };
     await focus(host); await host.until(`!document.getElementById('mp-create').disabled`, 150000); await click(host, 'mp-create'); const legacyCode = await host.until('__mp.client.room?.code');
     await value(guest, 'mp-code', legacyCode); await focus(guest); await click(guest, 'mp-join'); await guest.until('__mp.client.room?.code'); await bothReady([host, guest]);
     for (const page of [host, guest]) assert.equal(await page.evaluate(`document.getElementById('mp-room-laps-field').hidden && document.getElementById('mp-series-setup').hidden && document.getElementById('mp-series-summary').hidden`), true);

@@ -1,0 +1,12 @@
+.control-settings { margin: 12px 0; padding: 10px; border: 1px solid #596b85; border-radius: 10px; color: #f1f5ff; background: #131e2c; max-width: 100%; }
+.control-settings summary { cursor: pointer; min-height: 44px; display: list-item; line-height: 2; font-weight: 700; }
+.control-settings-body { display: grid; gap: 12px; min-width: 0; }
+.control-settings-body p { margin: 0; font-size: 13px; line-height: 1.6; color: #c6d2e3; overflow-wrap: anywhere; }
+.control-key-list { display: grid; gap: 8px; }
+.control-key-list label, .control-settings-body > label { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; min-height: 44px; }
+.control-settings button { min-height: 44px; padding: 8px 12px; border: 1px solid #6c819d; border-radius: 8px; background: #23334b; color: #fff; font: inherit; cursor: pointer; white-space: normal; }
+.control-key-list button { min-width: 140px; max-width: 100%; }
+.control-settings input[type='range'] { width: 100%; min-height: 32px; }
+.control-settings input[type='checkbox'] { width: 24px; height: 24px; }
+.control-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.control-settings .controls-status { color: #b9f3e0; min-height: 22px; }

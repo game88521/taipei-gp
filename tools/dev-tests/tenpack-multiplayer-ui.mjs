@@ -12,13 +12,13 @@ const finishEvidence = await multiplayerEvidence(report, import.meta.url);
 async function test(name, fn) { try { await fn(); report.cases.push({ name, status: 'PASS' }); } catch (error) { report.cases.push({ name, status: 'FAIL', error: error.stack }); } }
 async function enter(env, extra = {}) { const value = room('taipei', 1, extra); env.client.update(value, 'connected', 1); env.scene.requested.complete(); await env.flush(); return value; }
 await test('舊server隱藏圈數與系列；新server房主可見，房客圈數唯讀', async () => {
-  const env = environment(); await enter(env); assert.equal(env.ui('mp-room-laps-field').hidden, true); assert.equal(env.ui('mp-series-setup').hidden, true);
+  const env = await environment(); await enter(env); assert.equal(env.ui('mp-room-laps-field').hidden, true); assert.equal(env.ui('mp-series-setup').hidden, true);
   const value = await enter(env, { capabilities: caps, hostManagement: { lobbyRevision: 1 }, series: null });
   assert.equal(env.ui('mp-room-laps-field').hidden, false); assert.equal(env.ui('mp-room-laps').disabled, false); assert.equal(env.ui('mp-series-setup').hidden, false);
   value.hostId = 'guest'; env.client.notify(); assert.equal(env.ui('mp-room-laps').disabled, true); assert.equal(env.ui('mp-series-setup').hidden, true);
 });
 await test('真控制器送改圈與合法路線；重複地圖留在本頁明示原因', async () => {
-  const env = environment(); await enter(env, { capabilities: caps, hostManagement: { lobbyRevision: 1 }, series: null });
+  const env = await environment(); await enter(env, { capabilities: caps, hostManagement: { lobbyRevision: 1 }, series: null });
   env.ui('mp-room-laps').value = '5'; env.ui('mp-room-laps').dispatch('change'); assert.equal(env.client.commands.at(-1).laps, 5);
   env.ui('mp-series-create').dispatch('click'); assert.equal(env.client.commands.at(-1).type, 'configure-series');
   const fields = env.ui('mp-series-route').children.map(label => label.children[0]); fields[1].value = fields[0].value;
@@ -26,7 +26,7 @@ await test('真控制器送改圈與合法路線；重複地圖留在本頁明�
   env.ui('mp-series-count').value = '5'; env.ui('mp-series-count').dispatch('change'); assert.ok(env.ui('mp-series-route').children.every(label => !label.hidden));
 });
 await test('總積分與歷場用文字節點呈現，下一站/完成/明確結束流程正確', async () => {
-  const env = environment(); const data = series(); data.locked = true;
+  const env = await environment(); const data = series(); data.locked = true;
   data.standings = [{ playerId: 'self', name: '<img src=x>', rank: 1, points: 10, wins: 1 }];
   data.rounds = [{ matchId: 'one', trackId: 'taipei', laps: 1, results: [{ playerId: 'self', name: '<img src=x>', rank: 1, points: 10, finishMs: 50000, dnf: false }] }];
   const value = await enter(env, { phase: 'results', capabilities: caps, hostManagement: { lobbyRevision: 1 }, series: data });
@@ -37,12 +37,12 @@ await test('總積分與歷場用文字節點呈現，下一站/完成/明確結
   env.ui('mp-series-end').dispatch('click'); assert.equal(env.client.commands.at(-1).type, 'end-series');
 });
 await test('結束確認期間房間或系列已變動時不送出舊操作', async () => {
-  let env; env = environment({ confirm: () => { env.client.room.series.id = 'new-series'; return true; } });
+  let env; env = await environment({ confirm: () => { env.client.room.series.id = 'new-series'; return true; } });
   await enter(env, { capabilities: caps, hostManagement: { lobbyRevision: 1 }, series: series() });
   const count = env.client.commands.length; env.ui('mp-series-end').dispatch('click'); assert.equal(env.client.commands.length, count); assert.match(env.ui('mp-message').textContent, /狀態已更新/);
 });
 await test('完賽才顯示觀戰/隱藏操控，切換目標與掉線後備；下一場解除', async () => {
-  const env = environment(); const value = await enter(env, { phase: 'racing', matchId: 'one' });
+  const env = await environment(); const value = await enter(env, { phase: 'racing', matchId: 'one' });
   assert.equal(env.ui('mp-spectator-field').hidden, true); value.players[0].finishMs = 50000; value.players[0].loaded = true;
   value.players.push({ ...value.players[1], id: 'guest2', name: '丙' }); env.client.notify();
   assert.equal(env.ui('mp-spectator-field').hidden, false); assert.equal(env.ui('mp-controls').hidden, true); assert.equal(env.mp.input.isDriving(), false);
@@ -52,7 +52,7 @@ await test('完賽才顯示觀戰/隱藏操控，切換目標與掉線後備；�
 });
 await test('畫質使用專用儲存鍵，固定省電與標準可即時切回且不改FPS設定', async () => {
   const storage = new Storage(); storage.data.set('taipei-gp-multiplayer-fps-v1', '30'); storage.data.set('taipei-gp-multiplayer-quality-v1', 'economy'); storage.data.set('single-save', 'untouched');
-  const env = environment({ localStorage: storage }); assert.equal(env.ui('mp-quality').value, 'economy'); assert.equal(env.scene.qualityLevel, 'economy'); assert.equal(env.ui('mp-fps').value, '30');
+  const env = await environment({ localStorage: storage }); assert.equal(env.ui('mp-quality').value, 'economy'); assert.equal(env.scene.qualityLevel, 'economy'); assert.equal(env.ui('mp-fps').value, '30');
   env.ui('mp-quality').value = 'standard'; env.ui('mp-quality').dispatch('change'); assert.equal(env.scene.qualityLevel, 'standard'); assert.equal(storage.getItem('taipei-gp-multiplayer-fps-v1'), '30');
   assert.equal(storage.getItem('single-save'), 'untouched'); assert.deepEqual(storage.writes, ['taipei-gp-multiplayer-quality-v1']);
 });

@@ -1,14 +1,16 @@
 import { getMultiplayerTrack } from './multiplayer-tracks.ts';
+import type { MultiplayerEventMode, MultiplayerTeam } from './multiplayer-evolution';
 
 export interface SeriesResult {
   playerId: string; name: string; color: string; rank: number;
   finishMs: number | null; dnf: boolean; points: number;
 }
-export interface SeriesRound { matchId: string; trackId: string; laps: 1 | 3 | 5; results: SeriesResult[] }
+export interface SeriesRound { matchId: string; trackId: string; laps: 1 | 3 | 5; mode?: MultiplayerEventMode; results: SeriesResult[] }
 export interface SeriesStanding { playerId: string; name: string; color: string; points: number; wins: number; finishes: number; rank: number }
 export interface MultiplayerSeries {
   id: string; revision: number; trackIds: string[]; roundIndex: number;
-  locked: boolean; complete: boolean; entrants: { playerId: string; name: string; color: string }[];
+  originalHostId?: string;
+  locked: boolean; complete: boolean; entrants: { playerId: string; name: string; color: string; team?: MultiplayerTeam }[];
   rounds: SeriesRound[]; standings: SeriesStanding[];
 }
 export const SERIES_POINTS = [10, 6, 4, 3] as const;

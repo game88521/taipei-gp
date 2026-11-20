@@ -84,7 +84,7 @@ function harness(sources = current, saved) {
     season: { round: 0, results: [], laps: 3, diff: 'normal', rules: 'classic', seed: 42, form: {}, no: 1 } };
   save.stats = stats;
   const storage = { writes: [], last: null }, events = { podiums: 0, errors: [], toasts: [], clockResets: 0 };
-  const ctx = vm.createContext({ console: { ...console, error: (...a) => events.errors.push(a.map(String).join(' ')) }, performance, Date, Math, URLSearchParams,
+  const ctx = vm.createContext({ nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, horizonUi: null, evolutionOwned: false, cityChallengeOpenToken: null, console: { ...console, error: (...a) => events.errors.push(a.map(String).join(' ')) }, performance, Date, Math, URLSearchParams,
     setTimeout, clearTimeout, AbortController, DOMException, location: { search: '' }, document: { title: '', createElement: fakeElement, querySelector: () => null },
     $: get, track, car, field, save, stats, storage, events, CIRCUITS: env.circuits.CIRCUITS, CIRCUIT: env.circuits.CIRCUITS[0], SEASON: true, BOT: false,
     racingTools: undefined, seasonEditor: undefined, cityJobsUi: undefined,
@@ -119,7 +119,7 @@ function harness(sources = current, saved) {
     updateGpHud() { events.gpHud = (events.gpHud ?? 0) + 1; },
     ...env.season, teamOf: (name) => field.racers.find((r) => r.name === name)?.team ?? '', withPersona: (r) => r.name,
     startPodium() { events.podiums++; ctx.settleRace(); ctx.state = 'podium'; },
-    botInput: () => ({ steer: 0, brake: false }), input: { read: () => ({ steer: 0, brake: false }) }, SC_AT: null, gpEvent() {},
+    botInput: () => ({ steer: 0, brake: false }), input: { read: () => ({ steer: 0, brake: false }), release() { events.inputReleases = (events.inputReleases ?? 0) + 1; } }, SC_AT: null, gpEvent() {},
   });
   const names = ['streetResultOpen', 'recordSessionLap', 'renderSessionLaps', 'finishQualifyingAttempt', 'resetRace', 'startLap', 'sectorDone', 'completeLap', 'beginCountdown', 'startTt', 'startGp', 'saveSeasonCheckpoint', 'restoreSeasonCheckpoint',
     'settleAbandoned', 'finishRound', 'recordSeason', 'rewardGpFinish', 'settleRace', 'completeGpResults', 'showResults', 'pause', 'money', 'setMoney', 'earn', 'step',
@@ -350,7 +350,7 @@ await check('真endReplay中途退出：清除拆輪縮放／crew狀態，復原
 await check('真甩尾練習提示不改側滑／計分，關閉提示可繼續；換模式入帳一次並清提示', () => {
   const h = harness(), drift = new DriftScore(), control = new DriftScore(), fcar = new FreeCar();
   fcar.vx = 8; fcar.vz = 15; h.ctx.fcar = fcar; h.ctx.drift = drift; h.ctx.mode = 'free';
-  h.ctx.driftPractice = true; h.ctx.driftPracticeNote = ''; h.ctx.stats.bestDrift = 0; h.ctx.stats.totalDrift = 0;
+  h.ctx.controlHints = { label: () => '測試綁定' }; h.ctx.driftPractice = true; h.ctx.driftPracticeNote = ''; h.ctx.stats.bestDrift = 0; h.ctx.stats.totalDrift = 0;
   for (const name of ['updateDriftHud', 'bankDrift', 'finishDrift']) vm.runInContext(current.fn(name), h.ctx);
   vm.runInContext(`var exitCoach = ${current.click('coach-exit')};`, h.ctx);
   const physical = clone(fcar);

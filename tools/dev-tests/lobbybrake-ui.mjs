@@ -13,7 +13,7 @@ const managed = (extra = {}) => room('taipei', 1, { hostManagement: { lobbyRevis
 
 await test('等待可見且可取消；保留輸入、解除busy，晚到open不加入', async () => {
   let release; const connect = new Promise(resolve => { release = resolve; });
-  const env = environment({ connect: () => connect }); assert.equal(env.client.commands.length, 0);
+  const env = await environment({ connect: () => connect }); assert.equal(env.client.commands.length, 0);
   env.ui('mp-name').value = '朋友'; env.ui('mp-code').value = 'ABC234';
   env.ui('mp-join').dispatch('click'); await env.flush();
   assert.equal(env.ui('mp-entry-wait').hidden, false); assert.match(env.ui('mp-entry-progress').textContent, /正在連線/);
@@ -24,7 +24,7 @@ await test('等待可見且可取消；保留輸入、解除busy，晚到open不
   release(); await env.flush(); assert.equal(env.client.commands.length, 0); assert.equal(env.client.disconnects, 1);
 });
 await test('房間拒絕不自動重送，明確重試按鈕沿用目前輸入', async () => {
-  const env = environment(); env.ui('mp-code').value = 'ABC234';
+  const env = await environment(); env.ui('mp-code').value = 'ABC234';
   let requests = 0; env.client.join = async () => { requests++; throw new Error('房間已滿'); };
   env.ui('mp-join').dispatch('click'); await env.flush();
   assert.equal(requests, 1); assert.match(env.ui('mp-message').textContent, /房間已滿/); assert.equal(env.ui('mp-entry-retry').hidden, false);
@@ -34,14 +34,14 @@ await test('房間拒絕不自動重送，明確重試按鈕沿用目前輸入',
   assert.equal(env.ui('mp-entry-retry').hidden, true);
 });
 await test('舊連線錯誤不覆蓋本次空暱稱／無效房碼提示，也不建立連線', async () => {
-  let connections = 0; const env = environment({ connect: async () => { connections++; } });
+  let connections = 0; const env = await environment({ connect: async () => { connections++; } });
   env.client.error = '舊連線錯誤'; env.ui('mp-code').value = 'ABC234'; env.ui('mp-name').value = '';
   env.ui('mp-join').dispatch('click'); await env.flush(); assert.match(env.ui('mp-message').textContent, /車手名稱/);
   env.ui('mp-name').value = '甲'; env.ui('mp-code').value = 'BAD'; env.ui('mp-join').dispatch('click'); await env.flush();
   assert.match(env.ui('mp-message').textContent, /6 碼/); assert.equal(connections, 0);
 });
 await test('支援能力＋房主＋大廳才顯示管理；舊server、非房主、比賽中隱藏', async () => {
-  const env = environment(); env.client.update(room('taipei')); assert.equal(env.ui('mp-host-controls').hidden, true);
+  const env = await environment(); env.client.update(room('taipei')); assert.equal(env.ui('mp-host-controls').hidden, true);
   env.client.update(managed()); assert.equal(env.ui('mp-host-controls').hidden, false);
   assert.equal(env.ui('mp-host-target').children.length, 1); assert.equal(env.ui('mp-host-target').value, 'guest');
   env.client.update(managed({ hostId: 'guest' })); assert.equal(env.ui('mp-host-controls').hidden, true);
@@ -49,7 +49,7 @@ await test('支援能力＋房主＋大廳才顯示管理；舊server、非房�
   env.client.update(managed({ phase: 'racing' })); assert.equal(env.ui('mp-host-controls').hidden, true);
 });
 await test('離線車手可移出但不能交棒；無目標或失聯時停用按鈕', async () => {
-  const env = environment(), value = managed(); value.players[1].connected = false; env.client.update(value);
+  const env = await environment(), value = managed(); value.players[1].connected = false; env.client.update(value);
   assert.equal(env.ui('mp-host-transfer').disabled, true); assert.equal(env.ui('mp-host-kick').disabled, false);
   env.ui('mp-host-transfer').dispatch('click'); assert.equal(env.client.commands.length, 0);
   env.client.update(value, 'reconnecting'); assert.equal(env.ui('mp-host-kick').disabled, true);
@@ -57,27 +57,27 @@ await test('離線車手可移出但不能交棒；無目標或失聯時停用�
   assert.equal(env.ui('mp-host-kick').disabled, true); assert.equal(env.ui('mp-host-transfer').disabled, true);
 });
 await test('原生確認取消不送出；確認後才送給選定車手', async () => {
-  let accepted = false; const env = environment({ confirm: () => accepted }); env.client.update(managed());
+  let accepted = false; const env = await environment({ confirm: () => accepted }); env.client.update(managed());
   env.ui('mp-host-kick').dispatch('click'); assert.equal(env.client.commands.length, 0);
   accepted = true; env.ui('mp-host-kick').dispatch('click');
   assert.equal(env.client.commands.length, 1); assert.equal(env.client.commands[0].type, 'kick-player'); assert.equal(env.client.commands[0].targetPlayerId, 'guest');
 });
 await test('確認期間換圖／大廳版本或房主改變，不送出晚到管理命令', async () => {
-  let env; env = environment({ confirm: () => { env.client.update(managed({ hostManagement: { lobbyRevision: 2 } })); return true; } });
+  let env; env = await environment({ confirm: () => { env.client.update(managed({ hostManagement: { lobbyRevision: 2 } })); return true; } });
   env.client.update(managed()); env.ui('mp-host-transfer').dispatch('click');
   assert.equal(env.client.commands.length, 0); assert.match(env.ui('mp-message').textContent, /大廳狀態已變更/);
-  let env2; env2 = environment({ confirm: () => { env2.client.update(managed({ hostId: 'guest' })); return true; } });
+  let env2; env2 = await environment({ confirm: () => { env2.client.update(managed({ hostId: 'guest' })); return true; } });
   env2.client.update(managed()); env2.ui('mp-host-kick').dispatch('click'); assert.equal(env2.client.commands.length, 0);
 });
 await test('確認期間目標離線不交棒；交棒後舊房主立即失去管理入口', async () => {
-  let env; env = environment({ confirm: () => { const value = managed(); value.players[1].connected = false; env.client.update(value); return true; } });
+  let env; env = await environment({ confirm: () => { const value = managed(); value.players[1].connected = false; env.client.update(value); return true; } });
   env.client.update(managed()); env.ui('mp-host-transfer').dispatch('click'); assert.equal(env.client.commands.length, 0);
-  const next = environment(); next.client.update(managed()); next.ui('mp-host-transfer').dispatch('click');
+  const next = await environment(); next.client.update(managed()); next.ui('mp-host-transfer').dispatch('click');
   assert.equal(next.client.commands[0].type, 'transfer-host'); next.client.update(managed({ hostId: 'guest', hostManagement: { lobbyRevision: 2 } }));
   assert.equal(next.ui('mp-host-controls').hidden, true); next.ui('mp-host-kick').dispatch('click'); assert.equal(next.client.commands.length, 1);
 });
 await test('穩定大廳不重建管理選單；離房與新房不沿用舊目標', async () => {
-  const env = environment(); env.client.update(managed()); const option = env.ui('mp-host-target').children[0];
+  const env = await environment(); env.client.update(managed()); const option = env.ui('mp-host-target').children[0];
   for (let n = 0; n < 20; n++) env.client.update(managed()); assert.equal(env.ui('mp-host-target').children[0], option);
   env.client.update(null, 'disconnected'); assert.equal(env.ui('mp-host-controls').hidden, true);
   const value = managed({ code: 'DEF234' }); value.players[1].id = 'new-guest'; env.client.update(value);

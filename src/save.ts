@@ -1,4 +1,5 @@
 // 由 main.ts 拆出來（行為不變）：存檔（localStorage）
+import { parseCargoCheckpoint, parseCargoSettled, parseRouteDriftRecords, type CargoCheckpoint, type RouteDriftRecords } from './evolution-city-models';
 import type { Level } from './quality';
 import type { Stats } from './achievements';
 import type { SeasonSave, SeasonRecord } from './season';
@@ -10,6 +11,8 @@ import { parseStreetChallengeRecords, parseStreetSeriesCheckpoint, type StreetCh
 import { parseTaxiCheckpoint, parseTaxiSettledIds, type TaxiCheckpoint } from './street-taxi-state';
 import { parsePlayerProgress, type PlayerProgress } from './player-progress';
 import { parsePoliceCareer, type PoliceCareer } from './city-jobs-state';
+import { parseHorizonCity, type HorizonCitySave } from './horizon-city-models';
+import { parseHorizonRacing, type HorizonRacingSave } from './horizon-racing';
 
 // ---------------------------------------------------------------- 存檔
 export interface Ghost { t: number[]; s: number[]; x: number[]; z: number[]; h: number[] }
@@ -21,6 +24,11 @@ export interface TrackRec { best: number | null; sectors: (number | null)[]; gho
 export interface Save { schema?: number; playerId?: string; records?: Record<string, TrackRec>; damage?: Record<string, number>; ledger?: Transaction[]; trackV?: string; gpBest?: number | null; freePos?: { x: number; z: number; h: number; y?: number }; season?: SeasonSave; seasonHistory?: SeasonRecord[]; circuits?: Record<string, TrackRec>; best: number | null; sectors: (number | null)[]; ghost: Ghost | null; opts: Record<string, boolean | string>; steer?: SteerMode; car?: string; touch?: 'auto' | 'on' | 'off'; time?: string; sens?: number; curve?: 'linear' | 'gentle'; tc?: { size: number; op: number; pos: 'std' | 'swap' | 'lift' | 'swap-lift' }; tilt?: { inv: boolean; zero: number; dead: number }; vol?: { master: number; engine: number; fx: number; others?: number; ambient?: number }; tutDone?: boolean; name?: string; stats?: Partial<Stats>; ach?: string[]; owned?: string[]; paints?: Record<string, string[]>; paint?: Record<string, string>; street?: Record<string, number>; quality?: Level | 'auto'; taxi?: { money: number; trips: number } }
 export const KEY = 'taipei-gp-v2'; // v2 = 真實街道賽道（舊賽道的紀錄與影子車不適用）
 export interface Save {
+  horizonCity?: HorizonCitySave;
+  horizonRacing?: HorizonRacingSave;
+  routeDrift?: RouteDriftRecords;
+  cargoJob?: CargoCheckpoint | null;
+  cargoSettled?: string[];
   driftChallenge?: DriftChallengeRecords;
   streetChallenge?: StreetChallengeRecords;
   streetSeries?: StreetSeriesCheckpoint | null;
@@ -49,7 +57,7 @@ interface GoodSnapshot { at: number; raw: string }
 const recovery: SaveRecoveryState = { blocked: false, reason: null, dropped: [], message: '', originalRaw: null, originalArchived: false, archiveError: null, hasSnapshot: false, snapshotAt: null };
 /** 設定可回退預設值；金錢、收藏、紀錄及進度的任何已知資料損失都必須先由玩家救援。缺少可選欄位不視為損壞。 */
 export function criticalSaveDrops(dropped: readonly string[]): string[] {
-  const critical = new Set(['best', 'sectors', 'ghost', 'gpBest', 'trackV', 'playerId', 'taxi', 'ledger', 'stats', 'ach', 'owned', 'paints', 'paint', 'street', 'circuits', 'records', 'damage', 'season', 'seasonHistory', 'freePos', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer']);
+  const critical = new Set(['best', 'sectors', 'ghost', 'gpBest', 'trackV', 'playerId', 'taxi', 'ledger', 'stats', 'ach', 'owned', 'paints', 'paint', 'street', 'circuits', 'records', 'damage', 'season', 'seasonHistory', 'freePos', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer', 'routeDrift', 'cargoJob', 'cargoSettled', 'horizonCity', 'horizonRacing']);
   return dropped.filter((field) => critical.has(field.split('.')[0]));
 }
 let lastGood: GoodSnapshot | null = null, reloadRequired = false, originalObserved = false;
@@ -70,6 +78,13 @@ let beforeWriterRelease: (() => void) | null = null;
 export function setBeforeSaveWriterRelease(flush: () => void): void { beforeWriterRelease = flush; }
 /** blocked 不可重新初始化或偷偷採用外頁進度；必須重新載入，匯出本頁進度仍可使用。 */
 export function getSaveWriterState(): SaveWriterState { return { ...writer }; }
+/** Freeze automatic writes across a complete multi-store restore; success requires reload. */
+export function beginStorageRestore(): {finish(success:boolean,rollbackComplete:boolean):void}|null {
+  if(reloadRequired||!checkWriterCurrent().ok)return null;
+  reloadRequired=true;
+  let ended=false;
+  return {finish(success,rollbackComplete){if(ended)return;ended=true;if(!success&&rollbackComplete)reloadRequired=false;}};
+}
 /** 訂閱後只通知後續變更；目前狀態請另讀 getSaveWriterState。 */
 export function subscribeSaveWriter(listener: (state: SaveWriterState) => void): () => void {
   writerListeners.add(listener); return () => { writerListeners.delete(listener); };
@@ -395,6 +410,10 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
   }
   if (src.taxiJob === null) out.taxiJob = null;
   else take('taxiJob', parseTaxiCheckpoint(src.taxiJob));
+  if ('routeDrift' in src) { take('routeDrift', parseRouteDriftRecords(src.routeDrift)); if (src.routeDrift === null) dropped.push('routeDrift'); }
+  if (src.cargoJob === null) out.cargoJob = null;
+  else if ('cargoJob' in src) take('cargoJob', parseCargoCheckpoint(src.cargoJob, Date.now(), true));
+  if ('cargoSettled' in src) { take('cargoSettled', parseCargoSettled(src.cargoSettled)); if (src.cargoSettled === null) dropped.push('cargoSettled'); }
   if (src.streetSeries === null) out.streetSeries = null;
   else take('streetSeries', parseStreetSeriesCheckpoint(src.streetSeries));
   if ('taxiSettled' in src) {
@@ -403,6 +422,7 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
     if (src.taxiSettled === null) dropped.push('taxiSettled');
   }
   take('progress', parsePlayerProgress(src.progress));
+  if ('horizonCity' in src) { take('horizonCity', parseHorizonCity(src.horizonCity)); if (src.horizonCity === null) dropped.push('horizonCity'); }
   if (src.progress === null) dropped.push('progress');
   take('policeCareer', parsePoliceCareer(src.policeCareer));
   if (src.policeCareer === null) dropped.push('policeCareer');
@@ -442,6 +462,8 @@ export function parseSaveFile(text: string): { ok: true; save: Save; dropped: st
   if (src.damage && typeof src.damage === 'object') { out.damage = {}; for (const [k, v] of Object.entries(src.damage)) if (/^[a-z0-9-]{1,30}$/.test(k) && isNum(v, 0, 1)) out.damage[k] = v; }
   take('season', parseSeasonSave(src.season));
   take('seasonHistory', parseSeasonHistory(src.seasonHistory));
+  take('horizonRacing', parseHorizonRacing(src.horizonRacing));
+  if (src.horizonRacing === null) dropped.push('horizonRacing');
   const rawSeason = src.season as { pending?: { checkpoint?: unknown } } | undefined;
   if (rawSeason?.pending?.checkpoint != null && !out.season?.pending?.checkpoint) dropped.push('season.pending.checkpoint');
   const pos = src.freePos as Record<string, unknown> | undefined;
@@ -491,7 +513,7 @@ export function stampOf(id: string, rules = activeRules): string | undefined { r
 export function playerIdentity(): string { if (!save.playerId || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(save.playerId)) { save.playerId = randomUuid(); writeSave(); } return save.playerId; }
 export function prepareImportedSave(s: Save, dropped: string[] = []): { save: Save; preserved: string[] } {
   const current = serializedSave(), out = { ...s }, preserved: string[] = [];
-  for (const k of ['season', 'seasonHistory', 'freePos', 'records', 'damage', 'ledger', 'playerId', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer'] as const) if ((s[k] === undefined || dropped.some((name) => name === k || name.startsWith(k + '.'))) && current[k] !== undefined) { Object.assign(out, { [k]: current[k] }); preserved.push(k); }
+  for (const k of ['season', 'seasonHistory', 'freePos', 'records', 'damage', 'ledger', 'playerId', 'driftChallenge', 'streetChallenge', 'streetSeries', 'taxiJob', 'taxiSettled', 'progress', 'policeCareer', 'routeDrift', 'cargoJob', 'cargoSettled', 'horizonCity', 'horizonRacing'] as const) if ((s[k] === undefined || dropped.some((name) => name === k || name.startsWith(k + '.'))) && current[k] !== undefined) { Object.assign(out, { [k]: current[k] }); preserved.push(k); }
   return { save: out, preserved };
 }
 /**

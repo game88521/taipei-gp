@@ -1,0 +1,24 @@
+:root { --voyager-hud-scale: 1; }
+#voyager-comfort { display:grid; gap:12px; text-align:left; }
+#voyager-comfort label { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+#voyager-comfort p,.voyager-pack p { margin:4px 0; line-height:1.6; }
+#hud > .panel,#hud > .gp-panel,#hud > .tc,#hud > .speedo,#hud #road,#hud #clock,#mp-hud .mp-panel,#mp-hud .mp-speed { zoom:var(--voyager-hud-scale); }
+#hud #top-stack { font-size:calc(14px * var(--voyager-hud-scale)); }
+#hud #top-stack :is(span,p,b,small),#hud #top-stack :is(#sr-hud,#nav-hud,#taxi-hud) { font-size:inherit; }
+#mp-hud :is(.mp-race-stats,.mp-board) { zoom:var(--voyager-hud-scale); }
+html[data-voyager-contrast="true"] #mp-hud :is(.mp-race-stats,.mp-board,.mp-race-message,.mp-network-warning,.voyager-racing-live,.summit-live,.mp-horizon-race,.mp-arena-live,.mp-awareness,.mp-spectator-field) { background:#06090f!important; color:#fff!important; border:1px solid #f4f6ff; border-radius:8px; text-shadow:none!important; }
+html[data-voyager-contrast="true"] :is(#hud .panel,#hud .gp-panel,#hud .tc,#hud .speedo,#hud #top-stack > div,#hud #road,#hud #clock,#mp-hud .mp-panel,#mp-hud .mp-speed) { background:#06090f!important; color:#fff!important; border:1px solid #f4f6ff; border-radius:8px; text-shadow:none!important; }
+html[data-voyager-contrast="true"] :is(#hud .k,#hud .speedo small,#mp-hud small) { color:#f4f6ff!important; }
+.voyager-pack { padding:12px 0; border-bottom:1px solid #ffffff30; text-align:left; }
+.voyager-pack button { margin:8px 8px 0 0; }
+.voyager-photo { position:fixed; inset:0; z-index:100050; pointer-events:none; background:transparent; }
+.voyager-photo-controls { pointer-events:auto; position:absolute; right:max(12px,env(safe-area-inset-right)); top:max(12px,env(safe-area-inset-top)); width:min(340px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; padding:16px; background:#080c17f5; border:1px solid #ffffff80; border-radius:12px; color:#fff; }
+.voyager-photo-controls h2 { margin:0 0 10px; }
+.voyager-photo-controls label { display:grid; gap:3px; margin:8px 0; }
+.voyager-photo-controls button { margin:6px 6px 0 0; }
+.voyager-photo-controls input[type=range] { width:100%; }
+.voyager-photo-controls.voyager-photo-minimal > :not(.voyager-photo-reveal) { display:none; }
+.voyager-photo-controls.voyager-photo-minimal { width:auto; padding:6px; }
+body.voyager-photo-open > :not(#app):not(.voyager-photo):not(#mp-replay-viewer) { visibility:hidden!important; }
+body.voyager-photo-open #mp-replay-viewer .nexus-replay-controls { visibility:hidden; }
+@media(max-width:600px) { #hud > .gp-panel { max-width:42vw; } #hud > .gp-panel #board { max-height:22vh; overflow:hidden; } #voyager-comfort { padding:10px; } }

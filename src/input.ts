@@ -2,6 +2,95 @@
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
 const TILT_MAX_AGE_MS = 1500;
+export const CONTROL_KEY = 'taipei-gp-controls-v1';
+export const CONTROL_ACTIONS = ['left', 'right', 'throttle', 'brake', 'handbrake'] as const;
+export type ControlAction = typeof CONTROL_ACTIONS[number];
+export interface ControlPreferences {
+  v: 1;
+  keys: Record<ControlAction, string[]>;
+  gamepad: { enabled: boolean; deadzone: number; inverted: boolean };
+}
+export const CONTROL_LABELS: Record<ControlAction, string> = { left: '左轉', right: '右轉', throttle: '油門', brake: '煞車／倒車', handbrake: '甩尾' };
+export function defaultControls(): ControlPreferences {
+  return { v: 1, keys: { left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], throttle: ['ArrowUp', 'KeyW'], brake: ['ArrowDown', 'KeyS', 'Space'], handbrake: ['ShiftLeft', 'ShiftRight'] }, gamepad: { enabled: true, deadzone: 0.12, inverted: false } };
+}
+/** Menu, camera, map, DRS, pit and pursuit shortcuts remain available. */
+export function bindableCode(code: unknown): code is string {
+  return typeof code === 'string' && /^(Key[A-Z]|Arrow(Left|Right|Up|Down)|Space|Shift(Left|Right)|Numpad[0-9])$/.test(code)
+    && !['KeyB', 'KeyC', 'KeyE', 'KeyG', 'KeyH', 'KeyM', 'KeyP'].includes(code);
+}
+export function parseControls(raw: unknown): ControlPreferences | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const value = raw as ControlPreferences;
+  if (value.v !== 1 || !value.keys || typeof value.keys !== 'object' || !value.gamepad || typeof value.gamepad !== 'object') return null;
+  const keys = {} as ControlPreferences['keys'], seen = new Set<string>();
+  for (const action of CONTROL_ACTIONS) {
+    const codes = value.keys[action];
+    if (!Array.isArray(codes) || codes.length < 1 || codes.length > 3 || codes.some(code => !bindableCode(code) || seen.has(code))) return null;
+    for (const code of codes) { if (seen.has(code)) return null; seen.add(code); }
+    keys[action] = [...codes];
+  }
+  const pad = value.gamepad;
+  if (typeof pad.enabled !== 'boolean' || typeof pad.inverted !== 'boolean' || typeof pad.deadzone !== 'number' || !Number.isFinite(pad.deadzone) || pad.deadzone < 0.05 || pad.deadzone > 0.4) return null;
+  return { v: 1, keys, gamepad: { enabled: pad.enabled, deadzone: Math.round(pad.deadzone * 100) / 100, inverted: pad.inverted } };
+}
+export function rebindControl(config: ControlPreferences, action: ControlAction, code: string): { ok: true; config: ControlPreferences } | { ok: false; message: string } {
+  if (!bindableCode(code)) return { ok: false, message: '此按鍵保留給選單或其他操作，請換一個按鍵。' };
+  if (CONTROL_ACTIONS.some(other => other !== action && config.keys[other].includes(code))) return { ok: false, message: '此按鍵已用於另一個駕駛動作，請先更換該動作。' };
+  const copy = parseControls(config); if (!copy) return { ok: false, message: '操控設定無效，請還原預設。' };
+  copy.keys[action] = [code]; return { ok: true, config: copy };
+}
+export function controlCodeLabel(code: string): string {
+  return ({ ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Space: '空白鍵', ShiftLeft: '左 Shift', ShiftRight: '右 Shift' } as Record<string, string>)[code] ?? code.replace(/^Key/, '').replace(/^Numpad/, '數字鍵盤 ');
+}
+export function readControlPreferences(): { config: ControlPreferences; warning: string } {
+  try {
+    const raw = localStorage.getItem(CONTROL_KEY);
+    if (!raw) return { config: defaultControls(), warning: '' };
+    if (raw.length > 4096) return { config: defaultControls(), warning: '操控設定過大，暫用預設；原設定尚未覆寫。' };
+    const config = parseControls(JSON.parse(raw));
+    return config ? { config, warning: '' } : { config: defaultControls(), warning: '操控設定無效，暫用預設；原設定尚未覆寫。' };
+  } catch { return { config: defaultControls(), warning: '無法讀取操控設定，本次使用預設。' }; }
+}
+export function storeControlPreferences(value: ControlPreferences): boolean {
+  const config = parseControls(value); if (!config) return false;
+  try {
+    localStorage.setItem(CONTROL_KEY, JSON.stringify(config));
+    if (typeof window !== 'undefined' && typeof Event !== 'undefined') window.dispatchEvent?.(new Event('gp-controls-updated'));
+    return true;
+  } catch { return false; }
+}
+export interface PadSample { index: number; connected: boolean; mapping: string; axes: readonly number[]; buttons: readonly { pressed: boolean; value: number }[] }
+export function connectedStandardPad(): PadSample | null {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;
+    return Array.from(navigator.getGamepads()).find(pad => pad?.connected && pad.mapping === 'standard') ?? null;
+  } catch { return null; }
+}
+export function padSteering(axis: unknown, deadzone: number): number {
+  if (typeof axis !== 'number' || !Number.isFinite(axis) || Math.abs(axis) > 1 || !Number.isFinite(deadzone) || deadzone < 0.05 || deadzone > 0.4) return 0;
+  return Math.abs(axis) <= deadzone ? 0 : Math.sign(axis) * (Math.abs(axis) - deadzone) / (1 - deadzone);
+}
+export class StandardPadInput {
+  private index = -1;
+  private armed = false;
+  status: 'none' | 'neutral' | 'ready' = 'none';
+  reset() { this.index = -1; this.armed = false; this.status = 'none'; }
+  read(pad: PadSample | null, options: ControlPreferences['gamepad'], driving: boolean) {
+    const neutral = { steer: 0, brake: false, throttle: false, handbrake: false };
+    if (!options.enabled || !driving || !pad || !pad.connected || pad.mapping !== 'standard') { this.reset(); return neutral; }
+    if (this.index !== pad.index) { this.index = pad.index; this.armed = false; }
+    const pressed = (i: number) => { const button = pad.buttons[i]; return !!button && Number.isFinite(button.value) && button.value >= 0 && button.value <= 1 && (button.pressed || button.value >= 0.4); };
+    const steer = padSteering(pad.axes[0], options.deadzone) * (options.inverted ? -1 : 1);
+    const brake = pressed(6) || pressed(1), throttle = pressed(7) || pressed(0), handbrake = pressed(2);
+    if (!this.armed) {
+      this.status = 'neutral';
+      if (steer === 0 && !brake && !throttle && !handbrake) { this.armed = true; this.status = 'ready'; }
+      return neutral;
+    }
+    this.status = 'ready'; return { steer, brake, throttle, handbrake };
+  }
+}
 export interface TiltState {
   status: 'unsupported' | 'denied' | 'waiting' | 'ready' | 'invalid' | 'stale';
   raw: number | null;
@@ -35,6 +124,19 @@ export class Input {
   private tiltAt: number | null = null;
   private tiltPermission: 'unknown' | 'waiting' | 'denied' | 'unsupported' = 'unknown';
   private tiltInvalid = false;
+  private controls = readControlPreferences().config;
+  private controller = new StandardPadInput();
+  private focused = true;
+  private resetInput = () => { this.keys.clear(); this.controller.reset(); };
+
+  getControls(): ControlPreferences { return parseControls(this.controls)!; }
+  /** Call at a screen or match transition, even while the simulation is stopped. */
+  release() { this.resetInput(); }
+  setControls(value: ControlPreferences) {
+    const config = parseControls(value); if (!config) return false;
+    this.controls = config; this.keys.clear(); this.controller.reset(); return true;
+  }
+  getGamepadStatus() { return this.controller.status; }
 
   constructor(pad: HTMLElement, dot: HTMLElement, brakeBtn: HTMLElement, gasBtn: HTMLElement, leftBtn: HTMLElement, rightBtn: HTMLElement, driftBtn?: HTMLElement) {
     // 按住型的按鈕：多指同時按也不會互相干擾（每根手指各自記 pointerId）
@@ -115,17 +217,24 @@ export class Input {
       const target = e.target;
       if (!this.isDriving() || e.defaultPrevented || e.isComposing || isInteractiveTarget(target)) { this.keys.clear(); return; }
       this.keys.add(e.code);
-      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+      if (e.code === 'Space' || e.code.startsWith('Arrow') || CONTROL_ACTIONS.some(action => this.controls.keys[action].includes(e.code))) e.preventDefault();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     const reset = () => {
       this.keys.clear();
+      this.controller.reset();
       for (const ids of [this.brakeIds, this.gasIds, this.leftIds, this.rightIds, this.driftIds]) ids.clear();
       this.padId = -1; this.padSteer = 0; this.tiltSteer = 0; this.tiltAt = null; this.tiltInvalid = false;
       dot.style.transform = '';
       for (const btn of [brakeBtn, gasBtn, leftBtn, rightBtn, driftBtn]) btn?.classList.remove('on');
     };
+    this.resetInput = reset;
     addEventListener('blur', reset);
+    addEventListener('blur', () => { this.focused = false; this.controller.reset(); });
+    addEventListener('focus', () => { this.focused = true; this.controller.reset(); });
+    addEventListener('gamepaddisconnected', () => this.controller.reset());
+    addEventListener('gp-controls-updated', () => this.setControls(readControlPreferences().config));
+    addEventListener('storage', (event) => { if (event.key === CONTROL_KEY || event.key === null) this.setControls(readControlPreferences().config); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
     screen.orientation?.addEventListener('change', reset);
     addEventListener('blur', () => { this.keys.clear(); this.brakeIds.clear(); this.gasIds.clear(); brakeBtn.classList.remove('on'); gasBtn.classList.remove('on'); });
@@ -191,19 +300,25 @@ export class Input {
   }
 
   read() {
-    if (!this.isDriving()) this.keys.clear();
+    if (!this.isDriving() || document.hidden || !this.focused) {
+      this.keys.clear(); this.controller.reset();
+      return { steer: 0, brake: false, throttle: false, handbrake: false };
+    }
     const k = this.keys;
+    const held = (action: ControlAction) => this.controls.keys[action].some(code => k.has(code));
+    const gamepad = this.controller.read(connectedStandardPad(), this.controls.gamepad, true);
     let steer = 0;
-    if (k.has('ArrowLeft') || k.has('KeyA')) steer -= 1;
-    if (k.has('ArrowRight') || k.has('KeyD')) steer += 1;
+    if (held('left')) steer -= 1;
+    if (held('right')) steer += 1;
+    if (steer === 0 && gamepad.steer !== 0) steer = gamepad.steer;
     if (this.padId >= 0) steer = this.padSteer;
     else if (this.leftIds.size || this.rightIds.size) steer = (this.rightIds.size ? 1 : 0) - (this.leftIds.size ? 1 : 0);
     else if (this.tilt && steer === 0) steer = this.tiltStatus(performance.now()) === 'ready' ? this.tiltSteer : 0;
-    const brake = this.brakeIds.size > 0 || k.has('ArrowDown') || k.has('KeyS') || k.has('Space');
-    const throttle = this.gasIds.size > 0 || k.has('ArrowUp') || k.has('KeyW');
+    const brake = this.brakeIds.size > 0 || held('brake') || gamepad.brake;
+    const throttle = this.gasIds.size > 0 || held('throttle') || gamepad.throttle;
     if (this.curve === 'gentle') steer = Math.sign(steer) * Math.abs(steer) ** 1.6;
     steer = clamp(steer * this.sens);
-    const handbrake = this.driftIds.size > 0 || k.has('ShiftLeft') || k.has('ShiftRight'); // 甩尾
+    const handbrake = this.driftIds.size > 0 || held('handbrake') || gamepad.handbrake; // 甩尾
     return { steer, brake, throttle, handbrake };
   }
 }

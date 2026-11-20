@@ -4,11 +4,17 @@ import {
 } from '../shared/multiplayer-protocol';
 import { CATALOG_STAMP, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } from '../shared/multiplayer-tracks';
 import { parseRoomRules, type MultiplayerRoomRules } from '../shared/multiplayer-room-rules';
+import { parseRoomPreset, parseHorizon, validateHorizonSnapshot, type HorizonSettings, type RoomPreset } from '../shared/multiplayer-horizon';
+import { decodeMultiplayerReplay, validReplayDescriptor, REPLAY_MAX_CHARS, REPLAY_CHUNK_CHARS, type MultiplayerReplay } from '../shared/nexus-replay';
+import { validateArenaSnapshot, type ArenaMode } from '../shared/multiplayer-arena';
+import {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas,type AtlasSettings,type AtlasPitService} from '../shared/atlas-racing';
+import type {VoyagerSettings} from '../shared/voyager-racing';
+import {odysseySettings,type OdysseySettings,voyagerSettings,summitSettings,validateSummit,type SummitSettings,type SummitTyre} from '../shared/summit-racing';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
 type SnapshotListener = (room: RoomSnapshot) => void;
-type EntryKind = 'create' | 'join' | 'resume';
+type EntryKind = 'create' | 'join' | 'resume' | 'resume-series' | 'watch' | 'claim-seat' | 'create-configured';
 interface SavedSession {
   endpoint: string; code: string; playerId: string; token: string;
   version: number; physics: string; catalogStamp: string; savedAt: number;
@@ -19,9 +25,10 @@ interface PendingEntry {
 }
 
 const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
+const SERIES_SEATS_KEY = 'taipei-gp-multiplayer-series-seats-v1';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const } };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const } };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -45,6 +52,7 @@ export class MultiplayerClient {
   private credentials: SavedSession | null = null;
   private listeners = new Set<StateListener>();
   private snapshotListeners = new Set<SnapshotListener>();
+  private checkpointListeners = new Set<(checkpoint: { token: string; expiresAt: number; persistent: boolean }) => void>();
   private pings = new Map<number, number>();
   private clockSamples: { rtt: number; offset: number; at: number }[] = [];
   private offset = 0;
@@ -53,6 +61,8 @@ export class MultiplayerClient {
   private retiredMatches = new Set<string>();
   private requestSeq = 0;
   private inputSeq = 0;
+  private arenaSeq = 0;
+  private summitSeq=0;private voyagerSeq=0;
   private lastInputAt = -Infinity;
   private lastInputBrake = true;
   private _status: MultiplayerConnectionStatus = 'idle';
@@ -62,6 +72,12 @@ export class MultiplayerClient {
   private _selfId: string | null = null;
   private _rttMs: number | null = null;
   private _connectionGeneration = 0;
+  setOdyssey(settings:OdysseySettings){const r=this._room,parsed=odysseySettings(settings);if(!parsed||!r?.capabilities?.odysseyRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-odyssey',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  nextOdysseyStage(){const r=this._room;if(!r?.capabilities?.odysseyRacing||!r.odyssey?.settings.sprintWeekend||r.phase!=='results'||r.odyssey.weekend?.complete||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'next-odyssey-stage',roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  private preservedSeatKey = '';
+  private spectatorId: string | null = null;
+  private _horizonAvailable = false;
+  private replayPending: { id: string; offset: number; total: number | null; chunks: string[]; timer: ReturnType<typeof setTimeout>; resolve: (value: MultiplayerReplay) => void; reject: (error: Error) => void } | null = null;
 
   constructor(url: string) {
     let endpoint: URL;
@@ -77,6 +93,52 @@ export class MultiplayerClient {
   get snapshot() { return this._snapshot; }
   get selfId() { return this._selfId; }
   get rttMs() { return this._rttMs; }
+  get isSpectator() { return this.spectatorId !== null; }
+  get horizonAvailable() { return this._horizonAvailable; }
+  /** Explicit, result-only read. Parts are sequential and never enter the room state. */
+  downloadReplay(): Promise<MultiplayerReplay> {
+    const room=this._room,meta=room?.replay;
+    if(this.replayPending)return Promise.reject(Error('正在取得回放，請稍候。'));
+    if(!this.authenticated||this._status!=='connected'||room?.phase!=='results'||!room.capabilities?.replay||!meta?.ready)return Promise.reject(Error('目前服務或本場結算沒有可取得的回放。'));
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>this.rejectReplay('取得回放逾時；可以重新嘗試。'),20_000);
+      this.replayPending={id:meta.id,offset:0,total:null,chunks:[],timer,resolve,reject};
+      if(!this.send({type:'replay-chunk',replayId:meta.id,offset:0,requestId:`replay:${meta.id}`}))this.rejectReplay('連線已中斷，尚未取得回放。');
+    });
+  }
+  private rejectReplay(message: string) {
+    const p=this.replayPending;if(!p)return;this.replayPending=null;clearTimeout(p.timer);p.reject(Error(message));
+  }
+  setArena(mode:ArenaMode) {const r=this._room;if(!r?.capabilities?.nexusArena||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-arena',mode,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  arenaTeam(team:'red'|'blue') {const r=this._room;if(!r?.capabilities?.nexusArena||r.phase!=='lobby'||!r.hostManagement||this.isSpectator)return false;return this.command({type:'arena-team',team,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  arenaAction(){const r=this._room,p=r?.players.find(v=>v.id===this.selfId);if(!r?.capabilities?.nexusArena||r.phase!=='racing'||!r.matchId||!p?.arena?.active||p.dnf||p.finishMs!==null||!p.loaded)return false;const type=r.arena?.mode==='items'?'use-item':'relay-handoff';return this.command({type,roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,seq:++this.arenaSeq});}
+  setAtlas(settings:AtlasSettings){const r=this._room,parsed=atlasSettings(settings);if(!parsed||!r?.capabilities?.atlasRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-atlas',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  setVoyager(settings:VoyagerSettings){const r=this._room,parsed=voyagerSettings(settings);if(!parsed||!r?.capabilities?.voyagerRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-voyager',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  setVsc(active:boolean){const r=this._room;if(typeof active!=='boolean'||!r?.voyager?.settings.vsc||r.phase!=='racing'||!r.matchId||r.hostId!==this.selfId||this.isSpectator)return false;return this.command({type:'voyager-vsc',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,seq:++this.voyagerSeq,active});}
+  setSummit(settings:SummitSettings){const r=this._room,parsed=summitSettings(settings);if(!parsed||!r?.capabilities?.summit||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-summit',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  nextWeekend(){const r=this._room;if(!r?.capabilities?.summit||!r.summit?.settings.weekend||r.summit.stage!=='qualifying'||r.phase!=='results'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'next-weekend',roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  setPitStrategy(armed:boolean,compound:SummitTyre,service:AtlasPitService='tyres'){const r=this._room,p=r?.players.find(v=>v.id===this.selfId);if(!r?.capabilities?.summit||(!r.summit?.settings.endurance&&(!r.voyager||r.voyager.settings.weather==='legacy')&&!r.atlas?.settings.damage)||r.summit?.stage==='qualifying'||r.phase!=='racing'||!r.matchId||!p||p.dnf||p.finishMs!==null||!p.loaded||p.summit?.pitUntil&&p.summit.pitUntil>this.serverNow()||this.isSpectator||!ATLAS_PIT_SERVICES.includes(service)||service!=='tyres'&&!r.atlas?.settings.damage||service!=='repair'&&!r.summit?.settings.endurance&&(!r.voyager||r.voyager.settings.weather==='legacy'))return false;return this.command({type:'summit-pit',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,seq:++this.summitSeq,armed,compound,...(r.capabilities?.atlasRacing?{service}:{})});}
+  async watch(code: string, name: string) {
+    if (!this.horizonAvailable) throw Error('請先連線確認這個服務提供觀戰功能。');
+    const normalized=code.trim().toUpperCase(); if (!/^[A-HJ-NP-Z2-9]{6}$/.test(normalized)) throw Error('請輸入正確的 6 碼房間碼。');
+    await this.enter('watch', { type:'watch', ...identity, code:normalized, name:this.cleanName(name) });
+  }
+  async claimSpectatorSeat() {
+    const r=this._room; if (!this.isSpectator || !r?.capabilities?.horizon || !r.hostManagement) throw Error('目前沒有可轉入的觀眾身分。');
+    await this.enter('claim-seat', { type:'claim-seat', roomCode:r.code, expectedLobbyRevision:r.hostManagement.lobbyRevision });
+  }
+  async createConfigured(name: string, preset: RoomPreset) {
+    const parsed=parseRoomPreset(preset); if(!this.horizonAvailable || !parsed) throw Error('目前服務或範本不支援這項設定。');
+    await this.enter('create-configured', { type:'create-configured', ...identity, name:this.cleanName(name), preset:parsed });
+  }
+  setHorizon(horizon: HorizonSettings) {
+    const r=this._room,parsed=parseHorizon(horizon); if (!parsed||this.isSpectator||!r?.capabilities?.horizon||!r.hostManagement||r.phase!=='lobby'||r.hostId!==this._selfId||r.series?.locked) return false;
+    return this.command({type:'set-horizon',horizon:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});
+  }
+  recoverBlock() {
+    const r=this._room; if(!r?.matchId||!r.players.find(p=>p.id===this._selfId)?.block?.ghost)return false;
+    return this.command({type:'recover-block',roomCode:r.code,matchId:r.matchId});
+  }
   /** Changes on disconnect and authenticated welcome, including same-room resume. */
   get connectionGeneration() { return this._connectionGeneration; }
   get hasSavedSession() { return this.readSession() !== null; }
@@ -90,6 +152,70 @@ export class MultiplayerClient {
   onSnapshot(listener: SnapshotListener) {
     this.snapshotListeners.add(listener);
     return () => { this.snapshotListeners.delete(listener); };
+  }
+  onSeriesCheckpoint(listener: (checkpoint: { token: string; expiresAt: number; persistent: boolean }) => void) {
+    this.checkpointListeners.add(listener); return () => { this.checkpointListeners.delete(listener); };
+  }
+  get savedSeriesSeats(): { playerId: string; name: string; seriesId: string; key: string }[] {
+    return this.readSeriesSeats().map(seat => ({ playerId: seat.playerId, name: seat.name, seriesId: seat.seriesId, key: `${seat.seriesId}:${seat.playerId}` }));
+  }
+  private readSeriesSeats(): (SavedSession & { name: string; seriesId: string })[] {
+    try {
+      const raw = localStorage.getItem(SERIES_SEATS_KEY); if (!raw || raw.length > 20000) return [];
+      const seats: unknown = JSON.parse(raw); if (!Array.isArray(seats)) return [];
+      return seats.filter((s): s is SavedSession & { name: string; seriesId: string } => object(s) && s.endpoint === this.url && s.version === PROTOCOL_VERSION
+        && s.physics === PHYSICS_VERSION && s.catalogStamp === CATALOG_STAMP && typeof s.name === 'string' && s.name.length <= 64
+        && typeof s.seriesId === 'string' && s.seriesId.length > 0 && s.seriesId.length <= 128
+        && typeof s.playerId === 'string' && s.playerId.length <= 128 && typeof s.token === 'string' && s.token.length >= 8 && s.token.length <= 512
+        && finite(s.savedAt) && Date.now() - s.savedAt >= 0 && Date.now() - s.savedAt < 7 * 86400000).slice(0, 10);
+    } catch { return []; }
+  }
+  private preserveSeriesSeat(room: RoomSnapshot) {
+    if (!room.series?.locked || !this.credentials || !room.series.entrants.some(e => e.playerId === this._selfId)) return;
+    const me = room.players.find(p => p.id === this._selfId); if (!me) return;
+    const key = `${room.series.id}:${room.series.revision}:${this.credentials.token}`;
+    if (key === this.preservedSeatKey) return; this.preservedSeatKey = key;
+    const seats = this.readSeriesSeats(), stable = seats.find(s => s.playerId === this._selfId && s.seriesId === room.series!.id);
+    try { localStorage.setItem(SERIES_SEATS_KEY, JSON.stringify([{ ...(stable ?? this.credentials), seriesId: room.series.id, name: me.name, savedAt: Date.now() },
+      ...seats.filter(s => s.playerId !== this._selfId || s.seriesId !== room.series!.id)].slice(0, 10))); } catch { /* 本次分頁仍可續接。 */ }
+  }
+  async claimSeriesSeat(code: string, playerId: string) {
+    const normalized = code.trim().toUpperCase(), seat = this.readSeriesSeats().find(s => s.playerId === playerId || `${s.seriesId}:${s.playerId}` === playerId);
+    if (!/^[A-HJ-NP-Z2-9]{6}$/.test(normalized) || !seat) throw new Error('請輸入續賽新房碼，並選擇原車手席位。');
+    await this.enter('resume', { type: 'resume', ...identity, code: normalized, playerId: seat.playerId, token: seat.token });
+  }
+  async resumeSeries(token: string, name: string) {
+    if (!token || token.length > 65536) throw new Error('續賽檔案格式不正確，請重新選擇。');
+    await this.enter('resume-series', { type: 'resume-series', ...identity, token, name: this.cleanName(name) });
+  }
+  configureEvent(mode: 'race' | 'time-trial' | 'pursuit' | 'teams', durationSeconds: 180 | 300, releaseDelays: Record<string, 0 | 3 | 5 | 10>) {
+    const room = this.evolutionLobby(true); if (!room || room.series?.locked) return false;
+    return this.command({ type: 'configure-event', mode, durationSeconds, releaseDelays, roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  selectTeam(team: 'red' | 'blue') {
+    const room = this.evolutionLobby(false); if (!room || room.series?.locked) return false;
+    return this.command({ type: 'select-team', team, roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  voteTrack(trackId: string) {
+    const room = this.evolutionLobby(false); if (!room || !room.evolution || !getMultiplayerTrack(trackId)) return false;
+    return this.command({ type: 'vote-track', trackId, expectedVoteRevision: room.evolution.vote.revision, roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  resolveVote() {
+    const room = this.evolutionLobby(true); if (!room) return false;
+    return this.command({ type: 'resolve-vote', roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  randomSeries(count: 3 | 4 | 5) {
+    const room = this.evolutionLobby(true); if (!room || room.series?.locked) return false;
+    return this.command({ type: 'random-series', count, roomCode: room.code, expectedLobbyRevision: room.hostManagement!.lobbyRevision });
+  }
+  checkpointSeries() {
+    const room = this._room;
+    if (!room?.capabilities?.seriesResume || !room.series || room.series.complete || !room.matchId || room.phase !== 'results' || room.hostId !== this._selfId) return false;
+    return this.command({ type: 'checkpoint-series', roomCode: room.code, matchId: room.matchId, expectedSeriesRevision: room.series.revision });
+  }
+  private evolutionLobby(host: boolean) {
+    const room = this._room;
+    return room?.phase === 'lobby' && room.hostManagement && room.capabilities?.evolution && (!host || room.hostId === this._selfId) ? room : null;
   }
 
   /** 單獨建立傳輸；constructor 不會自動開啟 socket。 */
@@ -133,7 +259,7 @@ export class MultiplayerClient {
       this.lastInbound = clock();
       try { this.receive(event.data); }
       catch (error) {
-        this.clearSession();
+        if (!this.isSpectator) this.clearSession();
         this._room = this._snapshot = null; this._selfId = null;
         this.wantsConnection = false;
         this.failSocket(socket, error instanceof Error ? error.message : '伺服器回傳的資料無法讀取。');
@@ -232,7 +358,10 @@ export class MultiplayerClient {
   sendInput(steer: number, brake: boolean) {
     if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
     const self = this._room.players.find(player => player.id === this._selfId);
-    if (!self || self.dnf || self.finishMs !== null) return false;
+    if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false) return false;
+    if (!self || self.dnf || self.finishMs !== null || self.timeTrialDone) return false;
+    if (this._room.evolution?.mode === 'pursuit' && this._room.startAt !== null
+      && this.serverNow() < this._room.startAt + (this._room.evolution.releaseDelays[self.id] ?? 0) * 1000) return false;
     const now = clock();
     if (now - this.lastInputAt < 1000 / 30 && !(brake && !this.lastInputBrake)) return false;
     if ((this.socket?.bufferedAmount ?? 0) > 65536) {
@@ -245,7 +374,8 @@ export class MultiplayerClient {
 
   leave() {
     if (this.authenticated) this.send({ type: 'leave' });
-    this.clearSession();
+    if (!this.isSpectator) this.clearSession();
+    this.spectatorId=null; this.credentials=null;
     this._room = this._snapshot = null; this._selfId = null;
     this.lastRoomTime = -Infinity; this.retiredMatches.clear();
     this._error = null;
@@ -274,7 +404,7 @@ export class MultiplayerClient {
 
   private async enter(kind: EntryKind, message: ClientMessage) {
     if (this.entering || this.pending) throw new Error('正在處理房間連線，請稍候。');
-    if (this._room && kind !== 'resume') throw new Error('請先離開目前房間。');
+    if (this._room && kind !== 'resume' && kind !== 'claim-seat') throw new Error('請先離開目前房間。');
     this.entering = true;
     try {
       await this.connect();
@@ -296,6 +426,7 @@ export class MultiplayerClient {
   }
 
   private command(message: ClientMessage) {
+    if (this.isSpectator && !['track-loaded','leave'].includes(message.type)) { this._error='觀眾不能操作本場比賽。'; this.notify(); return false; }
     if (!this.authenticated || !this._room || this._status !== 'connected') {
       this._error = '尚未連上房間，請先建立或加入房間。'; this.notify(); return false;
     }
@@ -314,11 +445,30 @@ export class MultiplayerClient {
     const raw: unknown = JSON.parse(data);
     if (!object(raw) || typeof raw.type !== 'string') throw new Error('伺服器回傳的訊息格式不正確。');
     const message = raw as unknown as ServerMessage;
+    if(message.type==='replay-part'){
+      const p=this.replayPending;if(!p)return;
+      if(this._room?.phase!=='results'||this._room.replay?.id!==p.id||message.replayId!==p.id||message.offset!==p.offset||!Number.isSafeInteger(message.totalChars)||message.totalChars<1||message.totalChars>REPLAY_MAX_CHARS
+        ||typeof message.text!=='string'||!message.text.length||message.text.length>REPLAY_CHUNK_CHARS||p.offset+message.text.length>message.totalChars||p.total!==null&&p.total!==message.totalChars){this.rejectReplay('回放分段格式不正確，請重新取得。');return;}
+      p.total=message.totalChars;p.chunks.push(message.text);p.offset+=message.text.length;
+      if(p.offset===p.total){
+        this.replayPending=null;clearTimeout(p.timer);
+        try{const replay=decodeMultiplayerReplay(p.chunks.join(''));if(replay.id!==p.id)throw Error('回放識別不一致。');p.resolve(replay);}catch(e){p.reject(e instanceof Error?e:Error('回放檔無效。'));}
+      }else if(message.text.length!==REPLAY_CHUNK_CHARS||!this.send({type:'replay-chunk',replayId:p.id,offset:p.offset,requestId:`replay:${p.id}`}))this.rejectReplay('回放傳輸中斷，請重新取得。');
+      return;
+    }
+    if (message.type === 'series-checkpoint') {
+      if (!this.authenticated || this._room?.hostId !== this._selfId || this._room.phase !== 'results' || !this._room.series) return;
+      if (typeof message.token !== 'string' || message.token.length < 16 || message.token.length > 65536 || !finite(message.expiresAt)
+        || message.expiresAt <= this.serverNow() || typeof message.persistent !== 'boolean') throw new Error('續賽檔案格式不正確。');
+      for (const listener of this.checkpointListeners) listener({ token: message.token, expiresAt: message.expiresAt, persistent: message.persistent });
+      return;
+    }
     if (message.type === 'pong') {
       if (!finite(message.sentAt) || !finite(message.serverTime)) return;
       const began = this.pings.get(message.sentAt);
       if (began === undefined) return;
       this.pings.delete(message.sentAt);
+      this._horizonAvailable = message.capabilities?.horizon === true;
       const now = clock(), rtt = Math.max(0, now - began);
       const sample = { rtt, offset: message.serverTime - (message.sentAt + rtt / 2), at: now };
       this.clockSamples = [...this.clockSamples.filter(s => now - s.at < 15000), sample].slice(-8);
@@ -326,6 +476,7 @@ export class MultiplayerClient {
       this.offset = best.offset; this._rttMs = rtt; this.notify(); return;
     }
     if (message.type === 'error') {
+      if(message.requestId?.startsWith('replay:'))this.rejectReplay(typeof message.message==='string'?message.message:'無法取得回放。');
       const text = typeof message.message === 'string' ? message.message.slice(0, 300) : '房間操作失敗，請再試一次。';
       if (this.pending && message.requestId !== this.pending.id) return;
       const resuming = this.pending?.kind === 'resume';
@@ -338,11 +489,21 @@ export class MultiplayerClient {
       if (resuming && this.socket) this.failSocket(this.socket, text);
       return;
     }
+    if (message.type === 'watching') {
+      if (!this.pending || this.pending.kind!=='watch' || message.requestId!==this.pending.id) return;
+      this.validateRoom(message.room);
+      if (!message.room.capabilities?.horizon || typeof message.spectatorId!=='string' || !message.room.spectators?.some(v=>v.id===message.spectatorId)) throw Error('服務未提供有效觀眾身分。');
+      this.credentials=null;this.spectatorId=message.spectatorId;this._selfId=message.spectatorId;this.authenticated=true;this._connectionGeneration++;
+      this._status='connected';this._error=null;this.lastRoomTime=-Infinity;this._horizonAvailable=true;
+      if(!this.clockSamples.length)this.offset=message.room.serverTime-Date.now();
+      this.acceptRoom(message.room,true);const pending=this.pending;this.pending=null;clearTimeout(pending.timer);pending.resolve();this.notify();return;
+    }
     if (message.type === 'welcome') {
       if (!this.pending || message.requestId !== this.pending.id) return;
       this.validateRoom(message.room);
       if (typeof message.playerId !== 'string' || typeof message.resumeToken !== 'string' || message.resumeToken.length < 8 || message.resumeToken.length > 512 || !message.room.players.some(p => p.id === message.playerId)) throw new Error('伺服器未提供有效的房間身分。');
       this._selfId = message.playerId;
+      this.spectatorId=null;
       this.credentials = { endpoint: this.url, code: message.room.code, playerId: message.playerId, token: message.resumeToken, ...identity, savedAt: Date.now() };
       this.persistSession();
       this.authenticated = true; this.reconnectDeadline = 0; this.reconnectAttempts = 0;
@@ -375,41 +536,75 @@ export class MultiplayerClient {
     if (!object(room) || room.version !== PROTOCOL_VERSION || room.physics !== PHYSICS_VERSION || room.catalogStamp !== CATALOG_STAMP) throw new Error('遊戲與伺服器版本或地圖清單不一致，請更新後重新連線。');
     const descriptor = typeof room.trackId === 'string' ? getMultiplayerTrack(room.trackId) : undefined;
     if (!descriptor || room.trackStamp !== descriptor.trackStamp || !Number.isSafeInteger(room.trackRevision) || Number(room.trackRevision) < 1) throw new Error('伺服器提供的地圖版本不一致，請更新後重新連線。');
-    if (typeof room.code !== 'string' || typeof room.hostId !== 'string' || !['lobby', 'countdown', 'racing', 'results'].includes(String(room.phase)) || !finite(room.serverTime) || !finite(room.trackLength) || room.trackLength <= 0 || ![1, 3, 5].includes(Number(room.laps)) || (room.matchId !== null && typeof room.matchId !== 'string') || (room.startAt !== null && !finite(room.startAt)) || !Array.isArray(room.players) || room.players.length < 1 || room.players.length > 4) throw new Error('房間資料格式不正確，請重新連線。');
+    if (typeof room.code !== 'string' || typeof room.hostId !== 'string' || !['lobby', 'countdown', 'racing', 'results'].includes(String(room.phase)) || !finite(room.serverTime) || !finite(room.trackLength) || room.trackLength <= 0 || ![1, 3, 5].includes(Number(room.laps)) || (room.matchId !== null && typeof room.matchId !== 'string') || (room.startAt !== null && !finite(room.startAt)) || !Array.isArray(room.players) || room.players.length < (object(room.capabilities)&&room.capabilities.horizon===true?0:1) || room.players.length > 4) throw new Error('房間資料格式不正確，請重新連線。');
+    validateHorizonSnapshot(room);
+    const replayCap=object(room.capabilities)?room.capabilities.replay:undefined;
+    if(replayCap!==undefined&&replayCap!==true||'replay' in room&&(replayCap!==true||room.replay!==null&&!validReplayDescriptor(room.replay)))throw Error('回放能力或錄製狀態格式不正確。');
+    validateArenaSnapshot(room);
+    validateSummit(room);validateAtlas(room);
+    const summit=object(room.summit)?room.summit:undefined,summitQual=summit?.stage==='qualifying',summitEndurance=!!summit&&!summitQual&&object(summit.settings)&&Number(summit.settings.endurance)>0,summitTimed=summitQual||summitEndurance;
+    const practice=object(room.voyager)&&object(room.voyager.settings)&&Number(room.voyager.settings.practiceSeconds)>0;
+    const elimination=object(room.horizon)&&room.horizon.elimination===true;
     if ('hostManagement' in room && (!object(room.hostManagement) || !Number.isSafeInteger(room.hostManagement.lobbyRevision) || Number(room.hostManagement.lobbyRevision) < 1)) throw new Error('房主管理版本格式不正確，請重新連線。');
     if ('capabilities' in room && (!object(room.capabilities) || room.capabilities.lobbyOptions !== true || room.capabilities.championship !== true || !object(room.hostManagement))) throw new Error('房間功能能力格式不正確，請重新連線。');
     const rulesCap = object(room.capabilities) ? room.capabilities.roomRules : undefined;
     if ((rulesCap !== undefined && rulesCap !== true) || (rulesCap === true ? !parseRoomRules(room.roomRules) : 'roomRules' in room)) throw new Error('房間規則能力與設定不一致，請更新後重新連線。');
+    const evo = room.evolution, evoCap = object(room.capabilities) ? room.capabilities.evolution : undefined;
+    if (evoCap !== undefined && evoCap !== true || evoCap === true && (!object(evo) || !['race', 'time-trial', 'pursuit', 'teams'].includes(String(evo.mode))
+      || ![180, 300].includes(Number(evo.durationSeconds)) || !object(evo.releaseDelays) || !object(evo.teams) || !object(evo.vote)
+      || !Number.isSafeInteger(evo.vote.revision) || Number(evo.vote.revision) < 1 || !object(evo.vote.ballots)
+      || Object.values(evo.releaseDelays).some(value => ![0, 3, 5, 10].includes(Number(value)))
+      || Object.values(evo.teams).some(value => value !== 'red' && value !== 'blue')
+      || Object.values(evo.vote.ballots).some(value => typeof value !== 'string' || !getMultiplayerTrack(value)))
+      || evoCap !== true && 'evolution' in room) throw new Error('多人玩法設定格式不正確，請更新後重新連線。');
+    if (object(evo) && 'teamStandings' in evo && (!Array.isArray(evo.teamStandings) || ![0, 2].includes(evo.teamStandings.length)
+      || new Set(evo.teamStandings.map(t => object(t) ? t.team : null)).size !== evo.teamStandings.length
+      || evo.teamStandings.some((t, index) => !object(t) || !['red', 'blue'].includes(String(t.team)) || t.rank !== index + 1
+        || !['points', 'roundWins', 'wins', 'finishes', 'elapsedMs'].every(k => finite(t[k]) && Number(t[k]) >= 0 && Number(t[k]) <= 864000000)))) throw new Error('隊伍積分格式不正確，請重新連線。');
+    const resumeCap = object(room.capabilities) ? room.capabilities.seriesResume : undefined;
+    if (resumeCap !== undefined && (!object(resumeCap) || typeof resumeCap.persistent !== 'boolean' || !Number.isSafeInteger(resumeCap.ttlSeconds)
+      || Number(resumeCap.ttlSeconds) < 1 || Number(resumeCap.ttlSeconds) > 2592000)) throw new Error('續賽能力格式不正確，請重新連線。');
+    const timeTrial = object(evo) && evo.mode === 'time-trial';
     if ('series' in room && room.series !== null && (!object(room.capabilities) || room.capabilities.championship !== true || !validSeries(room.series, String(room.trackId), String(room.phase), room.matchId as string | null, Number(room.laps)))) throw new Error('系列賽成績格式不正確，請重新連線。');
     // Additive v2: absent metadata means an older server. If provided, validate
     // the complete pair rather than silently displaying an untrusted deadline.
     if ('deadlineAt' in room || 'deadlineReason' in room) {
       const validDeadline = room.deadlineAt === null && room.deadlineReason === null && room.phase === 'lobby'
         || finite(room.deadlineAt) && finite(room.startAt) && room.deadlineAt >= room.startAt && room.phase !== 'lobby'
-          && (room.deadlineReason === 'race-timeout' || room.deadlineReason === 'finish-timeout');
+          && ['race-timeout', 'finish-timeout', 'time-trial-timeout', 'time-trial-grace'].includes(String(room.deadlineReason));
       if (!validDeadline) throw new Error('比賽截止時間格式不正確，請重新連線。');
     }
     const ids = new Set<string>();
     for (const player of room.players) {
       if (!object(player) || typeof player.id !== 'string' || ids.has(player.id) || typeof player.name !== 'string' || player.name.length > 64 || typeof player.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(player.color) || typeof player.ready !== 'boolean' || typeof player.loaded !== 'boolean' || typeof player.connected !== 'boolean' || typeof player.dnf !== 'boolean' || !finite(player.ackSeq) || !Number.isSafeInteger(player.ackSeq) || player.ackSeq < -1 || !finite(player.completedLaps) || !finite(player.progress) || !finite(player.rank) || (player.finishMs !== null && !finite(player.finishMs)) || !object(player.car) || !object(player.car.pos) || !['x', 'z', 'h', 'v', 'steer'].every(key => finite((player.car as Record<string, unknown>)[key])) || !['i', 's', 'lat'].every(key => finite((player.car as { pos: Record<string, unknown> }).pos[key]))) throw new Error('車手狀態格式不正確，請重新連線。');
       if ('dnfReason' in player && (player.dnfReason === null ? player.dnf
-        : !player.dnf || player.finishMs !== null || typeof player.dnfReason !== 'string' || !['race-timeout', 'finish-timeout', 'disconnect-expired', 'left', 'server-stall'].includes(player.dnfReason))) throw new Error('未完賽原因格式不正確，請重新連線。');
+        : !player.dnf || player.finishMs !== null || typeof player.dnfReason !== 'string' || !['race-timeout', 'finish-timeout', 'disconnect-expired', 'left', 'server-stall', 'no-valid-lap', 'time-trial-no-lap'].includes(player.dnfReason))) throw new Error('未完賽原因格式不正確，請重新連線。');
+      if ('timeTrialDone' in player && (!timeTrial || typeof player.timeTrialDone !== 'boolean')) throw new Error('限時賽結束狀態格式不正確，請重新連線。');
       // Older v2 servers omit both fields. If either is present, require the
       // complete, bounded and internally consistent server timing record.
       if ('lapTimesMs' in player || 'bestLapMs' in player) {
         const times = player.lapTimesMs;
-        if (!Array.isArray(times) || typeof room.laps !== 'number' || !Number.isInteger(player.completedLaps) || player.completedLaps < 0 || player.completedLaps > room.laps
-          || times.length !== player.completedLaps || times.length > 5 || [...times].some(ms => !finite(ms) || ms <= 0 || ms > 86_400_000)
+        const validLaps=practice&&object(player.voyager)?player.voyager.validLaps:summitQual&&object(player.summit)?player.summit.validLaps:null;
+        const bestTimes=summitQual||practice?validLaps:times;
+        if (!Array.isArray(times) || !Array.isArray(bestTimes) || typeof room.laps !== 'number' || !Number.isInteger(player.completedLaps) || player.completedLaps < 0 || player.completedLaps > (timeTrial || elimination || summitTimed || practice ? 128 : room.laps)
+          || times.length !== player.completedLaps || times.length > (timeTrial || elimination || summitTimed || practice ? 128 : 5) || [...times].some(ms => !finite(ms) || ms <= 0 || ms > 86_400_000)
           || ((room.phase === 'lobby' || room.phase === 'countdown') && times.length > 0)
-          || (times.length === 0 ? player.bestLapMs !== null : !finite(player.bestLapMs) || Math.abs(player.bestLapMs - Math.min(...times)) > 0.001)
-          || (player.completedLaps === room.laps && player.finishMs === null)
-          || (player.finishMs !== null && (player.completedLaps !== Number(room.laps) || player.finishMs <= 0 || player.finishMs > 86_400_000
-            || Math.abs(times.reduce<number>((sum, ms) => sum + ms, 0) - player.finishMs) > 0.003))) throw new Error('逐圈成績格式不正確，請重新連線。');
+          || (bestTimes.length === 0 ? player.bestLapMs !== null : !finite(player.bestLapMs) || Math.abs(player.bestLapMs - Math.min(...bestTimes.map(Number))) > 0.001)
+          || (summitQual||practice)&&(bestTimes.length>times.length||bestTimes.some(ms=>!times.includes(ms)))
+          || (!timeTrial && !elimination && !summitTimed && !practice && player.completedLaps === room.laps && player.finishMs === null)
+          || (player.finishMs !== null && (timeTrial||summitQual||practice ? !bestTimes.length || player.finishMs !== player.bestLapMs
+            : (!summitEndurance&&player.completedLaps !== Number(room.laps)) || summitEndurance&&(player.finishMs<Number(summit!.durationSeconds)*1000||player.finishMs>Number(summit!.durationSeconds)*1000+120000) || player.finishMs <= 0 || player.finishMs > 86_400_000
+            || Math.abs(times.reduce<number>((sum, ms) => sum + ms, 0) - (object(evo) && evo.mode === 'pursuit' ? Number(player.netFinishMs) : player.finishMs)) > 0.003))) throw new Error('逐圈成績格式不正確，請重新連線。');
       }
+      if (object(evo) && evo.mode === 'pursuit' && (player.finishMs !== null
+        ? !finite(player.netFinishMs) || player.netFinishMs <= 0 || Math.abs(player.finishMs - player.netFinishMs - Number((evo.releaseDelays as Record<string, unknown>)[player.id] ?? 0) * 1000) > 0.003
+        : player.netFinishMs !== null && player.netFinishMs !== undefined)) throw new Error('讓秒完賽時間格式不正確，請重新連線。');
       ids.add(player.id);
     }
   }
   private acceptRoom(room: RoomSnapshot, snapshot: boolean) {
+
+    this._horizonAvailable=room.capabilities?.horizon===true;
     if (this.credentials && room.code !== this.credentials.code) return;
     const previousRoom = this._room;
     if (previousRoom?.hostManagement && room.hostManagement && room.hostManagement.lobbyRevision < previousRoom.hostManagement.lobbyRevision) return;
@@ -423,8 +618,10 @@ export class MultiplayerClient {
       this.retiredMatches.add(previous);
       if (this.retiredMatches.size > 16) this.retiredMatches.delete(this.retiredMatches.values().next().value!);
     }
+    if(this.replayPending&&(room.phase!=='results'||room.replay?.id!==this.replayPending.id))this.rejectReplay('房間已開始下一場，回放傳輸已停止。');
     this.lastRoomTime = room.serverTime;
     this._room = room;
+    this.preserveSeriesSeat(room);
     if (changedTrack) {
       this._snapshot = null; this.inputSeq = 0; this.lastInputAt = -Infinity; this.lastInputBrake = true;
     }
@@ -458,6 +655,7 @@ export class MultiplayerClient {
   private closed(socket: WebSocket, reason = '連線中斷，正在重新連線。') {
     if (this.socket !== socket) return;
     this.socket = null; this.authenticated = false;
+    this.rejectReplay('連線已中斷，回放尚未取得。');
     this._connectionGeneration++;
     this.clearConnectTimer(); this.clearHeartbeat();
     const reject = this.connectReject;

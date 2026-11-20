@@ -1,0 +1,12 @@
+.horizon-weekend-card { width:min(850px,94vw);max-height:88dvh;overflow:auto;padding:22px;text-align:left }
+.horizon-weekend-card p { line-height:1.6;font-size:13px }
+.horizon-weekend-card select { padding:8px;max-width:100%;color:inherit;background:#182536;border:1px solid #50718a;border-radius:7px }
+.horizon-weekend-settings { display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 }
+.horizon-weekend-settings label { display:flex;flex-direction:column;gap:5px;font-size:13px }
+.horizon-weekend-actions { display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 }
+#horizon-weekend-table { border-collapse:collapse;width:100%;font-size:13px }
+#horizon-weekend-table th,#horizon-weekend-table td { padding:6px;border-bottom:1px solid #ffffff25;text-align:left;white-space:nowrap }
+#horizon-weekend-table .me { color:#8ddcff;background:#1f384a }
+#horizon-weekend-hud { position:fixed;left:50%;bottom:95px;transform:translateX(-50%);max-width:90vw;padding:8px 13px;border-radius:10px;border:1px solid #8ddcff;background:#101826ee;color:white;z-index:84;font:13px system-ui;pointer-events:none }
+#practice-rewind-status { display:block;font-size:12px;margin:4px 0 }
+@media(max-height:450px) { #horizon-weekend-hud { bottom:8px;font-size:11px } .horizon-weekend-card { padding:12px;max-height:92dvh } }

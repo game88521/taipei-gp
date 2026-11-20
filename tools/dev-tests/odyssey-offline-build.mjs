@@ -1,0 +1,14 @@
+// Rex <game88521@gmail.com>. Verify the actual built offline resources, not a mocked bundle graph.
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..'),sha=b=>createHash('sha256').update(b).digest('hex'),cases=[];
+const test=async(name,fn)=>{try{cases.push({name,status:'PASS',details:await fn()});}catch(e){cases.push({name,status:'FAIL',error:String(e.stack)});}console.log(JSON.stringify(cases.at(-1)));};
+const sw=await readFile(path.join(root,'dist/sw.js'),'utf8'),build=sw.match(/const VERSION = '([a-f0-9]{12})'/)?.[1],packs=JSON.parse(await readFile(path.join(root,'dist/data/offline-packs.json'),'utf8'));
+await test('離線兩包的每個實際檔案存在且長度／SHA一致，不含已刪CSS-only JS facade',async()=>{assert.equal(packs.v,1);assert.deepEqual(packs.packs.map(p=>p.id).sort(),['free','workshop']);let checked=0;for(const pack of packs.packs){assert.ok(pack.files.length>180);assert.equal(new Set(pack.files.map(f=>f.url)).size,pack.files.length);for(const f of pack.files){assert.ok(typeof f.url==='string'&&f.url.startsWith('/')&&!f.url.includes('..'));const bytes=await readFile(path.join(root,'dist',f.url==='/'?'index.html':f.url.slice(1)));assert.equal(bytes.length,f.bytes);assert.equal(sha(bytes),f.sha256);checked++;}}return{checked};});
+await test('離線包包含新手把／共用樣式與工坊分段入口依賴',()=>{for(const p of packs.packs){assert.ok(p.files.some(f=>/odyssey-workshop-.+\.css$/.test(f.url)));assert.ok(p.files.some(f=>/input-.+\.js$/.test(f.url)));assert.ok(p.files.some(f=>/main-.+\.js$/.test(f.url)));}assert.ok(packs.packs.find(p=>p.id==='workshop').files.some(f=>/nexus-workshop-ui-.+\.js$/.test(f.url)));});
+await test('SW預快取項目全部可讀，仍依版本更新',async()=>{assert.match(build,/^[a-f0-9]{12}$/);const list=sw.match(/const PRECACHE\s*=\s*(\[[^;]*\])/);assert.ok(list,'SW PRECACHE declaration');let n=0;for(const url of JSON.parse(list[1])){assert.ok(!url.includes('..'));await readFile(path.join(root,'dist',url==='/'?'index.html':url.slice(1)));n++;}return{build,precache:n};});
+await test('固定競速核心與伺服器物理bundle逐byte保留',async()=>{const inv=JSON.parse(await readFile(path.resolve(root,'../taipei-gp-odyssey-baseline.json'),'utf8'));for(const p of['src/car.ts','src/track.ts','src/rivals.ts','src/pitlane.ts','server/physics.mjs','AGENTS.md','package.json','package-lock.json'])assert.equal(sha(await readFile(path.join(root,p))),inv.files.find(r=>r.path===p).sha256,p);});
+const summary={PASS:cases.filter(c=>c.status==='PASS').length,FAIL:cases.filter(c=>c.status==='FAIL').length},report={status:summary.FAIL?'FAIL':'PASS',build,completedAt:new Date().toISOString(),localOnly:true,cases,summary};await writeFile(new URL('odyssey-offline-build-result.json',import.meta.url),JSON.stringify(report,null,2)+'\n');if(summary.FAIL)process.exitCode=1;

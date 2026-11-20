@@ -9,6 +9,8 @@ import { parseAst } from 'rolldown/parseAst';
 import { pureUrl } from './pure-module-loader.mjs';
 import vm from 'node:vm';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..'), old = process.argv[2] === '--before';
+// The inactive real controller leaves the original callback behavior intact.
+const {VoyagerPhoto}=await import(await pureUrl(root,'voyager-photo.ts'));
 const source = old ? resolve(root, '../taipei-gp-twelve-before-102e84eea8ea') : root;
 const raw = await readFile(resolve(source, 'src/main.ts'), 'utf8'), code = stripTypeScriptTypes(raw, { mode: 'transform' }), ast = parseAst(code);
 const slice = (n) => { assert.ok(n, '找不到真main入口'); return code.slice(n.start, n.end); };
@@ -18,7 +20,7 @@ const isClick = (n) => n.type === 'CallExpression' && n.callee?.property?.name =
 const click = (id) => walk(ast, (n) => isClick(n) && n.callee.object?.arguments?.[0]?.value === id)?.arguments[1];
 const entry = old ? null : await import(await pureUrl(root, 'city-entry-intent.ts'));
 const script = fileURLToPath(import.meta.url), hash = (v) => createHash('sha256').update(v).digest('hex');
-const sourceFiles = old ? ['src/main.ts'] : ['src/main.ts', 'src/city-entry-intent.ts'];
+const sourceFiles = old ? ['src/main.ts'] : ['src/main.ts', 'src/city-entry-intent.ts', 'src/voyager-photo.ts'];
 const sourceHashes = async () => Object.fromEntries(await Promise.all(sourceFiles.map(async (file) => [file, hash(await readFile(resolve(source, file)))])));
 const report = { source, status: 'RUNNING', sourceHash: hash(raw), sourceHashes: await sourceHashes(), scriptSha256: hash(await readFile(script)), before: old, cases: [], browserUsed: false, playerStorageTouched: false,
   limitations: ['執行真main的userStart、普通接單/單次街賽callback及返回處理；DOM、合法offer、音效與存檔為隔離替身。', '權限延遲以可控Promise重現，未代表真手機授權對話框。'] };
@@ -42,7 +44,7 @@ function fixture(kind, lateSystems = false) {
   const guard = entry ? new entry.CityEntryIntent() : null;
   if (entry) entry.bindCityEntryCancellation(guard, document, window);
   const c = { def: { id: 'route' } }, options = { difficulty: 'standard', carId: 'street-f1', rules: 'traffic' };
-  const ctx = vm.createContext({ $, b, list, order: { id: 'order' }, c, document, window, cityEntryIntent: guard,
+  const ctx = vm.createContext({ voyagerPhoto: new VoyagerPhoto({canOpen:()=>false}), nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, horizonUi: null, horizonCity: null, evolutionOwned: false, cityChallengeOpenToken: null, $, b, list, order: { id: 'order' }, c, document, window, cityEntryIntent: guard,
     state: 'paused', mode: 'free', taxiCheckpointPending: false, nav: null, camSnap: false, mapOpen: false,
     fcar: { x: 100, z: 200, y: 0 }, chosen: { id: 'taxi' }, TOUCH: false, steerMode: 'tilt',
     sound: { start() { events.userStarts++; } }, input: { enableTilt: () => tilt },

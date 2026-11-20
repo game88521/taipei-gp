@@ -111,6 +111,7 @@ export class Traffic {
   /** 晚上、下雨開車燈（weather.ts 設定） */
   lightsOn = false;
   private carLights!: THREE.InstancedMesh;
+  private renderVisible = true;
   /** 有設定的話，被撞飛的車會停在牆邊，不會滑進建築裡 */
   collider: Collider | null = null;
   private pushOut = [0, 0];
@@ -530,11 +531,11 @@ export class Traffic {
    * 玩家的車撞到車流：兩台車照質量交換動量（剛體衝量），被撞的車會被撞出去、旋轉、在地上滑行，
    * 停幾秒再開回車道；機車又輕又不穩，撞得夠大力會倒地。回傳撞擊力道
    */
-  collidePlayer(p: FreeCar): number {
+  collidePlayer(p: FreeCar, shape?: { radius: number; range: number }): number {
     let impact = 0;
-    const pr = FreeCar.RADIUS;
+    const pr = shape?.radius ?? FreeCar.RADIUS, range = shape?.range ?? 9;
     for (const a of this.agents) {
-      if (!a.alive || Math.abs(a.x - p.x) > 9 || Math.abs(a.z - p.z) > 9 || Math.abs(a.y - p.y) > 2) continue;
+      if (!a.alive || Math.abs(a.x - p.x) > range || Math.abs(a.z - p.z) > range || Math.abs(a.y - p.y) > 2) continue;
       const half = KIND_LEN[a.kind] / 2 - 0.9, ar = KIND_R[a.kind];
       const inv = p.spec.mass / KIND_MASS[a.kind]; // 對方質量倒數 ÷ 玩家的（玩家開越重的車，撞得越遠）
       for (const [px, pz] of p.circles()) for (const ao of [-half, 0, half]) {
@@ -655,7 +656,7 @@ export class Traffic {
       }
     }
     this.carLights.count = nl;
-    this.carLights.visible = nl > 0;
+    this.carLights.visible = this.renderVisible && nl > 0;
     if (nl) { this.carLights.instanceMatrix.needsUpdate = true; if (this.carLights.instanceColor) this.carLights.instanceColor.needsUpdate = true; }
     this.meshes.forEach((mm, k) => {
       mm.paint.count = mm.fixed.count = counts[k];
@@ -682,7 +683,12 @@ export class Traffic {
   }
 
   /** 街道賽封路：車流不顯示 */
-  set visible(v: boolean) { for (const m of this.meshes) m.paint.visible = m.fixed.visible = v; this.blob.visible = v; }
+  set visible(v: boolean) {
+    this.renderVisible = v;
+    for (const m of this.meshes) m.paint.visible = m.fixed.visible = v;
+    this.blob.visible = v;
+    this.carLights.visible = v && this.carLights.count > 0;
+  }
   /** 紅綠燈（街道賽封路時隱藏，橫桿會擋到賽車的視線） */
   set signalsVisible(v: boolean) { for (const m of this.signalMeshes) m.visible = v; }
 }

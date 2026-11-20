@@ -21,7 +21,7 @@ async function enter(env, value = room('japan', 1, { code })) {
 }
 
 await check('開邀請頁僅預填房碼與提示，場景就緒後仍等使用者確認加入', async () => {
-  const env = environment({ href: `${base}?room=abcd23` });
+  const env = await environment({ href: `${base}?room=abcd23` });
   assert.equal(env.ui('mp-code').value, 'ABCD23'); assert.match(env.ui('mp-invite-hint').textContent, /確認車手暱稱/);
   assert.deepEqual(env.client.commands, []); assert.equal(env.client.room, null);
   env.scene.requested.complete(); await env.flush(); assert.deepEqual(env.client.commands, []);
@@ -31,7 +31,7 @@ await check('開邀請頁僅預填房碼與提示，場景就緒後仍等使用�
 });
 
 await check('重複或無效邀請不預填不自動加入，保留手動輸入與確認入口', async () => {
-  const env = environment({ href: `${base}?room=${code}&room=JKLM45` });
+  const env = await environment({ href: `${base}?room=${code}&room=JKLM45` });
   assert.equal(env.ui('mp-code').value, ''); assert.match(env.ui('mp-invite-hint').textContent, /重複/);
   assert.deepEqual(env.client.commands, []);
   env.ui('mp-code').value = 'abc#234'; env.ui('mp-code').dispatch('input'); assert.equal(env.ui('mp-code').value, code);
@@ -40,7 +40,7 @@ await check('重複或無效邀請不預填不自動加入，保留手動輸入�
 });
 
 await check('大廳提供目前房碼的乾淨邀請，原六碼複製按鈕仍可用', async () => {
-  const written = [], env = environment({ href, clipboard: { async writeText(text) { written.push(text); } } }); await enter(env);
+  const written = [], env = await environment({ href, clipboard: { async writeText(text) { written.push(text); } } }); await enter(env);
   assert.equal(env.ui('mp-invite-url').value, expected);
   env.ui('mp-copy-link').dispatch('click'); await env.flush(); assert.equal(written[0], expected);
   assert.match(env.ui('mp-message').textContent, /邀請連結已複製/);
@@ -50,7 +50,7 @@ await check('大廳提供目前房碼的乾淨邀請，原六碼複製按鈕仍�
 });
 
 await check('複製被拒與分享不支援時留下可選取連結，點欄位可手動複製', async () => {
-  const env = environment({ href, clipboard: { async writeText() { throw new Error('denied'); } } }); await enter(env);
+  const env = await environment({ href, clipboard: { async writeText() { throw new Error('denied'); } } }); await enter(env);
   env.ui('mp-copy-link').dispatch('click'); await env.flush();
   assert.match(env.ui('mp-message').textContent, /無法自動複製/); assert.equal(env.ui('mp-invite-url').value, expected);
   env.ui('mp-invite-url').dispatch('click'); assert.equal(env.ui('mp-invite-url').selected, true);
@@ -60,14 +60,14 @@ await check('複製被拒與分享不支援時留下可選取連結，點欄位�
 
 await check('分享取消有獨立提示，不自動轉成clipboard或入房命令', async () => {
   let copies = 0, shares = 0;
-  const env = environment({ href, clipboard: { async writeText() { copies++; } }, share: async () => { shares++; throw { name: 'AbortError' }; } });
+  const env = await environment({ href, clipboard: { async writeText() { copies++; } }, share: async () => { shares++; throw { name: 'AbortError' }; } });
   await enter(env); env.ui('mp-share-link').dispatch('click'); await env.flush();
   assert.match(env.ui('mp-message').textContent, /已取消分享/); assert.equal(shares, 1); assert.equal(copies, 0); assert.deepEqual(env.client.commands, []);
 });
 
 await check('複製尚未完成時離房再入另一房，舊成功回覆不覆蓋新房間提示或連結', async () => {
   let resolveCopy; const written = [];
-  const env = environment({ href, clipboard: { writeText(text) { written.push(text); return new Promise(resolve => { resolveCopy = resolve; }); } } });
+  const env = await environment({ href, clipboard: { writeText(text) { written.push(text); return new Promise(resolve => { resolveCopy = resolve; }); } } });
   await enter(env); env.ui('mp-copy-link').dispatch('click'); await env.flush(); assert.equal(written[0], expected);
   env.ui('mp-leave').dispatch('click'); env.client.update(room('japan', 1, { code: 'DEF567' }), 'connected', 3);
   const currentMessage = env.ui('mp-message').textContent; assert.equal(env.ui('mp-invite-url').value, `${base}?room=DEF567`);
@@ -77,7 +77,7 @@ await check('複製尚未完成時離房再入另一房，舊成功回覆不覆�
 });
 
 await check('分享尚未完成時離房，晚到錯誤不留下舊房間邀請或錯誤訊息', async () => {
-  let rejectShare; const env = environment({ href, share: () => new Promise((_resolve, reject) => { rejectShare = reject; }) });
+  let rejectShare; const env = await environment({ href, share: () => new Promise((_resolve, reject) => { rejectShare = reject; }) });
   await enter(env); env.ui('mp-share-link').dispatch('click'); await env.flush();
   env.ui('mp-leave').dispatch('click'); const message = env.ui('mp-message').textContent;
   rejectShare(new Error('late failure')); await env.flush();

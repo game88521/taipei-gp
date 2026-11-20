@@ -1,0 +1,40 @@
+# Summit 歷史測試調整核對
+
+本表為靜態 AST 核對，不列入執行案例數。比對不可變 before 的每一個 assert 呼叫；除合作協定由 v1 升 v2 的三處常數更新外，其餘原斷言逐字保留。兩筆滿房測試改送 COOP_VERSION，仍斷言伺服器拒絕第五人；health 改與同一公開版本常數比對。
+
+本輪已授權長軸車輛 opt-in 擴充，因此 Evolution／Horizon 城市測試的 FreeCar 保護改為固定舊版與已審閱新版 SHA，再逐格比對6000格預設物理、update回傳、四次碰撞反作用與15欄車況。原核心hash斷言仍逐字保留在其他檔案分支；原有 car／track／pitlane／taxi／server physics 檔案範圍不減少。每套只在原case新增六個assert呼叫，新增內容亦由本稽核鎖定雜湊。這是授權擴充的契約調整，沒有宣稱 FreeCar 原始碼仍與 before 一樣。
+
+其餘調整只補真 Summit 模組、繪圖物件、VM 新模式空狀態、最小 DOM 能力，以及等待真正非同步 UI 掛載完成再沿用原操作與斷言。沒有修改三組固定基準或省略原測試。
+
+|測試|before SHA256|after SHA256|
+|---|---|---|
+|`abcd-conflict-integration.mjs`|`8318a6279300af7fd42792681586f9fe46993b1424eb387b5b72b9e8da0baf72`|`fb4afd4191fa0ea277fd743cea1fa5fe8980a6591e45cf6783f1ac9411368762`|
+|`abcd-street-regression.mjs`|`94c1c7efe1de5a6303d76f2a32df83866da30ed87b172899ae9918cddc831c8b`|`016c3638ce9b2844dd71ba6a7a10825ade3a0a9c5585e9db597b7cf9a745c706`|
+|`all-navigation-regression.mjs`|`a0565ffeb4c9e89a3feb0773fc917332eff85f7348915d3e4eb30508a35ad74f`|`7127a4e644bee06d28109bbf22917159395717e7847f77a1016e2b36e4cf1764`|
+|`all-street-main.mjs`|`f590f2a27fca69a529a4c93cd0c1758eb8a31783b7fe309097c43f53332dee34`|`a395820543de58653e7a4f29bbbe5ad7d06095755de503d15386d9a5b180937b`|
+|`evolution-city-models.mjs`|`f5fe7598577ccf4c3549722ce5aff5b6aab7050ca33f95700162bd75c7802f14`|`ca43591c829cde1b470a6f5b2fb4922c52391f9f03ffa08cde1025e845076632`|
+|`evolution-city-save-main.mjs`|`388eca7f2146abd1954a6879430f67288a492d63355178f35073c445077ee6d9`|`6cd3cd8a0f6cb7be943504d7ce0f74be9caa2c6a2419a8bcdeda828670d283c0`|
+|`evolution-racing-challenges.mjs`|`1a43af64dcf60860c06e7aae68af3a2dd9eccd64e352d89e8ddef114964b7a62`|`b462ca96cecfd7ccb254d8bda13f51d2765e13888bc94f290b377e827ec17364`|
+|`followup-platform-regression.mjs`|`1176b70328aa0edee6c9a5956311b0fe24587a7c2d54bb0f8bfb655040a3eb81`|`d3146ac6db58837482fc4d47b53f847247f26d0dc597dbf331a2c90abf20c8e2`|
+|`horizon-city-models.mjs`|`d1ae178405819650538126a3fa953abcddc13b0d26a562a8619efc4ea5134ad4`|`d7208c382122fe71518259c8cdf3e1cf028d654adb830db7efdaf6a4ff2400b2`|
+|`horizon-racing-node.mjs`|`45df9d5f95d042c94fe334e6c6fe9813f39fd9ad01b088b09a225f16e7f3169b`|`c18bedddd6b3e8a78cb0d58e214211c9f03c1f314bd30785a2d8a4da2d5eddc1`|
+|`lobbybrake-client.mjs`|`be0a8e3b70d46d0ad505c7deb950ef06c240cc2fceeead48b13650862201be56`|`dac84e6eab785e0fcf3db1b233ac6f2dda5ea6929a2a7faca9403f23ada9abe1`|
+|`main-economy-integration.mjs`|`7c046772959cbbe3f638913016205bd5a5b5fed905925b1beeecb3ec291aee3a`|`47f457ad1e819ed4d6bb1e88931f518e799fc3b0938725481fd81ae919c4b884`|
+|`main-platform-integration.mjs`|`a8f750e839e3b08b81e4441ade23d48c2f034a136030e5c6b70b4673b1dce9af`|`4a1c59784e047b31d573d0f0cebb4a33c852f5a2913252bb8041e158be448a6f`|
+|`multiplayer-client-regression.mjs`|`544c075ce3db39fd790b7ec0ea8f2a68b4d1629a68370a32378aef1cecb0e2e9`|`629aa0688ec9a2aece22c24636793466ff68deba67fb1223dff53666f28237f4`|
+|`multiplayer-collision-client-regression.mjs`|`f920fde0fa2472af321825d8499d7e98e9431b7225ccc5e0587310e64f683f62`|`db311ba228844d4d0ddc3f815d95514bbe90e013370039df8f49ed3c76320ad6`|
+|`multiplayer-map-ui-lifecycle.mjs`|`bb2be7d2751c0f41acc3bee069f3ff360f055c7cfe6e89ad59169e1ca25db332`|`43a33f3748870e2a9e3f27e1c119aa8abd047e007e80f946db1a699341fbdc43`|
+|`next6-city-main.mjs`|`1c045a7e9ffc98746eaced99aab9a9f7e08fbee9bbd52d3b253c381d0c33632b`|`c89a2c25872099c3b5b5e96f080af3c8114ce9f19ab4179b4b3052590f36453e`|
+|`next6-multiplayer-deadlines.mjs`|`d5506390b146fb59fcc8dc32b3012a7f6ac50e26a61f8145315be25467f2e3d0`|`14a02c832589c481ae0c3cab3e8979fc2d968bc7c5a79e383c523aa5b682e88f`|
+|`next6-multiplayer-pacing.mjs`|`55f6bdf4693ae9b5dd858beebeea20d39a58841af92183d52d3eadbd98a3799d`|`ebf7f561bee11c6e3e9e593bb310bb0ea20cdf680e8c98912bcb8db98067aab6`|
+|`next6-multiplayer-ui.mjs`|`fcedf85bff5cd12694f29ce7569aceb8b5c3853592db2a0de9627fe168114e7b`|`b3267e62eb4e854d9260e005b1512ea54611ed833dd07f0720de7a167f974132`|
+|`nexus-coop-browser.mjs`|`35840876d48478adfcbfe60d7e18d1f7622abbdf6a107854fde96ac27840c8a1`|`038585030b413b4f8ff7b02e3ac538756597f08e24920b799cc877022cc6db82`|
+|`nexus-coop-server.mjs`|`e5e7a2f1beadfc3c110c5eb47b62e01866b711e9308f2fbc1cab2cda26a39bc2`|`dbda5c07f74812beaa3023c4ce8a5be0dee13da79874aeb2a7970f92749e48c8`|
+|`nexus-replay-client.mjs`|`7553b014c7fe0decefb3fd5707924a01c5c39d3c5717d7f3ed29b45902027e5f`|`dc8bbf2aac892cf8c9f5d264d3380170e11a14d98377cf6c3c0accadc4481a3d`|
+|`nexus-workshop-browser.mjs`|`274e6c27583914250d2135bc1694bd7ff8727b9d5cb8e86e9aa76ee75c15b47c`|`19c91f6a1d579a9aa11bca5dcca648a0c9111055fdac1b66402267d7bc793dae`|
+|`raceplus-laps-regression.mjs`|`71956a33b1987016eae7d35765feb4a2811eac6909fe50f13029e4016a920e00`|`169d2fc6fbdafb45e4ff5aa4bd463d59e01c5fcb7104789b653ed8310ce121a2`|
+|`tenpack-multiplayer-models.mjs`|`34bc25c5e7af976f868bd2282b49781bffbf66d6ecea0fb8b7afad46a729333b`|`a0eb4bd2609c8d4274d322ce3ac24a540cedad17ee4213a3f05fa62a0623d008`|
+|`twelve-multiplayer-fixtures.mjs`|`c982ef5569d6c06003d5df72f38a60684f558b659690696bea911170efec03fb`|`757b2986832b604259a73fcef4b109bc430c2bf53df5d83071882a834eda3590`|
+|`twelve-racing-regression.mjs`|`fd3217dd4c5f1ba2cfc1bdab1c0d5f71999f39d58c2f3ef25ba668d8db8bb2eb`|`d223ad4747c2dc8f8fb4be679289f7015f581a53390d4d5ddf985ae2751f16f8`|
+
+共 28 支歷史腳本。逐案執行結果另見 SUMMIT_VALIDATION.json；這份靜態核對不能代替回歸。

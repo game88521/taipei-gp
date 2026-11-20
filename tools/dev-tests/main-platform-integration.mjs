@@ -98,7 +98,7 @@ async function backupHarness(source = current) {
   await saveModule.initializeSaveWriter?.();
   storage.writes.length = 0; // 載入時的有效快照不屬於下列UI操作；仍嚴格檢查操作期間不得寫入任何key。
   const d = dom(), events = { toasts: [], reloads: 0, timers: [] };
-  const ctx = vm.createContext({ console, ...saveModule, $: d.get, KEY, localStorage: storage, navigator: {},
+  const ctx = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, ...saveModule, $: d.get, KEY, localStorage: storage, navigator: {},
     toast: (t) => events.toasts.push(t), fmt: (n) => String(n),
     setTimeout: (fn, ms) => events.timers.push({ fn, ms }), location: { reload: () => events.reloads++ } });
   vm.runInContext(source.backup(), ctx);
@@ -152,7 +152,7 @@ await test('還原前備份容量不足不重載；回復還原前資料先預�
 
 function context(extra = {}) {
   const d = dom(), events = [];
-  const ctx = vm.createContext({ console, performance, ...economy, $: d.get, events, nav: { nm: '手動目的地' }, mode: 'free', state: 'free',
+  const ctx = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, performance, ...economy, $: d.get, events, nav: { nm: '手動目的地' }, mode: 'free', state: 'free',
     fcar: { x: 0, z: 0, y: 10, h: 0, place(...v) { events.push(['place', ...v]); } },
     toast: (...v) => events.push(['toast', ...v]), finishDrift: (action) => events.push(['drift', action]),
     chosen: { id: 'sedan' }, taxi: null, sr: null, police: null, BOT: false, NO_TRAFFIC: false,
@@ -206,7 +206,7 @@ await test('追緝入口與按鈕共享守門：計程車／街頭／暫停／�
 // 不建 Damage 的煙霧／貼圖：抽出真實類別，僅使用原型上的車損狀態方法。
 const damageCode = stripTypeScriptTypes(await readFile(path.join(root, 'src/damage.ts'), 'utf8'), { mode: 'transform' });
 const damageAst = parseAst(damageCode), damageNode = walk(damageAst, (n) => n.type === 'ClassDeclaration' && n.id?.name === 'Damage');
-const damageContext = vm.createContext({}); vm.runInContext(`${damageCode.slice(damageNode.start, damageNode.end)};globalThis.Damage = Damage;`, damageContext);
+const damageContext = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null,}); vm.runInContext(`${damageCode.slice(damageNode.start, damageNode.end)};globalThis.Damage = Damage;`, damageContext);
 function isolatedDamage(values = { sedan: 0.8, police: 0.2 }) {
   const d = Object.create(damageContext.Damage.prototype); Object.assign(d, { value: 0, vehicle: 'sedan', values: {}, lastPaint: -1 }); d.restore(values); return d;
 }

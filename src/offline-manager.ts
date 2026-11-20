@@ -1,6 +1,6 @@
 import type { TileIndex } from './citydata';
 
-export interface OfflineTile { url: string; bytes: number; sha256: string }
+export interface OfflineTile { url: string; bytes: number; sha256: string; contentType?: string }
 export interface OfflineRegion { id: string; name: string; tiles: OfflineTile[] }
 export interface OfflineRegionState { id: string; name: string; total: number; cached: number; bytes: number; cachedBytes: number }
 export interface OfflineProgress { done: number; total: number; downloadedBytes: number; current: string }
@@ -106,7 +106,7 @@ export class OfflineRegionManager {
         if (body.byteLength !== tile.bytes || await this.deps.digest(body) !== tile.sha256) throw new Error('區塊版本與本頁不一致，尚未存入。請更新並重新載入後重試。');
         this.assertCurrent();
         if (controller.signal.aborted) throw abortError();
-        await this.cache.put(tile.url, new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        await this.cache.put(tile.url, new Response(body, { status: 200, headers: { 'Content-Type': tile.contentType ?? 'application/json' } }));
         downloaded++; downloadedBytes += tile.bytes;
         progress({ done: downloaded, total: tiles.length, downloadedBytes, current: tile.url });
       }

@@ -28,7 +28,9 @@ async function mainSource(base) {
   const code = stripTypeScriptTypes(raw, { mode: 'transform' }), ast = parseAst(code);
   const slice = (node) => { if (!node) throw Error('main.ts 缺少測試入口'); return code.slice(node.start, node.end); };
   const fnNode = (name) => ast.body.find((n) => n.type === 'FunctionDeclaration' && n.id?.name === name);
-  const eventCall = (scope, matchTarget, event) => walk(scope, (n) => n.type === 'CallExpression' && n.callee?.type === 'MemberExpression' && n.callee.property?.name === 'addEventListener' && n.arguments[0]?.value === event && matchTarget(n.callee.object));
+  // Capture listeners guard isolated modes; retain the original ordinary-mode transaction callback under test.
+  const isCapture = n => n.arguments[2]?.value === true || n.arguments[2]?.properties?.some(p => p.key?.name === 'capture' && p.value?.value === true);
+  const eventCall = (scope, matchTarget, event) => walk(scope, (n) => n.type === 'CallExpression' && n.callee?.type === 'MemberExpression' && n.callee.property?.name === 'addEventListener' && n.arguments[0]?.value === event && !isCapture(n) && matchTarget(n.callee.object));
   return {
     hash: createHash('sha256').update(raw).digest('hex'),
     fn: (name) => slice(fnNode(name)),
@@ -62,7 +64,7 @@ function harness(source = current, initialMoney = 1000) {
   const pv = { baseColor: '#ffffff', setPaint(color) { events.paints.push(color); } };
   const taxi = { money: initialMoney, trips: 0, settledIds: [], checkpoint: () => null, consumeSettlement: () => null,
     setCondition() {}, onHit() {}, update() { return null; } };
-  const ctx = vm.createContext({ console, Date, Math, Set, performance, Element: class {}, $: get, events, save, taxi, ...economy,
+  const ctx = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, Date, Math, Set, performance, Element: class {}, $: get, events, save, taxi, ...economy,
     stats: { earned: 0, gpWins: 0, trips: 0, escapes: 0, maxEscaped: 0, busted: 0, arrests: 0 },
     chosen: { id: 'sedan', name: '街道房車', price: 0 }, preview: { id: 'sedan', name: '街道房車', price: 0 }, pendingPaint: null,
     playerCars: new Map([['sedan', pv], ['police', pv]]), c: '#ff0000', free: false, bought: new Set(), pv,

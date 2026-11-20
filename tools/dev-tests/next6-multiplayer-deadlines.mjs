@@ -7,6 +7,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as roomRules from '../../shared/multiplayer-room-rules.ts';
+import * as horizon from '../../shared/multiplayer-horizon.ts';
+import * as arena from '../../shared/multiplayer-arena.ts';
+import * as nexusReplay from '../../shared/nexus-replay.ts';
+import * as summit from '../../shared/summit-racing.ts';
+import * as atlas from '../../shared/atlas-racing.ts';
 
 import * as protocol from '../../shared/multiplayer-protocol.ts';
 import * as registry from '../../shared/multiplayer-tracks.ts';
@@ -48,8 +53,13 @@ function clientClass(source) {
     .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-protocol['"];?/, 'const { PROTOCOL_VERSION, PHYSICS_VERSION, validSeries, validSeriesTracks } = protocol;')
     .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-tracks['"];?/, 'const { CATALOG_STAMP, DEFAULT_MULTIPLAYER_TRACK_ID, getMultiplayerTrack } = registry;')
     .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-room-rules['"];?/, 'const {parseRoomRules}=roomRules;')
+    .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-horizon['"];?/, 'const {parseRoomPreset,parseHorizon,validateHorizonSnapshot}=horizon;')
+    .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-arena['"];?/, 'const {validateArenaSnapshot}=arena;')
+    .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/nexus-replay['"];?/, 'const {decodeMultiplayerReplay,validReplayDescriptor,REPLAY_MAX_CHARS,REPLAY_CHUNK_CHARS}=nexusReplay;')
+    .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/summit-racing['"];?/, 'const {summitSettings,validateSummit}=summit;')
+    .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/atlas-racing['"];?/, 'const {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas}=atlas;')
     .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client = MultiplayerClient;';
-  const context = vm.createContext({ protocol, registry, roomRules, URL, Date, performance, location: { protocol: 'http:' } });
+  const context = vm.createContext({ protocol, registry, roomRules, horizon, arena, nexusReplay, summit, atlas, URL, Date, performance, location: { protocol: 'http:' } });
   vm.runInContext(code, context); return context.Client;
 }
 const Client = clientClass(await readFile(path.join(project, 'src/multiplayer-client.ts'), 'utf8'));
@@ -110,15 +120,15 @@ await test('首位完賽後60秒仍沿用舊邊界；靠近10分鐘時取較早�
 
 await test('斷線仍有10秒重連期限，逾期記原因；主動退出及長停頓原因各自保留', () => {
   const h = pair(); h.begin(); const disconnected = h.b.player;
-  h.service.disconnect(h.b); h.service.expireDisconnected(h.room, h.room.startAt + 9999);
+  h.service.disconnect(h.b); h.setNow(h.room.startAt + 9999); h.service.expireDisconnected(h.room, h.room.startAt + 9999);
   assert.equal(disconnected.dnf, false);
-  h.service.expireDisconnected(h.room, h.room.startAt + 10_000);
+  h.setNow(h.room.startAt + 10_000); h.service.expireDisconnected(h.room, h.room.startAt + 10_000);
   assert.equal(disconnected.dnfReason, 'disconnect-expired'); validate(h.service.snapshot(h.room));
-  h.service.maybeFinish(h.room, h.room.startAt + 600_000);
+  h.setNow(h.room.startAt + 600_000); h.service.maybeFinish(h.room, h.room.startAt + 600_000);
   assert.equal(disconnected.dnfReason, 'disconnect-expired', '整場期限不覆蓋較早的斷線原因');
   const leave = pair(); leave.begin(); const left = leave.b.player;
   leave.service.leave(leave.b, leave.room.startAt); assert.equal(left.dnfReason, 'left'); validate(leave.service.snapshot(leave.room));
-  const stall = pair(); stall.begin(); stall.service.tick(stall.room.startAt + 5001);
+  const stall = pair(); stall.begin(); stall.setNow(stall.room.startAt + 5001); stall.service.tick(stall.room.startAt + 5001);
   assert.equal(stall.room.phase, 'results'); assert.ok([...stall.room.players.values()].every(player => player.dnfReason === 'server-stall'));
   validate(stall.service.snapshot(stall.room));
 });

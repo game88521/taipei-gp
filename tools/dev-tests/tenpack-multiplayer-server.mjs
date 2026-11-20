@@ -56,7 +56,7 @@ await test('圈數操作限制房主/房碼/大廳世代/合法值，換圈清�
   await h.send(h.a, { type: 'set-laps', laps: 5, ...h.lobby() }); assert.equal(h.room.laps, 5); assert.equal(h.room.trackRevision, revision + 1);
   assert.ok([...h.room.players.values()].every(player => !player.ready && !player.loaded));
   assert.equal((await h.send(h.b, { type: 'ready', ready: true, ...stale })).code, 'STALE_TRACK');
-  assert.deepEqual(h.app.service.snapshot(h.room).capabilities, { lobbyOptions: true, championship: true, roomRules: true });
+  assert.deepEqual(h.app.service.snapshot(h.room).capabilities, { lobbyOptions: true, championship: true, roomRules: true, horizon: true, nexusArena: true, replay: true, odysseyRacing: true });
 }));
 await test('無效路線不突變房間，合法五站原子建立', () => harness(async h => {
   const revision = h.room.lobbyRevision;

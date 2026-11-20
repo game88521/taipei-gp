@@ -11,6 +11,9 @@ import { parseAst } from 'rolldown/parseAst';
 import { pureUrl } from './pure-module-loader.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// Real inactive photo controller: no DOM, rendering or simulation branch is replaced.
+const {VoyagerPhoto}=await import(await pureUrl(root,'voyager-photo.ts'));
+
 const before = resolve(process.argv[2] ?? process.env.GP_ABCD_BASELINE_DIR ?? resolve(root, '../taipei-gp-abcd-before-3bdf97336c02'));
 if (root === before) throw new Error('before不可使用受測工作副本');
 const dataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
@@ -49,7 +52,7 @@ function statsHarness(src, { hz = 60, state = 'free', map = false, speed = 20, n
   let now = 0, delta = 1 / hz, steps = 0, wallet = 0;
   const stats = { ...achievements.emptyStats(), ...initial }, save = { stats, ach: [] }, car = { x: 0, z: 0, y: 0, h: 0, v: speed, deck: null };
   const noop = () => {}, physics = (dt) => { steps++; car.x += car.v * dt; };
-  const context = vm.createContext({ console, Math, Number, performance: { now: () => now }, clock: { getDelta: () => delta },
+  const context = vm.createContext({ voyagerPhoto:new VoyagerPhoto({canOpen:()=>false}), summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, Math, Number, performance: { now: () => now }, clock: { getDelta: () => delta },
     ...frame, framePacer: new frame.RenderPacer(), renderMeter: new frame.RenderMeter(), frameCapPref: '60',
     BOT: false, SIM: 0, practiceRun: undefined, state, mode: state === 'race' ? 'race' : 'free', raceKind: 'tt', mapOpen: map,
     ctxLostNow: false, holdRender: false, STEP: 1 / 120, composer: null, scene: {}, camera: { position: { x: 0, z: 0 } },
@@ -111,7 +114,7 @@ function navHarness(src, { hz = 60, off = 0, navTime = 0, street = false, taxi =
   const calls = [], arrows = [], toasts = [], elements = new Map();
   const route = [[off, 0], [10000, 0]], streetRoute = [[5, 5], [50, 50]], taxiRoute = [[8, 8], [80, 80]], taxiYs = [3, 4];
   const element = (id) => { if (!elements.has(id)) elements.set(id, { style: {}, textContent: '', className: '' }); return elements.get(id); };
-  const context = vm.createContext({ console, Math, Number, performance: { now: () => now * 1000 }, $: element, ROAD_Y: -0.25,
+  const context = vm.createContext({ voyagerPhoto:new VoyagerPhoto({canOpen:()=>false}), summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, Math, Number, performance: { now: () => now * 1000 }, $: element, ROAD_Y: -0.25,
     cityGuidance: new CityGuidance(), groundH: () => 0, state: 'free', save: { opts: {} }, sound: { beep() {} },
     fcar: { x: 0, z: 0, y: 0, h: 0, v: 0 }, nav: { x: 10000, z: 0, y: 0, nm: '固定遠方目標', path: route, ys: [0, 0], t: navTime },
     mapOpen: false, roadAcc: 0, roadShown: '', lmAcc: 0, lmLast: '', lmAt: 0, toastUntil: 0, bigUntil: 0,

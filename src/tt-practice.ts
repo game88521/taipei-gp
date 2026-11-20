@@ -1,6 +1,10 @@
 export interface PracticeSegment { id: string; label: string; start: number; length: number }
 export interface PracticeConfig { segment: PracticeSegment; flying: boolean; targetTime: number | null; targetExit: number | null }
 export interface PracticeResult { time: number; exitSpeed: number; valid: boolean; timeMet: boolean | null; exitMet: boolean | null }
+export interface PracticeSnapshot {
+  active: boolean; running: boolean; result: PracticeResult | null; config: PracticeConfig | null;
+  previous: number; speed: number; distance: number; elapsed: number; started: number | null; approach: number; valid: boolean;
+}
 export function practiceSegments(track: { length: number; ds: number; curv: ArrayLike<number> }): PracticeSegment[] {
   const L = track.length;
   const segments: PracticeSegment[] = [{ id: 'lap', label: '完整飛行圈', start: 0, length: L }];
@@ -26,6 +30,19 @@ export class PracticeRun {
     this.started = this.approach < .001 ? 0 : null; this.active = this.running = this.valid = true; this.result = null;
   }
   stop() { this.active = this.running = false; }
+  /** 只供同一次獨立練習的記憶體倒帶；不寫入正式存檔。 */
+  snapshot(): PracticeSnapshot {
+    return { active: this.active, running: this.running, result: this.result ? { ...this.result } : null,
+      config: this.config ? { ...this.config, segment: { ...this.config.segment } } : null,
+      previous: this.previous, speed: this.speed, distance: this.distance, elapsed: this.elapsed,
+      started: this.started, approach: this.approach, valid: this.valid };
+  }
+  restore(snapshot: PracticeSnapshot) {
+    const s = structuredClone(snapshot);
+    this.active = s.active; this.running = s.running; this.result = s.result; this.config = s.config;
+    this.previous = s.previous; this.speed = s.speed; this.distance = s.distance; this.elapsed = s.elapsed;
+    this.started = s.started; this.approach = s.approach; this.valid = s.valid;
+  }
   update(dt: number, s: number, speed: number, valid: boolean): PracticeResult | null {
     if (!this.running || !this.config) return this.result;
     let delta = (s - this.previous + this.length) % this.length;
@@ -45,9 +62,9 @@ export class PracticeRun {
   get status() { return { approach: this.started === null, elapsed: this.started === null ? 0 : Math.max(0, this.elapsed - this.started), remaining: Math.max(0, this.approach + (this.config?.segment.length ?? 0) - this.distance) }; }
 }
 
-export function mountPracticeUi(host: HTMLElement, segments: PracticeSegment[], actions: { start: (config: PracticeConfig) => void; retry: () => void; exit: () => void }) {
+export function mountPracticeUi(host: HTMLElement, segments: PracticeSegment[], actions: { start: (config: PracticeConfig) => void; retry: () => void; exit: () => void; rewind?: (seconds: 3 | 5) => void }) {
   const panel = document.createElement('details'); panel.className = 'feature-card'; panel.id = 'tt-practice';
-  panel.innerHTML = '<summary>彎道／分段練習與飛行圈</summary><p class="sub">獨立練習，不更新 PB、最佳分段、影子、排行榜或成就。先從目標前約 150 m 加速，再以通過區段起點開始計時；目標僅供本次練習。</p>';
+  panel.innerHTML = '<summary>彎道／分段練習與飛行圈</summary><p class="sub">獨立練習，不更新 PB、最佳分段、影子、排行榜、錢包或成就。先從目標前約 150 m 加速，再以通過區段起點開始計時；目標僅供本次練習。可倒帶 3／5 秒重練，最多保留最近 10 秒；暫停、完成、重試或退出會清除倒帶。Alt+Z／Alt+X 僅在該鍵未綁定駕駛動作時可用。</p>';
   const select = document.createElement('select'); select.id = 'practice-segment'; select.setAttribute('aria-label', '練習區段');
   for (const segment of segments) { const option = document.createElement('option'); option.value = segment.id; option.textContent = segment.label; select.append(option); }
   const flying = document.createElement('input'); flying.type = 'checkbox'; flying.checked = true; flying.id = 'practice-flying';
@@ -66,6 +83,10 @@ export function mountPracticeUi(host: HTMLElement, segments: PracticeSegment[], 
   const hud = document.createElement('div'); hud.id = 'practice-hud'; hud.hidden = true;
   const text = document.createElement('span'); text.id = 'practice-status'; text.setAttribute('role', 'status');
   const retry = document.createElement('button'), quit = document.createElement('button'); retry.id = 'practice-retry'; retry.textContent = '重練此段'; quit.id = 'practice-exit-button'; quit.textContent = '結束練習';
-  retry.addEventListener('click', actions.retry); quit.addEventListener('click', actions.exit); hud.append(text, retry, quit); document.body.append(hud);
-  return { panel, hud, text };
+  const rewind3 = document.createElement('button'), rewind5 = document.createElement('button'), rewindStatus = document.createElement('span');
+  rewind3.type = rewind5.type = 'button'; rewind3.id = 'practice-rewind-3'; rewind5.id = 'practice-rewind-5'; rewindStatus.id = 'practice-rewind-status';
+  rewind3.textContent = '倒帶 3 秒'; rewind5.textContent = '倒帶 5 秒'; rewind3.disabled = rewind5.disabled = true;
+  rewind3.addEventListener('click', () => actions.rewind?.(3)); rewind5.addEventListener('click', () => actions.rewind?.(5));
+  retry.addEventListener('click', actions.retry); quit.addEventListener('click', actions.exit); hud.append(text, rewindStatus, rewind3, rewind5, retry, quit); document.body.append(hud);
+  return { panel, hud, text, rewind3, rewind5, rewindStatus };
 }

@@ -1,0 +1,46 @@
+// Local dist + isolated desktop Chrome. Injected Gamepad/File objects are fixtures.
+import assert from 'node:assert/strict';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { preview } from 'vite';
+import { CdpConnection, click, focus } from './multiplayer-ui-cdp.mjs';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+const origin='http://127.0.0.1:4351',cdp=`http://127.0.0.1:${process.env.GP_MULTIPLAYER_CDP_PORT??9334}`;
+const evidence=path.join(root,'tools/dev-tests',`evolution-controls-browser-${Date.now()}`);await mkdir(evidence);
+const report={status:'FAIL',cases:[],exceptions:[],externalRequests:[],screenshots:[],localOnly:true,realGamepadUsed:false,realPhoneUsed:false,fixtureFileSelection:true,sourceHashes:{}};
+const hash=b=>createHash('sha256').update(b).digest('hex');
+for(const f of ['src/input.ts','src/controls-ui.ts','src/controls.css','src/main.ts','index.html'])report.sourceHashes[f]=hash(await readFile(path.join(root,f)));
+report.scriptSha256=hash(await readFile(new URL(import.meta.url)));
+report.build=(await readFile(path.join(root,'dist/sw.js'),'utf8')).match(/const VERSION = '([^']+)'/)?.[1];
+let web,browser,page,context;
+async function check(name,fn){try{report.cases.push({name,status:'PASS',details:await fn()});}catch(e){report.cases.push({name,status:'FAIL',error:String(e.stack)});throw e;}finally{console.log(JSON.stringify(report.cases.at(-1)));}}
+const ev=e=>page.evaluate(e);
+async function selectorClick(selector){await ev(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'})`);const p=await ev(`(() => {const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);return{x,y,reachable:!!h&&(e===h||e.contains(h))}})()`);assert.equal(p.reachable,true,selector+' reachable');for(const type of ['mousePressed','mouseReleased'])await page.send('Input.dispatchMouseEvent',{type,x:p.x,y:p.y,button:'left',clickCount:1});}
+async function sendKey(code){await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:code.replace('Key',''),code});await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:code.replace('Key',''),code});}
+async function selectFile(config,delay=false){return ev(`(() => {const f=document.querySelector('#control-settings input[type=file]'),dt=new DataTransfer(),file=new File([JSON.stringify({app:'taipei-gp-controls',version:1,config:${JSON.stringify(config)}})],'controls.json',{type:'application/json'});${delay?`file.text=()=>new Promise(r=>window.__resolveControlsFile=()=>r(${JSON.stringify(JSON.stringify({app:'taipei-gp-controls',version:1,config}))}));`:''}dt.items.add(file);f.files=dt.files;f.dispatchEvent(new Event('change'));return true})()`);}
+try{
+ web=await preview({root,preview:{host:'127.0.0.1',port:4351,strictPort:true},logLevel:'error'});
+ const v=await(await fetch(cdp+'/json/version')).json();browser=new CdpConnection(v.webSocketDebuggerUrl,'controls-browser',report);
+ context=(await browser.send('Target.createBrowserContext')).browserContextId;
+ const {targetId}=await browser.send('Target.createTarget',{url:'about:blank',browserContextId:context});
+ const t=(await(await fetch(cdp+'/json')).json()).find(t=>t.id===targetId);page=new CdpConnection(t.webSocketDebuggerUrl,'controls',report);
+ page.on('Runtime.exceptionThrown',e=>report.exceptions.push(e));
+ page.on('Fetch.requestPaused',async({requestId,request})=>{const u=new URL(request.url),allowed=u.origin===origin||['about:','data:','blob:'].includes(u.protocol);if(!allowed)report.externalRequests.push(request.url);await page.send(allowed?'Fetch.continueRequest':'Fetch.failRequest',{requestId,...allowed?{}:{errorReason:'BlockedByClient'}});});
+ await page.send('Page.enable');await page.send('Runtime.enable');await page.send('Network.enable');await page.send('Network.setBypassServiceWorker',{bypass:true});await page.send('Fetch.enable',{patterns:[{urlPattern:'*'}]});
+ await page.send('Page.addScriptToEvaluateOnNewDocument',{source:`if(location.origin===${JSON.stringify(origin)}){localStorage.setItem('taipei-gp-v2',JSON.stringify({schema:3,best:null,sectors:[null,null,null],ghost:null,opts:{sound:false},tutDone:true,quality:'low'}));localStorage.setItem('taipei-gp-controls-v1','{broken');window.__controlsPad=null;Object.defineProperty(navigator,'getGamepads',{value:()=>[window.__controlsPad]})}`});
+ await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});await page.send('Page.navigate',{url:origin+'/?debug'});
+ await page.until(`window.__gp && !document.getElementById('btn-start').disabled`,150000);await ev('__gp.renderer.setPixelRatio(.15);__gp.renderer.setSize(160,90,false)');await focus(page);
+ await check('corrupt_preferences_remain_untouched_until_explicit_edit',async()=>{assert.equal(await ev(`localStorage.getItem('taipei-gp-controls-v1')`),'{broken');await selectorClick('[data-tab=settings]');await selectorClick('#control-settings summary');assert.match(await ev(`document.querySelector('.controls-status').textContent`),/預設/);return{fallbackOnly:true};});
+ await check('real_click_key_capture_rebind_conflict_and_escape',async()=>{await selectorClick('[data-control-action=left]');await sendKey('KeyQ');assert.deepEqual(await ev('__gp.input.getControls().keys.left'),['KeyQ']);await selectorClick('[data-control-action=left]');await sendKey('KeyD');assert.match(await ev(`document.querySelector('.controls-status').textContent`),/另一個/);await sendKey('Escape');assert.deepEqual(await ev('__gp.input.getControls().keys.left'),['KeyQ']);assert.deepEqual(await ev(`JSON.parse(localStorage.getItem('taipei-gp-controls-v1')).keys.left`),['KeyQ']);return{nativeKeyEvents:true};});
+ const defaults=await ev(`(() => {document.querySelector('[data-control=reset]').click();return __gp.input.getControls()})()`),custom=structuredClone(defaults);custom.keys.left=['KeyZ'];
+ await check('late_file_read_cannot_overwrite_new_reset',async()=>{await selectFile(custom,true);await selectorClick('[data-control=reset]');await ev('__resolveControlsFile()');assert.deepEqual(await ev('__gp.input.getControls().keys.left'),defaults.keys.left);return{delayedFileText:true,newerIntentWins:true};});
+ await check('valid_file_import_and_closed_panel_cancel',async()=>{await selectFile(custom);await page.until(`__gp.input.getControls().keys.left[0]==='KeyZ'`);await selectFile(defaults,true);await selectorClick('#control-settings summary');await ev('__resolveControlsFile()');assert.deepEqual(await ev('__gp.input.getControls().keys.left'),['KeyZ']);await selectorClick('#control-settings summary');await selectorClick('[data-control-action=right]');await selectorClick('[data-tab=play]');await sendKey('KeyX');assert.deepEqual(await ev('__gp.input.getControls().keys.right'),defaults.keys.right);return{validImport:true,closedAndHiddenPanelsCancel:true};});
+ await check('rebound_keyboard_in_real_driving_state_and_simulated_pad_neutral_gate',async()=>{await click(page,'btn-start');await selectorClick('.cp-go');await page.until('__gp.input.isDriving()',60000);await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'z',code:'KeyZ',windowsVirtualKeyCode:90});assert.equal(await ev('__gp.input.read().steer'),-1);await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'z',code:'KeyZ',windowsVirtualKeyCode:90});await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'a',code:'KeyA',windowsVirtualKeyCode:65});assert.equal(await ev('__gp.input.read().steer'),0);await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'a',code:'KeyA',windowsVirtualKeyCode:65});
+  assert.equal(await ev(`(() => {window.__controlsPad={index:0,connected:true,mapping:'standard',axes:[1],buttons:Array.from({length:8},()=>({pressed:false,value:0}))};return __gp.input.read().steer})()`),0);await ev('__controlsPad.axes=[0];__gp.input.read()');assert.equal(await ev('(__controlsPad.axes=[1],__gp.input.read().steer)'),1);await ev(`dispatchEvent(new Event('gamepaddisconnected'))`);assert.equal(await ev('__gp.input.read().steer'),0);return{actualDriving:true,simulatedGamepad:true,realGamepad:false};});
+ assert.deepEqual(report.exceptions,[]);assert.deepEqual(report.externalRequests,[]);report.status='PASS';
+}catch(e){report.error=String(e.stack);process.exitCode=1;}finally{
+ if(page)try{const shot=await page.send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(evidence,'final.png'),Buffer.from(shot.data,'base64'));report.screenshots.push('final.png');}catch{}
+ page?.close();if(context)await browser.send('Target.disposeBrowserContext',{browserContextId:context}).catch(e=>{report.cleanupError=String(e);report.status='FAIL';process.exitCode=1;});browser?.close();await web?.close();report.completedAt=new Date().toISOString();await writeFile(path.join(evidence,'report.json'),JSON.stringify(report,null,2)+'\n');await writeFile(path.join(root,'tools/dev-tests/evolution-controls-browser-result.json'),JSON.stringify({...report,evidence:path.relative(root,evidence)},null,2)+'\n');console.log(JSON.stringify({status:report.status,cases:report.cases.length,error:report.error,evidence}));
+}

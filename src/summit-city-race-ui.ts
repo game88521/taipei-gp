@@ -1,0 +1,74 @@
+import * as THREE from 'three';
+import type { FreeCar } from './freecar';
+import type { Collider } from './citydata';
+import { VoyagerCityPrediction, VoyagerCityClock } from './voyager-city-prediction';
+import type { CityData } from './citydata';
+import { vehicleById } from './vehicles';
+import { WorkshopRoads, encodeWorkshop, decodeWorkshop, parseWorkshop, type WorkshopDefinition, type WorkshopRoute } from './nexus-workshop';
+import { SummitCityRaceClient, cityRaceEndpoint } from './summit-city-race-client';
+import {cityRaceLaps,type CityRaceInput,type CityRaceRoom} from '../shared/summit-city-race';
+import './summit-city-race.css';
+interface Hooks {
+  scene:THREE.Scene;host:HTMLElement;isCity:boolean;car:FreeCar;city():CityData|null;
+  prepare():Promise<boolean>;canEnter():boolean;open():void;close():void;enter(def:WorkshopDefinition,route:WorkshopRoute):void;leave():void;
+  input():CityRaceInput;collider():Collider|null;visible():boolean;release():void;focusDriving():void;notify(text:string):void;weather():string;setWeather(value:string):void;
+}
+const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',id='')=>{const e=document.createElement(tag);e.textContent=text;if(id)e.id=id;return e;};
+const button=(text:string,id:string,run:()=>void)=>{const b=el('button',text,id);b.type='button';b.onclick=run;return b;};
+const fmt=(ms:number)=>`${(ms/1000).toFixed(3)}秒`;
+export function mountSummitCityRace(h:Hooks){
+  let book:WorkshopRoads|null=null,busy=false,entered=false,intent=0,wasActive=false,lastHudAt=0,lastPhase='',previousFocus:HTMLElement|null=null;
+  const prediction=new VoyagerCityPrediction(h.car,h.collider),predictionClock=new VoyagerCityClock();
+  let restore:{x:number;y:number;z:number;h:number;weather:string}|null=null;
+  const launch=button('🏁 城市自訂路線競速 · 2～4人','btn-summit-city-race',()=>open());launch.className='ghost-btn';h.host.append(launch);
+  const panel=el('section','','summit-city-race-panel');panel.className='summit-city-race-panel';panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+  const card=el('div');card.className='summit-city-race-card';const title=el('h1','城市自訂路線競速','city-race-title');panel.setAttribute('aria-labelledby',title.id);
+  const lead=el('p','房主貼上工坊 NG1 或閉合 NG2 分享碼建立私人房。NG2 支援 1／3／5 圈；相同車款與天氣、本車即時預測，伺服器裁定所有檢查點、圈速、碰撞與成績。');
+  const note=el('p','房主可選友車穿透或實體碰撞；高架與隧道分層判定。低速卡住可每10秒脫困一次，回到上一檢查點後方並保護3秒；不增加進度。靜態建築仍會碰撞，比賽最長10分鐘，不因開選單或斷線而暫停。獨立成績，不寫單人金錢、PB或工坊紀錄。');
+  const name=el('input','','city-race-name');name.value='城市車手';name.maxLength=20;name.setAttribute('autocomplete','nickname');
+  const code=el('input','','city-race-code');code.maxLength=6;code.autocapitalize='characters';code.autocomplete='off';
+  const challenge=el('textarea','','city-race-challenge');challenge.maxLength=4096;challenge.rows=3;challenge.placeholder='房主貼上 NG1／閉合 NG2 分享碼，或從工坊按「連線競速」';
+  const collisions=el('select','','city-race-collisions');for(const[value,text]of[['off','友車穿透'],['on','實體碰撞']]){const option=el('option',text);option.value=value;collisions.append(option);}
+  const label=(text:string,e:HTMLElement)=>{const l=el('label',text);l.append(e);return l;};
+  const status=el('p','','city-race-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  const routeInfo=el('p','','city-race-route'),list=el('ol','','city-race-players');
+  const create=button('建立城市競速房','city-race-create',()=>void enter('create')),join=button('加入城市競速房','city-race-join',()=>void enter('join')),resume=button('續接原席位（15秒內）','city-race-resume',()=>void enter('resume'));
+  const ready=button('確認路線並準備','city-race-ready',()=>{const p=client.room?.players.find(p=>p.id===client.selfId);client.command('ready',!p?.ready);}),start=button('房主起跑','city-race-start',()=>client.command('start')),again=button('回大廳再戰','city-race-again',()=>client.command('again'));
+  const close=button('返回駕駛／選單','city-race-close',closePanel),leave=button('離開城市競速房','city-race-leave',leaveRoom),cancel=button('取消等待','city-race-cancel',()=>{if(entered)leaveRoom();else{intent++;busy=false;client.cancel();render();}});
+  const invite=el('input','','city-race-invite');invite.readOnly=true;invite.setAttribute('aria-label','城市競速邀請網址');const copy=button('複製城市競速邀請','city-race-copy',()=>{if(!client.room)return;const u=new URL('/',location.href);u.searchParams.set('cityrace',client.room.code);invite.value=u.href;void navigator.clipboard?.writeText(u.href).catch(()=>{invite.focus();invite.select();});if(!navigator.clipboard){invite.focus();invite.select();}});
+  const actions=el('div');actions.className='city-race-actions';actions.append(create,join,resume,cancel,ready,start,again,leave,close);card.append(title,lead,note,label('車手暱稱',name),label('城市競速房間碼',code),label('工坊分享碼（房主）',challenge),label('建房碰撞規則',collisions),routeInfo,status,list,invite,copy,actions);panel.append(card);document.body.append(panel);
+  const hud=el('section','','city-race-hud');hud.hidden=true;const hudText=el('p','','city-race-progress'),roomButton=button('房間／成績','city-race-room',()=>open()),recover=button('低速脫困','city-race-recover',()=>{if(client.command('recover')){h.release();h.focusDriving();}});hud.append(hudText,recover,roomButton);document.body.append(hud);
+  const peers=new Map<string,{root:THREE.Group;dispose:()=>void}>(),group=new THREE.Group();group.name='city-race-only';h.scene.add(group);
+  const gateGeo=new THREE.RingGeometry(7,7.5,32).rotateX(-Math.PI/2),gateMat=new THREE.MeshBasicMaterial({color:'#fbc86a',side:THREE.DoubleSide,depthWrite:false}),gate=new THREE.Mesh(gateGeo,gateMat);group.add(gate);gate.visible=false;
+  let storage:Storage|null=null;try{storage=sessionStorage;}catch{}
+  const client=new SummitCityRaceClient(cityRaceEndpoint(String(import.meta.env.VITE_MULTIPLAYER_URL??''),location),render,validate,storage);
+  function validate(r:CityRaceRoom){const def=parseWorkshop(r.definition);if(!def||!book)throw Error('城市路線尚未就緒');const local=book.validate(def);if(JSON.stringify(local)!==JSON.stringify(r.route))throw Error('前後端城市道路版本不同，請更新後重試');}
+  function open(def?:WorkshopDefinition){if(!h.isCity){location.href='/?cityrace=1';return;}if(!entered&&!busy&&!h.canEnter()){h.notify('請先離開目前任務，再開啟城市競速');return;}if(def)challenge.value=encodeWorkshop(def);previousFocus=document.activeElement as HTMLElement;h.open();panel.hidden=false;render();close.focus();}
+  function closePanel(){if(busy){status.textContent='正在連線，可先按取消等待';return;}panel.hidden=true;h.release();h.close();if(entered)h.focusDriving();else previousFocus?.focus();}
+  async function enter(kind:'create'|'join'|'resume'){
+    if(busy||client.room)return;if(!entered&&!h.canEnter()){status.textContent='請先離開目前任務';return;}const token=++intent;busy=true;render();
+    try{if(!await h.prepare()||token!==intent)return;const data=h.city();if(!data)throw Error('城市資料尚未就緒');book??=new WorkshopRoads(data);if(kind==='create'){const {decodeWorkshop}=await import('./nexus-workshop');const def=decodeWorkshop(challenge.value);if(def.v===2&&def.nodes[0]!==def.nodes.at(-1))throw Error('線上NG2必須是閉合路線');book.validate(def);}if(token!==intent)return;
+      await client.enter(kind,name.value.trim(),code.value.trim().toUpperCase(),challenge.value.trim(),collisions.value==='on');if(token!==intent){client.leave();return;}const r=client.room!;if(!entered){restore={x:h.car.x,z:h.car.z,y:h.car.y,h:h.car.h,weather:h.weather()};h.enter(r.definition,r.route);h.setWeather(r.definition.weather);entered=true;}render();
+    }catch(e){if(!client.room)client.cancel();client.message=(e as Error).message;render();}finally{if(token===intent){busy=false;render();}}
+  }
+  function leaveRoom(){intent++;busy=false;client.leave();prediction.reset();predictionClock.reset();if(entered){entered=false;if(restore){const p=restore;restore=null;h.car.place(p.x,p.z,p.h,p.y);h.setWeather(p.weather);}h.leave();}clearPeers();render();}
+  function clearPeers(){for(const p of peers.values()){group.remove(p.root);p.dispose();}peers.clear();gate.visible=false;}
+  function render(){if(!client)return;const r=client.room,me=r?.players.find(p=>p.id===client.selfId);if(entered&&r?.phase!==lastPhase){lastPhase=r?.phase??'';if(r?.phase==='countdown'){panel.hidden=true;h.release();h.close();}else if(r?.phase==='results'){panel.hidden=false;h.release();h.open();}}status.textContent=client.message||(!client.endpoint?'服務尚未設定；請先設定對戰服務網址。':'請建立或加入城市競速房');
+    create.disabled=join.disabled=busy||!!r||!client.endpoint;resume.hidden=!client.resumable;resume.disabled=busy;cancel.hidden=!busy&&client.status!=='reconnecting';cancel.textContent=client.status==='reconnecting'?'取消重連並離房':'取消等待';ready.hidden=start.hidden=!r||r.phase!=='lobby';ready.disabled=client.status!=='connected';ready.textContent=me?.ready?'取消準備':'確認路線並準備';start.disabled=client.status!=='connected'||!r||r.hostId!==client.selfId||r.players.length<2||!r.players.every(p=>p.connected&&p.ready);again.hidden=r?.phase!=='results'||r.hostId!==client.selfId;leave.disabled=!entered&&!r;copy.hidden=invite.hidden=!r;challenge.disabled=name.disabled=code.disabled=collisions.disabled=busy||!!r;if(r)collisions.value=r.collisions?'on':'off';recover.hidden=r?.phase!=='racing';recover.disabled=client.status!=='connected'||!me||!!me.dnf||me.finishMs!==null||Math.hypot(h.car.vx,h.car.vz)>2;
+    if(client.status==='reconnecting')status.textContent=`${client.message} · 原席剩約${Math.ceil(client.retryRemainingMs/1000)}秒`;
+    routeInfo.textContent=r?`房間 ${r.code} · ${r.definition.name} · 每圈${(r.route.length/1000).toFixed(2)}公里 · ${cityRaceLaps(r.definition)}圈 · ${r.definition.car} · ${r.definition.weather} · ${r.collisions?'實體碰撞':'友車穿透'} · 每圈${r.route.gates.length}檢查點 · ${Math.min(600,r.definition.seconds)}秒時限`:'';
+    create.textContent='建立城市競速房';if(!r&&challenge.value.trim()){try{const d=decodeWorkshop(challenge.value);routeInfo.textContent=`待建立：${d.name} · ${d.v===2?`NG2 ${d.laps}圈，目標`:'NG1目標'}${d.seconds}秒 · 本連線賽實際時限${Math.min(600,d.seconds)}秒（最多10分鐘）`;create.textContent=`建立城市競速房（${Math.min(600,d.seconds)}秒）`;}catch{routeInfo.textContent='請貼上完整 NG1／閉合 NG2 分享碼，建房前會以真路網驗證。';}}
+    list.replaceChildren();for(const [i,p] of (r?.players??[]).entries()){const text=`${i+1}. ${p.name}${p.id===r?.hostId?'（房主）':''} · ${!p.connected?'斷線保留15秒':p.dnf?`DNF：${p.dnf}`:p.finishMs!==null?fmt(p.finishMs):r?.phase==='lobby'?p.ready?'已準備':'未準備':`完成${p.completedLaps}/${r?cityRaceLaps(r.definition):1}圈 · ${p.next}/${r?.route.gates.length}檢查點`}${p.lapTimes.length?` · 圈速 ${p.lapTimes.map(fmt).join('／')}`:''}`;list.append(el('li',text));}
+    hud.hidden=!entered||!h.visible();if(r&&me){const remaining=Math.max(0,(r.deadlineAt??0)-client.serverNow());hudText.textContent=r.phase==='countdown'?`${Math.max(0,Math.ceil(((r.startAt??0)-client.serverNow())/1000))} · 城市競速準備起跑`:r.phase==='results'?`比賽結束 · ${me.dnf?'DNF':fmt(me.finishMs??0)} · 房間查看全體名次`:r.phase==='lobby'?`城市競速 ${r.code} · 先確認路線並準備`:`城市競速 · 第${r.players.findIndex(p=>p.id===me.id)+1}名 · 第${Math.min(cityRaceLaps(r.definition),me.completedLaps+1)}/${cityRaceLaps(r.definition)}圈 · 檢查點${me.next}/${r.route.gates.length} · 剩${Math.ceil(remaining/1000)}秒${me.ghostUntil>client.serverNow()?' · 暫時無碰撞保護':''}`;}if(entered&&client.status!=='connected')hudText.textContent=client.status==='reconnecting'?`自車煞停 · 自動重連剩約${Math.ceil(client.retryRemainingMs/1000)}秒 · 房間可取消重連`:client.message;
+  }
+  challenge.addEventListener('input',render);
+  panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closePanel();}if(e.key==='Tab'){const xs=[...card.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')].filter(x=>x.getClientRects().length),a=xs[0],b=xs.at(-1);if(e.shiftKey&&document.activeElement===a){e.preventDefault();b?.focus();}else if(!e.shiftKey&&document.activeElement===b){e.preventDefault();a?.focus();}}});
+  const fromUrl=new URLSearchParams(location.search).get('cityrace');if(fromUrl){if(/^[A-HJ-NP-Z2-9]{6}$/.test(fromUrl))code.value=fromUrl;}
+  return {client,prediction,open,close:closePanel,leave:leaveRoom,get active(){return entered;},get busy(){return busy;},get opened(){return !panel.hidden;},get vehicleId(){return client.room?.definition.car;},
+    navInfo(){const r=client.room,p=r?.players.find(p=>p.id===client.selfId),next=p&&r?.route.gates[p.next];return r?{path:r.route.path,ys:r.route.ys,next:next?[next.x,next.z] as [number,number]:null}:null;},
+    frame(now:number,dt:number){const r=client.room,me=r?.players.find(p=>p.id===client.selfId);group.visible=entered&&h.visible();if(!r||!entered){if(entered)h.car.vx=h.car.vz=h.car.w=0;clearPeers();hud.hidden=!entered||!h.visible();return;}
+      if(me&&client.status==='connected'){const vehicle=vehicleById(r.definition.car);h.car.spec={...vehicle.spec,grip:vehicle.spec.grip*(['rain','rainnight'].includes(r.definition.weather)?.82:1)};const running=r.phase==='racing'&&!me.dnf&&me.finishMs===null;prediction.reconcile(me,r.serverTime,`${r.matchId}:${r.revision}:${me.motionRevision}`,running);const active=running&&h.visible()&&panel.hidden&&!document.hidden&&document.hasFocus();if(!active){prediction.suspend();predictionClock.reset();if(wasActive)client.input({steer:0,throttle:false,brake:false,handbrake:false,active:false});}else if(!predictionClock.advance(dt,()=>{const controls={...h.input(),active:true},seq=client.input(controls);if(seq!==null)prediction.advance(seq,controls);})){prediction.suspend();client.input({steer:0,throttle:false,brake:false,handbrake:false,active:false});}wasActive=active;prediction.render(dt);const next=r.route.gates[me.next];gate.visible=!!next&&running;if(next)gate.position.set(next.x,next.y-.15,next.z);}else{prediction.suspend();predictionClock.reset();wasActive=false;}
+      const ids=new Set(r.players.filter(p=>p.id!==client.selfId).map(p=>p.id));for(const [id,p]of peers)if(!ids.has(id)){group.remove(p.root);p.dispose();peers.delete(id);}for(const p of r.players){if(p.id===client.selfId)continue;let peer=peers.get(p.id);if(!peer){const model=vehicleById(r.definition.car).build();model.root.userData.dynamic=true;const mats=new Set<THREE.Material>(),geos=new Set<THREE.BufferGeometry>();model.root.traverse(o=>{if(o instanceof THREE.Mesh){geos.add(o.geometry);for(const mat of Array.isArray(o.material)?o.material:[o.material])mats.add(mat);}});peer={root:model.root,dispose:()=>{for(const m of mats)m.dispose();for(const g of geos)g.dispose();}};peers.set(p.id,peer);group.add(peer.root);}peer.root.position.set(p.pose.x,p.pose.y,p.pose.z);peer.root.rotation.set(-p.pose.pitch,p.pose.h,p.pose.roll,'YXZ');peer.root.visible=p.connected;}
+      if(now-lastHudAt>200){lastHudAt=now;render();}
+    },dispose(){leaveRoom();group.removeFromParent();gateGeo.dispose();gateMat.dispose();panel.remove();hud.remove();launch.remove();},};
+}

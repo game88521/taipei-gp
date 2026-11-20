@@ -28,7 +28,7 @@ function harness(extra = {}) {
       classList: { add() {}, remove() {}, toggle() {} }, appendChild(n) { this.children.push(n); }, replaceChildren() { this.children = []; } });
     return nodes.get(id);
   };
-  const context = vm.createContext({ console, $, document: { createElement: () => ({ appendChild() {}, textContent: '', className: '' }) },
+  const context = vm.createContext({ summitCityRace: undefined, summitDuty: undefined, nexusCoop: undefined, nexusWorkshop: undefined, evolutionCity: undefined, evolutionOwned: false, cityChallengeOpenToken: null, console, $, document: { createElement: () => ({ appendChild() {}, textContent: '', className: '' }) },
     ...streetPerformanceHelpers, save: {}, stats: { earned: 0, trips: 0, streetWins: 0 }, mode: 'free', state: 'free', BOT: false, CIRCUIT: null, police: null,
     writeSave() {}, toast() {}, sound: { beep() {}, engine() {}, sirenAt() {} },
     menu: $('menu'), clock: { getDelta() { return 0; } }, hideMenu() {}, saveFreePos() {}, ...extra });

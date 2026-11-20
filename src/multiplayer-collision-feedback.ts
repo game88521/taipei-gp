@@ -1,6 +1,7 @@
 import { multiplayerCarsOverlap } from '../shared/multiplayer-collisions';
 import type { CarState, RoomPlayer } from '../shared/multiplayer-protocol';
 import type { Track } from './track';
+import { horizonCollisionEligible } from '../shared/multiplayer-horizon';
 
 export type AuthoritativeCarSample = { at: number; car: CarState };
 export const MULTIPLAYER_COLLISION_FEEDBACK_MS = 100;
@@ -8,8 +9,8 @@ export const MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS = 250;
 
 /** 僅判斷畫面校正時機；位置、速度與碰撞結果仍完全來自伺服器。 */
 export function nearMultiplayerOpponents(track: Track, self: RoomPlayer, players: RoomPlayer[]) {
-  if (!self.connected || !self.loaded || self.dnf || self.finishMs !== null) return [];
-  return players.filter(peer => peer.id !== self.id && peer.connected && peer.loaded && !peer.dnf && peer.finishMs === null
+  if (!horizonCollisionEligible(self)) return [];
+  return players.filter(peer => peer.id !== self.id && horizonCollisionEligible(peer)
     && multiplayerCarsOverlap(track, self.car, peer.car, .4));
 }
 export function nearMultiplayerOpponent(track: Track, self: RoomPlayer, players: RoomPlayer[]) {

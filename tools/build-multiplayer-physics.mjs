@@ -16,3 +16,4 @@ await build({
     lib: { entry: path.join(root, 'server/physics-entry.ts'), formats: ['es'], fileName: () => 'physics.mjs' },
   },
 });
+await import('./build-summit-city-physics.mjs');

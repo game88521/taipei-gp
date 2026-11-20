@@ -11,6 +11,12 @@ import { MultiplayerNetworkWindow } from '../../src/multiplayer-network.ts';
 
 import { Car, buildTrack, multiplayerCarsOverlap, resolveMultiplayerCollisions } from '../../server/physics.mjs';
 import { spectatorTarget } from '../../src/multiplayer-spectator.ts';
+import { horizonCollisionEligible } from '../../shared/multiplayer-horizon.ts';
+import { arenaDriver, arenaCollision } from '../../shared/multiplayer-arena.ts';
+import { summitPredict } from '../../shared/summit-racing.ts';
+import { getMultiplayerTrack } from '../../shared/multiplayer-tracks.ts';
+import { qualityFor } from '../../src/quality.ts';
+import { getVoyagerComfort } from '../../src/voyager-comfort.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const baselineFlag = process.argv.indexOf('--baseline');
@@ -20,15 +26,18 @@ const source = await readFile(path.join(project, 'src/multiplayer-scene.ts'), 'u
 const beforeSource = await readFile(path.join(baseline, 'src/multiplayer-scene.ts'), 'utf8');
 const feedbackSource = await readFile(path.join(project, 'src/multiplayer-collision-feedback.ts'), 'utf8');
 const stripImports = text => stripTypeScriptTypes(text, { mode: 'transform' }).replace(/^import[\s\S]*?;\r?\n/gm, '');
+const visualsContext = vm.createContext({ THREE, surfaceY: (t, i, lat) => t.py[i] + Math.max(-7, Math.min(7, lat)) * t.bank[i] });
+vm.runInContext(stripImports(await readFile(path.join(project, 'src/summit-racing-visuals.ts'), 'utf8')).replace('export class SummitRacingVisuals', 'class SummitRacingVisuals') + '\nglobalThis.Visuals = SummitRacingVisuals;', visualsContext);
+const SummitRacingVisuals = visualsContext.Visuals;
 const trackSource = await readFile(path.join(project, 'src/track.ts'), 'utf8');
 const locateContext = vm.createContext({ Math });
 vm.runInContext(stripImports(trackSource.slice(trackSource.indexOf('export function locate('))).replace('export function locate', 'function locate') + '\nglobalThis.locate = locate;', locateContext);
 const locate = locateContext.locate;
-const feedbackContext = vm.createContext({ multiplayerCarsOverlap, Math });
+const feedbackContext = vm.createContext({ multiplayerCarsOverlap, Math, horizonCollisionEligible });
 vm.runInContext(stripImports(feedbackSource).replace(/\bexport (?=(?:function|const)\b)/g, '') + '\nglobalThis.feedback = { authoritativeCollisionChanged, nearMultiplayerOpponent, nearMultiplayerOpponents, collisionVisualTarget, MULTIPLAYER_COLLISION_FEEDBACK_MS, MULTIPLAYER_COLLISION_INTERPOLATION_RECOVERY_MS };', feedbackContext);
 const feedback = feedbackContext.feedback;
 function sceneClass(text) {
-  const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, ...feedback, console, Math, locate, multiplayerCarsOverlap, resolveMultiplayerCollisions, spectatorTarget,
+  const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, ...feedback, console, Math, locate, multiplayerCarsOverlap, resolveMultiplayerCollisions, spectatorTarget, horizonCollisionEligible, arenaDriver, arenaCollision, summitPredict, SummitRacingVisuals, getMultiplayerTrack, qualityFor, getVoyagerComfort,
     surfaceY: (t, i, lat) => t.py[i] + Math.max(-7, Math.min(7, lat)) * t.bank[i],
     bankRoll: (t, i, lat) => Math.abs(lat) <= 7 ? Math.atan(-t.bank[i]) : 0,
     heightAt: (t, s) => {
@@ -63,8 +72,8 @@ function scene(previous, Class = Scene, t = track) {
   Object.assign(instance, {
     network: new MultiplayerNetworkWindow(), visualTargets: new Map(), currentTrack: t, car: new Car(), correction: new THREE.Vector3(.5, 0, -.5),
     authoritativeSelf: { at: 1000, car: previous }, collisionRecoveryUntil: -Infinity, collisionVisualUntil: new Map(),
-    predictionAt: 1000, predictedPeers: new Map(), predictionContact: false,
-    room: null, selfId: 'self', matchId: 'race-one', inputHistory: [{ at: 1000, steer: 0, brake: false }],
+    predictionAt: 1000, predictedPeers: new Map(), predictionContact: false, summitVisuals: new SummitRacingVisuals(), weatherKey: '',
+    room: null, selfId: 'self', matchId: 'race-one', arenaRevision: 0, inputHistory: [{ at: 1000, steer: 0, brake: false }],
     lastSteer: 0, lastBrake: false, accumulator: 0, cameraReady: true,
     cars: new Map([['self', { samples: [] }], ['peer', { samples: [] }]]),
     matchesMap: () => true, resetCamera: () => {},

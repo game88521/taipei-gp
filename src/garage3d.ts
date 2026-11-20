@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Vehicle } from './vehicles';
+import type { CarModel } from './carModel';
+import type { CarAppearance } from './horizon-city-models';
+import { applyAppearance } from './horizon-appearance';
 
 // 車庫的 3D 預覽：選單車庫分頁裡一個小畫布，車子在展示台上慢慢轉（可以拖曳轉動）。
 // 用自己的一個小 WebGL 畫布（跟遊戲的場景分開），只在車庫分頁看得到時才畫；第一次用到才建立。
@@ -31,13 +34,13 @@ export class GaragePreview {
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(28, 2, 0.1, 100);
   private turn = new THREE.Group();
-  private models = new Map<string, { root: THREE.Object3D; paint?: THREE.MeshStandardMaterial; size: number }>();
-  private cur: { root: THREE.Object3D; paint?: THREE.MeshStandardMaterial; size: number } | null = null;
+  private models = new Map<string, { root: THREE.Object3D; model: CarModel; paint?: THREE.MeshStandardMaterial; size: number }>();
+  private cur: { root: THREE.Object3D; model: CarModel; paint?: THREE.MeshStandardMaterial; size: number } | null = null;
   private ang = 0.6;
   private idle = 0; // 拖曳放開後幾秒才繼續自己轉
   private drag: { x: number; a: number } | null = null;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  constructor(private canvas: HTMLCanvasElement, private appearance: (id: string) => CarAppearance | undefined = () => undefined) {
     canvas.addEventListener('pointerdown', (e) => { this.drag = { x: e.clientX, a: this.ang }; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener('pointermove', (e) => { if (this.drag) { this.ang = this.drag.a + (e.clientX - this.drag.x) * 0.012; this.idle = 2.5; } });
     const up = () => { this.drag = null; };
@@ -86,7 +89,7 @@ export class GaragePreview {
       const model = v.build();
       const box = new THREE.Box3().setFromObject(model.root), size = box.getSize(new THREE.Vector3());
       model.root.position.y -= box.min.y; // 輪子貼地
-      m = { root: model.root, paint: model.root.userData.paint as THREE.MeshStandardMaterial | undefined, size: Math.max(size.x, size.z) };
+      m = { root: model.root, model, paint: model.root.userData.paint as THREE.MeshStandardMaterial | undefined, size: Math.max(size.x, size.z) };
       this.models.set(v.id, m);
       this.turn.add(m.root);
     }
@@ -108,6 +111,7 @@ export class GaragePreview {
     if (this.idle > 0) this.idle -= dt; else if (!this.drag) this.ang += dt * 0.45;
     this.turn.rotation.y = this.ang;
     if (paintColor && this.cur.paint) this.cur.paint.color.copy(paintColor);
+    if (this.shown) applyAppearance(this.cur.model, this.shown.id, this.appearance(this.shown.id));
     // 鏡頭：依車長拉開，從斜前方略高處看
     const d = this.cur.size * 1.08 + 0.8;
     this.camera.position.set(d * 0.78, d * 0.3, d * 0.62);

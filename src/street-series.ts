@@ -40,7 +40,7 @@ export function recordStreetResult(records: StreetChallengeRecords, result: Stre
   return improved;
 }
 export interface StreetSeriesCheckpoint extends StreetRaceOptions {
-  v: 1; id: string; routeIds: [string, string, string]; next: number; results: StreetRaceResult[];
+  v: 1; id: string; routeIds: string[]; next: number; results: StreetRaceResult[];
 }
 function validOptions(r: StreetRaceOptions) {
   return ['easy', 'standard', 'hard'].includes(r.difficulty) && typeof r.carId === 'string' && r.carId.length > 0 && r.carId.length <= 80
@@ -57,9 +57,9 @@ export function parseStreetSeriesCheckpoint(raw: unknown): StreetSeriesCheckpoin
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as StreetSeriesCheckpoint;
   if (r.v !== 1 || !validOptions(r) || typeof r.id !== 'string' || !r.id || r.id.length > 160
-    || !Array.isArray(r.routeIds) || r.routeIds.length !== 3 || new Set(r.routeIds).size !== 3
+    || !Array.isArray(r.routeIds) || r.routeIds.length < 3 || r.routeIds.length > 5 || new Set(r.routeIds).size !== r.routeIds.length
     || r.routeIds.some((s) => typeof s !== 'string' || !s || s.length > 80)
-    || !Number.isInteger(r.next) || r.next < 0 || r.next > 3 || !Array.isArray(r.results) || r.results.length !== r.next) return null;
+    || !Number.isInteger(r.next) || r.next < 0 || r.next > r.routeIds.length || !Array.isArray(r.results) || r.results.length !== r.next) return null;
   const ids = new Set<string>();
   for (let i = 0; i < r.results.length; i++) {
     const q = r.results[i];
@@ -68,15 +68,16 @@ export function parseStreetSeriesCheckpoint(raw: unknown): StreetSeriesCheckpoin
   }
   return JSON.parse(JSON.stringify({ ...r, results: r.results.map((q) => ({ ...q })) })) as StreetSeriesCheckpoint;
 }
-/** 三站短系列：固定車款／規則／難度；只保存已完成站次，途中離開可重跑本站。 */
+/** 3～5站短系列；v1舊三站存檔仍可直接接續。固定規則，僅保存完整站次。 */
 export class StreetSeries {
   private state: StreetSeriesCheckpoint | null = null;
   get checkpoint() { return this.state ? parseStreetSeriesCheckpoint(this.state) : null; }
-  get active() { return !!this.state && this.state.next < 3; }
-  get complete() { return this.state?.next === 3; }
+  get active() { return !!this.state && this.state.next < this.state.routeIds.length; }
+  get complete() { return !!this.state && this.state.next === this.state.routeIds.length; }
   get nextRouteId() { return this.active ? this.state!.routeIds[this.state!.next] : null; }
   get points() { return this.state?.results.reduce((sum, r) => sum + (r.finished ? [10, 6, 4, 2, 1][r.place - 1] : 0), 0) ?? 0; }
-  get medal(): StreetMedal { return !this.complete ? 'none' : this.points >= 25 ? 'gold' : this.points >= 18 ? 'silver' : this.points >= 10 ? 'bronze' : 'none'; }
+  get medalThresholds() { const n = this.state?.routeIds.length ?? 3; return { gold: Math.ceil(25 * n / 3), silver: 6 * n, bronze: Math.ceil(10 * n / 3) }; }
+  get medal(): StreetMedal { const t = this.medalThresholds; return !this.complete ? 'none' : this.points >= t.gold ? 'gold' : this.points >= t.silver ? 'silver' : this.points >= t.bronze ? 'bronze' : 'none'; }
   start(routeIds: string[], options: StreetRaceOptions) {
     const state = parseStreetSeriesCheckpoint({ v: 1, id: randomUuid(), routeIds, next: 0, results: [], ...options });
     if (!state) return false;

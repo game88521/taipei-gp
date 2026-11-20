@@ -7,6 +7,7 @@ import { HALF_WIDTH, VMAX as VMAX0, GRIP0, GRIPK, surfaceY, bankRoll, locate, ty
 import { PIT, boxS, laneLat, signedS, mountedAt, type PitLane, type StopInfo } from './pitlane';
 import { RaceTiming } from './race-timing';
 import { recordingBracket, REPLAY_FRAME_LIMIT } from './bounded-recording';
+import { canRejoin, safeLane, type AiPolicy } from './evolution-ai';
 import { parseRaceSnapshot, type RaceSnapshot, type ReplayState, type ReplayEvent, type QualifyingOptions, type CompletionOptions, type CompletionProgress } from './race-state';
 
 // 街道賽的 AI 對手：走「賽車線」（彎道切內側）、照自己的極限速度曲線開、
@@ -112,6 +113,7 @@ export const DIFFICULTY: Record<Difficulty, { name: string; grip: number; brake:
 export const PLAYER_LIVERY = TEAMS[0].livery;
 
 export class RaceField {
+  aiPolicy: AiPolicy = 'legacy'; // 明示版本；舊 checkpoint 與固定 BOT 保留原行為。
   racers: Racer[] = [];
   raceTime = 0;
   laps = LAPS;
@@ -331,6 +333,7 @@ export class RaceField {
     const s = parseRaceSnapshot(value);
     if (!s || s.trackN !== this.t.N || Math.abs(s.trackLength - this.t.length) > 0.01
       || s.racers.some((r, k) => r.name !== this.racers[k]?.name)) return false;
+    this.aiPolicy = 'legacy'; // v1 checkpoint 沒有策略版本，不能套用新版 AI。
     this.rules = s.rules; this.difficulty = s.difficulty; this.form = { ...s.form }; this.look = s.look;
     this.applyDifficulty();
     this.raceTime = s.raceTime; this.laps = s.laps; this.wet = s.wet; this.rainAt = s.rainAt ?? Infinity;
@@ -355,7 +358,7 @@ export class RaceField {
     return { completed: others.filter((r) => r.finish != null || r.dnf).length, total: others.length, elapsed: this.raceTime - start };
   }
   private *completionSteps(maxSeconds = 180): Generator<CompletionProgress, Racer[]> {
-    if (this.completionJob || this.solo || this.me.finish == null) throw new Error('只能在玩家完賽後結算其餘車手');
+    if (this.completionJob || this.solo || this.me.finish == null && !this.me.dnf) throw new Error('只能在玩家完賽或已判 DNF 後結算其餘車手');
     const job = {}, start = this.raceTime, dt = 1 / 120;
     const limit = Number.isFinite(maxSeconds) ? Math.max(0, Math.min(3600, maxSeconds)) : 180;
     this.completionJob = job; this.completing = true;
@@ -893,18 +896,36 @@ export class RaceField {
     } else if (!blocker && r.defT <= 0) {
       r.lat += (0 - r.lat) * Math.min(1, dt === 1 / 120 ? 0.8 / 120 : 0.8 * dt); // 固定回歸保留原算式
     }
+    let laneBrake = false;
+    if (this.aiPolicy === 'safe-v1' && !this.solo) {
+      const lane = safeLane(c.pos.lat, this.line[i] + r.lat, c.v,
+        this.racers.filter(o => o !== r && !o.pit && !o.dnf && !(this.completing && o.finish != null)).map(o => ({ ...o.car.pos, v: o.car.v, x: o.car.x, z: o.car.z })),
+        c.pos.s, t.length, HALF_WIDTH - 1.3, dt);
+      if (lane.constrained) r.lat = lane.target - this.line[i];
+      laneBrake = lane.brake;
+      if (lane.constrained && r.defT === 3) r.defT = 0;
+    }
     const j = (i + Math.round((8 + c.v * this.look) / t.ds)) % N;
     const off = Math.max(-(HALF_WIDTH - 1.3), Math.min(HALF_WIDTH - 1.3, this.line[j] + r.lat));
     const tx = t.px[j] - t.tz[j] * off, tz = t.pz[j] + t.tx[j] * off;
     let err = Math.atan2(tx - c.x, tz - c.z) - c.h;
     err = Math.atan2(Math.sin(err), Math.cos(err));
-    let brake = c.v > want + 0.5;
+    let brake = c.v > want + 0.5 || laneBrake;
     // 換邊來不及就跟著前車速度（約 0.2 秒的跟車距離）
     // 跟車距離：激進的貼得近、穩健的留多一點
     if (blocker && gap < 7.29 - 3 * P.aggr + c.v * (0.1415 - 0.05 * P.aggr) && Math.abs(blocker.car.pos.lat - c.pos.lat) < 1.8 && c.v > blocker.car.v - 1) brake = true;
     // 卡住太久（撞牆停住）就自動扶正
-    r.stuck = c.v < 2 ? r.stuck + dt : 0;
-    if (r.stuck > 3) { c.placeAt(t, i); r.stuck = 0; }
+    r.stuck = c.v < 2 ? (this.aiPolicy === 'legacy' ? r.stuck + dt : Math.min(99, r.stuck + dt)) : 0;
+    if (r.stuck > 3) {
+      if (this.aiPolicy === 'legacy') { c.placeAt(t, i); r.stuck = 0; }
+      else {
+        const target = { s: i * t.ds, lat: 0, v: 0, x: t.px[i], z: t.pz[i] };
+        const traffic = this.racers.filter(o => o !== r && !o.pit && !o.dnf && !(this.completing && o.finish != null))
+          .map(o => ({ ...o.car.pos, v: o.car.v, x: o.car.x, z: o.car.z }));
+        if (canRejoin(target, traffic, t.length)) { c.placeAt(t, i); r.stuck = 0; r.lat = -this.line[i]; }
+        else brake = true;
+      }
+    }
     const steer = -err * 2.6;
     return { steer: Math.max(-1, Math.min(1, steer)), brake };
   }

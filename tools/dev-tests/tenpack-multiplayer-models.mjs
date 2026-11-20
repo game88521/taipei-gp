@@ -7,6 +7,12 @@ import { MultiplayerNetworkWindow } from '../../src/multiplayer-network.ts';
 
 import { MultiplayerAutoQuality, qualityMode } from '../../src/multiplayer-quality.ts';
 import { spectatorTargets, spectatorTarget } from '../../src/multiplayer-spectator.ts';
+import { horizonCollisionEligible } from '../../shared/multiplayer-horizon.ts';
+import { arenaDriver, arenaCollision } from '../../shared/multiplayer-arena.ts';
+import { summitPredict } from '../../shared/summit-racing.ts';
+import { getMultiplayerTrack } from '../../shared/multiplayer-tracks.ts';
+import { qualityFor } from '../../src/quality.ts';
+import { getVoyagerComfort } from '../../src/voyager-comfort.ts';
 import { validSeries } from '../../shared/multiplayer-series.ts';
 import { Car, buildTrack, resolveMultiplayerCollisions, multiplayerCarsOverlap } from '../../server/physics.mjs';
 import { multiplayerEvidence } from './tenpack-multiplayer-evidence.mjs';
@@ -47,9 +53,9 @@ await test('固定畫質不自動變動，隱藏/大廳/無效採樣清累積而
   assert.equal(qualityMode('invalid'), 'auto');
 });
 const strip = text => stripTypeScriptTypes(text, { mode: 'transform' }).replace(/^import[\s\S]*?;\r?\n/gm, '').replace(/\bexport /g, '');
-const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, console, Math, devicePixelRatio: 2, spectatorTarget, multiplayerCarsOverlap, resolveMultiplayerCollisions,
+const context = vm.createContext({ THREE, Car, performance, MultiplayerNetworkWindow, console, Math, devicePixelRatio: 2, spectatorTarget, multiplayerCarsOverlap, resolveMultiplayerCollisions, horizonCollisionEligible, arenaDriver, arenaCollision, summitPredict, getMultiplayerTrack, qualityFor, getVoyagerComfort,
   surfaceY: (track, index) => track.py[index], bankRoll: () => 0, heightAt: (track, distance) => track.py[((Math.floor(distance / track.ds) % track.N) + track.N) % track.N] });
-vm.runInContext(strip(await readFile(new URL('../../src/multiplayer-collision-feedback.ts', import.meta.url), 'utf8')) + '\n' + strip(await readFile(new URL('../../src/multiplayer-scene.ts', import.meta.url), 'utf8')) + '\nglobalThis.Scene = MultiplayerScene;', context);
+vm.runInContext(strip(await readFile(new URL('../../src/summit-racing-visuals.ts', import.meta.url), 'utf8')) + '\n' + strip(await readFile(new URL('../../src/multiplayer-collision-feedback.ts', import.meta.url), 'utf8')) + '\n' + strip(await readFile(new URL('../../src/multiplayer-scene.ts', import.meta.url), 'utf8')) + '\nglobalThis.Scene = MultiplayerScene; globalThis.Visuals = SummitRacingVisuals;', context);
 await test('真scene畫質只改像素比與呈現檔位；固定模式可還原且不碰Car', () => {
   const scene = Object.create(context.Scene.prototype), ratios = [], car = new Car();
   Object.assign(scene, { car, renderer: { setPixelRatio: value => ratios.push(value) }, cullAt: 100 }); const before = car.snapshot();
@@ -60,7 +66,7 @@ await test('真scene.frame觀戰鏡頭跟隨目標，畫質與觀戰均不改自
   const visual = car => ({ model: { root: new THREE.Group(), body: new THREE.Group(), steer: [], spin: [] }, name: new THREE.Object3D(), samples: [{ at: 1000, car: car.snapshot() }] });
   const snapshot = room({ serverTime: 1000, startAt: 0, players: [player('self', { finishMs: 900, car: own.snapshot() }), player('peer', { car: peer.snapshot() })] });
   const scene = Object.create(context.Scene.prototype); let draws = 0;
-  Object.assign(scene, { network: new MultiplayerNetworkWindow(), visualTargets: new Map(), currentTrack: track, car: own, prepared: true, disposed: false, contextLost: false, room: snapshot, selfId: 'self', watchingId: 'peer',
+  Object.assign(scene, { network: new MultiplayerNetworkWindow(), visualTargets: new Map(), currentTrack: track, car: own, prepared: true, disposed: false, contextLost: false, room: snapshot, selfId: 'self', watchingId: 'peer', summitVisuals: new context.Visuals(), weatherKey: '',
     qualityLevel: 'economy', accumulator: 0, correction: new THREE.Vector3(), predictedPeers: new Map(), collisionVisualUntil: new Map(), cars: new Map([['self', visual(own)], ['peer', visual(peer)]]),
     camH: peer.h, closeCamera: false, cullAt: 1000, camera: new THREE.PerspectiveCamera(), renderer: { render() { draws++; } }, inputHistory: [{ at: 100, steer: .2, brake: false }],
     mapScene: { scene: new THREE.Scene(), world: { setStartLights() {}, sky: new THREE.Object3D(), mountains: new THREE.Object3D() } } });

@@ -65,7 +65,7 @@ async function harness(src = after, env = afterEnv) {
   const elements = new Map(), $ = (id) => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
   const events = { writes: 0, finishes: [], ghostReads: 0, toasts: [] };
   const ctx = vm.createContext({
-    racingTools: undefined, stopPolice() {}, updateBrakingAssist() {},
+    racingTools: undefined, nexusWorkshop: undefined, stopPolice() {}, updateBrakingAssist() {},
     practiceRun: undefined, practiceUi: undefined, practiceIntent: 0,
     pitCalibration: undefined, observePitCalibration() {}, ...boundedRecording,
     console, performance: { now: () => 10000 }, Date, Math, Number,
