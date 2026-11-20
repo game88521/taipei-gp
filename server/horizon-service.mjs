@@ -6,6 +6,7 @@ import {voyagerJoinError} from './voyager-racing-service.mjs';
 import {summitActive,summitJoinError} from './summit-racing-service.mjs';
 import {odysseyActive} from './odyssey-racing-service.mjs';
 import {atlasJoinError} from './atlas-racing-service.mjs';
+import {expeditionJoinError} from './expedition-racing-service.mjs';
 export { defaultHorizon, horizonRequired };
 export const emptyBlock = () => ({ ghost: false, reason: null, warningAt: null, recoveryAt: null });
 const validName = v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 16 && !/[\u0000-\u001f\u007f<>"'`\\]/u.test(v);
@@ -21,13 +22,14 @@ export function horizonReceive(service, client, m, now) {
     if (m.type === 'watch') {
       const target = codeValid(m.code) && service.rooms.get(m.code);
       if (!target) { service.fail(client, 'ROOM_NOT_FOUND', m); return true; }
+      if(expeditionJoinError(target,m)){service.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:m.requestId,message:expeditionJoinError(target,m)});return true;}
       if(odysseyActive(target)&&m.clientCapabilities?.odysseyRacing!==true){service.send(client,{type:'error',code:'ODYSSEY_RULE',requestId:m.requestId,message:'此房使用 Odyssey 房規，請更新後再觀戰。'});return true;}
       if(atlasJoinError(target,m)){service.send(client,{type:'error',code:'ATLAS_RULE',requestId:m.requestId,message:atlasJoinError(target,m)});return true;}
       if(voyagerJoinError(target,m)){service.send(client,{type:'error',code:'VOYAGER_RULE',requestId:m.requestId,message:voyagerJoinError(target,m)});return true;}
       if(summitActive(target)&&m.clientCapabilities?.summit!==true){service.send(client,{type:'error',code:'SUMMIT_RULE',requestId:m.requestId,message:'請更新遊戲後觀戰排位週末／AI／耐久。'});return true;}
       if(target.arena?.mode&&target.arena.mode!=='off'&&m.clientCapabilities?.nexusArena!==true){service.send(client,{type:'error',code:'ARENA_RULE',requestId:m.requestId,message:'此房使用接力／道具玩法，請更新後觀戰。'});return true;}
       if (target.spectators.size >= 8) { service.fail(client, 'SPECTATORS_FULL', m); return true; }
-      const viewer = { id: randomUUID(), name: m.name.trim(), client, loaded: false, supportsOdyssey:m.clientCapabilities?.odysseyRacing===true,supportsAtlas:m.clientCapabilities?.atlasRacing===true,supportsArena:m.clientCapabilities?.nexusArena===true,supportsVoyager:m.clientCapabilities?.voyagerRacing===true,supportsSummit:m.clientCapabilities?.summit===true };
+      const viewer = { id: randomUUID(), name: m.name.trim(), client, loaded: false, supportsExpedition:m.clientCapabilities?.expeditionRacing===true,supportsOdyssey:m.clientCapabilities?.odysseyRacing===true,supportsAtlas:m.clientCapabilities?.atlasRacing===true,supportsArena:m.clientCapabilities?.nexusArena===true,supportsVoyager:m.clientCapabilities?.voyagerRacing===true,supportsSummit:m.clientCapabilities?.summit===true };
       client.room = target; client.viewer = viewer; client.player = null; target.spectators.set(viewer.id, viewer);
       service.send(client, { type: 'watching', spectatorId: viewer.id, room: service.snapshot(target, now), requestId: m.requestId });
       service.broadcast(target, 'room', now); return true;
@@ -65,7 +67,7 @@ export function horizonReceive(service, client, m, now) {
       else if (room.players.size >= 4) service.fail(client, 'ROOM_FULL', m);
       else if(summitJoinError(room,{clientCapabilities:{odysseyRacing:client.viewer.supportsOdyssey,summit:client.viewer.supportsSummit,atlasRacing:client.viewer.supportsAtlas}}))service.send(client,{type:'error',code:'SUMMIT_RULE',requestId:m.requestId,message:'這場週末已鎖定或需更新遊戲，現在無法轉入參賽。'});
       else if(room.arena?.mode&&room.arena.mode!=='off'&&!client.viewer.supportsArena)service.send(client,{type:'error',code:'ARENA_RULE',requestId:m.requestId,message:'請更新後再轉入接力／道具參賽。'});
-      else { const odysseyRacing=client.viewer.supportsOdyssey,voyagerRacing=client.viewer.supportsVoyager,name = client.viewer.name,nexusArena=client.viewer.supportsArena,summit=client.viewer.supportsSummit,atlasRacing=client.viewer.supportsAtlas; detachViewer(client); service.addPlayer(client, room, name, { ...m, clientCapabilities: { roomRules: true, evolution: true, horizon: true, nexusArena,summit,atlasRacing,voyagerRacing,odysseyRacing } }, now); }
+      else { const expeditionRacing=client.viewer.supportsExpedition,odysseyRacing=client.viewer.supportsOdyssey,voyagerRacing=client.viewer.supportsVoyager,name = client.viewer.name,nexusArena=client.viewer.supportsArena,summit=client.viewer.supportsSummit,atlasRacing=client.viewer.supportsAtlas; detachViewer(client); service.addPlayer(client, room, name, { ...m, clientCapabilities: { roomRules: true, evolution: true, horizon: true, nexusArena,summit,atlasRacing,voyagerRacing,odysseyRacing,expeditionRacing } }, now); }
       return true;
     }
     service.fail(client, 'SPECTATOR_READ_ONLY', m); return true;

@@ -1,4 +1,5 @@
-/** 教練資料僅留在本分頁；不把舊影子車推測成煞車操作。 */
+import { CoachTraceStore } from './expedition-coach.ts';
+/** 完整有效 PB 遙測獨立保存；不把舊影子車推測成煞車操作。 */
 export interface CoachSample { time: number; s: number; speed: number; brake: boolean; valid: boolean }
 export interface CoachPoint { t: number; s: number; v: number; brake: boolean }
 export interface CoachTrace { time: number; points: CoachPoint[] }
@@ -21,11 +22,16 @@ export class TtCoach {
   private last: CoachTrace | null = null;
   private best: CoachTrace | null = null;
   private personalBest: number | null = null;
-  constructor(readonly length: number, readonly capacity = 4096) {}
+  readonly store: CoachTraceStore;
+  constructor(readonly length: number, readonly capacity = 4096, storage?: Pick<Storage, 'getItem' | 'setItem'> | null) {
+    if (storage === undefined) { try { storage = typeof localStorage === 'undefined' ? null : localStorage; } catch { storage = null; } }
+    this.store = new CoachTraceStore(storage ?? null);
+  }
   startSession(context: string, personalBest: number | null) {
     if (context !== this.context) { this.last = null; this.best = null; }
     if (this.best && this.best.time !== personalBest) this.best = null;
-    this.context = context; this.personalBest = personalBest; this.resetLap();
+    this.context = context; this.personalBest = personalBest;
+    this.best ??= this.store.load(context, this.length, personalBest); this.resetLap();
   }
   resetLap() { this.points = []; this.invalid = false; this.interval = .05; }
   sample(value: CoachSample) {
@@ -45,7 +51,7 @@ export class TtCoach {
     if (!valid || this.invalid || !Number.isFinite(time) || time <= 0 || !last || this.points.length < 3 || last.s < this.length - 40) return false;
     const trace = { time, points: this.points.map(p => ({ ...p })) };
     this.last = trace;
-    if (newBest) { this.best = cloneTrace(trace); this.personalBest = time; }
+    if (newBest) { this.best = cloneTrace(trace); this.personalBest = time; this.store.save(this.context, this.length, trace); }
     return true;
   }
   reference(which: CoachReference): CoachTrace | null { return cloneTrace(which === 'pb' ? this.best : this.last); }

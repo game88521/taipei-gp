@@ -12,11 +12,25 @@ export const ATLAS_BACKUP_SLOTS:readonly [string,string,number][]=[
   ['taipei-gp-voyager-workshop-ghost-v1','工坊最佳幽靈車',2_000_000],
   ['taipei-gp-odyssey-pad-v1','手把功能鍵',1024],
   ['taipei-gp-odyssey-road-duty-v1','一般道路公車紀錄',1_000_000],
+  ['taipei-gp-expedition-hud-v1','HUD 元件位置',16000],
+  ['taipei-gp-expedition-network-v1','多人延遲偏好',100],
+  ['taipei-gp-expedition-coach-v1','圈速教練軌跡',2_000_000],
+  ['taipei-gp-expedition-daily-v1','每日挑戰紀錄',40000],
+  ['taipei-gp-expedition-rally-v1','定速拉力紀錄',100000],
+  ['taipei-gp-expedition-crew-results-v1','雙人救援紀錄',100000],
+  ['taipei-gp-expedition-social-results-v1','城市巡航／警匪／追走戰績',100000],
+  ['taipei-gp-frontier-performance-v1','最近五份本機效能摘要',100000],
+  ['taipei-gp-frontier-rally-results-v1','多人定速拉力結果',100000],
+  ['taipei-gp-frontier-crew-v2','多事故合作救援紀錄',100000],
+  ['taipei-gp-frontier-tandem-ghost-v1','單人追走領跑鬼車',1000000],
+  ['taipei-gp-frontier-tandem-results-v1','單人追走陪練成績',100000],
 ];
 export interface AtlasBackup {type:'taipei-gp-full-backup';v:1;at:string;build:string;slots:{key:string;raw:string|null}[];replays:unknown[]}
 export interface AtlasStorage {getItem(k:string):string|null;setItem(k:string,v:string):void;removeItem(k:string):void}
 export interface AtlasReplayPort {read():Promise<unknown[]>;replace(value:unknown[],expected:unknown[]):Promise<void>;journal(value:AtlasBackup):Promise<void>;clearJournal():Promise<void>}
 const obj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+// The new summary contract uses UTF8 bytes. Retain historical size semantics for older slots.
+const slotFits=(key:string,raw:string,limit:number)=>raw.length<=limit&&(!key.startsWith('taipei-gp-frontier-')||new TextEncoder().encode(raw).length<=limit);
 function bounded(value:unknown,depth=0):boolean {
   if(depth>40)return false;
   if(value===null||typeof value==='boolean'||typeof value==='string')return true;
@@ -27,16 +41,16 @@ function bounded(value:unknown,depth=0):boolean {
 export function parseAtlasBackup(text:string):AtlasBackup {
   if(typeof text!=='string'||text.length>ATLAS_BACKUP_LIMIT)throw Error('整包備份上限40MB。');
   const v:unknown=JSON.parse(text);
-  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
+  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,19,26,27,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
   if(Object.keys(v).some(k=>!['type','v','at','build','slots','replays'].includes(k)))throw Error('整包備份含不支援的欄位。');
   const seen=new Set<string>();
-  const slots=v.slots.map(row=>{if(!obj(row)||typeof row.key!=='string'||seen.has(row.key)||Object.keys(row).some(k=>!['key','raw'].includes(k)))throw Error('備份分類重複或無效。');const spec=ATLAS_BACKUP_SLOTS.find(s=>s[0]===row.key);if(!spec||!(row.raw===null||typeof row.raw==='string'&&row.raw.length<=spec[2]))throw Error('備份包含未允許的資料或分類過大。');seen.add(row.key);if(row.raw!==null){let value:unknown;try{value=row.key==='taipei-gp-multiplayer-quality-v1'?row.raw:JSON.parse(row.raw as string);}catch{throw Error(`${spec[1]}不是有效JSON，原資料尚未改動。`);}if(!bounded(value))throw Error(`${spec[1]}包含不支援的資料。`);}return {key:row.key,raw:row.raw as string|null};});
+  const slots=v.slots.map(row=>{if(!obj(row)||typeof row.key!=='string'||seen.has(row.key)||Object.keys(row).some(k=>!['key','raw'].includes(k)))throw Error('備份分類重複或無效。');const spec=ATLAS_BACKUP_SLOTS.find(s=>s[0]===row.key);if(!spec||!(row.raw===null||typeof row.raw==='string'&&slotFits(row.key,row.raw,spec[2])))throw Error('備份包含未允許的資料或分類過大。');seen.add(row.key);if(row.raw!==null){let value:unknown;try{value=['taipei-gp-multiplayer-quality-v1','taipei-gp-expedition-network-v1'].includes(row.key)?row.raw:JSON.parse(row.raw as string);}catch{throw Error(`${spec[1]}不是有效JSON，原資料尚未改動。`);}if(!bounded(value))throw Error(`${spec[1]}包含不支援的資料。`);}return {key:row.key,raw:row.raw as string|null};});
   if(!bounded(v.replays))throw Error('回放內容包含不支援的資料。');
   if(ATLAS_BACKUP_SLOTS.slice(0,v.slots.length).some(([key])=>!seen.has(key)))throw Error('備份分類不完整。');
   return {type:v.type,v:1,at:v.at,build:v.build,slots,replays:v.replays};
 }
 export async function captureAtlasBackup(storage:AtlasStorage,port:AtlasReplayPort,build:string):Promise<AtlasBackup> {
-  const slots=ATLAS_BACKUP_SLOTS.map(([key,,limit])=>{const raw=storage.getItem(key);if(raw!==null&&raw.length>limit)throw Error(`資料過大，請先使用該模式的匯出功能：${key}`);return{key,raw};});
+  const slots=ATLAS_BACKUP_SLOTS.map(([key,,limit])=>{const raw=storage.getItem(key);if(raw!==null&&!slotFits(key,raw,limit))throw Error(`資料過大，請先使用該模式的匯出功能：${key}`);return{key,raw};});
   const replays=await port.read();
   if(slots.some(s=>storage.getItem(s.key)!==s.raw))throw Error('資料在讀取時變更，請暫停遊戲後重試。');
   const value:AtlasBackup={type:'taipei-gp-full-backup',v:1,at:new Date().toISOString(),build,slots,replays};

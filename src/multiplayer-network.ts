@@ -1,6 +1,9 @@
+import {networkFeel, type NetworkFeel} from './expedition-network';
 /** Arrival timing only affects remote-car presentation. Authority/input/prediction are untouched. */
 export class MultiplayerNetworkWindow {
   delayMs = 110;
+  mode: NetworkFeel = 'balanced';
+  setMode(value: unknown) { this.mode = networkFeel(value); this.reset(); }
   private arrivals: number[] = [];
   private gaps: number[] = [];
   private transit: number[] = [];
@@ -14,7 +17,7 @@ export class MultiplayerNetworkWindow {
       this.gaps.push(Math.min(1000, gap)); this.gaps = this.gaps.slice(-40);
       const sorted = [...this.gaps].sort((a, b) => a - b), p90 = sorted[Math.floor((sorted.length - 1) * .9)] ?? 50;
       const ages = [...this.transit].sort((a, b) => a - b), age = ages[Math.floor((ages.length - 1) * .9)] ?? 0;
-      const target = Math.max(80, Math.min(220, age + p90 + 30));
+      const target = Math.max(80, Math.min(220, age + p90 + (this.mode === 'stable' ? 65 : this.mode === 'responsive' ? 10 : 30)));
       this.delayMs = Math.max(80, Math.min(220, this.delayMs + Math.max(-1, Math.min(12, target - this.delayMs))));
     }
     this.lastServer = serverTime; this.lastArrival = arrival;
@@ -23,5 +26,5 @@ export class MultiplayerNetworkWindow {
   }
   age(now: number) { return Number.isFinite(this.lastArrival) ? Math.max(0, now - this.lastArrival) : null; }
   warning(now: number) { const age = this.age(now); return age !== null && age > 500 ? `網路快照已停頓 ${(age / 1000).toFixed(1)} 秒，畫面等待同步。` : ''; }
-  diagnostics(now: number) { return { interpolationMs: this.delayMs, snapshotAgeMs: this.age(now), samples: this.arrivals.length }; }
+  diagnostics(now: number) { const sorted=[...this.gaps].sort((a,b)=>a-b); return { mode:this.mode, interpolationMs: this.delayMs, snapshotAgeMs: this.age(now), samples: this.arrivals.length, gapP90Ms:sorted[Math.floor((sorted.length-1)*.9)]??null }; }
 }

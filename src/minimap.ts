@@ -1,5 +1,6 @@
 import { TOWER_101 } from './track';
 import type { RoadNet, Seg } from './citydata';
+import {radarPoint,type FrontierRadarFriend} from './frontier-radar';
 
 // 小地圖：以車子為中心、車頭朝上，畫半徑 220 m 內的道路
 
@@ -18,7 +19,7 @@ export class Minimap {
     this.g = canvas.getContext('2d')!;
   }
 
-  draw(x: number, z: number, h: number, extra?: { route: [number, number][] | null; next: [number, number] | null; rivals: { x: number; z: number; color?: string }[]; flags: { x: number; z: number }[] }) {
+  draw(x: number, z: number, h: number, extra?: { route: [number, number][] | null; next: [number, number] | null; rivals: { x: number; z: number; color?: string }[]; flags: { x: number; z: number }[];friends?:readonly FrontierRadarFriend[] }) {
     const g = this.g, W = this.canvas.width, H = this.canvas.height, k = W / 2 / RANGE;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, W, H);
@@ -89,6 +90,15 @@ export class Minimap {
     g.beginPath();
     g.arc(TOWER_101.x, TOWER_101.z, 9 / k * (W / 300), 0, Math.PI * 2);
     g.fill();
+    // Names stay upright while roads rotate. Distant friends remain on the radar rim.
+    if(extra?.friends?.length){
+      g.save();g.setTransform(1,0,0,1,0,0);const unit=W/300;
+      for(const friend of extra.friends.slice(0,3)){
+        const p=radarPoint(x,z,h,friend,RANGE);if(!p)continue;const sx=W/2+p.x*k,sy=H/2+p.y*k;
+        g.save();g.translate(sx,sy);g.rotate(p.angle);g.fillStyle=friend.color;g.strokeStyle='#101824';g.lineWidth=2*unit;g.beginPath();g.moveTo(0,-8*unit);g.lineTo(6*unit,6*unit);g.lineTo(-6*unit,6*unit);g.closePath();g.fill();g.stroke();g.restore();
+        g.font=`bold ${12*unit}px sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillStyle='#101824';const text=String(friend.slot+1)+(friend.dy>1.8?'↑':friend.dy< -1.8?'↓':'');g.fillRect(sx-12*unit,sy+8*unit,24*unit,16*unit);g.fillStyle=friend.color;g.fillText(text,sx,sy+16*unit);
+      }g.restore();
+    }
     g.restore();
     // 自己的車（固定在中心朝上）
     g.setTransform(1, 0, 0, 1, W / 2, H / 2);

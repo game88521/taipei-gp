@@ -1,0 +1,128 @@
+{
+  "version": "expedition-ai-v1",
+  "physics": "classic-multitrack-collisions-v3",
+  "catalogStamp": "catalog-v2:c6b17e2cc2291b1415b700d0930e89e3b5f8ffa7710b4481a00439643f6f228c",
+  "conditions": "dry-isolated-standing-start-60hz",
+  "tracks": {
+    "taipei": {
+      "relaxed": 81990.29,
+      "standard": 75057.257,
+      "competitive": 72190.992
+    },
+    "australia": {
+      "relaxed": 151060.609,
+      "standard": 137519.055,
+      "competitive": 131774.487
+    },
+    "china": {
+      "relaxed": 168064.316,
+      "standard": 152099.379,
+      "competitive": 145150.368
+    },
+    "japan": {
+      "relaxed": 173898.586,
+      "standard": 159739.101,
+      "competitive": 153333.715
+    },
+    "miami": {
+      "relaxed": 152169.98,
+      "standard": 135748.409,
+      "competitive": 128236.04
+    },
+    "canada": {
+      "relaxed": 121345.935,
+      "standard": 106922.519,
+      "competitive": 100936.296
+    },
+    "monaco": {
+      "relaxed": 117517.005,
+      "standard": 109756.3,
+      "competitive": 106513.45
+    },
+    "barcelona": {
+      "relaxed": 149234.994,
+      "standard": 136900.912,
+      "competitive": 130688.334
+    },
+    "austria": {
+      "relaxed": 117779.891,
+      "standard": 105539.164,
+      "competitive": 100468.103
+    },
+    "britain": {
+      "relaxed": 170692.64,
+      "standard": 155501.026,
+      "competitive": 148703.324
+    },
+    "belgium": {
+      "relaxed": 182998.517,
+      "standard": 162553.046,
+      "competitive": 154375.574
+    },
+    "hungary": {
+      "relaxed": 140528.481,
+      "standard": 129583.846,
+      "competitive": 124800.876
+    },
+    "netherlands": {
+      "relaxed": 125485.657,
+      "standard": 116261.9,
+      "competitive": 112263.059
+    },
+    "italy": {
+      "relaxed": 148487.757,
+      "standard": 129435.182,
+      "competitive": 120539.577
+    },
+    "madrid": {
+      "relaxed": 167182.5,
+      "standard": 155035.809,
+      "competitive": 149624.639
+    },
+    "azerbaijan": {
+      "relaxed": 169859.611,
+      "standard": 152457.384,
+      "competitive": 145112.234
+    },
+    "malaysia": {
+      "relaxed": 169087.134,
+      "standard": 152754.728,
+      "competitive": 145095.699
+    },
+    "singapore": {
+      "relaxed": 149471.058,
+      "standard": 135791.527,
+      "competitive": 129700.794
+    },
+    "usa": {
+      "relaxed": 179846.755,
+      "standard": 164841.031,
+      "competitive": 158165.904
+    },
+    "mexico": {
+      "relaxed": 130339.581,
+      "standard": 116763.693,
+      "competitive": 109920.54
+    },
+    "brazil": {
+      "relaxed": 128493.293,
+      "standard": 117209.574,
+      "competitive": 112260.804
+    },
+    "lasvegas": {
+      "relaxed": 171310.011,
+      "standard": 152084.663,
+      "competitive": 142907.823
+    },
+    "qatar": {
+      "relaxed": 150243.641,
+      "standard": 137357.002,
+      "competitive": 131934.085
+    },
+    "abudhabi": {
+      "relaxed": 156887.93,
+      "standard": 141821.152,
+      "competitive": 134879.506
+    }
+  }
+}

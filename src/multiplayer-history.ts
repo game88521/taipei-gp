@@ -4,17 +4,19 @@ import type { RoomSnapshot } from '../shared/multiplayer-protocol';
 import {atlasSettings,type AtlasSettings} from '../shared/atlas-racing.ts';
 import { getMultiplayerTrack } from '../shared/multiplayer-tracks.ts';
 import { DEFAULT_ROOM_RULES, parseRoomRules, type MultiplayerRoomRules } from '../shared/multiplayer-room-rules.ts';
+import {EXPEDITION_RACING_VERSION,expeditionSettings,validExpeditionPenalty,type ExpeditionPenalty,type ExpeditionRaceState} from '../shared/expedition-racing.ts';
 
 export const MULTIPLAYER_HISTORY_KEY = 'taipei-gp-multiplayer-history-v1';
-export interface HistoryPlayer { name: string; rank: number; finishMs: number | null; bestLapMs: number | null; lapTimesMs: number[]; dnf: boolean; dnfReason: string | null; points: number | null; team?: 'red' | 'blue'; netFinishMs?: number | null; releaseDelaySeconds?: number; eliminated?: boolean; eliminationWinner?: boolean; eliminationRank?: number | null;ai?:boolean;practiceSectorsMs?:[number|null,number|null,number|null];odyssey?:OdysseyPlayer }
+export interface HistoryPlayer { name: string; rank: number; finishMs: number | null; bestLapMs: number | null; lapTimesMs: number[]; dnf: boolean; dnfReason: string | null; points: number | null; team?: 'red' | 'blue'; netFinishMs?: number | null; releaseDelaySeconds?: number; eliminated?: boolean; eliminationWinner?: boolean; eliminationRank?: number | null;ai?:boolean;practiceSectorsMs?:[number|null,number|null,number|null];odyssey?:OdysseyPlayer;expedition?:ExpeditionPenalty }
 export interface HistoryRound { trackId: string; laps: number; players: HistoryPlayer[] }
-export interface MultiplayerHistoryEntry { id: string; kind: 'race' | 'series'; at: number; rules: MultiplayerRoomRules; rounds: HistoryRound[]; players: HistoryPlayer[]; mode?: 'time-trial' | 'pursuit' | 'teams' | 'elimination' | 'relay' | 'items' | 'practice'; durationSeconds?: 180 | 300 | 600 | 1200; teamStandings?: { team: 'red' | 'blue'; rank: number; points: number }[];atlas?:AtlasSettings;voyager?:VoyagerSettings;summit?:{stage:'single'|'qualifying'|'sprint'|'race';weekend:boolean;mixed:boolean;durationSeconds:null|180|480|600};odyssey?:OdysseyState }
+export interface MultiplayerHistoryEntry { id: string; kind: 'race' | 'series'; at: number; rules: MultiplayerRoomRules; rounds: HistoryRound[]; players: HistoryPlayer[]; mode?: 'time-trial' | 'pursuit' | 'teams' | 'elimination' | 'relay' | 'items' | 'practice'; durationSeconds?: 180 | 300 | 600 | 1200; teamStandings?: { team: 'red' | 'blue'; rank: number; points: number }[];atlas?:AtlasSettings;voyager?:VoyagerSettings;summit?:{stage:'single'|'qualifying'|'sprint'|'race';weekend:boolean;mixed:boolean;durationSeconds:null|180|480|600};odyssey?:OdysseyState;expedition?:ExpeditionRaceState }
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const integer = (v: unknown, min: number, max: number) => Number.isSafeInteger(v) && Number(v) >= min && Number(v) <= max;
 const time = (v: unknown) => v === null || typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 86400000;
 const reasons = ['race-timeout', 'finish-timeout', 'disconnect-expired', 'left', 'server-stall', 'time-trial-grace', 'time-trial-no-lap'];
 function parsePlayer(v: unknown, maxLaps = 5): HistoryPlayer | null {
   if (!object(v) || typeof v.name !== 'string' || v.name.length > 64 || !integer(v.rank, 1, 4) || !time(v.finishMs) || !time(v.bestLapMs)
+    || v.expedition!==undefined&&!validExpeditionPenalty(v.expedition,v.finishMs as number|null)
     || typeof v.dnf !== 'boolean' || v.dnf && v.finishMs !== null || !Array.isArray(v.lapTimesMs) || v.lapTimesMs.length > maxLaps
     || v.lapTimesMs.some(n => n === null || !time(n)) || v.dnfReason !== null && !reasons.includes(String(v.dnfReason))
     || v.points !== null && !integer(v.points, 0, 50)
@@ -27,7 +29,7 @@ function parsePlayer(v: unknown, maxLaps = 5): HistoryPlayer | null {
     || v.eliminated !== undefined && typeof v.eliminated !== 'boolean' || v.eliminationWinner !== undefined && typeof v.eliminationWinner !== 'boolean'
     || v.eliminationRank !== undefined && v.eliminationRank !== null && !integer(v.eliminationRank,1,4)
     || v.eliminated && (v.eliminationWinner || v.dnf || v.finishMs !== null)) return null;
-  return { ...(v.odyssey===undefined?{}:{odyssey:structuredClone(v.odyssey) as unknown as OdysseyPlayer}),name: v.name, rank: Number(v.rank), finishMs: v.finishMs as number | null, bestLapMs: v.bestLapMs as number | null,
+  return { ...(v.expedition===undefined?{}:{expedition:structuredClone(v.expedition) as ExpeditionPenalty}),...(v.odyssey===undefined?{}:{odyssey:structuredClone(v.odyssey) as unknown as OdysseyPlayer}),name: v.name, rank: Number(v.rank), finishMs: v.finishMs as number | null, bestLapMs: v.bestLapMs as number | null,
     lapTimesMs: [...v.lapTimesMs] as number[], dnf: v.dnf, dnfReason: v.dnfReason as string | null, points: v.points as number | null,
     ...(v.team === undefined ? {} : { team: v.team as 'red' | 'blue' }), ...(v.netFinishMs === undefined ? {} : { netFinishMs: v.netFinishMs as number | null }),
     ...(v.releaseDelaySeconds === undefined ? {} : { releaseDelaySeconds: Number(v.releaseDelaySeconds) }),
@@ -53,6 +55,12 @@ export function parseHistory(raw: string | null): MultiplayerHistoryEntry[] | nu
     const odyssey=e.odyssey===undefined?undefined:parseOdysseyState(e.odyssey);if(odyssey===null||odyssey&&(!object(summit)||e.kind!=='race'||summit.mixed||summit.stage==='sprint'&&!odyssey.settings.sprintWeekend)||object(summit)&&summit.stage==='sprint'&&!odyssey?.settings.sprintWeekend)return null;
     const maxLaps = e.mode === 'practice' || e.mode === 'time-trial' || e.mode === 'elimination' ||object(summit)&&summit.durationSeconds!==null ? 128 : 5;
     const rules = parseRoomRules(e.rules), players = parsePlayers(e.players, maxLaps); if (!rules || !players) return null;
+    const expedition=e.expedition;
+    if(expedition!==undefined){
+      if(!object(expedition)||Object.keys(expedition).length!==2||expedition.version!==EXPEDITION_RACING_VERSION||!expeditionSettings(expedition.settings)||!Object.values(expeditionSettings(expedition.settings)!).some(Boolean)||e.kind!=='race'||e.mode!==undefined||odyssey||object(summit)&&(summit.weekend||summit.durationSeconds!==null)||voyager?.practiceSeconds)return null;
+      if(players.some(p=>!validExpeditionPenalty(p.expedition,p.finishMs,expeditionSettings(expedition.settings)!)))return null;
+      const finished=players.filter(p=>p.finishMs!==null&&!p.dnf).sort((a,b)=>a.rank-b.rank);if(finished.some((p,i)=>i>0&&p.expedition!.adjustedFinishMs!<finished[i-1].expedition!.adjustedFinishMs!))return null;
+    }else if(players.some(p=>p.expedition))return null;
     if(odyssey){
       const s=summit as Record<string,unknown>,window=odysseyStopWindow(Number(s.durationSeconds));
       if(e.mode!==undefined||players.length<2||players.some(p=>p.ai)||voyager&&(voyager.practiceSeconds||voyager.weather!=='legacy'||voyager.vsc))return null;
@@ -64,6 +72,7 @@ export function parseHistory(raw: string | null): MultiplayerHistoryEntry[] | nu
     for (const r of e.rounds) {
       if (!object(r) || typeof r.trackId !== 'string' || !getMultiplayerTrack(r.trackId) || ![1, 3, 5].includes(Number(r.laps))) return null;
       const rp = parsePlayers(r.players, maxLaps); if (!rp) return null; rounds.push({ trackId: r.trackId, laps: Number(r.laps), players: rp });
+      if(expedition!==undefined){if(rp.length!==players.length||rp.some(p=>{const top=players.find(q=>q.rank===p.rank);return !top||top.name!==p.name||JSON.stringify(top.expedition)!==JSON.stringify(p.expedition)||p.finishMs!==top.finishMs;}))return null;}else if(rp.some(p=>p.expedition))return null;
     }
     for(const r of rounds){if(odyssey){if(r.players.length!==players.length||r.players.some(p=>{const top=players.find(v=>v.rank===p.rank);return !top||top.name!==p.name||!p.odyssey||!top.odyssey||(['pitStartedMs','qualifiedStopMs','stopMissed'] as const).some(k=>p.odyssey![k]!==top.odyssey![k]);})||odyssey.weekend&&(r.trackId!==odyssey.weekend.trackId||r.laps!==((summit as Record<string,unknown>).stage==='sprint'?1:odyssey.weekend.raceLaps)))return null;}else if(r.players.some(p=>p.odyssey))return null;}
     if (e.kind === 'race' ? ++races > 20 || rounds.length !== 1 : ++series > 10) return null;
@@ -74,7 +83,7 @@ export function parseHistory(raw: string | null): MultiplayerHistoryEntry[] | nu
       || e.teamStandings !== undefined && (!Array.isArray(e.teamStandings) || e.teamStandings.length !== 2 || e.teamStandings.some(t => !object(t)
         || !['red', 'blue'].includes(String(t.team)) || !integer(t.rank, 1, 2) || !integer(t.points, 0, 100)))) return null;
     ids.add(e.id); entries.push({ id: e.id, kind: e.kind as 'race' | 'series', at: Number(e.at), rules, rounds, players,
-      ...(odyssey?{odyssey}:{}),...(e.mode === undefined ? {} : { mode: e.mode as MultiplayerHistoryEntry['mode'] }),...(atlas?{atlas}:{}),...(voyager?{voyager}:{}),...(summit===undefined?{}:{summit:structuredClone(summit) as MultiplayerHistoryEntry['summit']}),
+      ...(expedition?{expedition:structuredClone(expedition) as unknown as ExpeditionRaceState}:{}),...(odyssey?{odyssey}:{}),...(e.mode === undefined ? {} : { mode: e.mode as MultiplayerHistoryEntry['mode'] }),...(atlas?{atlas}:{}),...(voyager?{voyager}:{}),...(summit===undefined?{}:{summit:structuredClone(summit) as MultiplayerHistoryEntry['summit']}),
       ...(e.durationSeconds === undefined ? {} : { durationSeconds: Number(e.durationSeconds) as 180 | 300 | 600 | 1200 }),
       ...(e.teamStandings === undefined ? {} : { teamStandings: (e.teamStandings as { team: 'red' | 'blue'; rank: number; points: number }[]).map(t => ({ team: t.team, rank: t.rank, points: t.points })) }) });
   }
@@ -95,18 +104,18 @@ export class MultiplayerHistory {
     catch { this.error = '瀏覽器無法保存近期戰績，本次仍可查看與匯出。'; }
   }
   capture(room: RoomSnapshot | null, selfId: string | null, now = Date.now()) {
-    if (!room || room.phase !== 'results' || !room.matchId || !room.players.some(p => p.id === selfId)) return false;
+    if (!room || room.cup || room.phase !== 'results' || !room.matchId || !room.players.some(p => p.id === selfId)) return false;
     const rules = { ...(room.roomRules ?? DEFAULT_ROOM_RULES) };
     const mode = room.voyager?.settings.practiceSeconds?'practice':room.arena?.mode&&room.arena.mode!=='off'?room.arena.mode:room.horizon?.elimination ? 'elimination' : room.evolution?.mode, metadata = mode && mode !== 'race' ? { mode, ...(mode==='practice'?{durationSeconds:room.voyager!.settings.practiceSeconds as 600|1200}:{}),...(mode === 'time-trial' ? { durationSeconds: room.evolution!.durationSeconds } : {}),
       ...(mode === 'teams' ? { teamStandings: room.evolution!.teamStandings?.map(t => ({ team: t.team, rank: t.rank, points: t.points })) } : {}) } : {};
-    const players = room.players.map(p => ({ ...noTiming(p),...(p.odyssey?{odyssey:structuredClone(p.odyssey)}:{}), bestLapMs: p.bestLapMs ?? null, lapTimesMs: [...(p.lapTimesMs ?? [])], dnfReason: p.dnfReason ?? null,
+    const players = room.players.map(p => ({ ...noTiming(p),...(p.expedition?{expedition:structuredClone(p.expedition)}:{}),...(p.odyssey?{odyssey:structuredClone(p.odyssey)}:{}), bestLapMs: p.bestLapMs ?? null, lapTimesMs: [...(p.lapTimesMs ?? [])], dnfReason: p.dnfReason ?? null,
       ...(mode === 'elimination' ? { eliminated:!!p.eliminated, eliminationWinner:!!p.eliminationWinner, eliminationRank:p.eliminationRank??null } : {}),
       ...(mode === 'pursuit' ? { netFinishMs: p.netFinishMs ?? null, releaseDelaySeconds: room.evolution!.releaseDelays[p.id] ?? 0 } : {}),
       ...(mode === 'teams' && room.evolution!.teams[p.id] ? { team: room.evolution!.teams[p.id] } : {}),
       ...(mode === 'relay'&&room.arena?.teams[p.id]?{team:room.arena.teams[p.id]}:{}),...(p.summit?{ai:p.summit.ai}:{}),...(mode==='practice'?{practiceSectorsMs:p.voyager?.bestSectorsMs??[null,null,null] as [null,null,null]}:{}) }));
     const advanced=room.summit,summit=advanced&&(advanced.settings.weekend||advanced.settings.endurance||advanced.mixed)?{stage:advanced.stage,weekend:advanced.settings.weekend,mixed:advanced.mixed,durationSeconds:advanced.durationSeconds as null|180|480|600}:undefined;
     const a=room.atlas?.settings,atlas=a&&(a.aiLevel!=='standard'||a.damage||a.flags)?{...a}:undefined;
-    const race: MultiplayerHistoryEntry = { ...(room.odyssey?{odyssey:structuredClone(room.odyssey)}:{}),id: `race:${room.matchId}`, kind: 'race', at: now, rules, rounds: [{ trackId: room.trackId, laps: room.laps, players }], players, ...metadata,...(room.voyager&&(room.voyager.settings.practiceSeconds||room.voyager.settings.weather!=='legacy'||room.voyager.settings.vsc)?{voyager:{...room.voyager.settings}}:{}),...(atlas?{atlas}:{}),...(summit?{summit}:{}) };
+    const race: MultiplayerHistoryEntry = { ...(room.expedition?{expedition:structuredClone(room.expedition)}:{}),...(room.odyssey?{odyssey:structuredClone(room.odyssey)}:{}),id: `race:${room.matchId}`, kind: 'race', at: now, rules, rounds: [{ trackId: room.trackId, laps: room.laps, players }], players, ...metadata,...(room.voyager&&(room.voyager.settings.practiceSeconds||room.voyager.settings.weather!=='legacy'||room.voyager.settings.vsc)?{voyager:{...room.voyager.settings}}:{}),...(atlas?{atlas}:{}),...(summit?{summit}:{}) };
     const pending = [race], s = room.series;
     if (s?.complete && s.entrants.some(e => e.playerId === selfId)) pending.push({ id: `series:${s.id}`, kind: 'series', at: now, rules, ...metadata,
       rounds: s.rounds.map(r => ({ trackId: r.trackId, laps: r.laps, players: r.results.map(noTiming) })),

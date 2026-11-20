@@ -1,6 +1,6 @@
 export type AtlasGroup = 'solo' | 'online' | 'coop' | 'local';
 export const ATLAS_MODE_KEY = 'taipei-gp-mode-browser-v1';
-export interface AtlasMode { id: string; name: string; group: AtlasGroup; players: string; devices: string; duration: string; target: string; section?: string; cityOnly?: boolean }
+export interface AtlasMode { id: string; name: string; group: AtlasGroup; players: string; devices: string; duration: string; target: string; section?: string; cityOnly?: boolean; variant?:string }
 export const ATLAS_MODES: readonly AtlasMode[] = [
   { id:'free', name:'自由駕駛', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'不限時', target:'btn-free' },
   { id:'taxi', name:'計程車載客', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'依行程', target:'btn-taxi' },
@@ -17,6 +17,16 @@ export const ATLAS_MODES: readonly AtlasMode[] = [
   { id:'duty', name:'公車勤務／道路救援', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'依路線', target:'btn-summit-duty' },
   { id:'race', name:'連線賽道競速', group:'online', players:'1～4人（可AI補位）', devices:'鍵盤／觸控／手把', duration:'依房規', target:'btn-multiplayer' },
   { id:'city-race', name:'城市路線連線競速', group:'online', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'最多10分鐘', target:'btn-summit-city-race' },
+  { id:'cruise', name:'城市多人自由巡航', group:'online', players:'1～4人', devices:'鍵盤／觸控／手把', duration:'最多30分鐘', target:'btn-expedition-social', variant:'cruise' },
+  { id:'chase', name:'多人警匪追逐', group:'online', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'3分鐘', target:'btn-expedition-social', variant:'chase' },
+  { id:'tandem', name:'雙人追走甩尾', group:'online', players:'2人', devices:'鍵盤／觸控／手把', duration:'兩段各60秒', target:'btn-expedition-social', variant:'tandem' },
+  { id:'convoy', name:'車隊巡遊任務', group:'online', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'3～5站／最多30分鐘', target:'btn-expedition-social', variant:'convoy' },
+  { id:'crown', name:'移動王冠爭奪戰', group:'online', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'3分鐘', target:'btn-expedition-social', variant:'crown' },
+  { id:'crew', name:'多事故合作道路救援', group:'coop', players:'2人', devices:'鍵盤／觸控／手把', duration:'1～3件／每件最多30分鐘', target:'btn-expedition-duty', variant:'crew' },
+  { id:'friend-rally', name:'好友定速拉力', group:'online', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'最多10分鐘', target:'btn-frontier-rally' },
+  { id:'tandem-practice', name:'追走單人陪練', group:'solo', players:'1人＋領跑鬼車', devices:'鍵盤／觸控／手把', duration:'每段10～120秒', target:'btn-frontier-tandem-practice' },
+  { id:'rally', name:'城市定速拉力', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'依路線', target:'btn-expedition-duty', variant:'rally' },
+  { id:'daily', name:'每日固定條件挑戰', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'一圈情境挑戰', target:'btn-expedition-daily' },
   { id:'coop', name:'城市合作配送', group:'coop', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'最多20分鐘', target:'btn-nexus-coop' },
   { id:'split', name:'同機雙人分割畫面', group:'local', players:'2人', devices:'鍵盤＋手把／雙手把', duration:'1／3／5圈', target:'btn-splitscreen' },
 ];

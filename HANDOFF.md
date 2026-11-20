@@ -1,3 +1,46 @@
+<!-- frontier-release-20261121 -->
+# 2026-11-21 Frontier 新版發布準備
+
+作者：Rex <game88521@gmail.com>。Rex 已明確要求「幫我上新版」，授權將已驗證且套回的 Expedition＋Frontier 改善提交並正常推送 main 與 multiplayer-test，沿用原網址 https://taipei-gp.vercel.app/，同步更新多人後端。
+
+這是發布前準備紀錄；實際提交、兩分支推送、Vercel Production 與 Render 更新狀態，以 DCISI/taipei-frontier-release-receipt.json 及 TAIPEI_FRONTIER_RELEASE.md 為準。未有部署成功證據，不能只由本段宣稱已上線。Render 設定 autoDeploy:false，無管理授權時仍需控制台 Manual Deploy 最新提交。
+
+產品來源維持封版相同；發布另以正式公開 WSS 環境建置。公開設定造成的 build 差異會另記，不改寫原本機 caeeecc35bef 與歷史驗證。唯一文件差異是在 HANDOFF 前新增本段，以下原始封版 bytes 完整保留；其中「尚未提交／未部署」是當時狀態。只讀部署中繼資料與靜態版本，不在正式站開房或操作遊戲。
+
+以下完整保留封版紀錄。
+
+<!-- frontier-current-20261121 -->
+# 2026-11-21 最新：Frontier 十二項改善與新玩法
+
+作者：Rex <game88521@gmail.com>。承接已套回但未提交的Expedition build d5068bed213b，本輪於 DCISI/taipei-gp-frontier-work／feature/frontier-12 完成十二項實作與本機封版，build **caeeecc35bef**。基準HEAD a387c72bec2931411957063aaa63120a59122749；不從Git HEAD覆蓋前輪未提交成果。
+
+固定編號：1好友雷達與車頂暱稱、2城市房主管理、3城市觀戰與匿名回放、4城市短斷線自動續接、5效能採樣與可驗證調校、6碰撞事實分析、7車隊巡遊、8移動王冠、9多人定速拉力、10多事故合作救援、11追走單人陪練、12四人好友盃。入口與行為見 [FRONTIER_FIXES.md](./FRONTIER_FIXES.md)，逐項狀態見 [FRONTIER_PROGRESS.md](./FRONTIER_PROGRESS.md)，完整證據與來源清單見 [FRONTIER_VALIDATION.md](./FRONTIER_VALIDATION.md)／JSON。
+
+完整build、34套Node／服務、14套瀏覽器共96案、固定三基準全部PASS。四個物理核心原文保持；三基準54.425／162.0／175.7及aiHits0／8／5相同。原始FAIL與修前對照完整保留，沒有改寫為PASS。
+
+**沒有commit、push或部署，本輪尚未出現在公開網址。** 原專案實際套入狀態以 DCISI/taipei-frontier-delivery-receipt.json 的APPLIED_BUILD_VERIFIED與 TAIPEI_FRONTIER_DELIVERY.md獨立核對為準；本段本機封版不代替成功收據。只用本輪精確差異／CAS交付工具，先備份、套回、離線build及逐檔驗證；保留前輪86個未提交改動與其他檔案，不重跑歷史Apply。上線前後端須同步，含city-duty-v2、/city-rally與frontier-cup／crown等能力。
+
+實體手機、真手把、跨網路真人、玩法平衡、免費主機容量、30分鐘實機溫度／耗電未驗證；桌面viewport不能列作實機PASS。 效能採樣的draw CPU不是GPU時間；0.65解析度的像素量減少57.75%，不等於FPS提升。 巡遊與定速拉力另有真FreeCar完整道路證據；救援六腿完整道路不等於真人精準停靠。救援browser明示停靠fixture；四人盃browser明示finish fixture，完整真Car／WS四場由Node另驗。 追走browser用真Input／FreeCar錄製，停renderer後以固定步加速；不是真人時間試駕。中立跟隨0分基準驗規則，不宣稱真人正分平衡。 COPY隔離smoke是Windows Node24啟動集合驗證，沒有執行Docker／Alpine image build。 最後實機計畫在 tools/dev-tests/frontier-phone-test-plan.md。AGENTS持續適用：繁體中文、虛構品牌、署名Rex、不自行push、只測本機、手機最後。全部報告／截圖／原生下載／原始FAIL另存 DCISI/taipei-gp-frontier-validation-evidence。
+
+以下完整保留本輪開始前HANDOFF原bytes，各輪狀態以當時時間理解。
+
+<!-- expedition-current-20261120 -->
+# 2026-11-20 最新：Expedition 十二項改善與新玩法
+
+作者：Rex <game88521@gmail.com>。本輪基準 main 提交 `a387c72bec2931411957063aaa63120a59122749`，在 `DCISI/taipei-gp-expedition-work`／`feature/expedition-12` 完成十二項功能與本機封版，build **d5068bed213b**。入口、規則及限制見 [EXPEDITION_FIXES.md](./EXPEDITION_FIXES.md)；機器可核對的來源清單與證據見 [EXPEDITION_VALIDATION.json](./EXPEDITION_VALIDATION.json)。
+
+固定編號：1延遲碰撞呈現、2效能採樣與渲染、3分裝置HUD、4PB遙測教練、5多人正式賽規罰秒、6全24圖三難度AI校準、7城市巡航、8警匪追逐、9合作救援、10定速拉力、11每日固定挑戰、12雙人輪換追走。新城市玩法會還原原車、天候、鏡頭與導航；尚未完成入場就取消及重複清理也不清掉原導航。
+
+完整build通過；Node／真Car AI共 **267案**、資源 **4案**、瀏覽器 **33案** 與固定回歸 **3案** 全PASS。AI72組全部完賽、零護牆接觸、24圖難度圈時有序。固定54.425／162.0／175.7、aiHits0／8／5保持；car／track／rivals／pitlane原文未改。曾失敗的測試與導航修前2FAIL保留，沒有改寫成PASS。
+
+**沒有commit、push或部署，本輪尚未出現在公開網址。** 本章記錄本機封版；原專案是否已套回，以 `DCISI/taipei-expedition-delivery-receipt.json` 的APPLIED_BUILD_VERIFIED及 `TAIPEI_EXPEDITION_DELIVERY.md` 獨立核對為準。套回工具只在原專案仍為乾淨main／同基準時備份、精確複製、建置及逐檔驗證；不要重跑歷史Apply或覆蓋既有變更。發布時Vercel與Render須同步，新路徑/city-social、/city-duty及schema6／expedition-racing能力需前後端相符。
+
+測試只使用本機。實體手機／手把、外網真人與平衡、免費主機容量、30分鐘GPU／溫度／耗電及Docker image build尚未驗證；桌面viewport與明示停靠／計分fixture不算真機或人工完整跑線。動態解析度實測像素減少57.75%，不是FPS增幅。最後真機計畫見 `tools/dev-tests/expedition-phone-test-plan.md`。
+
+全部報告與前輪失敗保留於worktree的tools/dev-tests；本輪最終報告另存 `DCISI/taipei-gp-expedition-validation-evidence`。AGENTS.md持續適用：繁中、虛構品牌、署名Rex、不自行push、只測本機、手機最後。
+
+以下完整保留本輪開始前HANDOFF原bytes；各輪狀態以當時時間理解。
+
 <!-- version-audit-release-20261120 -->
 # 2026-11-20 修正版發布準備
 

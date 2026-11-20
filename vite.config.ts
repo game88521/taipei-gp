@@ -24,7 +24,7 @@ function serviceWorker(): Plugin {
       for(const output of Object.values(bundle))if(output.type==='asset'&&!output.fileName.endsWith('.css'))sharedPackAssets.add(output.fileName);
       const collect = (root: string, dynamic: boolean) => {
         const files = new Set<string>();
-        const walk = (name: string) => { if (files.has(name)) return; const out = bundle[name]; if(dynamic&&root.includes('main-')&&out?.type==='chunk'&&['nexus-workshop-ui','nexus-coop-ui'].includes(out.name))return; files.add(name); if(out?.type!=='chunk')return;
+        const walk = (name: string) => { if (files.has(name)) return; const out = bundle[name]; if(dynamic&&root.includes('main-')&&out?.type==='chunk'&&['nexus-workshop-ui','nexus-coop-ui','expedition-social-ui','expedition-duty-ui'].includes(out.name))return; files.add(name); if(out?.type!=='chunk')return;
           for(const dep of [...out.imports,...(dynamic?out.dynamicImports:[])])walk(dep);
           for(const css of (out as typeof out & {viteMetadata?:{importedCss?:Set<string>}}).viteMetadata?.importedCss??[])files.add(css);
         };walk(root);return files;

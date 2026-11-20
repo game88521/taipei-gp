@@ -10,6 +10,8 @@ import type { ArenaState, ArenaPlayer, ArenaMode } from './multiplayer-arena';
 import type {AtlasState,AtlasPlayer,AtlasSettings,AtlasPitService} from './atlas-racing';
 import type {SummitState,SummitPlayer,SummitSettings,SummitTyre} from './summit-racing';
 import type {OdysseyState,OdysseyPlayer,OdysseySettings} from './odyssey-racing';
+import type {ExpeditionRaceState,ExpeditionPenalty,ExpeditionSettings} from './expedition-racing';
+import type {FrontierCupState,CupIntent,CupCommand,CupReadyBinding,FRONTIER_CUP_VERSION} from './frontier-cup';
 export { validSeries, validSeriesTracks } from './multiplayer-series.ts';
 
 export type { CarState };
@@ -67,6 +69,8 @@ export interface RoomPlayer {
   atlas?:AtlasPlayer;
   voyager?:VoyagerPlayer;
   odyssey?:OdysseyPlayer;
+  expedition?:ExpeditionPenalty;
+  cup?:{active:boolean;seed:1|2|3|4};
   gridIndex?: number;
   eliminated?: boolean;
   eliminationWinner?: boolean;
@@ -85,13 +89,15 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
   /** Additive v2 capability; absent on older servers. Commands bind this lobby generation. */
   hostManagement?: { lobbyRevision: number };
   /** Optional additive capabilities. Older servers omit these controls. */
-  capabilities?: { lobbyOptions: true; championship: true; roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;seriesResume?: { persistent: boolean; ttlSeconds: number } };
+  capabilities?: { lobbyOptions: true; championship: true; roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;seriesResume?: { persistent: boolean; ttlSeconds: number } };
+  cup?:FrontierCupState|null;
   replay?: ReplayDescriptor | null;
   arena?: ArenaState;
   summit?:SummitState;
   atlas?:AtlasState;
   voyager?:VoyagerState;
   odyssey?:OdysseyState;
+  expedition?:ExpeditionRaceState;
   horizon?: HorizonSettings;
   spectators?: { id: string; name: string; loaded: boolean }[];
   elimination?: EliminationState;
@@ -111,8 +117,10 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
 }
 
 type Request = { requestId?: string };
-type ClientCapabilities = { clientCapabilities?: { roomRules: true; evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true } };
+type ClientCapabilities = { clientCapabilities?: { roomRules: true; evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION } };
 export type ClientMessage =
+  | ({type:CupCommand}&CupIntent)
+  | {type:'set-expedition';roomCode:string;expectedLobbyRevision:number;settings:ExpeditionSettings}
   | {type:'set-odyssey';roomCode:string;expectedLobbyRevision:number;settings:OdysseySettings}
   | {type:'next-odyssey-stage';roomCode:string;expectedLobbyRevision:number}
   | {type:'set-voyager';roomCode:string;expectedLobbyRevision:number;settings:VoyagerSettings}
@@ -148,7 +156,7 @@ export type ClientMessage =
   | { type: 'end-series'; roomCode: string; expectedLobbyRevision: number }
   | { type: 'next-series'; roomCode: string; matchId: string; expectedSeriesRevision: number }
   | ({ type: 'track-loaded' } & TrackSelection)
-  | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string }
+  | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string;cupReady?:CupReadyBinding }
   | { type: 'start'; trackRevision: number }
   | { type: 'reset' }
   | { type: 'leave' }

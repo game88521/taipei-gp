@@ -32,8 +32,8 @@ export function parseRoomPreset(v: unknown): RoomPreset | null {
     durationSeconds: v.durationSeconds as 180|300, trackIds: [...v.trackIds] as string[], horizon };
 }
 /** Shared authority eligibility; no client clock can grant collision immunity. */
-export function horizonCollisionEligible(p: { connected: boolean; loaded: boolean; dnf: boolean; finishMs: number | null; eliminated?: boolean; eliminationWinner?: boolean; block?: BlockState }) {
-  return p.connected && p.loaded && !p.dnf && p.finishMs === null && !p.eliminated && !p.eliminationWinner && !p.block?.ghost;
+export function horizonCollisionEligible(p: { connected: boolean; loaded: boolean; dnf: boolean; finishMs: number | null; eliminated?: boolean; eliminationWinner?: boolean; block?: BlockState;cup?:{active:boolean} }) {
+  return p.connected && p.loaded && !p.dnf && p.finishMs === null && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && p.cup?.active!==false;
 }
 export function validateHorizonSnapshot(room: Record<string, unknown>) {
   const cap = object(room.capabilities) ? room.capabilities.horizon : undefined;

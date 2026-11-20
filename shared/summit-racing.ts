@@ -4,6 +4,8 @@ import {atlasLimits,type AtlasState,type AtlasPlayer} from './atlas-racing.ts';
 import {validateOdyssey} from './odyssey-racing.ts';
 export {odysseySettings} from './odyssey-racing.ts';
 export type {OdysseySettings} from './odyssey-racing.ts';
+export {FRONTIER_CUP_VERSION,validateCupSnapshot} from './frontier-cup.ts';
+export type {CupIntent,CupCommand} from './frontier-cup.ts';
 export type SummitTyre='soft'|'medium'|'hard'|'wet';
 export interface SummitSettings { weekend:boolean; ai:number; endurance:0|480|600 }
 export interface SummitQualifying {id:string;name:string;bestMs:number|null;grid:number;ai:boolean;dnf:boolean}

@@ -1,4 +1,5 @@
 export const ATLAS_RACING_VERSION='atlas-racing-v1';
+export {expeditionSettings,validateExpedition,type ExpeditionSettings} from './expedition-racing.ts';
 export type AtlasAiLevel='relaxed'|'standard'|'competitive';
 export type AtlasPitService='tyres'|'repair'|'both';
 export interface AtlasSettings {aiLevel:AtlasAiLevel;damage:boolean;flags:boolean}

@@ -1,4 +1,8 @@
 import './multiplayer.css';
+import {mountExpeditionPerformance} from './expedition-performance-ui';
+import {mountExpeditionHud} from './expedition-hud-ui';
+import {ExpeditionResolution} from './expedition-performance';
+import {networkFeel,NETWORK_FEELS,NETWORK_FEEL_KEY} from './expedition-network';
 import './voyager-platform.css';
 import {mountVoyagerComfort} from './voyager-comfort';
 import {mountResultCard} from './voyager-photo';
@@ -33,6 +37,8 @@ import {MultiplayerArenaVisuals} from './multiplayer-arena-visuals';
 import {SummitRacingPanel} from './summit-racing-ui';
 import {mountDiagnostics} from './odyssey-diagnostics';
 import {mountOdysseyGamepad} from './odyssey-gamepad';
+import {FrontierCupPanel} from './frontier-cup-ui';
+import {CUP_MATCH_LABELS} from '../shared/frontier-cup';
 
 await acquireAtlasPageLease();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -69,6 +75,7 @@ let historyStorage: Storage | null = null; try { historyStorage = localStorage; 
 const recentHistory = new MultiplayerHistory(historyStorage);
 const historyPanel = new MultiplayerHistoryPanel(recentHistory, $('mp-history-list'), $('mp-history-status'));
 const autoQuality = new MultiplayerAutoQuality();
+const expeditionResolution=new ExpeditionResolution();
 let spectatorKey = '';
 const horizonPanel = new MultiplayerHorizonPanel(() => client, fn => action(async () => { await fn(); }), () => enterRoom('watch'), preset => { pendingRoomPreset=preset; enterRoom('preset'); });
 try { autoQuality.setMode(localStorage.getItem(MULTIPLAYER_QUALITY_KEY)); } catch { /* 本次仍可手動選擇 */ }
@@ -80,7 +87,7 @@ function applyQuality() {
 $('mp-quality').addEventListener('change', () => {
   autoQuality.setMode($<HTMLSelectElement>('mp-quality').value);
   try { localStorage.setItem(MULTIPLAYER_QUALITY_KEY, autoQuality.mode); } catch { /* 本次設定仍有效 */ }
-  applyQuality();
+  expeditionResolution.reset();scene?.setRenderScale(performanceScale??1);applyQuality();
 });
 $('mp-series-count').addEventListener('change', () => seriesPanel.updateCount());
 let lapDriverId: string | null = null, lapDriversKey = '';
@@ -112,13 +119,39 @@ const input = new Input($('mp-pad'), $('mp-pad-dot'), $('mp-brake'), $('mp-gas')
 const arenaPanel=new MultiplayerArenaPanel(()=>client,input);
 const arenaVisuals=new MultiplayerArenaVisuals();
 const summitPanel=new SummitRacingPanel(()=>client);
+const cupPanel=new FrontierCupPanel(()=>client);
 mountControlSettings($('mp-control-settings'), input);
 mountOdysseyGamepad({host:$('mp-control-settings'),input});
 const voyagerComfortHost=document.createElement('div');$('mp-control-settings').after(voyagerComfortHost);mountVoyagerComfort(voyagerComfortHost);
+let performanceScale:number|null=null;
+const expeditionPerformance=mountExpeditionPerformance(voyagerComfortHost,'multiplayer',{
+  context:()=>({
+    mode:client?.room?[client.room.arena?.mode&&client.room.arena.mode!=='off'?'arena-'+client.room.arena.mode:client.room.evolution?.mode??'race',client.room.summit?.stage??'single',client.room.summit?.settings.endurance?'endurance':'',client.room.horizon?.elimination?'elimination':'',client.room.series?'series':''].filter(Boolean).join(':'):'lobby',track:client?.room?.trackId??$<HTMLSelectElement>('mp-track').value,
+    quality:scene?.performanceContext.quality??autoQuality.level,fpsCap:renderLimit,
+    viewportWidth:innerWidth,viewportHeight:innerHeight,dpr:devicePixelRatio,
+    bufferWidth:scene?.renderer.domElement.width??0,bufferHeight:scene?.renderer.domElement.height??0,
+    effectiveScale:scene?.performanceContext.effectiveScale??1,players:client?.room?.players.length??0,
+    streamLoaded:scene?.performanceContext.streamLoaded??0,streamPending:scene?.performanceContext.streamPending??0,
+  }),
+  onScale:scale=>{performanceScale=scale;scene?.setRenderScale(scale??expeditionResolution.scale);},
+});
+const expeditionHud=mountExpeditionHud(voyagerComfortHost,'multiplayer',[
+ {id:'speed',label:'時速',selector:'.mp-speed'},
+ {id:'timing',label:'圈數與計時',selector:'.mp-race-stats'},
+ {id:'board',label:'名次',selector:'#mp-board'},
+ {id:'map',label:'近車與賽道',selector:'#mp-awareness'},
+]);
+const feelLabel=document.createElement('label');feelLabel.textContent='連線畫面平順度 ';
+const feelSelect=document.createElement('select');feelSelect.id='expedition-network-feel';
+for(const [value,text]of Object.entries(NETWORK_FEELS)){const option=document.createElement('option');option.value=value;option.textContent=text;feelSelect.append(option);}
+try{feelSelect.value=networkFeel(localStorage.getItem(NETWORK_FEEL_KEY));}catch{feelSelect.value='balanced';}
+const feelNote=document.createElement('p');feelNote.className='sub';feelNote.textContent='平順優先會增加畫面延遲；反應優先較易看見抖動。只調整呈現，碰撞和成績仍由伺服器決定。';
+feelSelect.onchange=()=>{const mode=networkFeel(feelSelect.value);scene?.network.setMode(mode);try{localStorage.setItem(NETWORK_FEEL_KEY,mode);}catch{}};
+feelLabel.append(feelSelect);voyagerComfortHost.append(feelLabel,feelNote);
 mountResultCard($('mp-results'),()=>multiplayerResultCardData(client?.room,client?.room?getMultiplayerTrack(client.room.trackId)?.name:undefined),'voyager-mp-result-card');
 mountControlHints(input, { multiplayer: true, steering: () => 'drag' });
 const sound = new Sound();
-const canDrive = () => !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.finishMs === null) && focused && !document.hidden && !scene.contextLost;
+const canDrive = () => !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.cup?.active!==false && p.finishMs === null) && focused && !document.hidden && expeditionHud.editor.hidden && !scene.contextLost;
 input.isDriving = canDrive;
 
 function desiredMap() {
@@ -177,7 +210,7 @@ function synchronizeMap(force = false) {
 
 function renderUi() {
   if (!canDrive()) input.release();
-  if (recentHistory.capture(client?.room ?? null, client?.selfId ?? null)) historyPanel.render();
+  if (!client?.room?.cup&&recentHistory.capture(client?.room ?? null, client?.selfId ?? null)) historyPanel.render();
   historyPanel.render();
   const room = client?.room, me = room?.players.find(p => p.id === client?.selfId);
   const phase = room?.phase ?? '', active = phase === 'countdown' || phase === 'racing';
@@ -189,7 +222,7 @@ function renderUi() {
   const targets = spectatorTargets(room ?? null, client?.selfId ?? null);
   const watching = targets.length > 0 && localMapReady;
   $('mp-spectator-field').hidden = !watching;
-  $('mp-controls').hidden = !!me && (me.dnf || me.finishMs !== null || !!me.timeTrialDone || me.arena?.active===false);
+  $('mp-controls').hidden = !!me && (me.dnf || me.finishMs !== null || !!me.timeTrialDone || me.arena?.active===false || me.cup?.active===false);
   const targetKey = JSON.stringify([room?.code, room?.matchId, targets.map(player => [player.id, player.name])]);
   if (targetKey !== spectatorKey) {
     spectatorKey = targetKey; const select = $<HTMLSelectElement>('mp-spectator'); select.replaceChildren();
@@ -248,12 +281,12 @@ function renderUi() {
     $<HTMLButtonElement>('mp-host-transfer').disabled = !connected || busy || !target?.connected;
     setText($('mp-ready'), me?.ready ? '取消準備' : '我準備好了');
     $<HTMLButtonElement>('mp-ready').disabled = !connected || !localMapReady;
-    $('mp-start').hidden = room.hostId !== client?.selfId;
+    $('mp-start').hidden = room.hostId !== client?.selfId || !!room.cup;
     const teamsReady = room.evolution?.mode !== 'teams' || room.players.length === 4 && !!room.series && ['red', 'blue'].every(team => room.players.filter(p => room.evolution?.teams[p.id] === team).length === 2);
     $<HTMLButtonElement>('mp-start').disabled = !connected || !localMapReady || room.players.length < 2 || !teamsReady || room.players.some(p => !p.ready || !p.connected || !p.loaded);
     setText($('mp-start'), !teamsReady ? '需要四人、每隊兩人與系列路線' : room.players.length < 2 ? '等待朋友加入' : room.players.some(p => !p.loaded) ? '等待地圖載入' : room.players.some(p => !p.ready || !p.connected) ? '等待全員準備' : '開始倒數');
     setText($('mp-result-track'), `${trackLabel} · ${modeLabel(room.evolution?.mode)} · ${room.evolution?.mode === 'time-trial' ? `${room.evolution.durationSeconds / 60} 分鐘` : `${room.laps} 圈`}`);
-    setText($('mp-race-track'), room.series ? `系列 ${room.series.roundIndex + 1}/${room.series.trackIds.length} · ${trackLabel}` : trackLabel);
+    setText($('mp-race-track'), room.cup ? `${CUP_MATCH_LABELS[room.cup.matches[room.cup.index].key]} · ${trackLabel}` : room.series ? `系列 ${room.series.roundIndex + 1}/${room.series.trackIds.length} · ${trackLabel}` : trackLabel);
     if (phase === 'results') playerLists.results.update(room, client?.selfId);
     if (phase === 'results') {
       syncLapDriver(room, client?.selfId ?? null);
@@ -264,18 +297,19 @@ function renderUi() {
     if ($<HTMLInputElement>('mp-invite-url').value !== invitationUrl) $<HTMLInputElement>('mp-invite-url').value = invitationUrl;
     $<HTMLButtonElement>('mp-copy-link').disabled = !invitationUrl;
     $<HTMLButtonElement>('mp-share-link').disabled = !invitationUrl;
-    $('mp-rematch').hidden = room.hostId !== client?.selfId;
+    $('mp-rematch').hidden = room.hostId !== client?.selfId || !!room.cup;
     $<HTMLButtonElement>('mp-rematch').disabled = !connected || !!room.series?.complete;
     setText($('mp-rematch'), room.series ? room.series.complete ? '系列賽已完成' : '前往下一站' : '再來一場');
     setText($('mp-results-note'), room.series?.complete ? '系列賽已完成，可查看總積分與歷場成績；房主結束系列後可再開新賽事。' : room.hostId === client?.selfId ? '下一場會回到大廳，請所有人重新準備。' : '等房主開啟下一場，或離開房間。');
     if (active && !mapError) playerLists.board.update(room, client?.selfId);
     if (me) {
-      setText($('mp-position'), `P${me.rank}`);
-      setText($('mp-lap'), room.evolution?.mode === 'time-trial' ? `已完成 ${me.completedLaps} 圈` : `${Math.min(room.laps, me.completedLaps + 1)} / ${room.laps} 圈`);
-      setText($('mp-last-lap'), me.bestLapMs != null ? `最快圈 ${time(me.bestLapMs)}` : me.lapTimesMs === undefined ? '' : '尚未完成單圈');
+      setText($('mp-position'), me.cup?.active===false?'觀戰':`P${me.rank}`);
+      setText($('mp-lap'), me.cup?.active===false?'原席候場':room.evolution?.mode === 'time-trial' ? `已完成 ${me.completedLaps} 圈` : `${Math.min(room.laps, me.completedLaps + 1)} / ${room.laps} 圈`);
+      setText($('mp-last-lap'), me.cup?.active===false?'本場原席觀戰，不列圈速':me.bestLapMs != null ? `最快圈 ${time(me.bestLapMs)}` : me.lapTimesMs === undefined ? '' : '尚未完成單圈');
     }
     setText($('mp-race-message'), !connected ? '連線中斷，自車已煞停；正在重連，其他車手繼續比賽。'
       : !localMapReady ? '正在載入並確認比賽地圖，自車保持煞車。'
+      : me?.cup?.active===false ? `你留在原席觀戰，本場不列 DNF。${watching?`正在追看 ${targets.find(player=>player.id===scene?.spectatorId)?.name??targets[0].name}`:'等待兩位出賽車手'}。`
       : me?.dnf ? `本場未完成：${dnfLabel(me.dnfReason)}；${watching ? `觀戰 ${targets.find(player => player.id === scene?.spectatorId)?.name ?? targets[0].name}` : '等待其他車手完賽'}。`
       : me?.timeTrialDone && phase !== 'results' ? `末圈完成，等待結算${watching ? ` · 觀戰 ${targets.find(player => player.id === scene?.spectatorId)?.name ?? targets[0].name}` : ''}。`
       : me?.finishMs !== null && me?.finishMs !== undefined ? `🏁 你已完賽：${time(me.finishMs)}，${watching ? `觀戰 ${targets.find(player => player.id === scene?.spectatorId)?.name ?? targets[0].name}` : '等待其他車手'}。`
@@ -295,6 +329,7 @@ function renderUi() {
   }
   horizonPanel.render(busy);
   summitPanel.render(room??null,client?.selfId??null,connected,busy,client?.serverNow()??Date.now());
+  cupPanel.render(room??null,client?.selfId??null,connected,busy);
 }
 
 function syncHostTargets(room: NonNullable<MultiplayerClient['room']>, selfId: string | null) {
@@ -314,16 +349,17 @@ function syncHostTargets(room: NonNullable<MultiplayerClient['room']>, selfId: s
 
 function syncLapDriver(room: NonNullable<MultiplayerClient['room']>, selfId: string | null) {
   const select = $<HTMLSelectElement>('mp-lap-driver');
-  const key = JSON.stringify(room.players.map(player => [player.id, player.name, player.id === selfId]));
+  const players=room.players.filter(player=>player.cup?.active!==false);
+  const key = JSON.stringify(players.map(player => [player.id, player.name, player.id === selfId]));
   if (key !== lapDriversKey) {
     select.replaceChildren();
-    for (const player of room.players) {
+    for (const player of players) {
       const option = document.createElement('option'); option.value = player.id;
       option.textContent = `${player.name}${player.id === selfId ? '（你）' : ''}`; select.appendChild(option);
     }
     lapDriversKey = key;
   }
-  if (!room.players.some(player => player.id === lapDriverId)) lapDriverId = selfId && room.players.some(player => player.id === selfId) ? selfId : room.players[0]?.id ?? null;
+  if (!players.some(player => player.id === lapDriverId)) lapDriverId = selfId && players.some(player => player.id === selfId) ? selfId : players[0]?.id ?? null;
   select.value = lapDriverId ?? '';
 }
 
@@ -464,7 +500,7 @@ $('mp-sound').addEventListener('click', () => {
 $('mp-reload').addEventListener('click', () => location.reload());
 addEventListener('keydown', e => { if (e.code === 'Escape' && client?.room?.phase === 'racing') { $('mp-race-message').textContent = '連線比賽持續進行；需要離開時，請點「離開比賽」。'; } });
 document.addEventListener('visibilitychange', () => {
-  renderPacer.reset(); renderElapsed = 0; autoQuality.reset();
+  renderPacer.reset(); renderElapsed = 0; autoQuality.reset();if(performanceScale===null)expeditionResolution.reset();scene?.setRenderScale(performanceScale??expeditionResolution.scale);
   if (document.hidden) { client?.sendInput(0, true); sound.engine(0, 0, false); }
   else if (soundEnabled) sound.unlock();
 });
@@ -485,17 +521,19 @@ renderUi();
 
 try {
   scene = new MultiplayerScene($('mp-scene'));
+  scene.network.setMode(networkFeel(feelSelect.value));
   applyQuality();
-  scene.onContextLost = () => { graphicsReady = false; mapLoadToken++; client?.sendInput(0, true); client?.disconnect(); sound.engine(0, 0, false); $('mp-graphics-error').hidden = false; };
+  scene.onContextLost = () => { expeditionPerformance.stop();graphicsReady = false; mapLoadToken++; client?.sendInput(0, true); client?.disconnect(); sound.engine(0, 0, false); $('mp-graphics-error').hidden = false; };
   let previousAt = performance.now();
   scene.renderer.setAnimationLoop(() => {
-    const at = performance.now(), dt = Math.min(.1, (at - previousAt) / 1000); previousAt = at;
+    const at = performance.now(),rawDelta=(at-previousAt)/1000,dt=Math.min(.1,rawDelta);previousAt=at;
     const drive = canDrive(), control = drive ? input.read() : { steer: 0, brake: true };
     const now = client?.serverNow() ?? Date.now();
     const room = client?.room;
     arenaPanel.sample('handbrake'in control&&!!control.handbrake,drive);
     const active = room?.phase === 'countdown' || room?.phase === 'racing';
-    if (autoQuality.sample(dt, !!active && graphicsReady && focused && !document.hidden)) applyQuality();
+    if (performanceScale===null&&autoQuality.sample(dt, !!active && graphicsReady && focused && !document.hidden)) applyQuality();
+    if(performanceScale===null&&expeditionResolution.sample(rawDelta,autoQuality.mode==='auto'&&!!active&&graphicsReady&&focused&&!document.hidden))scene?.setRenderScale(expeditionResolution.scale);
     const draw = !document.hidden && renderPacer.due(at, active ? renderLimit : 10);
     renderElapsed += dt;
     // 預測、碰撞校正每次動畫回呼都推進；只節流繪圖及HUD。
@@ -503,6 +541,7 @@ try {
     if (draw) {
       arenaPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
       summitPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
+      cupPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy);
       if(scene&&graphicsReady)arenaVisuals.update(scene.scene,scene.track,room??null,now);
       renderElapsed = 0;
       setText($('mp-countdown'), room?.phase === 'countdown' && room.startAt ? String(Math.max(1, Math.ceil((room.startAt - now) / 1000))) : '');
@@ -515,6 +554,7 @@ try {
       if (($('mp-awareness') as HTMLDetailsElement).open) awareness.update(graphicsReady ? scene?.track ?? null : null, room ?? null, scene?.spectatorId ?? client?.selfId ?? null, at);
       setText($('mp-speed'), String(Math.round((scene?.spectatorId ? scene.viewSpeed : scene?.car.v ?? 0) * 3.6)));
     }
+    if(scene)expeditionPerformance.sample(rawDelta,scene.lastRenderCpuMs!==null,document.hidden?'hidden':!active?'menu':!graphicsReady||!focused||scene.contextLost?'inactive':true,scene.renderer.info,scene.lastRenderCpuMs===null?{}:{renderCpuMs:scene.lastRenderCpuMs});
     if (soundEnabled) sound.engine(.15 + .7 * Math.min(1, (scene?.car.v ?? 0) / 85), control.brake ? .1 : 1, drive);
   });
   synchronizeMap();
@@ -532,4 +572,4 @@ try {
 
 // 本機隔離瀏覽器測試可讀真實client／物理狀態，沒有新增伺服器作弊操作。
 const replayPanel=mountMultiplayerReplay(()=>client);
-(window as unknown as { __mp: unknown }).__mp = { client, get scene() { return scene; }, get ready() { return graphicsReady; }, input, replay:replayPanel };
+(window as unknown as { __mp: unknown }).__mp = { client, get scene() { return scene; }, get ready() { return graphicsReady; }, input, replay:replayPanel,expeditionHud,expeditionPerformance,expeditionResolution };

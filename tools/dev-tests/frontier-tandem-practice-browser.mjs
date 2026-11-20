@@ -1,0 +1,80 @@
+// Rex <game88521@gmail.com>. Local UI/Input/FreeCar integration; fixed-step acceleration is explicit.
+import assert from 'node:assert/strict';
+import {readFile,readdir,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {FrontierBrowserHarness,click,focus,layout,protectedSave,ROOT} from './frontier-browser-harness.mjs';
+import {pureUrl} from './pure-module-loader.mjs';
+
+const h=new FrontierBrowserHarness('frontier-tandem-practice-browser',new URL(import.meta.url),[
+ 'src/frontier-tandem-practice.ts','src/frontier-tandem-practice-ui.ts','src/frontier-tandem-practice.css',
+ 'src/frontier-records.ts','src/frontier-lazy-city.ts','src/atlas-modes.ts','src/atlas-platform.ts',
+ 'src/main.ts','src/input.ts','src/freecar.ts','src/vehicles.ts','tools/dev-tests/frontier-browser-harness.mjs',
+]);
+const M=await import(await pureUrl(ROOT,'frontier-tandem-practice.ts'));
+let error,recorded,complete;
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function keyboard(p,down){await p.send('Input.dispatchKeyEvent',{type:down?'keyDown':'keyUp',key:'ArrowUp',code:'ArrowUp',windowsVirtualKeyCode:38,nativeVirtualKeyCode:38});}
+async function brake(p,down){await p.send('Input.dispatchKeyEvent',{type:down?'keyDown':'keyUp',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40,nativeVirtualKeyCode:40});}
+async function driveFocus(p){await focus(p);await p.evaluate('__gp.renderer.domElement.tabIndex=0;__gp.renderer.domElement.focus({preventScroll:true})');await p.until('document.activeElement===__gp.renderer.domElement');}
+async function countdown(p,kind){assert.equal(await p.evaluate('__gp.frontierTandemPractice.phase'),'countdown-'+kind);return p.evaluate(`(()=>{let steps=0;while(__gp.frontierTandemPractice.phase==='countdown-${kind}'&&steps<500){__gp.freeStep(1/120);steps++;}__gp.frontierTandemPractice.frame(.1);return{phase:__gp.frontierTandemPractice.phase,steps,seconds:steps/120,state:__gp.state,input:__gp.input.read()};})()`);}
+async function panel(p){await focus(p);if(!await p.evaluate('__gp.frontierTandemPractice.opened'))await click(p,'frontier-tandem-room');await p.until('__gp.frontierTandemPractice.opened');}
+async function returned(p){return p.evaluate(`(()=>{const c=__gp.fcar,b=__frontierPracticeBefore;return{active:__gp.frontierTandemPractice.active,busy:__gp.frontierTandemPractice.busy,state:__gp.state,pose:{x:c.x,z:c.z,y:c.y,h:c.h},originalPose:b.pose,specReferenceRestored:c.spec===__frontierPracticeSpec,geometryReferenceRestored:c.geometry===__frontierPracticeGeometry,geometry:c.geometry,originalGeometry:b.geometry,weather:__gp.weather.kind,originalWeather:b.weather,navigation:__gp.nav,originalNavigation:b.navigation,protected:${protectedSave},originalProtected:__frontierPracticeProtected,actors:__gp.scene.getObjectByName('frontier-tandem-practice-actors').children.length,input:__gp.input.read()};})()`);}
+function assertReturned(r){assert.equal(r.active,false);assert.equal(r.busy,false);assert.equal(r.state,'paused');assert.equal(r.specReferenceRestored,true);assert.equal(r.geometryReferenceRestored,true);assert.deepEqual(r.geometry,r.originalGeometry);assert.equal(r.weather,r.originalWeather);assert.deepEqual(r.navigation,r.originalNavigation);assert.equal(r.protected,r.originalProtected);assert.equal(r.actors,0);for(const axis of['x','z','y','h'])assert.ok(Math.abs(r.pose[axis]-r.originalPose[axis])<.01,axis+' return pose');assert.equal(r.input.throttle,false);assert.equal(r.input.brake,false);}
+
+try{
+ await h.start(1);const p=h.pages[0];
+ h.report.fixedStepSeconds=1/120;
+ h.report.limitations.push('錄製及跟隨透過真Input與__gp.freeStep(1/120)推進實際FreeCar／Collider；renderer.setAnimationLoop(null)停止背景RAF，測試以手動固定小步加速，並非真人按實際時間全程試駕。');
+ h.report.limitations.push('借車前指定一個明示、完整合法的原車geometry標記，只用來驗證還原；陪練由產品設定為標準muscle幾何。沒有塞入ghost、車位、速度或分數完成錄製／跟隨。');
+ h.report.limitations.push('async取消個案使用同一JS呼叫內的程式化真按鈕click接stop，刻意命中await前取消；其餘主要流程使用CDP原生滑鼠及鍵盤事件。');
+ await h.test('玩法目錄真按鈕載入單人陪練，三種尺寸控制可達並明示鬼車規則',async()=>{
+  await focus(p);await p.evaluate('document.getElementById("atlas-modes").open=true');await click(p,'atlas-launch-tandem-practice');
+  await p.until('!!__gp.frontierTandemPractice?.phase&&!!document.getElementById("frontier-tandem-overlay")&&__gp.frontierTandemPractice.opened',180000);
+  assert.equal(await p.evaluate('__gp.frontierTandemPractice.active'),false);assert.match(await p.evaluate('document.getElementById("frontier-tandem-overlay").textContent'),/單人離線陪練/);
+  assert.equal(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_GHOST_KEY)+')'),null);
+  await layout(p,'tandem-practice-entry','#frontier-tandem-overlay',h.report,h.evidence);
+  await p.evaluate(`__gp.renderer.setAnimationLoop(null);__gp.setNav(-1118.56,967.82,'陪練還車導航測試');window.__frontierPracticeGeometry={wheelbase:3.1,inertia:3.6,radius:.98,offsets:[1.6,0,-1.6],halfWidth:1,surfaceSpan:1.8};__gp.fcar.geometry=__frontierPracticeGeometry;window.__frontierPracticeSpec=__gp.fcar.spec;window.__frontierPracticeBefore={pose:{x:__gp.fcar.x,z:__gp.fcar.z,y:__gp.fcar.y,h:__gp.fcar.h},geometry:structuredClone(__gp.fcar.geometry),weather:__gp.weather.kind,navigation:structuredClone(__gp.nav)};window.__frontierPracticeProtected=${protectedSave};window.__frontierPracticeTrace={steps:0,touches:0,distance:0,maxSpeed:0};`);
+  return{entry:'atlas-launch-tandem-practice',deviceEmulationOnly:true,backgroundRafDisabledForDeterministicPhysics:true};
+ });
+ await h.test('真鍵盤油門與煞車經FreeCar錄製至少10秒50公尺，停止後只留本頁不自動覆蓋',async()=>{
+  await click(p,'frontier-tandem-record');await p.until('__gp.frontierTandemPractice.phase==="countdown-record"&&!__gp.frontierTandemPractice.busy',180000);await driveFocus(p);const start=await countdown(p,'record');assert.equal(start.phase,'record');
+  assert.equal(await p.evaluate('__gp.fcar.geometry===undefined'),true);assert.equal(await p.evaluate('__gp.fcar.spec.engine'),10.5);
+  await keyboard(p,true);assert.equal(await p.evaluate('__gp.input.read().throttle'),true);
+  await p.evaluate(`(()=>{const t=__frontierPracticeTrace,c=__gp.fcar;for(let i=0;i<480;i++){const x=c.x,z=c.z;__gp.freeStep(1/120);t.steps++;t.distance+=Math.hypot(c.x-x,c.z-z);t.maxSpeed=Math.max(t.maxSpeed,Math.hypot(c.vx,c.vz));if(c.touch)t.touches++;}__gp.frontierTandemPractice.frame(.1);})()`);
+  await keyboard(p,false);await brake(p,true);assert.equal(await p.evaluate('__gp.input.read().brake'),true);
+  await p.evaluate(`(()=>{const t=__frontierPracticeTrace,c=__gp.fcar;for(let i=0;i<480&&c.v>.3;i++){const x=c.x,z=c.z;__gp.freeStep(1/120);t.steps++;t.distance+=Math.hypot(c.x-x,c.z-z);if(c.touch)t.touches++;}})()`);
+  await brake(p,false);await p.evaluate(`(()=>{const t=__frontierPracticeTrace,c=__gp.fcar;while(t.steps<1260){const x=c.x,z=c.z;__gp.freeStep(1/120);t.steps++;t.distance+=Math.hypot(c.x-x,c.z-z);if(c.touch)t.touches++;}__gp.frontierTandemPractice.frame(.1);})()`);
+  assert.equal(await p.evaluate('__gp.frontierTandemPractice.phase'),'record');await click(p,'frontier-tandem-hud-stop');await p.until('__gp.frontierTandemPractice.opened&&!!__gp.frontierTandemPractice.ghost');recorded=await p.evaluate('__gp.frontierTandemPractice.ghost');
+  assert.ok(M.parsePracticeGhost(recorded));assert.ok(recorded.durationMs>=10000&&recorded.durationMs<=120000);assert.ok(recorded.distanceM>=50);assert.ok(recorded.frames.length>=51);assert.equal(recorded.vehicle,'muscle');
+  assert.equal(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_GHOST_KEY)+')'),null);assert.equal(await p.evaluate(protectedSave),await p.evaluate('__frontierPracticeProtected'));
+  await writeFile(path.join(h.evidence,'real-input-recorded-ghost.json'),JSON.stringify(recorded,null,2)+'\n');await h.shot(p,'real-input-recorded-ghost.png');
+  return{countdown:start,manualFixedSteps:await p.evaluate('__frontierPracticeTrace'),durationMs:recorded.durationMs,distanceM:recorded.distanceM,frames:recorded.frames.length,ghostInjected:false,poseInjectedDuringRecord:false};
+ });
+ await h.test('明確保存真錄製鬼車，跟隨完整時長產出獨立低分原因與唯一結果',async()=>{
+  await click(p,'frontier-tandem-save');assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_GHOST_KEY)+')')),recorded);
+  await click(p,'frontier-tandem-follow');await p.until('__gp.frontierTandemPractice.phase==="countdown-follow"');await driveFocus(p);const started=await countdown(p,'follow');assert.equal(started.phase,'follow');
+  const initial=await p.evaluate('({x:__gp.fcar.x,z:__gp.fcar.z,y:__gp.fcar.y,h:__gp.fcar.h})'),frame=recorded.frames[0];assert.ok(Math.abs(Math.hypot(initial.x-frame[1],initial.z-frame[2])-15)<.01);
+  await p.evaluate(`(()=>{let steps=0;while(__gp.frontierTandemPractice.phase==='follow'&&steps<18000){__gp.freeStep(1/120);steps++;if(steps%60===0)__gp.frontierTandemPractice.frame(.1);}__gp.frontierTandemPractice.frame(.1);window.__frontierPracticeFollowSteps=steps;})()`);
+  assert.equal(await p.evaluate('__gp.frontierTandemPractice.phase'),'finished');complete=await p.evaluate('__gp.frontierTandemPractice.latest');assert.ok(complete);assert.ok(M.parsePracticeResults([complete]));assert.equal(complete.ghostId,recorded.id);assert.ok(Math.abs(complete.seconds-recorded.durationMs/1000)<.00001);assert.equal(complete.score,0);assert.equal(complete.goodSeconds,0);assert.ok(complete.reasons.far>0||complete.reasons.slow>0);assert.equal(complete.reasons.invalid,0);
+  const saved=JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_RESULTS_KEY)+')'));assert.deepEqual(saved,[complete]);assert.equal(await p.evaluate(protectedSave),await p.evaluate('__frontierPracticeProtected'));
+  await layout(p,'tandem-practice-results','#frontier-tandem-overlay',h.report,h.evidence);return{result:complete,fixedSteps:await p.evaluate('__frontierPracticeFollowSteps'),neutralInputBaseline:true,humanSkillBalanceVerified:false};
+ });
+ await h.test('原生Blob下載含目前真鬼車及獨立成績，嚴格解析且沒有私人席位',async()=>{
+  await h.browser.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:h.evidence,browserContextId:h.contexts[0],eventsEnabled:true});await click(p,'frontier-tandem-download');const filename='taipei-tandem-practice.json';for(let i=0;i<100&&!(await readdir(h.evidence)).includes(filename);i++)await sleep(50);
+  const raw=await readFile(path.join(h.evidence,filename),'utf8'),data=JSON.parse(raw);assert.deepEqual(Object.keys(data).sort(),['type','v','ghost','records','current'].sort());assert.equal(data.type,'taipei-gp-tandem-practice');assert.equal(data.v,1);assert.deepEqual(data.ghost,recorded);assert.deepEqual(data.records,[complete]);assert.deepEqual(data.current,complete);assert.ok(M.parsePracticeGhost(data.ghost));assert.ok(M.parsePracticeResults(data.records));for(const key of['token','selfId','resumeKey','endpoint','code'])assert.equal(new RegExp('"'+key+'"\\s*:').test(raw),false,key);return{filename,bytes:Buffer.byteLength(raw),nativeAnchorDownload:true};
+ });
+ await h.test('重試同鬼車後中途離開不新增成績，幾何／材質釋放並還原原車導航天候與存檔',async()=>{
+  await click(p,'frontier-tandem-retry');await p.until('__gp.frontierTandemPractice.phase==="countdown-follow"');await driveFocus(p);assert.equal((await countdown(p,'follow')).phase,'follow');await p.evaluate('for(let i=0;i<120;i++)__gp.freeStep(1/120);__gp.frontierTandemPractice.frame(.1)');assert.equal(await p.evaluate('__gp.frontierTandemPractice.latest'),null);
+  await panel(p);await p.evaluate(`window.__frontierPracticeDisposals={geometry:0,material:0};const seenGeometry=new Set(),seenMaterial=new Set();__gp.scene.getObjectByName('frontier-tandem-practice-actors').traverse(o=>{if(o.isMesh){if(!seenGeometry.has(o.geometry)){seenGeometry.add(o.geometry);o.geometry.addEventListener('dispose',()=>__frontierPracticeDisposals.geometry++);}for(const m of Array.isArray(o.material)?o.material:[o.material])if(!seenMaterial.has(m)){seenMaterial.add(m);m.addEventListener('dispose',()=>__frontierPracticeDisposals.material++);}}});window.__frontierPracticeExpectedDisposals={geometry:seenGeometry.size,material:seenMaterial.size};`);
+  await click(p,'frontier-tandem-leave');const out=await returned(p);assertReturned(out);const disposals=await p.evaluate('({actual:__frontierPracticeDisposals,expected:__frontierPracticeExpectedDisposals})');assert.ok(disposals.expected.geometry>0&&disposals.expected.material>0);assert.deepEqual(disposals.actual,disposals.expected);assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_RESULTS_KEY)+')')),[complete]);assert.deepEqual(await p.evaluate('__gp.frontierTandemPractice.ghost'),recorded);return{...out,disposals,incompleteRetrySaved:false};
+ });
+ await h.test('await前同呼叫取消借車，晚到工作不能重啟陪練或覆寫還車狀態',async()=>{
+  await p.evaluate('__gp.frontierTandemPractice.open()');await p.until('__gp.frontierTandemPractice.opened');const result=await p.evaluate(`(async()=>{document.getElementById('frontier-tandem-record').click();const pending={busy:__gp.frontierTandemPractice.busy,active:__gp.frontierTandemPractice.active};__gp.frontierTandemPractice.stop();await new Promise(resolve=>setTimeout(resolve,30));return{pending,phase:__gp.frontierTandemPractice.phase};})()`);assert.equal(result.pending.busy,true);assert.equal(result.pending.active,true);assert.equal(result.phase,'idle');assertReturned(await returned(p));assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_RESULTS_KEY)+')')),[complete]);return{...result,synchronousProgrammaticButtonClickForRace:true,lateAsyncEnterPrevented:true};
+ });
+ await h.test('載入中真返回按鈕取消generation，晚到完成不恢復free或污染存檔',async()=>{
+  if(!await p.evaluate('__gp.frontierTandemPractice.opened'))await p.evaluate('__gp.frontierTandemPractice.open()');const result=await p.evaluate(`(async()=>{document.getElementById('frontier-tandem-record').click();const pending={busy:__gp.frontierTandemPractice.busy,active:__gp.frontierTandemPractice.active};document.getElementById('frontier-tandem-close').click();await new Promise(resolve=>setTimeout(resolve,30));return{pending,phase:__gp.frontierTandemPractice.phase,opened:__gp.frontierTandemPractice.opened,state:__gp.state};})()`);assert.equal(result.pending.busy,true);assert.equal(result.pending.active,true);assert.equal(result.phase,'idle');assert.equal(result.opened,false);assert.notEqual(result.state,'free');assertReturned(await returned(p));assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_RESULTS_KEY)+')')),[complete]);return{...result,synchronousProgrammaticButtonClicksForRace:true,lateAsyncEnterPrevented:true};
+ });
+ await h.test('真UI過短錄製拒絕並保留先前鬼車，離開後沒有殘留操控或演員',async()=>{
+  if(!await p.evaluate('__gp.frontierTandemPractice.opened'))await p.evaluate('__gp.frontierTandemPractice.open()');await click(p,'frontier-tandem-record');await p.until('__gp.frontierTandemPractice.phase==="countdown-record"&&!__gp.frontierTandemPractice.busy');await driveFocus(p);assert.equal((await countdown(p,'record')).phase,'record');await p.evaluate('for(let i=0;i<60;i++)__gp.freeStep(1/120);__gp.frontierTandemPractice.frame(.1)');await click(p,'frontier-tandem-hud-stop');await p.until('__gp.frontierTandemPractice.opened');assert.equal(await p.evaluate('__gp.frontierTandemPractice.phase'),'idle');assert.deepEqual(await p.evaluate('__gp.frontierTandemPractice.ghost'),recorded);assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_GHOST_KEY)+')')),recorded);assert.match(await p.evaluate('document.getElementById("frontier-tandem-status").textContent'),/至少|10秒|50公尺/);await click(p,'frontier-tandem-leave');assertReturned(await returned(p));assert.deepEqual(JSON.parse(await p.evaluate('localStorage.getItem('+JSON.stringify(M.TANDEM_RESULTS_KEY)+')')),[complete]);await focus(p);await click(p,'btn-resume');await p.until('__gp.state==="free"');assert.equal(await p.evaluate('__gp.state'),'free');return{shortRecordingSeconds:.5,priorGhostPreserved:true,priorResultCount:1,resumeAfterReturn:'free',protectedSaveCheckedBeforeResume:true};
+ });
+}catch(e){error=e;}finally{await h.finish(error);}

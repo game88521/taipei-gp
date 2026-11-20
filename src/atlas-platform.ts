@@ -19,6 +19,8 @@ export function mountAtlasPlatform(h:AtlasPlatformHooks) {
       if(!target||target instanceof HTMLButtonElement&&target.disabled){status.textContent='這個模式還在準備，請稍後重試。';return;}
       if(m.cityOnly&&target.hidden){const back=make('a','回台北選擇此玩法','atlas-mode-city-link');back.href='/';status.replaceChildren(document.createTextNode('此玩法需回台北。'),back);return;}
       if(m.cityOnly){opening=true;launch.disabled=true;status.textContent='正在準備城市玩法…';try{forwarding=target;let pending:Promise<boolean>;try{pending=h.openCityChallenges(m.section);}finally{forwarding=null;}if(await pending)remember(m.id);else status.textContent='這次沒有開啟玩法，請稍後重試。';}catch{status.textContent='城市玩法載入失敗，請稍後重試。';}finally{opening=false;for(const button of list.querySelectorAll<HTMLButtonElement>('.atlas-launch'))button.disabled=false;}return;}
+      if(m.target==='btn-expedition-social'&&m.variant)target.dataset.socialMode=m.variant;
+      if(m.target==='btn-expedition-duty'&&m.variant)target.dataset.dutyMode=m.variant;
       remember(m.id);forwarding=target;try{target.click();}finally{forwarding=null;}
     };
     const favorite=make('button',prefs.favorites.includes(m.id)?'★':'☆','atlas-favorite-'+m.id);favorite.type='button';favorite.setAttribute('aria-label',`${prefs.favorites.includes(m.id)?'取消收藏':'收藏'}${m.name}`);favorite.setAttribute('aria-pressed',String(prefs.favorites.includes(m.id)));favorite.onclick=()=>{prefs.favorites=prefs.favorites.includes(m.id)?prefs.favorites.filter(id=>id!==m.id):[...prefs.favorites,m.id];persist();render();document.getElementById(favorite.id)?.focus();};row.append(launch,favorite);list.append(row);}

@@ -7,7 +7,7 @@ export const GP_CHALLENGES = [
   { id: 'defend', seed: 81006, title: '舊胎守住 P6', description: 'P6 滾動起跑，剩一圈；中性胎已磨耗 78%，守住第 6 名內。追兵用較新的胎。', grid: 6, goal: 6, remaining: 1, wear: .78, wet: 0, hits: 99 },
   { id: 'rain', seed: 81010, title: '雨中穩住積分', description: 'P10 雨胎起跑，剩一圈；濕地 60%，第 10 名內完賽且重撞不超過 2 次。', grid: 10, goal: 10, remaining: 1, wear: .2, wet: .6, hits: 2 },
 ] as const;
-export type GpChallenge = typeof GP_CHALLENGES[number];
+export interface GpChallenge { id: string; seed: number; title: string; description: string; grid: number; goal: number; remaining: number; wear: number; wet: number; hits: number }
 export interface ChallengeResult { success: boolean; rank: number; elapsed: number; hits: number; reason: string }
 /** Scenario construction uses its own fixed seed and restores the public, validated physics snapshot. */
 export function makeChallengeSnapshot(field: RaceField, track: Track, def: GpChallenge): RaceSnapshot {

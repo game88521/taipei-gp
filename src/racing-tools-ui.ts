@@ -1,5 +1,6 @@
 import { RaceAnalysis, type AnalysisField } from './race-analysis';
 import { TtCoach, interpolateCoach, type CoachSample, type CoachTrace, type CoachReference } from './tt-coach';
+import { coachAdvice } from './expedition-coach';
 
 const tyre = (i: number) => ['軟胎', '中胎', '硬胎', '雨胎'][i] ?? '未知胎';
 const seconds = (n: number | null) => n === null ? '資料不足' : `${n.toFixed(3)} 秒`;
@@ -93,7 +94,8 @@ export class RacingToolsUi {
   renderTt() {
     const reference = this.coach.reference(this.ttReference.value as CoachReference), last = this.coach.reference('last');
     const focus = this.ttFocus.value === 'last' ? last : this.coach.current(); this.ttBody.replaceChildren();
-    const note = element('p', '藍線：比較圈速度；橘線：參考圈速度。下方紅色／紫色標記：比較圈／參考圈煞車。依相同賽道距離對齊；正差表示較慢。只留本分頁有效圈，每條軌跡最多 4096 點，切換賽道／規則重新建立；無效圈不成為參考。'); note.className = 'sub'; this.ttBody.append(note);
+    const note = element('p', '藍線：比較圈速度；橘線：參考圈速度。下方紅色／紫色：煞車。依相同距離對齊；正差表示較慢。完整有效 PB 遙測依賽道版本／規則保存，最多10份，每份4096點；目前圈與上圈只留本頁。'); note.className = 'sub'; this.ttBody.append(note);
+    if (this.coach.store.error) this.ttBody.append(element('p', this.coach.store.error));
     if (!reference) this.ttBody.append(element('p', this.ttReference.value === 'pb'
       ? this.coach.historicalPb === null ? '目前尚無個人最佳圈。完整完成第一個有效圈後，會建立本分頁的 PB 遙測參考。'
         : `目前 PB ${seconds(this.coach.historicalPb)}；舊紀錄沒有煞車遙測。需在本分頁完成新的有效 PB，或改選上個有效圈。`
@@ -101,6 +103,11 @@ export class RacingToolsUi {
     if (!focus) this.ttBody.append(element('p', '目前圈尚無採樣，可選「上個有效圈」檢視已完成記錄。'));
     if (focus || reference) this.ttBody.append(graph(focus, reference, this.options.trackLength));
     if (focus && reference) {
+      const advice = element('section'); advice.id = 'expedition-coach-advice'; advice.append(element('h3', '優先改善的三個路段'));
+      const tips = coachAdvice(focus, reference, this.options.trackLength);
+      if (tips.length) for (const tip of tips) advice.append(element('p', tip.text));
+      else advice.append(element('p', '目前完整採樣的路段與參考接近，或資料還不足以列出失時；繼續完成有效圈。'));
+      this.ttBody.append(advice);
       if (this.ttFocus.value === 'last' && this.ttReference.value === 'last') this.ttBody.append(element('p', '比較圈與參考圈同為上個有效圈，差值為 0；可切換個人最佳參考，或等待目前圈採樣。'));
       const points = focus.points, rows: string[][] = [];
       for (const part of [.25, .5, .75, 1]) {

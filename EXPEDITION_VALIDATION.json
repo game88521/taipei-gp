@@ -1,0 +1,1974 @@
+{
+  "status": "PASS",
+  "author": "Rex <game88521@gmail.com>",
+  "baseline": "a387c72bec2931411957063aaa63120a59122749",
+  "branch": "feature/expedition-12",
+  "build": "d5068bed213b",
+  "createdAt": "2026-11-20T11:41:34.822Z",
+  "localOnly": true,
+  "externalRequests": 0,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "db383957aa25d54ce438256d260e32ea360d481bda0bb9dc56d1e5b876ea709f"
+    },
+    {
+      "path": "EXPEDITION_DUTY.md",
+      "sha256": "ecb73437e50997b694bf31cee7c546c6c8bfb9c9255fc9143c64c1ec39cbb209"
+    },
+    {
+      "path": "EXPEDITION_FIXES.md",
+      "sha256": "16142d5ff2464cfc512ee4dd484526ba652c49425b629e47573bed93fdbd964b"
+    },
+    {
+      "path": "EXPEDITION_PLAN.md",
+      "sha256": "6e07cbf362ea33567df72857cddf7de329fa8f03805a52a9c5d55e534f220f54"
+    },
+    {
+      "path": "EXPEDITION_PLATFORM.md",
+      "sha256": "1d7f25872a9235a3402af47e554a42cc7fe98f010f24102bed2d9a2dd0171684"
+    },
+    {
+      "path": "EXPEDITION_RACING.md",
+      "sha256": "61fbdb797a2933ed86fbd37c331940ffeb7ad7ac259c534ba43c1db824870715"
+    },
+    {
+      "path": "EXPEDITION_SOCIAL.md",
+      "sha256": "b078b2d9ea4d3548f4372a4a3135dedb6887a1a49c69734866ddb676b3bf494e"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "7c87c3755e9c5770f1539096301a332530ba38c18e51199e1f9d4034a49d6585"
+    },
+    {
+      "path": "server/Dockerfile",
+      "sha256": "1a2f9e8e40ababf0872574bf9bfc1582a5041db83e12747db38501be59d352cb"
+    },
+    {
+      "path": "server/expedition-duty-service.mjs",
+      "sha256": "5cfdf9fb4d0411455e04f29d1bbd3142fe956632c8e2024c6c56d64e51b68d2e"
+    },
+    {
+      "path": "server/expedition-racing-service.mjs",
+      "sha256": "72e105d912fccd0a980e2ee9228d07cb3a7b6417c9f1ded8dccc321385fbb16b"
+    },
+    {
+      "path": "server/expedition-social-service.mjs",
+      "sha256": "672acc6e5db0a04dd4c35b4984f5cd25ee6f586b22efe7283e6b6924b7b097b8"
+    },
+    {
+      "path": "server/horizon-service.mjs",
+      "sha256": "4f3c7d098fcf6e880267efec27facdec2ac851018073a499d565d716f144bcb3"
+    },
+    {
+      "path": "server/index.mjs",
+      "sha256": "b18a733d48dd3726ac35c6f2a6f2959ecd0761268036d79dfab72ed863990494"
+    },
+    {
+      "path": "server/nexus-replay-service.mjs",
+      "sha256": "05aad34d379b9a9ea9952c31a7c51efbff24953254b31512c5747b3c55d2dfc7"
+    },
+    {
+      "path": "server/odyssey-diagnostics.mjs",
+      "sha256": "a00a1519a0f58edfaf4842c945edaee30bafbf64157b28c2598c52fcb58b0f5f"
+    },
+    {
+      "path": "server/room-service.mjs",
+      "sha256": "621d3e994a43d9178b4f5c35970172000272f5a28545ed023b14e60983138b37"
+    },
+    {
+      "path": "server/voyager-racing-service.mjs",
+      "sha256": "30b48f6003910effd9ff13c84c8cc8644d124d5653fa222179f017e8d4e4858e"
+    },
+    {
+      "path": "shared/atlas-racing.ts",
+      "sha256": "446beb12c04e4c17c33365b4800eedcd727f04f3b8d640744b0a0aa34fa52a45"
+    },
+    {
+      "path": "shared/expedition-ai-calibration.json",
+      "sha256": "cf35429c6462c5d8e902e18b26685bd01dbee2a270b75a21e978b4e89e5fcb2d"
+    },
+    {
+      "path": "shared/expedition-duty.ts",
+      "sha256": "0774ae40af7edb878b1aad199244a415229466b3da9404ffac562f424822a509"
+    },
+    {
+      "path": "shared/expedition-racing.ts",
+      "sha256": "553498c71b340e5a86ef9b12a91832c4420b847420f68305861a4db2efb97381"
+    },
+    {
+      "path": "shared/expedition-social.ts",
+      "sha256": "c1896c14d2ad8e890a3d3e57360096dd22eb212c2349484e7449e746419d61a9"
+    },
+    {
+      "path": "shared/multiplayer-protocol.ts",
+      "sha256": "76d8f07329f24b85ed625ebb5740ce79117242bb28b1c0fb977a404e59965035"
+    },
+    {
+      "path": "shared/nexus-replay.ts",
+      "sha256": "3ba516bb219d1fef52f747af505703057a80d15410efebf0893ef72f993a09f9"
+    },
+    {
+      "path": "src/atlas-backup-validators.ts",
+      "sha256": "60a03caf1dfe9fe7039e93c72c58d64817cf8c9703572860c01392991de7270d"
+    },
+    {
+      "path": "src/atlas-backup.ts",
+      "sha256": "11c76f4f9168a13af8d1599f0a7df205efb835e0c684d8c5ffb69c2c12144905"
+    },
+    {
+      "path": "src/atlas-modes.ts",
+      "sha256": "7c6fc29a10d558150db4551f108aead60b91f5ad813647f75daf235a4f05955b"
+    },
+    {
+      "path": "src/atlas-platform.ts",
+      "sha256": "b70445f36dcce260e51d1d487edb4b4efc1846386a88fc582b42dc010df8150f"
+    },
+    {
+      "path": "src/atlas-racing-ui.ts",
+      "sha256": "d334b13f48e4ad23e566899dd29e60da631c78fdbc7ad6c528b0bffc6b77d620"
+    },
+    {
+      "path": "src/evolution-challenges.ts",
+      "sha256": "7feaf26f650f00396f3a64ac7c4c1fa2a4283778f8eae6d6fd4e5ca796116fd5"
+    },
+    {
+      "path": "src/expedition-coach.ts",
+      "sha256": "c20c6be2577b064f8dbfecd04090f07adc219b056b5e02c319491ace95196fad"
+    },
+    {
+      "path": "src/expedition-daily.ts",
+      "sha256": "bb57b4c0c056b6433adeb685af9f573e04b3d525cdfbe0f20723280ff6d8dd0d"
+    },
+    {
+      "path": "src/expedition-duty-client.ts",
+      "sha256": "81850a269491c9073b583e9a3dd1785b0510c08bd1b47b8b25c58c8a666b84be"
+    },
+    {
+      "path": "src/expedition-duty-rally.ts",
+      "sha256": "a250596aee38b0ee1a18b1de89ee24866f9f2bd64f88b88b8d16beaa9a07e22b"
+    },
+    {
+      "path": "src/expedition-duty-records.ts",
+      "sha256": "b171c1042080bece6550de461fdd4e45345cd36ed15e8f651df54b3bb8d884d3"
+    },
+    {
+      "path": "src/expedition-duty-ui.ts",
+      "sha256": "571add071b717f0e1089189b8dedd6a0ceff9f4f59480481c14e2d236f6e1ba8"
+    },
+    {
+      "path": "src/expedition-duty.css",
+      "sha256": "7d1fe5121bb6f9ccbf9bf1a3a381534c36509da966db752bf90e0a234a5d743d"
+    },
+    {
+      "path": "src/expedition-hud-ui.ts",
+      "sha256": "2c621641cd6a59eb8bf8143a98d3f16a16c35702a189d63651d7546ac0415e3d"
+    },
+    {
+      "path": "src/expedition-hud.ts",
+      "sha256": "143539bbbe3f44c6c999501f203a68b17091ae243ffc2d4d2e305270a382595c"
+    },
+    {
+      "path": "src/expedition-lazy-city.ts",
+      "sha256": "77cc28ea6a631eda33e60639c65b14196b282fc567c8d1abbc0ae064ff3fb7c3"
+    },
+    {
+      "path": "src/expedition-network.ts",
+      "sha256": "d75a1ae0f9154bdb1e8559ce2a71c1942491bb57280c95655cd4d48fed05558e"
+    },
+    {
+      "path": "src/expedition-performance-ui.ts",
+      "sha256": "2f68cd2cf0754c21cb6e0aeb3e9f6719a2cb4e2f9aebec1e1cefbdbff9e2a19b"
+    },
+    {
+      "path": "src/expedition-performance.ts",
+      "sha256": "e916ac622e7837a030bf850b169e35ef0e842dab15ce19240862178ccfd965a1"
+    },
+    {
+      "path": "src/expedition-platform.css",
+      "sha256": "becf0ff561895d7d2525a522fb1e7026dbcbe81b741011f640df8355208553ef"
+    },
+    {
+      "path": "src/expedition-racing-ui.ts",
+      "sha256": "8cb4b437a6913479c40dc0df6dfb373fb1434bb6443811021b339ea63f9350cf"
+    },
+    {
+      "path": "src/expedition-social-client.ts",
+      "sha256": "cae97fd260083e91d8f767bc2114a6795376da25e0869ef820d815eb2dfd1fd3"
+    },
+    {
+      "path": "src/expedition-social-history.ts",
+      "sha256": "b9ec96a15ecb1fc37e1f48a9b2bcacbe6fe875a9cce247265818ce17e2bd7f79"
+    },
+    {
+      "path": "src/expedition-social-labels.ts",
+      "sha256": "1e3eac2ce87379401151a5bcb209d69feab184de02ad9bc2884abee8980fc4ee"
+    },
+    {
+      "path": "src/expedition-social-ui.ts",
+      "sha256": "1a052b5b7e580221bd1fa60bbcf0c435525c7821128c12ebd30626422094a8cf"
+    },
+    {
+      "path": "src/expedition-social.css",
+      "sha256": "bfbc27998cc5515547915888a06ec45965fc5184c98656e11833977feec44683"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "059b6eeeecc2185b1ada9e566cd0464409c78af476f579e2b2439ef1a6c82bf3"
+    },
+    {
+      "path": "src/multiplayer-client.ts",
+      "sha256": "3f00f83744ea57705f3adbc8192f47a5a5842b22c9b0110edcf821e31464d59c"
+    },
+    {
+      "path": "src/multiplayer-game.ts",
+      "sha256": "8891710298d1e2d88b9fdef4786852e87962d1175997d5cbab9bb924e717a000"
+    },
+    {
+      "path": "src/multiplayer-history-ui.ts",
+      "sha256": "c8ea0ba811f3f7f133bacee1306abea8a452eb58529e775e54c0437a1e26676f"
+    },
+    {
+      "path": "src/multiplayer-history.ts",
+      "sha256": "2cc779e65f8ac1e27e89d326d71fac474c13b798d342ca1e44129ce01aad38a0"
+    },
+    {
+      "path": "src/multiplayer-network.ts",
+      "sha256": "2df0ff598786657e6ab13fc1c43fc9cf0901fc9d778117833c7a647bc85996dd"
+    },
+    {
+      "path": "src/multiplayer-scene.ts",
+      "sha256": "5a926a00aa1eacad7c73aa866e705583f8f78b996248823dde86d9d5c37565c0"
+    },
+    {
+      "path": "src/multiplayer-ui.ts",
+      "sha256": "3efb02460e875ceec3cfa32b93f59f7501bbdadc48cb972e9c1fcc21d3fe3a52"
+    },
+    {
+      "path": "src/odyssey-diagnostics.ts",
+      "sha256": "8a3053824720ad8c520cace19bfdfd4968b947798e13a3ea27c0a197cf56b301"
+    },
+    {
+      "path": "src/racing-tools-ui.ts",
+      "sha256": "05781b9c8706970526ad951dc257e56e61ecbc693031b8f3d370265519c5696b"
+    },
+    {
+      "path": "src/summit-lazy-city.ts",
+      "sha256": "2c06277bc25b86faf3a3759607df25dbe02af5c23f4b9155a3075e47d7f66a49"
+    },
+    {
+      "path": "src/tt-coach.ts",
+      "sha256": "a0cc94f4e53cefe6020f8dd821a1e7286384a692faed69f1caf01a8b0def3fe5"
+    },
+    {
+      "path": "src/voyager-racing-ui.ts",
+      "sha256": "7b52da6cebfd2c1eb0042b83eed8541206abe9225e11a3581e371f89418c6b8f"
+    },
+    {
+      "path": "src/voyager-result-data.ts",
+      "sha256": "a97763e80a58aa2648c846eb0c7b6c370bad6663be70fef12693ff901dba6384"
+    },
+    {
+      "path": "tools/dev-tests/expedition-ai-calibration.mjs",
+      "sha256": "0444ce7385fc87d34d4ea6fce46aaab9da6b22844fda5b9f009dc1323b23c0a6"
+    },
+    {
+      "path": "tools/dev-tests/expedition-backup-node.mjs",
+      "sha256": "543e31c9a74f7239f19c866e4cff366e1047f252fc101f5da6350a7741353528"
+    },
+    {
+      "path": "tools/dev-tests/expedition-diagnostics-node.mjs",
+      "sha256": "8bfa3e3a986b91a635ee619e46827c6a31ff72ef0ab3204e4a7aea0e459b9be7"
+    },
+    {
+      "path": "tools/dev-tests/expedition-duty-browser.mjs",
+      "sha256": "32ab38ab6629dbea100ae85733cf0f6a17a008d3f5cf2a83dd70fd4d10978882"
+    },
+    {
+      "path": "tools/dev-tests/expedition-duty-node.mjs",
+      "sha256": "9a00631d9abf9d2dbd239b6fe6f4c3f04858acbc28015d7042e8cf13aa1c8fa3"
+    },
+    {
+      "path": "tools/dev-tests/expedition-main-restore-node.mjs",
+      "sha256": "b4c3d2566cbfd285259f5c435b012f4acd2cf77ff968551e4b56a114a7485d81"
+    },
+    {
+      "path": "tools/dev-tests/expedition-phone-test-plan.md",
+      "sha256": "c30925df5ed9993e845bb36d596865e4dfa35b0aacfe89e37949b9f8a12e6b78"
+    },
+    {
+      "path": "tools/dev-tests/expedition-platform-browser.mjs",
+      "sha256": "daca86cf134bc316f36ec3819efd495d4de9b4e70da852ac28359fac4d685e36"
+    },
+    {
+      "path": "tools/dev-tests/expedition-platform-node.mjs",
+      "sha256": "d32bf6e17f259afc0ce322972608ab2efefcc9afa6b7813b9f12e57805d31abf"
+    },
+    {
+      "path": "tools/dev-tests/expedition-racing-browser.mjs",
+      "sha256": "0052964db96e4833535c67d974b4ae43f364fc298d13c8485869e092f94bd8a6"
+    },
+    {
+      "path": "tools/dev-tests/expedition-racing-node.mjs",
+      "sha256": "065afb523e8ed7a5a742e2f6407876b6434bdd7287da72b9eee09208ec9db26b"
+    },
+    {
+      "path": "tools/dev-tests/expedition-server-node.mjs",
+      "sha256": "8de84a3b4b6482a33898566066c5e4e643f46f5d0bf0bca11d30f6c8c0e8a2ec"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-browser.mjs",
+      "sha256": "283a928203313cf05772167ceb7bbd0367990500d5f50d88de35d632bc19b97d"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-client-node.mjs",
+      "sha256": "172e7cf5e0c39786d3bb6b3bbc8f80ea6869b1de103e697f36f951bba9e9c033"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-node.mjs",
+      "sha256": "e6a73a5016fc1718144a592eaeec848769d2a28b110a0b973d5e04c715acfaba"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-collision-browser.mjs",
+      "sha256": "c8b53803e50758c1c2a33caa045709a9468c7037365f13ee72bcf69da5bad1a1"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-collision-client-regression.mjs",
+      "sha256": "d72e82bb6f0c5c8b6cfe0d72fa00351f7df9477b39f456f0a636f6a0941d2b92"
+    },
+    {
+      "path": "tools/dev-tests/odyssey-network-node.mjs",
+      "sha256": "dc28a8766ca1e141b2b5b5531cacef59d1e9c0157f89e3c70395aa3dd35964f9"
+    },
+    {
+      "path": "tools/dev-tests/pure-module-loader.mjs",
+      "sha256": "377188cea2e74edd69ec86a60d0d3bab3d6e48db793b2ced5b3c30131b7edaf2"
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "91fbcced1698b1381ba6be854c06f6ac3383c01efa029723d8364abccbe5e06b"
+    }
+  ],
+  "immutableCore": [
+    {
+      "path": "src/car.ts",
+      "sha256": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+      "matchesBaseline": true
+    },
+    {
+      "path": "src/track.ts",
+      "sha256": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+      "matchesBaseline": true
+    },
+    {
+      "path": "src/rivals.ts",
+      "sha256": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+      "matchesBaseline": true
+    },
+    {
+      "path": "src/pitlane.ts",
+      "sha256": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+      "matchesBaseline": true
+    }
+  ],
+  "sourceHandoffSha256": "d09f0075073fc92a880f9a8a1d589f7e975d9672e8f2549892df9f014abffb23",
+  "originalHandoffBytesPreserved": true,
+  "buildFiles": [
+    {
+      "path": "assets/atlas-backup-ui-BxYnxNzz.js",
+      "sha256": "4092781c29163296f0f44f8cca138b82d2511d09df92ab04fe0c9a161f47d7aa"
+    },
+    {
+      "path": "assets/atlas-coop-history-BVZUzFAb.js",
+      "sha256": "e8ad07abdccf634792735c104667410b3a21840afde411cc66fc98302def3838"
+    },
+    {
+      "path": "assets/bigmap-DsQ6Rvzo.js",
+      "sha256": "3a291b5405feddbbcc57ee8382edfed4c6ca84fe48e9b48874e87a155701173a"
+    },
+    {
+      "path": "assets/carModel-CTFE76HG.js",
+      "sha256": "d2e9b8ce137d924a74e03dc5050ffd02f9f65b96edcb511f1b0f8e7e3e7202da"
+    },
+    {
+      "path": "assets/circuit-catalog-BZccumI3.js",
+      "sha256": "88456d22c18f280f72d2d00c24f1ad1de2363a48aad996121c9cc35a07ce910e"
+    },
+    {
+      "path": "assets/city-BQFT1LjI.js",
+      "sha256": "777acd3c89711bb93e5f1858fd1abd1f4b462b0b4d7084351e481fde646ec6ca"
+    },
+    {
+      "path": "assets/city-CZ_jTYRs.js",
+      "sha256": "608138a8a9f67da00b8d6b201e52c8ef19e426f65a7be6c7ca8073783b97117f"
+    },
+    {
+      "path": "assets/citydata-cqpwMw8e.js",
+      "sha256": "e8331dfe709b2f01bd5e071acdde3434dab9cdbe37f0f9c93919264217134951"
+    },
+    {
+      "path": "assets/expedition-coach-CWZZzhDM.js",
+      "sha256": "4e397b6049083d95a382345600acb1af3d4d2fcfafa465e2941d093c7254513d"
+    },
+    {
+      "path": "assets/expedition-duty-DjVazRIu.js",
+      "sha256": "f716f56500a4064f9f482aabeb721e330bab5002c28c41237373569a2c89e725"
+    },
+    {
+      "path": "assets/expedition-duty-records-MTXocNW1.js",
+      "sha256": "64f7104035cabd9417ab1cc258b0651182985d7af3d02a2061e917d3b3d745b1"
+    },
+    {
+      "path": "assets/expedition-duty-ui-CmmtF9Im.css",
+      "sha256": "db8f1b62f0c08d0567c0db9742e154a930258a3e192adbb9d44c3b8973826814"
+    },
+    {
+      "path": "assets/expedition-duty-ui-DTiidTKm.js",
+      "sha256": "b97fc0a8e2534546f28d976b491ec33a38632f8829375800a2b539ee3d1a94d9"
+    },
+    {
+      "path": "assets/expedition-social-6TEbuWrt.js",
+      "sha256": "1be5b195ce8de26ed8939a21483d5dcaf052dd9d0bd3d9fef0591cdf481d139c"
+    },
+    {
+      "path": "assets/expedition-social-history-uxPoLLhu.js",
+      "sha256": "15d262dd90799c32f568483acd7e57c40853886fa385b4402274a8b399776e68"
+    },
+    {
+      "path": "assets/expedition-social-ui-B759SYS7.js",
+      "sha256": "03a05fba86781e8ba4bd547c516e05846b3d7699a07ccd15b68c30ecceaaabe3"
+    },
+    {
+      "path": "assets/expedition-social-ui-DHum9jPp.css",
+      "sha256": "1b9fa6d57febfc25c6c296f6d3adb5e1441a1310c92597104e99970c1d2f94ca"
+    },
+    {
+      "path": "assets/filler-Dz9fkmPM.js",
+      "sha256": "95daecb3219818e0dd9b83ed3ec8372a1dc8b020961a0f2867b40b9fbc5c3784"
+    },
+    {
+      "path": "assets/frame-pacing-BkKA_xkG.js",
+      "sha256": "2354150b72e2d59699a8b797e96c6c23d19474d5fe8682bd7ab2e40aea7adff2"
+    },
+    {
+      "path": "assets/frame-pacing-C0uDYAiN.css",
+      "sha256": "73c63612665303ba4b16b72ce15f1590349413085846130555cc4506eb0bf851"
+    },
+    {
+      "path": "assets/freecar-uJWco_0F.js",
+      "sha256": "b9960b69cdede2071a817e961a4bab8923ca3ff7e9628f02ed7b1e778f7db042"
+    },
+    {
+      "path": "assets/garage3d-BMwamkyi.js",
+      "sha256": "3d144814c3eb999612c407c241614219b2d15471170bfd5eb9f893f1e87079d3"
+    },
+    {
+      "path": "assets/graphics-CurLcFNg.js",
+      "sha256": "dbf8abae711995b9a584be3901e04a2c85eea49d251dbe8d4113bd3dea4060d7"
+    },
+    {
+      "path": "assets/horizon-appearance-bUtV_wZr.js",
+      "sha256": "ea47fab1bbaa6a9c98d565d3983ae0d7039d4520fef2cf6cb4232f2b69cd1b01"
+    },
+    {
+      "path": "assets/horizon-city-models-BPfpMREy.js",
+      "sha256": "e666ca1a56ed24ec88f739b37a90ad27cca02a554b28e23512a1d7abfd89e6c3"
+    },
+    {
+      "path": "assets/input-AeRZbtx_.js",
+      "sha256": "0772d1a57c76769c0e40a745cab8b23a1f0066d76ffe92bddecf1804adeb18b4"
+    },
+    {
+      "path": "assets/loading-DsVvM-y7.js",
+      "sha256": "d1fc9130e4363dabba50942309e76e555d8f228bb22e4746a4d20c80561f8c99"
+    },
+    {
+      "path": "assets/main-CeUdwUFa.js",
+      "sha256": "550936b113dce524e342b94613ffbd45de7cd4140180790e8c7ef1c80ca9901b"
+    },
+    {
+      "path": "assets/main-D6pyq-KR.css",
+      "sha256": "964b79801c7591bc5c44f0205750281fcc6e359f3b800b44512ef736241c6e5f"
+    },
+    {
+      "path": "assets/modulepreload-polyfill-P2Xu9kJm.js",
+      "sha256": "418c206484b89b68ef5f067277831e583fc9193a62aadf4de269acaaeb12a85f"
+    },
+    {
+      "path": "assets/multiplayer-CCNmsDKM.css",
+      "sha256": "942beb593bf9e59ba7a8c3f2b15b085a7f2416e62412df127d41473abb08fd91"
+    },
+    {
+      "path": "assets/multiplayer-collisions-BQT4PQ7K.js",
+      "sha256": "8742680ad4b3b7a9f06c3c0dede495cc1f27618f07a61e311c253cda8f9eb0b7"
+    },
+    {
+      "path": "assets/multiplayer-DfxRoQ1d.js",
+      "sha256": "1897f56d51dc567a6afda506cbac388bb7fee70c38ccb908a642a8f54bd18614"
+    },
+    {
+      "path": "assets/multiplayer-entry-DT8YVoT3.js",
+      "sha256": "f337e9a9fddb8a134df56f81393a6bcb6844b2ad98b8502ec9b56c5bb2dc844c"
+    },
+    {
+      "path": "assets/multiplayer-horizon-DMfs_Vv8.js",
+      "sha256": "d2febe372ab996108bcd36957791817cde4ef3e73b5ce7c8e6457b9c026427b1"
+    },
+    {
+      "path": "assets/multiplayer-presets-DDcBlEL5.js",
+      "sha256": "4cf842b2229d772cb3771bccb92ce8182061cfe673207789f9f29879788e4a1a"
+    },
+    {
+      "path": "assets/multiplayer-protocol-CjsJH6kG.js",
+      "sha256": "9114bcdd11dd3b99a0a3a69db1875fb7b8ea7ac61eccf0a23f47cb33f9295703"
+    },
+    {
+      "path": "assets/multiplayer-scene-Dnz3_3Z5.js",
+      "sha256": "3d3e497c81f1376ad5276dd2cbcf5679bcd51d2aeec3e163b9389d67a8c088b5"
+    },
+    {
+      "path": "assets/multiplayer-scene-EtP04jCa.js",
+      "sha256": "d6ec4b3bc4b7e33e0876c5ec774e031e85f307db58a8e82a608b0491c7d2fea3"
+    },
+    {
+      "path": "assets/multiplayer-tracks-BxKryHS3.js",
+      "sha256": "a7051a4c7beb2af7d739646053980827251acb45433051b2a7825af340d56e53"
+    },
+    {
+      "path": "assets/nexus-coop-B0PEj8aL.js",
+      "sha256": "f49363e63e28754a8f322a25f73a6bebd5d8be5291e33af4f9a17026a341917d"
+    },
+    {
+      "path": "assets/nexus-coop-client-BzqoMXUe.js",
+      "sha256": "e09604bab8d44dfff937d32ab438a4a7bedeb3c1f41a8717d627bfd007f895cd"
+    },
+    {
+      "path": "assets/nexus-coop-ui-C0BDeDaK.js",
+      "sha256": "5afca7e86852582db8010eb1f4aeb2f30369a3cfffb41fc5bc2d04084900a711"
+    },
+    {
+      "path": "assets/nexus-coop-ui-C7Y4rDQn.css",
+      "sha256": "a73b29311202f19856aa1cf4227e058bc9d734a89a2542d1d25fd520ce41cc0e"
+    },
+    {
+      "path": "assets/nexus-replay-C0rApDaE.js",
+      "sha256": "bb10e570129edad768a1900ed63dbe11a6b43a9f6d3031a829a3875ec95612f9"
+    },
+    {
+      "path": "assets/nexus-replay-ui-CzfoOVfe.js",
+      "sha256": "4eaa69e929c9492539ae16d3a6f4217b3d61cf364d8f7e675f85bcc364a10cc5"
+    },
+    {
+      "path": "assets/nexus-replay-ui-Dx9YHZQm.css",
+      "sha256": "8b7cd7e14ae6b360ef1a770b39423410364954cb711b7add1ebb6423d514f3a9"
+    },
+    {
+      "path": "assets/nexus-workshop-B2N3QKoM.js",
+      "sha256": "94e55f6711194bf4482842e773e1c8793e9557daae1dea4f977247643ebbecc3"
+    },
+    {
+      "path": "assets/nexus-workshop-iiAZbwle.js",
+      "sha256": "41cba8dad1e6d88038e36d74935c30cf157e690fe5f7a79db1bda15e1b00ba2f"
+    },
+    {
+      "path": "assets/nexus-workshop-ui-BldWSXu1.js",
+      "sha256": "2d1245d0cbe47966c3bf22e389f0da6376ce03b1ed5df22b7985ce8d0fdefa44"
+    },
+    {
+      "path": "assets/nexus-workshop-ui-POJstq1y.css",
+      "sha256": "3904dacf4c1f24a7aa000f1c21c3c5af388c043972ba10d23c1e054756ad539e"
+    },
+    {
+      "path": "assets/odyssey-diagnostics-CL2mAhmm.css",
+      "sha256": "871eb7b60b1f6f7dc01b16780c16ccfe74520fa8c65b2990b434abcecef2bcff"
+    },
+    {
+      "path": "assets/odyssey-diagnostics-DVr26oHs.js",
+      "sha256": "bcc2d4ff6f02f93bf247a2c8cbd9176752772dda84cceafcd3dad72788ed894a"
+    },
+    {
+      "path": "assets/odyssey-pad-settings-mZ_UmfOt.js",
+      "sha256": "e2106901a5b7f9ecb762af1aacfe02f5cf6d7d07fbbc7b2b47a4bdb42dc3c0c2"
+    },
+    {
+      "path": "assets/odyssey-workshop-C1dDypqN.css",
+      "sha256": "29e16551e76ef876f8c20abbdd703905fd773c56d86ddf088074fc6781b2fb3b"
+    },
+    {
+      "path": "assets/preload-helper-BZ1Pz5am.js",
+      "sha256": "8820987e6a8afb54d776f21e305917e1ecf83cef678b4db38c2e5a405d04a8bf"
+    },
+    {
+      "path": "assets/race-state-wvVf6fLg.js",
+      "sha256": "26cd3556313a1181e9b69a88ffdffc9be1bb051da03c10896ca0e792bbf66397"
+    },
+    {
+      "path": "assets/router-GNcMfhGZ.js",
+      "sha256": "40193cf8811b2dbd218be6977877115d9b7eb411b94ee59c416dd6a10f82f1cb"
+    },
+    {
+      "path": "assets/splitscreen-CU_kKLAU.css",
+      "sha256": "ee5703462d39f5e4534038fdf432bd503fc4dbdf187ef533c4bf6caeaef56c8f"
+    },
+    {
+      "path": "assets/splitscreen-t6cH-d3k.js",
+      "sha256": "a4d697090736b585b15ba6fded8a770627c12ef766cbc2917f5651de9bbf151c"
+    },
+    {
+      "path": "assets/summit-city-duty-QSWbdWd_.js",
+      "sha256": "265a1a1bc6d6763b47718cae62e264b11da69bf3e074a174db2d6b85b1b82105"
+    },
+    {
+      "path": "assets/summit-duty-vehicle-CxyL2ZpG.js",
+      "sha256": "032a227a2cf124939554c258e114ac63ed0479f57b0b987570ae4dc5bfb5022b"
+    },
+    {
+      "path": "assets/summit-racing-qVg_snDM.js",
+      "sha256": "3d66435766c15149eedfbe39857d9be6eaf98f768641ec0e50b8093efa84fb81"
+    },
+    {
+      "path": "assets/summit-replay-bookmarks-BV8l7_Da.js",
+      "sha256": "88617bef7ccb0acf065b187302b3c472507bdc5b632b0e321315ae99dccea45c"
+    },
+    {
+      "path": "assets/surface-CNjeF9L-.js",
+      "sha256": "57bca3e7a739dca9ae526c093090d1e7fcb3010202e764c6082255220844c6f1"
+    },
+    {
+      "path": "assets/three.core-BErde6Mx.js",
+      "sha256": "4ffb46a75a2e6d0aff5af3d5753e60cbb24cf33aeab6357de1dc84e3206ace92"
+    },
+    {
+      "path": "assets/three.module-DHxKBGpz.js",
+      "sha256": "c4cac229f936179ae8ea888e5257a9732694d4b1047cf0f1f46d96368597c45d"
+    },
+    {
+      "path": "assets/tileworker-zsgvDVqc.js",
+      "sha256": "d233eb295d91f48d9687cbea2487fb2d32c030745d2c16563f9077e2be54c7d9"
+    },
+    {
+      "path": "assets/vehicles-Bvu0RBqv.js",
+      "sha256": "888a548115d31dc8bc2cd6a3a42b658dcfaeb3d8ebcfd17b66a9fd038a1c8ea0"
+    },
+    {
+      "path": "assets/voyager-comfort-EkAiwtsz.js",
+      "sha256": "0882db9d8ab1b7ca01a19b6b7d486d2fb8ef759ae73fd041f92e130dae19b8ee"
+    },
+    {
+      "path": "assets/voyager-photo-4NYG8xJ6.js",
+      "sha256": "46d0c76485171cbda2646e88d72028493c2fcd0091482bcff15b15c289a4a2b6"
+    },
+    {
+      "path": "assets/voyager-workshop-ghost-CbMU4dEz.js",
+      "sha256": "c66df612002c0922c610d5a62de0778d8e69cb55cdedbfa91075e662d5e77dd5"
+    },
+    {
+      "path": "assets/weather-Z5Wck6r9.js",
+      "sha256": "102c7032dd4b846fe7af965354c693394d14bcb69dbd886563b6a92f15e43c93"
+    },
+    {
+      "path": "data/circuits/abudhabi.json",
+      "sha256": "89f238ffeb513140073502291f9fbcdfc9aa3ced6189a58141aaef4c383b5885"
+    },
+    {
+      "path": "data/circuits/australia.json",
+      "sha256": "4b2e78aeccc71004ea50e52e915f943d55784a47adbc84bad24ac632ae5fcb31"
+    },
+    {
+      "path": "data/circuits/austria.json",
+      "sha256": "560c532f3400a6473170976e853bec67def5c6ce7d6e0ba434ddbddb5704c787"
+    },
+    {
+      "path": "data/circuits/azerbaijan.json",
+      "sha256": "3ad6c07952d31e5edbb59cec00882d2894fadf8f4f7cc9b5563e54d520c45a0b"
+    },
+    {
+      "path": "data/circuits/barcelona.json",
+      "sha256": "50726f3ef12db7e58e202d404f0ddba485e0ef5b4c75e1325925d14ae0c09779"
+    },
+    {
+      "path": "data/circuits/belgium.json",
+      "sha256": "887512926a6066c1617a99974d343a65762e16eaaf0812b10c0c7ead2ad1de95"
+    },
+    {
+      "path": "data/circuits/brazil.json",
+      "sha256": "aa2b416590c387a5caf6f788b6a26b6cde766350cf6906ac394e06886302a4e3"
+    },
+    {
+      "path": "data/circuits/britain.json",
+      "sha256": "346eb8624d2567b93b4c6552c9bb42a688b4bda2be535e11132f22042473918f"
+    },
+    {
+      "path": "data/circuits/canada.json",
+      "sha256": "9c6e99ec8acf619cb56308917522f6583fe49ad27d25ed711e4b3360cdc36545"
+    },
+    {
+      "path": "data/circuits/china.json",
+      "sha256": "b3408ca779b09cb26ab9b93dce404e6b9cb1c4f33dbfb0d6fcd107b7a60be6c7"
+    },
+    {
+      "path": "data/circuits/hungary.json",
+      "sha256": "035ec93fde8784eb2e0cae8653e8d54c74b59b8dd72d3fd304ceb134d15f3dbf"
+    },
+    {
+      "path": "data/circuits/italy.json",
+      "sha256": "f3b009f27f01d713c60ed2582d810621063c2509655800ddd29dbff6edc8ce4d"
+    },
+    {
+      "path": "data/circuits/japan.json",
+      "sha256": "fc9276fcb5f21f55aa7413b587df37ff11097713e667ccc52bc56debc3f5b36b"
+    },
+    {
+      "path": "data/circuits/lasvegas.json",
+      "sha256": "72abd969e732a5d8360c9d4c61723e012ea7e63742bd669ab35ffa67c1cc2abd"
+    },
+    {
+      "path": "data/circuits/madrid.json",
+      "sha256": "6b6827f84958a0b05c0d794654ea9396bb136be52eff528639451d457d724f02"
+    },
+    {
+      "path": "data/circuits/malaysia.json",
+      "sha256": "4fbfcfa444095cf7bd6bbdfda9afbffa608e33242ce6795984d29cb32da17a43"
+    },
+    {
+      "path": "data/circuits/mexico.json",
+      "sha256": "d87451ff78709c827186511b93b79ffcf6e5dabe3a38a2772505b2433d7337ce"
+    },
+    {
+      "path": "data/circuits/miami.json",
+      "sha256": "1bf4ef2fac6cb2ec9ac974069479e422168af2415684a485e86eba633ad203b9"
+    },
+    {
+      "path": "data/circuits/monaco.json",
+      "sha256": "af820fe429d938752d356b27f50f81ee8c95b0c64af2763fb5b1d20f0b69aae8"
+    },
+    {
+      "path": "data/circuits/netherlands.json",
+      "sha256": "c3dd48a284a77415cfb8633ddc9cace9b7f4fe09ad424378debc12c69db215ea"
+    },
+    {
+      "path": "data/circuits/outlines.json",
+      "sha256": "a8d88923838437e1005fd9e28cf8d1ce88f8ff3e30f2e814b3a3bff59a140196"
+    },
+    {
+      "path": "data/circuits/qatar.json",
+      "sha256": "1df63b97ac96b3b25776a4b8704b4f311e18873ca9dcbc3a867117355ed496dc"
+    },
+    {
+      "path": "data/circuits/singapore.json",
+      "sha256": "09874fc8442398fb4e8be8efb07f8dca550439d05d69981149f538bf4ea06a41"
+    },
+    {
+      "path": "data/circuits/usa.json",
+      "sha256": "99b70dc754fb0dfb702699c8152b44a3b2d02135c4a4bbd438c101427cbbed92"
+    },
+    {
+      "path": "data/city.json",
+      "sha256": "6b6a8ef56dc7fc9a2d03e56696212c46f55781320c24da45130d03a392b7a1bc"
+    },
+    {
+      "path": "data/offline-packs.json",
+      "sha256": "d9cbfe0081eefb955dcb289148f166443df0b2e24b81b51d25e9a29d8cc90de1"
+    },
+    {
+      "path": "data/offline-tiles.json",
+      "sha256": "652dbc5db9b45fc23871c0866db77a84b777d4ffec8105d798e8fb4c31c86f8f"
+    },
+    {
+      "path": "data/tiles/-1_-1.json",
+      "sha256": "d9095a7245fee0de542049485e9eff23373a6ddc2a8aeccaafc924c3936a35a6"
+    },
+    {
+      "path": "data/tiles/-1_-2.json",
+      "sha256": "29decbe23d1aad8514dbc6e07445f534bc3da0de690b7abfc2370c31779d23d9"
+    },
+    {
+      "path": "data/tiles/-1_-3.json",
+      "sha256": "5fa060ba9601e70e65c977d5186f4b1f4e26577278cebe6b0dfa7550378a2974"
+    },
+    {
+      "path": "data/tiles/-1_-4.json",
+      "sha256": "4ec22f895eaae4ff493a0c4a3589c6006c70d100a8a934fb3202b613491f3d5b"
+    },
+    {
+      "path": "data/tiles/-1_-5.json",
+      "sha256": "c3d37000c3655fbb96dc3f6a9fd765f3d732bd9b3da6190fc466f94dafac0331"
+    },
+    {
+      "path": "data/tiles/-1_-6.json",
+      "sha256": "2ef73681a23c4187d15a6c729c74e1fe378941936df60f309f3a4b25e15bce61"
+    },
+    {
+      "path": "data/tiles/-1_0.json",
+      "sha256": "ffa3755a9b9dc8c028532bb4a1269f7535086f082d7e5fc1db746d942c96e541"
+    },
+    {
+      "path": "data/tiles/-1_1.json",
+      "sha256": "80a9186759361503951519da0d89774b8e3349d094274b847d04ee577209e191"
+    },
+    {
+      "path": "data/tiles/-1_2.json",
+      "sha256": "95970d2e1ce1698ef330f8b104103fef4aa725b5f347e41b759374c20a93ef4f"
+    },
+    {
+      "path": "data/tiles/-1_3.json",
+      "sha256": "6e4c1fe2ec5b4a73617243cc81e501d0eff069e22a0e4d58023851d0cda89191"
+    },
+    {
+      "path": "data/tiles/-10_-1.json",
+      "sha256": "00c76c0ef04a4d1a8d73c85413b62b5bd16da8f2daa73ab476450fa2301a3e4f"
+    },
+    {
+      "path": "data/tiles/-10_-10.json",
+      "sha256": "a66b124c176a6b963c93d6b8c0b312a070bd0cd51cc1065a3e7a27746595df6a"
+    },
+    {
+      "path": "data/tiles/-10_-2.json",
+      "sha256": "db42e5952ec421a7853b18190bb9765cb85d79da4f32306a7c16befa32db4649"
+    },
+    {
+      "path": "data/tiles/-10_-3.json",
+      "sha256": "d0bd565e692454c8d120d7030edac5fc21f4e3d39656f3c8839efe070720487e"
+    },
+    {
+      "path": "data/tiles/-10_-4.json",
+      "sha256": "68dd35b623cfd3866d0b2ccbf4123f40b522f89324f05941c43ccc5f76717fa5"
+    },
+    {
+      "path": "data/tiles/-10_-5.json",
+      "sha256": "ebbdc27bd2a4c622b215a3bea3821261d2ae8e96672a52fefa20d3a9ed13d6cf"
+    },
+    {
+      "path": "data/tiles/-10_-6.json",
+      "sha256": "b3feb41024fc5062d1348d730c314341480b8ab1962a6d46b316521ec04416a5"
+    },
+    {
+      "path": "data/tiles/-10_-7.json",
+      "sha256": "37d8592ec972f9f36c8bf1e2a97f1df1fac224119fd0e3050a5dd33cd1156c8f"
+    },
+    {
+      "path": "data/tiles/-10_-8.json",
+      "sha256": "e74355a254f63ecc0432258141f2f21fc28ea4cf37127762bfc5b0a20a293922"
+    },
+    {
+      "path": "data/tiles/-10_-9.json",
+      "sha256": "abc7d25028d2b779e2ccbd78040625e725bd2d8920a609a904e8686e95d8b3e8"
+    },
+    {
+      "path": "data/tiles/-10_0.json",
+      "sha256": "2db16953cfe48d6d9c536b5aa086cdaf0534d54d1dc6d616a6400d531b04891c"
+    },
+    {
+      "path": "data/tiles/-10_1.json",
+      "sha256": "3ca2721d90c0150c108ec65e3d261b7ca596d2fa670de0e7714f5402dea6c677"
+    },
+    {
+      "path": "data/tiles/-10_2.json",
+      "sha256": "be291578ef8534b7fb39efa15e19d5433e0277dd347e727b76529f3051e98e78"
+    },
+    {
+      "path": "data/tiles/-10_3.json",
+      "sha256": "8e21b09d97f7239ce011a08fb46f82cf0664de12a5d2c19ec0370b71ca0e93e7"
+    },
+    {
+      "path": "data/tiles/-10_4.json",
+      "sha256": "297998f2cf2c2e45c4faac9d69743873e19495c70e3f39874fef54f0e6223126"
+    },
+    {
+      "path": "data/tiles/-11_-1.json",
+      "sha256": "f70d7295d352d457d149a036715e94cb4614c5cc75833c8ab765288d9d051094"
+    },
+    {
+      "path": "data/tiles/-11_-10.json",
+      "sha256": "365e7a5cd96c4c781691978a26ac2a27d60af5967eda38534d5f3f9dd1094dee"
+    },
+    {
+      "path": "data/tiles/-11_-11.json",
+      "sha256": "8ba383dbc586909cac622e43f8315908c87e1a0c86c8106801e30025e7b7b94f"
+    },
+    {
+      "path": "data/tiles/-11_-2.json",
+      "sha256": "0f1a50e9748d420f14ead5181d5e490702486c55486b7a90963fa56f5f233c06"
+    },
+    {
+      "path": "data/tiles/-11_-3.json",
+      "sha256": "e4cde780f1bfb7b833f545750be4dc6b6a3eeff130bac874601b81d1f9a9bcd8"
+    },
+    {
+      "path": "data/tiles/-11_-4.json",
+      "sha256": "40be7528693ebfbeefaa9666db37c0ec7ca645bcc490ecce01ee1488dbe89fb0"
+    },
+    {
+      "path": "data/tiles/-11_-5.json",
+      "sha256": "314db80e1d532c9deb16421cbc2a6ba04dfe64a569fb363981095d7c3cd53dec"
+    },
+    {
+      "path": "data/tiles/-11_-6.json",
+      "sha256": "913eeac6d74e6ce68971b230b7c85388324eb2c5fd3d31decf2a21e33236ca0b"
+    },
+    {
+      "path": "data/tiles/-11_0.json",
+      "sha256": "8d0ec6682478282759f1b8a6969d42a8cbbdb7c2b079732c5380ba5c83b36f5c"
+    },
+    {
+      "path": "data/tiles/-11_1.json",
+      "sha256": "cba2947b61a81af8920a1b68f8718ba1fd48f8163687cb6bd29f8ec89735da47"
+    },
+    {
+      "path": "data/tiles/-11_2.json",
+      "sha256": "5f02a16cc79901a9376b8608693d2410b909e22a52818c30d746dc21899f0d62"
+    },
+    {
+      "path": "data/tiles/-11_3.json",
+      "sha256": "495633f95f3127a08fd7bce47fe70bdfc338bdd8e9cbc99ec00c352b0979e3e1"
+    },
+    {
+      "path": "data/tiles/-11_4.json",
+      "sha256": "5dde10e6db6705deaa404d4f06edfa3d0141adc459eb37cd095da8aff8d23a11"
+    },
+    {
+      "path": "data/tiles/-11_5.json",
+      "sha256": "a95de5bb86edb282646b77cd162e3afdca3f5c8eace9ba9ff97f9949a63a9d3c"
+    },
+    {
+      "path": "data/tiles/-12_-11.json",
+      "sha256": "5d212abd9fcdef349340e51686cebe0474c20e9bda42a1f9765ff7ea85e17c5c"
+    },
+    {
+      "path": "data/tiles/-12_-4.json",
+      "sha256": "8f88ad8fef563c3b71c7dcb8dbeef75d2049d4d8b60f12b0391732080139b479"
+    },
+    {
+      "path": "data/tiles/-12_0.json",
+      "sha256": "abaefc9c6568e9698e116d5f4d42a5e011c507a2aa7caba4b75e8033ae771280"
+    },
+    {
+      "path": "data/tiles/-12_1.json",
+      "sha256": "d93bf5a60dff29ee66dde404480969f72e86ff41d6a96d2767adbeead77b2ff4"
+    },
+    {
+      "path": "data/tiles/-2_-1.json",
+      "sha256": "01665821ff05ed0d8f2f93fa4cafd80cbdd9b448b1f056f3ecd4ad5485da8cd5"
+    },
+    {
+      "path": "data/tiles/-2_-2.json",
+      "sha256": "8527ad066de0ae39c70b8d077fd8e12da05a141fd5c59b3ae9dc669ad59eeb0f"
+    },
+    {
+      "path": "data/tiles/-2_-3.json",
+      "sha256": "0d2f7941ee6a722a2d60ad129b89a53d2de87bc2ccf5a488223c18906aceb2e3"
+    },
+    {
+      "path": "data/tiles/-2_-4.json",
+      "sha256": "f8f9e54282432150fe00a6d4f05a4aec1c5ce42213bd2ee83a12aaa73d65b699"
+    },
+    {
+      "path": "data/tiles/-2_-5.json",
+      "sha256": "5344051776aff8e7e90004be297cba5c3fce01b8f902f910d4542b83343a453a"
+    },
+    {
+      "path": "data/tiles/-2_0.json",
+      "sha256": "4561c7c0c406eadae46ebc224de312d8f7775cdec2777948c9d90e70df44b435"
+    },
+    {
+      "path": "data/tiles/-2_1.json",
+      "sha256": "1245a34848e387e8185c98d414857606e80f9ba2116f8848a1d13432bc7074e9"
+    },
+    {
+      "path": "data/tiles/-2_2.json",
+      "sha256": "2be19a96501ac0eb42e5db6c0089c7fb76887ce84f9d08e011175399d1a3d9cf"
+    },
+    {
+      "path": "data/tiles/-2_3.json",
+      "sha256": "c960d15f2d3ff6b698cd9ec137ee4f77bd730ef91d82612b006d41e4518df1b4"
+    },
+    {
+      "path": "data/tiles/-3_-1.json",
+      "sha256": "5d1155f5c77a8c7d5eb82282cf5eb84fcbe89a7b224af232e49a3cdd93196ae6"
+    },
+    {
+      "path": "data/tiles/-3_-2.json",
+      "sha256": "4d80b76720a12ffefdbe3e50e45227327ef1799987de395f344db0976ca6407f"
+    },
+    {
+      "path": "data/tiles/-3_-3.json",
+      "sha256": "10b5369c09422e8a2bf863140f8fbcb035f5f86deba1ea03f2e738c80d776cbc"
+    },
+    {
+      "path": "data/tiles/-3_-4.json",
+      "sha256": "3e5d087ae3b09dcb3f40fc5d04cca37ca157df690ca0750afe4e2adfb0ef5c26"
+    },
+    {
+      "path": "data/tiles/-3_-5.json",
+      "sha256": "683419275b60e0563be2790d10ea3faf023430c81567d188ba380a4bc4ed50df"
+    },
+    {
+      "path": "data/tiles/-3_-6.json",
+      "sha256": "ea8b50bcf4ee43b80d4941218674f863388f3f40f89a675b6f51f22a7b69ca3d"
+    },
+    {
+      "path": "data/tiles/-3_0.json",
+      "sha256": "50e22dd46932fe484837c67bca012a71e18de02b88bc2b7aca274f187552c8c2"
+    },
+    {
+      "path": "data/tiles/-3_1.json",
+      "sha256": "dc9fcf186f1ab6203c1f36ecd1554d7a6cdbf9db5a8bb834cb89aad2817b665f"
+    },
+    {
+      "path": "data/tiles/-3_2.json",
+      "sha256": "20cfdedd6925a0b80924318a8a6b95440b94489daf1aabbc77fa44437260dbdf"
+    },
+    {
+      "path": "data/tiles/-3_3.json",
+      "sha256": "ddac3f88915cc23ae628169f2fd49d645a5efbb695ef4c1c567f84e7df006933"
+    },
+    {
+      "path": "data/tiles/-4_-1.json",
+      "sha256": "060f3ee698994febb981a558797f7fb1ce4b07d94f2e27ffa794fbb91014d05c"
+    },
+    {
+      "path": "data/tiles/-4_-2.json",
+      "sha256": "ac9d6658fdc674ac2522a211a365878c7832420fc444cd3256cc644c743c04d9"
+    },
+    {
+      "path": "data/tiles/-4_-3.json",
+      "sha256": "9a1358f6fd299241e0982766be68ca117f3eab43bf37595e5f199a4f3940d5e6"
+    },
+    {
+      "path": "data/tiles/-4_-4.json",
+      "sha256": "a67e5e9e56418723e7666b9ff00417a996c8dd92ad90cb9369032e34d0eb0b9f"
+    },
+    {
+      "path": "data/tiles/-4_-5.json",
+      "sha256": "0dade663f17c34b28dbcf1a5bb01ba190d4f99d72df99c600b2933f50ae60e42"
+    },
+    {
+      "path": "data/tiles/-4_-6.json",
+      "sha256": "115175ae56309986997711e3e8976648fde0a00b18a1050a80b67e07a73856ad"
+    },
+    {
+      "path": "data/tiles/-4_0.json",
+      "sha256": "6167f0441aff5997f370b108f7cdd73a87aa875dfc7a4b8d0adc6cfae4bf8eab"
+    },
+    {
+      "path": "data/tiles/-4_1.json",
+      "sha256": "9ddc4f48dc35081f1769990cc76e976727ee42d2f78c8cda33f756225c782e19"
+    },
+    {
+      "path": "data/tiles/-4_2.json",
+      "sha256": "80c1d1fe0ed554629101557652df92df2b028600899141359f93c1a10db78711"
+    },
+    {
+      "path": "data/tiles/-4_3.json",
+      "sha256": "b64c9098ca16aaf8840cbf33932f7abb33d9278e730f11b98daa1a2516fe5814"
+    },
+    {
+      "path": "data/tiles/-5_-1.json",
+      "sha256": "04d3733542c57fe6bc61f3dbef94f55cd68fdb06fbe1fde03ff898995826accd"
+    },
+    {
+      "path": "data/tiles/-5_-2.json",
+      "sha256": "4b7d47232a2e585f99fec14aa752a99f02a73f3ea35a09a59e49da893d116769"
+    },
+    {
+      "path": "data/tiles/-5_-3.json",
+      "sha256": "0ad551c7419186d8a1a62e49f212e028a835e2f34c73a51b74adbdab26f1aee6"
+    },
+    {
+      "path": "data/tiles/-5_-4.json",
+      "sha256": "6528067330063bb0c31af0737034c644cad421956ed8f0111938c3d97da14005"
+    },
+    {
+      "path": "data/tiles/-5_-5.json",
+      "sha256": "f8c65f832aef7744385c0ce9029ea4f325e02b4079f18bd08ae0ffce62a17aeb"
+    },
+    {
+      "path": "data/tiles/-5_-6.json",
+      "sha256": "c18af443fc771c6bed3ec14a3c68a30e7a8f1355f38537cc23df4322d70ecca5"
+    },
+    {
+      "path": "data/tiles/-5_0.json",
+      "sha256": "abba327f9c1fe84e5cb5b8b78558b49547e1fa71a3d98840478bde595806963e"
+    },
+    {
+      "path": "data/tiles/-5_1.json",
+      "sha256": "ceb69a87230bebd4ad831fcacd0898086c759cd66268332b755f5c4502207e85"
+    },
+    {
+      "path": "data/tiles/-5_2.json",
+      "sha256": "dd85785ca3503446b38822d10272da2df89a3cb8929b44a839a3c47e074d14fd"
+    },
+    {
+      "path": "data/tiles/-5_3.json",
+      "sha256": "66dbc98188d3cfcc81151ea07725647bf59dda397ea4d4df1300c29492fd9bfe"
+    },
+    {
+      "path": "data/tiles/-6_-1.json",
+      "sha256": "d0b91a2947d7796cf798c691f2bcce1ad51b4c4c77609afd1e5b8e18a1e3848b"
+    },
+    {
+      "path": "data/tiles/-6_-2.json",
+      "sha256": "14d64711c60d84f8fa86d2e55f1a2a615fa6a2c272f99b9f6a4aa2809fe7e369"
+    },
+    {
+      "path": "data/tiles/-6_-3.json",
+      "sha256": "f17225e7cf7609918005426e361072e01317e05e0ab240f4b98d64cf73766fc0"
+    },
+    {
+      "path": "data/tiles/-6_-4.json",
+      "sha256": "bffce3568ce85cf781a672cde885f1164e73c67bc122c6f35665ee373cce0f9d"
+    },
+    {
+      "path": "data/tiles/-6_-5.json",
+      "sha256": "203e0cc3cc58927d97816b3a0c486684d949210e0677efe624993ea72aec45a0"
+    },
+    {
+      "path": "data/tiles/-6_-6.json",
+      "sha256": "b5cb6e71d9bd62f99b7d22c437b909c812e36346a772c3a9c9cd166f6b809c37"
+    },
+    {
+      "path": "data/tiles/-6_0.json",
+      "sha256": "502f2718be68f6eab8a573b69a2f16fd2c61867c3b276a1a85a6cac8db8c5d3a"
+    },
+    {
+      "path": "data/tiles/-6_1.json",
+      "sha256": "960b9fbe0053685165d8e5ae4323225b196af72bdcfe009c0b8aebbc366ee705"
+    },
+    {
+      "path": "data/tiles/-6_2.json",
+      "sha256": "1dc2af6fa1e0f8cbe92ae5ef7f9d8400cefe4e2ff4ed524ea93f37dbb9d033c2"
+    },
+    {
+      "path": "data/tiles/-6_3.json",
+      "sha256": "1c2ba6356d2bb795f95cf1c8fbba739a6e6066bb7988743313f6808c6f8e50b9"
+    },
+    {
+      "path": "data/tiles/-6_4.json",
+      "sha256": "435f235e2225c7c4790c99001ef366d1f36dacf7391c58b4b3fd217e4d15ec0f"
+    },
+    {
+      "path": "data/tiles/-7_-1.json",
+      "sha256": "ef8eacbaa7d539244325b3e51c891c0ede02a7992cb19e9464c062d01beb81c5"
+    },
+    {
+      "path": "data/tiles/-7_-2.json",
+      "sha256": "9096de7802fe26a604930f1a4379f995f56e61af78e4f66b8ad90e7e0c742daf"
+    },
+    {
+      "path": "data/tiles/-7_-3.json",
+      "sha256": "09e23b91604de05be41d87ea737cd0ca6b0f7119eb02913e314aba393095103b"
+    },
+    {
+      "path": "data/tiles/-7_-4.json",
+      "sha256": "0e5179db7ff9e3fc297556792ad8d63decfcec0c5d5ab39cf8ac8c5961d15839"
+    },
+    {
+      "path": "data/tiles/-7_-5.json",
+      "sha256": "4c22bca5229c6e5e9a605e57a5f18a73f7e1840baed66d1cd51ae0fafc95947f"
+    },
+    {
+      "path": "data/tiles/-7_-6.json",
+      "sha256": "462c73a275b915eb167b086f93b9634c74a09463e310f7834727ea5ccbd80e7d"
+    },
+    {
+      "path": "data/tiles/-7_0.json",
+      "sha256": "74fd9970e0328dd01013e87ad43e6af1e4affc72d559d6553d88179ca07f722a"
+    },
+    {
+      "path": "data/tiles/-7_1.json",
+      "sha256": "791ae328668800e952d85e7275fa3ab98e57042e260d897d82ee70055830d9f5"
+    },
+    {
+      "path": "data/tiles/-7_2.json",
+      "sha256": "fde8cadc1098f76dadad48b5bf11a5e267aaac5eac7ce2228e53fbcf5c519c4a"
+    },
+    {
+      "path": "data/tiles/-7_3.json",
+      "sha256": "8a90b69550db3f35d29f326af731c2cf46e54b6d0972aabba3b1f4d20edc0f13"
+    },
+    {
+      "path": "data/tiles/-7_4.json",
+      "sha256": "51f77dfe992270968c58922682993bdbfa3e0366655bc8dc2d8ce704ed3a3948"
+    },
+    {
+      "path": "data/tiles/-7_5.json",
+      "sha256": "4186a41f96511e5e429aca6729904f01011ce09de2780e2b92465f80988679fb"
+    },
+    {
+      "path": "data/tiles/-8_-1.json",
+      "sha256": "54c230295dd6346a65694df543e8da441368290b0c2e5ffd5d76a8b3b6eaf21b"
+    },
+    {
+      "path": "data/tiles/-8_-2.json",
+      "sha256": "4378b3d255d9c26eab0a57ab4107427de025cb61f3079466d3bf6387d1cf3386"
+    },
+    {
+      "path": "data/tiles/-8_-3.json",
+      "sha256": "3a0397188233652ab49183b144bdfa3d6a90112cea184fb0f687b8c9bc8e32e5"
+    },
+    {
+      "path": "data/tiles/-8_-4.json",
+      "sha256": "99716614c1ef97cfb35ac2858637a13a31902d87c521553e29faf33ccb9b43d0"
+    },
+    {
+      "path": "data/tiles/-8_-5.json",
+      "sha256": "6e46f3180bf30f04eaa6bf21f456bf1d1acb53f3ca9d8e153b6e91d61fe00cfd"
+    },
+    {
+      "path": "data/tiles/-8_-6.json",
+      "sha256": "9ef64bfceb421a45255dad2115c8474a0a2e7dd08df4611d868f910247224a1d"
+    },
+    {
+      "path": "data/tiles/-8_0.json",
+      "sha256": "ab68aec1c67a6a2581749b88f5ea84bbeda9c6f25b19c39c525f0e9dcf269835"
+    },
+    {
+      "path": "data/tiles/-8_1.json",
+      "sha256": "2de5826e25849ca4b3d236f336c2110c93b96daf2bd335cd56a6bfee943a0427"
+    },
+    {
+      "path": "data/tiles/-8_2.json",
+      "sha256": "706c6d73471c3e52cc95529ea26717f39bd4bf8b4aa8eaa34acee657244a10f9"
+    },
+    {
+      "path": "data/tiles/-8_3.json",
+      "sha256": "8897abd4d9c16bb8ac998b4ea251b89dbe3420ca92f02a9fa7f19286a1fe012a"
+    },
+    {
+      "path": "data/tiles/-9_-1.json",
+      "sha256": "d29d4b7c1f48eeac983c496b954c356fcde998726f0980762e2d436538abc9a0"
+    },
+    {
+      "path": "data/tiles/-9_-2.json",
+      "sha256": "6045fea2f06d379b0c2b62060f1d5f2904d8256b0af260aa85dd674075abc42f"
+    },
+    {
+      "path": "data/tiles/-9_-3.json",
+      "sha256": "e7723d315188da94eff5c858648379920d7f9ea86d4feb590e1de3a770494145"
+    },
+    {
+      "path": "data/tiles/-9_-4.json",
+      "sha256": "9c21aae557835a7318c2cce8afe8b5993b430c911a5c706c86c8ca1a72bc2707"
+    },
+    {
+      "path": "data/tiles/-9_-5.json",
+      "sha256": "819f42dde72438099d8e3aa9ed6824a22c47f7f01815ee7156523f0a1757e481"
+    },
+    {
+      "path": "data/tiles/-9_-6.json",
+      "sha256": "0382241b7b13bd2583c88074a75689db3eebf141b3d7e71aab085ce869ccf8a6"
+    },
+    {
+      "path": "data/tiles/-9_-7.json",
+      "sha256": "9698b2efb87b2e5676c68afcdeea0c828dc12359444a46a8a3e4b0872246fa2f"
+    },
+    {
+      "path": "data/tiles/-9_-8.json",
+      "sha256": "a9045f862a62aae3ca43407766bc26ef085e69f222b759414f813476289e162d"
+    },
+    {
+      "path": "data/tiles/-9_0.json",
+      "sha256": "a95c2eba0d061a488ace208300016a54b8eb27feff067b6c7e662ea3753b6d28"
+    },
+    {
+      "path": "data/tiles/-9_1.json",
+      "sha256": "09d0f85b91fa81c35df3314f4fad40a4fb4d70fcf7345da98de1fb159ae37eee"
+    },
+    {
+      "path": "data/tiles/-9_2.json",
+      "sha256": "70053c09ff4a9e5f58056eb5833d80b9238bdcb2a13f162858275d456bb93345"
+    },
+    {
+      "path": "data/tiles/-9_3.json",
+      "sha256": "4dc330e9133b7ba4ad6a837c350e810adf4a75d18b0f9706e8020abaef66e2f2"
+    },
+    {
+      "path": "data/tiles/0_-1.json",
+      "sha256": "9f46ee7d3375370a6f7ae3373a2d9a9437591adee10c1dd4a9a5ad951520163d"
+    },
+    {
+      "path": "data/tiles/0_-2.json",
+      "sha256": "0d89bd257cb53c6083f3c78cf24d9f6dda42e004471a3080c13334e3cc9964b4"
+    },
+    {
+      "path": "data/tiles/0_-3.json",
+      "sha256": "d172755ebd660a207f9b120bb861938dcb20d20834aa47dbfe350aa1fb88f60e"
+    },
+    {
+      "path": "data/tiles/0_-4.json",
+      "sha256": "8b9c1403f301b9160d37000dc0cc723608cfedaa2085ce8bb3eaff6ea0fcf273"
+    },
+    {
+      "path": "data/tiles/0_-5.json",
+      "sha256": "7c1784a9ae9ae39ff7ecba5209bd83a155ba83523e8c5487ed1fb4eef7451eed"
+    },
+    {
+      "path": "data/tiles/0_-6.json",
+      "sha256": "986e2998fb35cf96fdfcb437a672a5bdb027e5b3e2341520814c2a3e8ba3dbdb"
+    },
+    {
+      "path": "data/tiles/0_0.json",
+      "sha256": "feca1652c4e587f6b73254b5036282971306d57f9e6d690761269c874ef85087"
+    },
+    {
+      "path": "data/tiles/0_1.json",
+      "sha256": "8b769a4219a8b072b7e6018a3ca81a58a019e61c07c6d0aae587eafce77a5dbe"
+    },
+    {
+      "path": "data/tiles/0_2.json",
+      "sha256": "17d2224c7b17d7e08201334fd24ca9c37978a1ecbb15bb29d4b3b9bccefca84c"
+    },
+    {
+      "path": "data/tiles/0_3.json",
+      "sha256": "003be0c599ac04b1973a01ec4580f2e238728efb6b0b0b52b6c19fff13e59111"
+    },
+    {
+      "path": "data/tiles/0_4.json",
+      "sha256": "a1def3524727b9bfe01c7c4967cb5c5c69103907039e20f9af02af788fcbcfb6"
+    },
+    {
+      "path": "data/tiles/1_-1.json",
+      "sha256": "70ed1d606913b05899297c25a6436624a9fe0b27c9b9b6af5a43c8ba032ce198"
+    },
+    {
+      "path": "data/tiles/1_-2.json",
+      "sha256": "c89bf473666418b14657d7159b8b4dee1bf88526566d05c95b6cf0f763063e7d"
+    },
+    {
+      "path": "data/tiles/1_-3.json",
+      "sha256": "9911f6185e1c0957b93c82835263a8df77f72ca0273ad8c228f370c2aa112c78"
+    },
+    {
+      "path": "data/tiles/1_-4.json",
+      "sha256": "435f4cc9218ab1d6b891e5fae81162eb8e913e614199ac396c760203caa184e1"
+    },
+    {
+      "path": "data/tiles/1_-5.json",
+      "sha256": "77afa03c1677206e8ea0346af3920ccc653c4aa8ae86b45dce25c7484110355b"
+    },
+    {
+      "path": "data/tiles/1_-6.json",
+      "sha256": "7177bdfda9790125c1fc9ca91183f7334bddbcc354c723acef240c88435a638f"
+    },
+    {
+      "path": "data/tiles/1_-7.json",
+      "sha256": "72c0d756f8f7a2f6e0b3011645f41e2e97c8449c2bb7c647333ae212925f9bf2"
+    },
+    {
+      "path": "data/tiles/1_0.json",
+      "sha256": "83dabd949ad96ba54460745d5adb1ece6668f68a6a9c6a625f895884978a7a04"
+    },
+    {
+      "path": "data/tiles/1_1.json",
+      "sha256": "a16cab0f7ab7205f5fe9fc341b484a26ec25ecf7ebf838cc6b4be6c92b3e0194"
+    },
+    {
+      "path": "data/tiles/1_2.json",
+      "sha256": "b8072c0aff8e86ed58be25ba98f863295512b7f458bce84705285cddd79f7faf"
+    },
+    {
+      "path": "data/tiles/1_3.json",
+      "sha256": "cba6792c8f4099ce7b6f35766f9f7126c6ccab095ce44866445444560da8cf06"
+    },
+    {
+      "path": "data/tiles/1_4.json",
+      "sha256": "9837e55cc51d4ad6742053f3d166a361ea8e2051c1c6b3308f40244daa2c10f3"
+    },
+    {
+      "path": "data/tiles/2_-1.json",
+      "sha256": "0819c40f2d9b733a5328af6e6e2e4ac1bdfba8163884ebb54f0d07bbe1d27e9e"
+    },
+    {
+      "path": "data/tiles/2_-2.json",
+      "sha256": "508dec330228c06bfa40d24922acc85469f0bbb4c94708b99afa5466e81c4373"
+    },
+    {
+      "path": "data/tiles/2_-3.json",
+      "sha256": "263bf5ca1e3b9593428e787c56ad21dd9506e1c2f59fd06b04139917b093efd8"
+    },
+    {
+      "path": "data/tiles/2_-4.json",
+      "sha256": "415ec2c9da3bf4d230ae56819fd09af853c447cd0762f1e6158f99b427fb3cf9"
+    },
+    {
+      "path": "data/tiles/2_-5.json",
+      "sha256": "81c204d2055d1e0b3598ecafb148b73e00b0c160a1e8b6d41941d18717e0d3f8"
+    },
+    {
+      "path": "data/tiles/2_-6.json",
+      "sha256": "4c3448ce746fd48f5790cdc5c2f0b1d582ad9d83762404064193697489722042"
+    },
+    {
+      "path": "data/tiles/2_0.json",
+      "sha256": "ccdbd0074a120874d8e1f39ef79f077ae09f2dfe8599f0c88f7cab18006d957b"
+    },
+    {
+      "path": "data/tiles/2_1.json",
+      "sha256": "9d4dec91e0c455af9fa6da828fc4f8ee2dca913647fa2519b5f2ebbdcb115737"
+    },
+    {
+      "path": "data/tiles/2_2.json",
+      "sha256": "b86764e4b7babc262ea209e0576d61138728b9902cbbf6270f0bc2257411495a"
+    },
+    {
+      "path": "data/tiles/2_3.json",
+      "sha256": "d5040acf1794da01771b58743accce6e1e2c279dfc1fb765b9ceb60df003ccbc"
+    },
+    {
+      "path": "data/tiles/3_-1.json",
+      "sha256": "50c3f4970ac97db44c3efec34c723ee9ac4de7e0669ace7ccf19874dc3178f51"
+    },
+    {
+      "path": "data/tiles/3_-2.json",
+      "sha256": "4b84a63bc41e1e6594ae4974171f4658f0948feb5e2972ccdd7b4b5cfa6ba36a"
+    },
+    {
+      "path": "data/tiles/3_-3.json",
+      "sha256": "ac358583f311e660ee5f0209e923e09f3b36e0c5acddb2489391bed587803411"
+    },
+    {
+      "path": "data/tiles/3_-4.json",
+      "sha256": "680c4c1ed9f34db643be9a9fd9d26f1c150439f882aa0f4dd6e58cc5bef5b0ec"
+    },
+    {
+      "path": "data/tiles/3_-5.json",
+      "sha256": "dde4098ebabfc4ea06fdd6b4e954040987a3c908fa747b22c195a0050e890a4d"
+    },
+    {
+      "path": "data/tiles/3_-6.json",
+      "sha256": "fe5fd2d4c279ce456dac6695067c8efc5eb847dda41440e2cd80f64e07140855"
+    },
+    {
+      "path": "data/tiles/3_0.json",
+      "sha256": "649a202fb973ef181bd34e0baaef981475284696480157cd379b875bd123bb0b"
+    },
+    {
+      "path": "data/tiles/3_1.json",
+      "sha256": "ef459f3a7d3335178ce3faeadea3cfa98abff73570cc9d882459552c2531a959"
+    },
+    {
+      "path": "data/tiles/3_2.json",
+      "sha256": "286961db62f05387379d5d23b31878965b3241513f2576dbb2ea35e6c08efe52"
+    },
+    {
+      "path": "data/tiles/3_3.json",
+      "sha256": "4e702d53e9231cacc3ae2cbb0edeb12dc5e329f2439906a819aa1b836d19d4b1"
+    },
+    {
+      "path": "data/tiles/4_-1.json",
+      "sha256": "0d6719da2ec62c36d3031b294e6390a3b6e51a432a742cb2a8eb710a509eb505"
+    },
+    {
+      "path": "data/tiles/4_-2.json",
+      "sha256": "1865aefc04ad28dff901e53df3513550f2c1faa783a61585e882aa302f1206e6"
+    },
+    {
+      "path": "data/tiles/4_-3.json",
+      "sha256": "6a8cc03e031c2e1d1528090129b88581f5c2ae1fc8d2e197151e8d971ca97e83"
+    },
+    {
+      "path": "data/tiles/4_-4.json",
+      "sha256": "975269839a9e43e870aad0805da8a6e308241963f0e5e26407e8900d2a958c21"
+    },
+    {
+      "path": "data/tiles/4_-5.json",
+      "sha256": "9d176d1f94700efc4f97367efe350a0d31350c88a7416d9e8298a888bee626b1"
+    },
+    {
+      "path": "data/tiles/4_-6.json",
+      "sha256": "f091fea7b0210708bb5ed8e194cafb43db34c70d3dd7c0694264af76ae2d3287"
+    },
+    {
+      "path": "data/tiles/4_0.json",
+      "sha256": "0897a86579f727aa264b0cfebaf2672f0b20ee4a6914d2dd9d155efd8a4b20bf"
+    },
+    {
+      "path": "data/tiles/4_1.json",
+      "sha256": "837270437589fecef254d2cd29da8647aaa9e9e078fe21d02e65c4981cacd251"
+    },
+    {
+      "path": "data/tiles/4_2.json",
+      "sha256": "f93c453d36427f504f08e9deea7d8dc14a36eb2641880b02ce045ab9d8ecc123"
+    },
+    {
+      "path": "data/tiles/4_3.json",
+      "sha256": "172f668797c880908a89861b4638457a5b074a25b3a02c9a8d294cd4e35c0c32"
+    },
+    {
+      "path": "data/tiles/5_-2.json",
+      "sha256": "b2823beab265caa7759b2be9e26a9fd2783287876f53bc6c3945c558559169ec"
+    },
+    {
+      "path": "data/tiles/5_-3.json",
+      "sha256": "67444802805942c24f1594605e49e685f2192d4e380cee307fb6ad78e8e1b122"
+    },
+    {
+      "path": "data/tiles/5_-4.json",
+      "sha256": "f1455d9fbd13c582e57e97119c9488484a3c5e439c7818dd6f7a0ab097bf3f83"
+    },
+    {
+      "path": "data/tiles/5_-5.json",
+      "sha256": "2040c709d35d85dc063ba014dfc5dda911c64975dca85e27ba1c65842c77dce1"
+    },
+    {
+      "path": "engine-worklet.js",
+      "sha256": "ab2e8200dbdac2d5aed5690145611a816789515f2294681228bc048b0044117d"
+    },
+    {
+      "path": "icon-180.png",
+      "sha256": "cc188c9a1d822ae97eb4c83cdb6ba2076b36f8a172382c026863d1c4abd29296"
+    },
+    {
+      "path": "icon-192.png",
+      "sha256": "cb7be8f84c4a4db5e3ce3389ce215ac57881f936b1dc54f607ccaa5de3b783a2"
+    },
+    {
+      "path": "icon-512.png",
+      "sha256": "965f725c56d3ac542c5f3304ce62039a42d71bdff9f7fedf569163095095f4bf"
+    },
+    {
+      "path": "icon-maskable-512.png",
+      "sha256": "b011cd11357e1addb3d5418a8956df46c048778124f16d0a8128e22aeea1a65e"
+    },
+    {
+      "path": "icon.svg",
+      "sha256": "1736e001ad8847ac9a3927015954f1e4d2816a8a4971bfc52dbe0bd933b35533"
+    },
+    {
+      "path": "index.html",
+      "sha256": "e799763f83c6194e9b952c87402d051fa3283db014617cf0ed1659f3e0947392"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "ab7e16cdea45952b66f49992086e4b79169def2c9cb3f5bbe54f0491fc5a171a"
+    },
+    {
+      "path": "multiplayer.html",
+      "sha256": "c38eff49adb4dc84b47e8c40f1bd65b320f828578604990cd3db941f24bf3ef8"
+    },
+    {
+      "path": "splitscreen.html",
+      "sha256": "f210dd75ef770f6761740bae0dde7e53886f9349d79faac76719b6a92174b2b9"
+    },
+    {
+      "path": "sw.js",
+      "sha256": "0b3c81412661b025f2b7d04ae92a75240eff0248caeaf7a34fcffdd7b0024339"
+    }
+  ],
+  "tests": [
+    {
+      "file": "expedition-platform-node-result.json",
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "403202f4f5c99f66b19bf1ee4715cba6838a5a19a54769e4c0261b9672795dfa"
+    },
+    {
+      "file": "expedition-racing-node-result.json",
+      "status": "PASS",
+      "passed": 14,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "da9439fe49eb572fb3bc49a71e7981b29b90a677ea20ed2f1501ba68a7b092a0"
+    },
+    {
+      "file": "expedition-ai-calibration-result.json",
+      "status": "PASS",
+      "passed": 72,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "ffc2c7dfbf152dc2d6d660e264041422cf15c34a95c3d8a24c01ddcf9e21cd86"
+    },
+    {
+      "file": "expedition-social-node-result.json",
+      "status": "PASS",
+      "passed": 19,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "cleanup": true,
+      "externalRequests": 0,
+      "sha256": "4248a0094ec1d6db197ba12fb933084f0ae7adbd03e9d7f7fded09fb9c404ddc"
+    },
+    {
+      "file": "expedition-social-client-node-result.json",
+      "status": "PASS",
+      "passed": 6,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "externalRequests": 0,
+      "sha256": "4cdf0de6c4e054405e34f04829cf2abe15c9302f3fabade069c3ae55f2f38e54"
+    },
+    {
+      "file": "expedition-diagnostics-node-result.json",
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "cleanup": true,
+      "externalRequests": 0,
+      "sha256": "b3a04d7f46bb7aa4b2acfdd1caec357794707344f0f22be38682cec18cae5f7f"
+    },
+    {
+      "file": "expedition-backup-node-result.json",
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "6286458973cb5cdf46bb9dba60a4fb0695777913b256673ae972d9e935d75747"
+    },
+    {
+      "file": "expedition-duty-node-result.json",
+      "status": "PASS",
+      "passed": 14,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "3dbd64480290f59fc5f8010faf0d70a7f1d7fd77b4b674f8ebb1770eb1ef31ac"
+    },
+    {
+      "file": "expedition-server-node-result.json",
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "652494b8af611518b4988f8df21e1c3b3f709c8e73ab12be1ab5e9b32aad6166"
+    },
+    {
+      "file": "expedition-main-restore-node-result.json",
+      "status": "PASS",
+      "passed": 3,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "377c98ce95d7b67eef0fbbfcb5e7898683a4f5729d4f2d6ec949e02c09e4bb15"
+    },
+    {
+      "file": "multiplayer-collision-client-result.json",
+      "status": "PASS",
+      "passed": 20,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "78feae9d9d8fab1e48f5c1a58cf1973928e75b0b3436c89dd902fa27d9bdb055"
+    },
+    {
+      "file": "multiplayer-collision-server-summary.json",
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "371bb54825beb4b9ae9943795462e10fafe81974e2401d73176e2b3235f8fc7e"
+    },
+    {
+      "file": "odyssey-network-node-result.json",
+      "status": "PASS",
+      "passed": 15,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "externalRequests": 0,
+      "sha256": "5f299bc340ffdb18d327e7e0e83dcb720e028d878c334c863ac7c1aa640ee3de"
+    },
+    {
+      "file": "odyssey-racing-node-result.json",
+      "status": "PASS",
+      "passed": 13,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "ee53c91e321476170e386677f59401b9d35b5ee68db86c9ab2b4c6ad831dc1dc"
+    },
+    {
+      "file": "multiplayer-server-summary.json",
+      "status": "PASS",
+      "passed": 14,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "externalRequests": 0,
+      "sha256": "3abbec74e9e024e8a23feca1b6a1c6d083d0eb6097532504802c9113295881e7"
+    },
+    {
+      "file": "nexus-coop-server-result.json",
+      "status": "PASS",
+      "passed": 19,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sha256": "20af0136023aae4e067ffc8fcea8d418c67c55b995c6ec1f19846891bfff7f85"
+    },
+    {
+      "file": "summit-city-race-server-result.json",
+      "status": "PASS",
+      "passed": 13,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "sha256": "4d844eb7c1aee62881dff4a0a937ca997399d1e582636eb3c7e6bfc9c4d35ee3"
+    },
+    {
+      "file": "expedition-racing-browser-result.json",
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "build": "d5068bed213b",
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "exceptions": 0,
+      "externalRequests": 0,
+      "sha256": "516b579166bb6fe175e6cf22f6af8ad29073d7acdc91535845ae3d8135893e24"
+    },
+    {
+      "file": "expedition-social-browser-result.json",
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "build": "d5068bed213b",
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "exceptions": 0,
+      "externalRequests": 0,
+      "sha256": "6e1ee7f9b99102fa6b11a02e3d22aef2994807c1ecf92a6a44629ad23463779f"
+    },
+    {
+      "file": "expedition-duty-browser-result.json",
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "build": "d5068bed213b",
+      "sourceUnchanged": true,
+      "scriptUnchanged": true,
+      "cleanup": true,
+      "exceptions": 0,
+      "externalRequests": 0,
+      "sha256": "2d912a09a95b9c0e990eec55bddfe89d86a42a9f6dc8b5467b56638c2928b9c7"
+    },
+    {
+      "file": "expedition-platform-browser-result.json",
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "build": "d5068bed213b",
+      "sourceUnchanged": true,
+      "exceptions": 0,
+      "externalRequests": 0,
+      "sha256": "2e5df9e42918c4502e0fa7a6d1891e05b62112ef5eab8232e9eb66aa9c36f406"
+    },
+    {
+      "file": "multiplayer-collision-browser-summary.json",
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "stale": [],
+      "unmapped": [],
+      "build": "d5068bed213b",
+      "exceptions": 0,
+      "externalRequests": 0,
+      "sha256": "8723fd42a9edd2be2f18201bae47c9d7d5a3d56d900b6308305487b9f3201ac0"
+    }
+  ],
+  "summary": {
+    "nodeAndAi": 267,
+    "resourceChecks": 4,
+    "browser": 33,
+    "fixedBaselines": 3
+  },
+  "artifacts": [
+    {
+      "path": "tools/dev-tests/expedition-platform-node-result.json",
+      "sha256": "403202f4f5c99f66b19bf1ee4715cba6838a5a19a54769e4c0261b9672795dfa",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-platform-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-racing-node-result.json",
+      "sha256": "da9439fe49eb572fb3bc49a71e7981b29b90a677ea20ed2f1501ba68a7b092a0",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-racing-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-ai-calibration-result.json",
+      "sha256": "ffc2c7dfbf152dc2d6d660e264041422cf15c34a95c3d8a24c01ddcf9e21cd86",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-ai-calibration-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-node-result.json",
+      "sha256": "4248a0094ec1d6db197ba12fb933084f0ae7adbd03e9d7f7fded09fb9c404ddc",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-social-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-client-node-result.json",
+      "sha256": "4cdf0de6c4e054405e34f04829cf2abe15c9302f3fabade069c3ae55f2f38e54",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-social-client-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-diagnostics-node-result.json",
+      "sha256": "b3a04d7f46bb7aa4b2acfdd1caec357794707344f0f22be38682cec18cae5f7f",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-diagnostics-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-backup-node-result.json",
+      "sha256": "6286458973cb5cdf46bb9dba60a4fb0695777913b256673ae972d9e935d75747",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-backup-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-duty-node-result.json",
+      "sha256": "3dbd64480290f59fc5f8010faf0d70a7f1d7fd77b4b674f8ebb1770eb1ef31ac",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-duty-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-server-node-result.json",
+      "sha256": "652494b8af611518b4988f8df21e1c3b3f709c8e73ab12be1ab5e9b32aad6166",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-server-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-main-restore-node-result.json",
+      "sha256": "377c98ce95d7b67eef0fbbfcb5e7898683a4f5729d4f2d6ec949e02c09e4bb15",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-main-restore-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-collision-client-result.json",
+      "sha256": "78feae9d9d8fab1e48f5c1a58cf1973928e75b0b3436c89dd902fa27d9bdb055",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/multiplayer-collision-client-result.json"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-collision-server-summary.json",
+      "sha256": "371bb54825beb4b9ae9943795462e10fafe81974e2401d73176e2b3235f8fc7e",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/multiplayer-collision-server-summary.json"
+    },
+    {
+      "path": "tools/dev-tests/odyssey-network-node-result.json",
+      "sha256": "5f299bc340ffdb18d327e7e0e83dcb720e028d878c334c863ac7c1aa640ee3de",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/odyssey-network-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/odyssey-racing-node-result.json",
+      "sha256": "ee53c91e321476170e386677f59401b9d35b5ee68db86c9ab2b4c6ad831dc1dc",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/odyssey-racing-node-result.json"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-server-summary.json",
+      "sha256": "3abbec74e9e024e8a23feca1b6a1c6d083d0eb6097532504802c9113295881e7",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/multiplayer-server-summary.json"
+    },
+    {
+      "path": "tools/dev-tests/nexus-coop-server-result.json",
+      "sha256": "20af0136023aae4e067ffc8fcea8d418c67c55b995c6ec1f19846891bfff7f85",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/nexus-coop-server-result.json"
+    },
+    {
+      "path": "tools/dev-tests/summit-city-race-server-result.json",
+      "sha256": "4d844eb7c1aee62881dff4a0a937ca997399d1e582636eb3c7e6bfc9c4d35ee3",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/summit-city-race-server-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-racing-browser-result.json",
+      "sha256": "516b579166bb6fe175e6cf22f6af8ad29073d7acdc91535845ae3d8135893e24",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-racing-browser-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-browser-result.json",
+      "sha256": "6e1ee7f9b99102fa6b11a02e3d22aef2994807c1ecf92a6a44629ad23463779f",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-social-browser-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-duty-browser-result.json",
+      "sha256": "2d912a09a95b9c0e990eec55bddfe89d86a42a9f6dc8b5467b56638c2928b9c7",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-duty-browser-result.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-platform-browser-result.json",
+      "sha256": "2e5df9e42918c4502e0fa7a6d1891e05b62112ef5eab8232e9eb66aa9c36f406",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-platform-browser-result.json"
+    },
+    {
+      "path": "tools/dev-tests/multiplayer-collision-browser-summary.json",
+      "sha256": "8723fd42a9edd2be2f18201bae47c9d7d5a3d56d900b6308305487b9f3201ac0",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/multiplayer-collision-browser-summary.json"
+    },
+    {
+      "path": "tools/dev-tests/expedition-resources-result.json",
+      "sha256": "ef2aaaa927532fd737bc8c8389fa313fd865899f61ddb9601cbe92819e6ec249",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-resources-result.json"
+    },
+    {
+      "path": "tools/dev-tests/chain-stab-out.txt",
+      "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/chain-stab-out.txt"
+    },
+    {
+      "path": "tools/dev-tests/expedition-final-build-log.txt",
+      "sha256": "efa837b5112a293dbe8819cfc77161275720e0a2995ec012bcc9cc73ae50889c",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-final-build-log.txt"
+    },
+    {
+      "path": "tools/dev-tests/expedition-main-restore-before-result.json",
+      "sha256": "c644474c44d773045e28350ed8861004d0cb5021317265e577716bfb377356dd",
+      "retainedCopy": "taipei-gp-expedition-validation-evidence/expedition-main-restore-before-result.json"
+    }
+  ],
+  "limitations": [
+    "實體手機／手把、跨網真人平衡、免費主機容量、30分鐘GPU／溫度／耗電、Docker image build尚未驗證。",
+    "瀏覽器使用桌面viewport；救援停靠、拉力160m、部分遊戲結算與遙測使用明示fixture，非人工跑完全長路線。",
+    "動態解析度量到像素減少57.75%，不能換算FPS增幅；30分鐘資料保留採合成時序。"
+  ],
+  "delivery": {
+    "status": "SEPARATE_RECEIPT_REQUIRED",
+    "receipt": "../taipei-expedition-delivery-receipt.json"
+  }
+}

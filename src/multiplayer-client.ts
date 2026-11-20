@@ -7,9 +7,9 @@ import { parseRoomRules, type MultiplayerRoomRules } from '../shared/multiplayer
 import { parseRoomPreset, parseHorizon, validateHorizonSnapshot, type HorizonSettings, type RoomPreset } from '../shared/multiplayer-horizon';
 import { decodeMultiplayerReplay, validReplayDescriptor, REPLAY_MAX_CHARS, REPLAY_CHUNK_CHARS, type MultiplayerReplay } from '../shared/nexus-replay';
 import { validateArenaSnapshot, type ArenaMode } from '../shared/multiplayer-arena';
-import {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas,type AtlasSettings,type AtlasPitService} from '../shared/atlas-racing';
+import {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas,expeditionSettings,validateExpedition,type ExpeditionSettings,type AtlasSettings,type AtlasPitService} from '../shared/atlas-racing';
 import type {VoyagerSettings} from '../shared/voyager-racing';
-import {odysseySettings,type OdysseySettings,voyagerSettings,summitSettings,validateSummit,type SummitSettings,type SummitTyre} from '../shared/summit-racing';
+import {odysseySettings,type OdysseySettings,voyagerSettings,summitSettings,validateSummit,type SummitSettings,type SummitTyre,FRONTIER_CUP_VERSION,validateCupSnapshot,type CupIntent,type CupCommand} from '../shared/summit-racing';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
@@ -28,7 +28,7 @@ const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const SERIES_SEATS_KEY = 'taipei-gp-multiplayer-series-seats-v1';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const } };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const,expeditionRacing:true as const,frontierCup:FRONTIER_CUP_VERSION as typeof FRONTIER_CUP_VERSION } };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -113,6 +113,7 @@ export class MultiplayerClient {
   arenaTeam(team:'red'|'blue') {const r=this._room;if(!r?.capabilities?.nexusArena||r.phase!=='lobby'||!r.hostManagement||this.isSpectator)return false;return this.command({type:'arena-team',team,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
   arenaAction(){const r=this._room,p=r?.players.find(v=>v.id===this.selfId);if(!r?.capabilities?.nexusArena||r.phase!=='racing'||!r.matchId||!p?.arena?.active||p.dnf||p.finishMs!==null||!p.loaded)return false;const type=r.arena?.mode==='items'?'use-item':'relay-handoff';return this.command({type,roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,seq:++this.arenaSeq});}
   setAtlas(settings:AtlasSettings){const r=this._room,parsed=atlasSettings(settings);if(!parsed||!r?.capabilities?.atlasRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-atlas',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  setExpedition(settings:ExpeditionSettings){const r=this._room,parsed=expeditionSettings(settings);if(!parsed||!r?.capabilities?.expeditionRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-expedition',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
   setVoyager(settings:VoyagerSettings){const r=this._room,parsed=voyagerSettings(settings);if(!parsed||!r?.capabilities?.voyagerRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-voyager',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
   setVsc(active:boolean){const r=this._room;if(typeof active!=='boolean'||!r?.voyager?.settings.vsc||r.phase!=='racing'||!r.matchId||r.hostId!==this.selfId||this.isSpectator)return false;return this.command({type:'voyager-vsc',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,seq:++this.voyagerSeq,active});}
   setSummit(settings:SummitSettings){const r=this._room,parsed=summitSettings(settings);if(!parsed||!r?.capabilities?.summit||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-summit',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
@@ -336,10 +337,18 @@ export class MultiplayerClient {
     if (ready && room && !room.players.find(player => player.id === this._selfId)?.loaded) {
       this._error = '請等目前地圖載入完成後再準備。'; this.notify(); return false;
     }
-    return this.command({ type: 'ready', ready, trackRevision: room?.trackRevision ?? 0, trackStamp: room?.trackStamp ?? '' });
+    return this.command({ type: 'ready', ready, trackRevision: room?.trackRevision ?? 0, trackStamp: room?.trackStamp ?? '',...(room?.cup?{cupReady:{cupId:room.cup.id,cupRevision:room.cup.revision,lobbyRevision:room.hostManagement?.lobbyRevision??0}}:{}) });
   }
   start() { return this.command({ type: 'start', trackRevision: this._room?.trackRevision ?? 0 }); }
   reset() { return this.command({ type: 'reset' }); }
+  captureCupIntent():CupIntent|null {
+    const r=this._room;
+    return r?.capabilities?.frontierCup===FRONTIER_CUP_VERSION&&r.hostManagement&&r.hostId===this._selfId?{roomCode:r.code,cupId:r.cup?.id??null,expectedCupRevision:r.cup?.revision??0,expectedLobbyRevision:r.hostManagement.lobbyRevision,matchId:r.matchId,trackRevision:r.trackRevision}:null;
+  }
+  cupCommand(type:CupCommand,intent:CupIntent|null=this.captureCupIntent()) {
+    const current=this.captureCupIntent();
+    return !!intent&&!!current&&Object.keys(current).every(k=>current[k as keyof CupIntent]===intent[k as keyof CupIntent])&&this.command({type,...intent});
+  }
   kickPlayer(targetPlayerId: string) { return this.hostCommand('kick-player', targetPlayerId); }
   transferHost(targetPlayerId: string) { return this.hostCommand('transfer-host', targetPlayerId); }
 
@@ -358,7 +367,7 @@ export class MultiplayerClient {
   sendInput(steer: number, brake: boolean) {
     if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
     const self = this._room.players.find(player => player.id === this._selfId);
-    if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false) return false;
+    if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false || self?.cup?.active===false) return false;
     if (!self || self.dnf || self.finishMs !== null || self.timeTrialDone) return false;
     if (this._room.evolution?.mode === 'pursuit' && this._room.startAt !== null
       && this.serverNow() < this._room.startAt + (this._room.evolution.releaseDelays[self.id] ?? 0) * 1000) return false;
@@ -541,7 +550,7 @@ export class MultiplayerClient {
     const replayCap=object(room.capabilities)?room.capabilities.replay:undefined;
     if(replayCap!==undefined&&replayCap!==true||'replay' in room&&(replayCap!==true||room.replay!==null&&!validReplayDescriptor(room.replay)))throw Error('回放能力或錄製狀態格式不正確。');
     validateArenaSnapshot(room);
-    validateSummit(room);validateAtlas(room);
+    validateSummit(room);validateAtlas(room);validateExpedition(room);validateCupSnapshot(room);
     const summit=object(room.summit)?room.summit:undefined,summitQual=summit?.stage==='qualifying',summitEndurance=!!summit&&!summitQual&&object(summit.settings)&&Number(summit.settings.endurance)>0,summitTimed=summitQual||summitEndurance;
     const practice=object(room.voyager)&&object(room.voyager.settings)&&Number(room.voyager.settings.practiceSeconds)>0;
     const elimination=object(room.horizon)&&room.horizon.elimination===true;
@@ -611,6 +620,7 @@ export class MultiplayerClient {
     const previousRoom = this._room;
     if (previousRoom?.hostManagement && room.hostManagement && room.hostManagement.lobbyRevision < previousRoom.hostManagement.lobbyRevision) return;
     if (previousRoom?.series && room.series?.id === previousRoom.series.id && room.series.revision < previousRoom.series.revision) return;
+    if (previousRoom?.cup && room.cup?.id === previousRoom.cup.id && room.cup.revision < previousRoom.cup.revision) return;
     if (previousRoom && room.trackRevision < previousRoom.trackRevision) return;
     const changedTrack = !!previousRoom && room.trackRevision !== previousRoom.trackRevision;
     if (previousRoom && !changedTrack && (room.trackId !== previousRoom.trackId || room.trackStamp !== previousRoom.trackStamp)) throw new Error('地圖更新順序不正確，請重新連線。');
@@ -668,14 +678,15 @@ export class MultiplayerClient {
   }
   private scheduleReconnect() {
     if (!this.wantsConnection || !this.credentials || this.reconnectTimer) return;
-    if (!this.reconnectDeadline) this.reconnectDeadline = clock() + RECONNECT_WINDOW;
+    if (!this.reconnectDeadline) this.reconnectDeadline = clock() + (this._room?.cup?15000:RECONNECT_WINDOW);
     const remaining = this.reconnectDeadline - clock();
     if (remaining <= 0) {
+      const seconds=this._room?.cup?15:10;
       this.wantsConnection = false; this.clearSession(); this.reconnectDeadline = 0;
       this._room = this._snapshot = null; this._selfId = null;
-      this._status = 'disconnected'; this._error = '連線中斷已超過 10 秒，本次續接已結束。'; this.notify(); return;
+      this._status = 'disconnected'; this._error = `連線中斷已超過 ${seconds} 秒，本次續接已結束。`; this.notify(); return;
     }
-    this._status = 'reconnecting'; this._error = '連線暫時中斷，正在重新連線（最多 10 秒）…'; this.notify();
+    this._status = 'reconnecting'; this._error = `連線暫時中斷，正在重新連線（最多 ${this._room?.cup?15:10} 秒）…`; this.notify();
     const delay = Math.min(remaining, this.reconnectAttempts++ === 0 ? 100 : 750);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;

@@ -7,6 +7,12 @@ const teamName = (team: 'red' | 'blue') => team === 'red' ? '紅隊' : '藍隊';
 /** Presentation only: the server's classification always owns position. */
 export function multiplayerResultCardData(room: RoomSnapshot | null | undefined, mapName?: string): ResultCardData | null {
   if (room?.phase !== 'results') return null;
+  if(room.cup){
+    const c=room.cup,m=c.matches[c.index],complete=c.status==='complete',ids=complete?[c.matches[3].winnerId,c.matches[3].loserId,c.matches[2].winnerId,c.matches[2].loserId]:m.pair??[];
+    const lines=ids.map((id,i)=>{const e=c.entrants.find(e=>e.playerId===id)!,r=m.results.find(r=>r.playerId===id);return complete?`第 ${i+1} 名 ${e.name}`:`${e.name} · ${r?.dnf?'未完賽':r?.finishMs==null?'未完成':time(r.finishMs)}`;});
+    if(!complete)lines.push(c.status==='replay'?'本場需重賽，尚未判勝負':'本場勝出：'+(c.entrants.find(e=>e.playerId===m.winnerId)?.name??'尚未決定'),'其餘兩位原席觀戰，本場不列成績');
+    return{title:complete?'四人好友盃最終結果':'好友盃小場結果',map:mapName??room.trackId,lines};
+  }
   const practice = !!room.voyager?.settings.practiceSeconds;
   const arena = room.arena?.mode ?? 'off';
   const mode = arena !== 'off' ? arena : room.horizon?.elimination ? 'elimination' : room.evolution?.mode ?? 'race';
@@ -39,6 +45,7 @@ export function multiplayerResultCardData(room: RoomSnapshot | null | undefined,
       result = `淨跑${time(p.netFinishMs)}／${result}／讓${room.evolution?.releaseDelays[p.id] ?? p.releaseDelaySeconds ?? 0}秒`;
     } else if (!fastest && p.bestLapMs != null) result += ` · 最佳圈 ${time(p.bestLapMs)}`;
     if (mode === 'relay') result += ` · 已交棒${p.arena?.handoffs ?? 0}次`;
+    if(p.expedition)result+=` · 罰${p.expedition.penaltyMs/1000}秒${p.expedition.adjustedFinishMs===null?'':`／調整後 ${time(p.expedition.adjustedFinishMs)}`}`;
     lines.push(`${label} · ${result}`);
   }
   if(room.odyssey?.weekend){const w=room.odyssey.weekend;lines.push('週末總積分：'+w.standings.map(r=>(w.entrants.find(e=>e.id===r.id)?.name??'車手')+' '+r.points+'分').join(' / '));}

@@ -13,3 +13,15 @@ tools/dev-tests/*-result.json
 server/physics.mjs
 tools/dev-tests/multiplayer-*-evidence-*/
 tools/dev-tests/multiplayer-*-summary.json
+tools/dev-tests/expedition-*-evidence-*/
+tools/dev-tests/expedition-*-log.txt
+tools/dev-tests/expedition-*-stderr.txt
+tools/dev-tests/expedition-*-before.json
+tools/dev-tests/expedition-*-before-*.json
+tools/dev-tests/odyssey-*-evidence-*/
+tools/dev-tests/summit-city-race-server-evidence-*/
+tools/dev-tests/nexus-coop-server-evidence-*/
+tools/dev-tests/nexus-coop-server-stderr.txt
+tools/dev-tests/frontier-*-evidence-*/
+tools/dev-tests/frontier-*-log.txt
+tools/dev-tests/frontier-*-before*.json

@@ -16,6 +16,9 @@ import {atlasVisible,atlasEnsure,atlasReceive,atlasReset,atlasImpact,atlasContac
 import {voyagerVisible,voyagerPractice,voyagerReset,voyagerAdded,voyagerPublic,voyagerJoinError,voyagerReceive,voyagerStart,voyagerTick,voyagerBefore,voyagerAfter,voyagerGate,voyagerOrder,voyagerFinish} from './voyager-racing-service.mjs';
 import { summitEventsEnabled, summitEvent, summitContacts, summitOvertakes } from './summit-events-service.mjs';
 import {odysseyActive,odysseyReceive,odysseyStartError,odysseyStart,odysseyResetPlayer,odysseyBeforeLobby,odysseyTick,odysseyFinalize,odysseyPublic,odysseyRuleMissed} from './odyssey-racing-service.mjs';
+import {expeditionEnabled,expeditionReceive,expeditionReset,expeditionPlayer,expeditionJoinError,expeditionTick} from './expedition-racing-service.mjs';
+import {FRONTIER_CUP_VERSION} from '../shared/frontier-cup.ts';
+import {CUP_RESUME_MS,cupReceive,cupCanDrive,cupPlayer,cupGridCar,cupBeforeLobby,cupFinish,cupStall} from './frontier-cup-service.mjs';
 
 export const TICK_MS = 1000 / 60;
 export const SNAPSHOT_MS = 1000 / 20;
@@ -159,7 +162,9 @@ export class RoomService {
       if (typeof message.sentAt !== 'number' || !Number.isFinite(message.sentAt)) return this.fail(client, 'BAD_MESSAGE', message);
       this.send(client, { type: 'pong', sentAt: message.sentAt, serverTime: now, capabilities: { horizon: true } }); return;
     }
+    if (cupReceive(this, client, message, now)) return;
     if (receiveReplay(this, client, message, now)) return;
+    if (expeditionReceive(this, client, message, now)) return;
     if (odysseyReceive(this, client, message, now)) return;
     if (voyagerReceive(this, client, message, now)) return;
     if (atlasReceive(this, client, message, now)) return;
@@ -193,6 +198,7 @@ export class RoomService {
       if (!validCode(message.code)) return this.fail(client, 'ROOM_NOT_FOUND', message);
       const room = this.rooms.get(message.code);
       if (!room) return this.fail(client, 'ROOM_NOT_FOUND', message);
+      { const error=expeditionJoinError(room,message);if(error)return this.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:message.requestId,message:error}); }
       { const error=voyagerJoinError(room,message);if(error)return this.send(client,{type:'error',code:'VOYAGER_RULE',requestId:message.requestId,message:error}); }
       { const error=summitJoinError(room,message); if(error)return this.send(client,{type:'error',code:'SUMMIT_RULE',requestId:message.requestId,message:error}); }
       if (arenaMode(room)!=='off' && message.clientCapabilities?.nexusArena!==true) return this.send(client,{type:'error',code:'ARENA_RULE',requestId:message.requestId,message:'此房已開啟接力／道具，請更新遊戲再加入。'});
@@ -502,6 +508,7 @@ export class RoomService {
   }
 
   newCar(room, slot) {
+    const cupGrid=cupGridCar(room,slot);if(cupGrid)return cupGrid;
     const summitGrid=summitGridCar(room,slot);if(summitGrid)return summitGrid;
     const grid = gridCar(room, slot); if (grid) return grid;
     const track = room.track;
@@ -548,9 +555,11 @@ export class RoomService {
     player.supportsSummit = request.clientCapabilities?.summit === true;
     player.supportsVoyager = request.clientCapabilities?.voyagerRacing === true;
     player.supportsOdyssey = request.clientCapabilities?.odysseyRacing === true;
+    player.supportsExpedition = request.clientCapabilities?.expeditionRacing === true;
+    player.supportsCup = request.clientCapabilities?.frontierCup === FRONTIER_CUP_VERSION;
     resetArenaPlayer(room,player);
     resetHorizonPlayer(room, player, now);
-    summitResetPlayer(room,player);voyagerReset(room,player,now);odysseyResetPlayer(room,player);
+    summitResetPlayer(room,player);voyagerReset(room,player,now);odysseyResetPlayer(room,player);expeditionReset(player);
     return player;
   }
 
@@ -573,6 +582,8 @@ export class RoomService {
     if (!validCode(request.code)) return this.fail(client, 'ROOM_NOT_FOUND', request);
     const room = this.rooms.get(request.code);
     if (!room) return this.fail(client, 'ROOM_NOT_FOUND', request);
+    if(room.cup&&request.clientCapabilities?.frontierCup!==FRONTIER_CUP_VERSION)return this.send(client,{type:'error',code:'CUP_RULE',requestId:request.requestId,message:'此房需要好友盃新版才能續接原席。'});
+    if(expeditionJoinError(room,request))return this.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:request.requestId,message:expeditionJoinError(room,request)});
     if(odysseyActive(room)&&request.clientCapabilities?.odysseyRacing!==true)return this.send(client,{type:'error',code:'ODYSSEY_RULE',requestId:request.requestId,message:'此房需要 Odyssey 新版才能續接。'});
     if(voyagerJoinError(room,request))return this.send(client,{type:'error',code:'VOYAGER_RULE',requestId:request.requestId,message:voyagerJoinError(room,request)});
     if(atlasJoinError(room,request))return this.send(client,{type:'error',code:'ATLAS_RULE',requestId:request.requestId,message:atlasJoinError(room,request)});
@@ -583,7 +594,7 @@ export class RoomService {
     if (!player) return this.fail(client, room.removedPlayerIds.has(request.playerId) ? 'REMOVED_BY_HOST' : 'INVALID_SESSION', request);
     if (!defaultRoomRules(room.roomRules) && !request.clientCapabilities?.roomRules) return this.fail(client, 'RULES_UNSUPPORTED', request);
     if ((room.evolution.mode !== 'race' || room.requiresEvolution) && !request.clientCapabilities?.evolution) return this.fail(client, 'EVOLUTION_UNSUPPORTED', request);
-    if (player.expired || (!player.connected && !player.awaitingSeriesSeat && now - player.disconnectedAt >= this.disconnectMs)) {
+    if (player.expired || (!player.connected && !player.awaitingSeriesSeat && now - player.disconnectedAt >= (room.cup?CUP_RESUME_MS:this.disconnectMs))) {
       this.expireDisconnected(room, now); return this.fail(client, 'SESSION_EXPIRED', request);
     }
     if (!equalToken(request.token, player.token) && !(player.awaitingSeriesSeat && /^[a-f0-9]{64}$/.test(request.token) && equalToken(seatHash(request.token), player.resumeHash))) return this.fail(client, 'INVALID_SESSION', request);
@@ -602,6 +613,8 @@ export class RoomService {
     player.supportsSummit = request.clientCapabilities?.summit === true;
     player.supportsVoyager = request.clientCapabilities?.voyagerRacing === true;
     player.supportsOdyssey = request.clientCapabilities?.odysseyRacing === true;
+    player.supportsExpedition = request.clientCapabilities?.expeditionRacing === true;
+    player.supportsCup = request.clientCapabilities?.frontierCup === FRONTIER_CUP_VERSION;
     player.input = { steer: 0, brake: true }; player.lastInputAt = now; player.receivedSeq = player.ackSeq;
     // Action sequences belong to this replacement socket; the retired socket is detached above.
     player.summitSeq = -1; player.arenaUsedSeq = -1;player.voyagerSeq=-1;
@@ -618,10 +631,11 @@ export class RoomService {
     player.dnf = false; player.dnfReason = null;
     resetHorizonPlayer(room, player, now);
     resetArenaPlayer(room,player);
-    summitResetPlayer(room,player);voyagerReset(room,player,now);odysseyResetPlayer(room,player);
+    summitResetPlayer(room,player);voyagerReset(room,player,now);odysseyResetPlayer(room,player);expeditionReset(player);
   }
 
   toLobby(room, now) {
+    cupBeforeLobby(room);
     odysseyBeforeLobby(room);
     room.phase = 'lobby'; room.matchId = null; room.startAt = null; room.simAt = null; room.firstFinishAt = null; room.updatedAt = now;
     room.lobbyRevision++;
@@ -657,8 +671,8 @@ export class RoomService {
     client.room = null; client.player = null;
     if (!room || !player) return;
     player.client = null; player.connected = false; player.loaded = false; player.token = null; player.expired = true;
-    player.disconnectedAt = now; this.markDnf(player, 'left'); player.input = { steer: 0, brake: true };
-    if (room.phase === 'lobby' || room.phase === 'countdown' || voyagerPractice(room)) room.players.delete(player.id);
+    player.disconnectedAt = now; if(cupCanDrive(room,player))this.markDnf(player, 'left'); player.input = { steer: 0, brake: true };
+    if (!room.cup&&(room.phase === 'lobby' || room.phase === 'countdown' || voyagerPractice(room))) room.players.delete(player.id);
     this.electHost(room); room.updatedAt = now;
     if (![...room.players.values()].some((p) => p.connected&&!p.isAi)) room.emptySince ??= now;
     if (room.phase === 'countdown') this.toLobby(room, now);
@@ -669,9 +683,9 @@ export class RoomService {
   expireDisconnected(room, now) {
     let changed = false;
     for (const player of [...room.players.values()]) {
-      if (player.connected || player.expired || player.awaitingSeriesSeat || now - player.disconnectedAt < this.disconnectMs) continue;
-      player.expired = true; player.token = null; this.markDnf(player, 'disconnect-expired'); changed = true;
-      if (room.phase === 'lobby' || voyagerPractice(room)) room.players.delete(player.id);
+      if (player.connected || player.expired || player.awaitingSeriesSeat || now - player.disconnectedAt < (room.cup?CUP_RESUME_MS:this.disconnectMs)) continue;
+      player.expired = true; player.token = null; if(cupCanDrive(room,player))this.markDnf(player, 'disconnect-expired'); changed = true;
+      if (!room.cup&&(room.phase === 'lobby' || voyagerPractice(room))) room.players.delete(player.id);
     }
     if (changed) { this.electHost(room); if(summitRosterChanged(this,room,now))return; if (!this.maybeFinish(room, now)) this.broadcast(room, 'room', now); }
   }
@@ -700,6 +714,7 @@ export class RoomService {
 
   maybeFinish(room, now) {
     if (room.phase !== 'racing') return false;
+    const cup=cupFinish(this,room,now);if(cup!==null)return cup;
     const practice=voyagerFinish(this,room,now);if(practice!==null)return practice;
     const summit=summitFinish(this,room,now);if(summit!==null)return summit;
     arenaSync(room);
@@ -727,6 +742,7 @@ export class RoomService {
     const track = room.track, length = track.length;
     const moving = [];
     for (const player of room.players.values()) {
+      if(!cupCanDrive(room,player))continue;
       if (player.dnf || player.finishMs !== null || player.timeTrialDone || player.eliminated || player.eliminationWinner) continue;
       if(voyagerPractice(room)&&(!player.loaded||player.completedLaps>=128))continue;
       if(summitBeforeStep(room,player,at))continue;
@@ -781,6 +797,7 @@ export class RoomService {
       }
     }
     atlasFlags(room,at);
+    expeditionTick(room,at);
     summitOvertakes(room,at);voyagerOrder(room,at);
   }
 
@@ -794,8 +811,10 @@ export class RoomService {
         // A busy server must not run an unbounded catch-up loop. A prolonged
         // pause aborts the match rather than silently changing race speed.
         if (at - room.simAt > 5000) {
-          for (const p of room.players.values()) this.markDnf(p, 'server-stall');
-          this.maybeFinish(room, at);
+          if(!cupStall(this,room,at)){
+            for (const p of room.players.values()) this.markDnf(p, 'server-stall');
+            this.maybeFinish(room, at);
+          }
         } else {
           let steps = 0;
           while (room.phase === 'racing' && room.simAt + TICK_MS <= at + 1e-6 && steps++ < 300) {
@@ -823,6 +842,7 @@ export class RoomService {
       room.evolution.vote = { revision: room.evolution.vote.revision + 1, ballots: {} }; room.voteLobbyRevision = room.lobbyRevision;
     }
     const players = [...room.players.values()].sort((a, b) => {
+      if(room.cup&&cupCanDrive(room,a)!==cupCanDrive(room,b))return cupCanDrive(room,a)?-1:1;
       if(room.phase==='results'&&odysseyActive(room)){const aa=odysseyRuleMissed(room,a),bb=odysseyRuleMissed(room,b);if(a.dnf!==b.dnf)return a.dnf?1:-1;if(aa!==bb)return aa?1:-1;}
       if(voyagerPractice(room)||room.summit?.stage==='qualifying')return Number(a.dnf)-Number(b.dnf)||(a.bestLapMs??Infinity)-(b.bestLapMs??Infinity)||a.slot-b.slot;
       if (room.horizon.elimination) return (a.eliminationRank ?? 0) - (b.eliminationRank ?? 0) || b.distance-a.distance || a.slot-b.slot;
@@ -836,7 +856,8 @@ export class RoomService {
       if (a.finishMs !== null || b.finishMs !== null) {
         if (a.finishMs === null) return 1;
         if (b.finishMs === null) return -1;
-        if (a.finishMs !== b.finishMs) return a.finishMs - b.finishMs;
+        const aa=a.finishMs+(expeditionEnabled(room)?a.expedition?.penaltyMs??0:0),bb=b.finishMs+(expeditionEnabled(room)?b.expedition?.penaltyMs??0:0);
+        if (aa !== bb) return aa - bb;
       }
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
       return b.distance - a.distance || a.slot - b.slot;
@@ -854,6 +875,8 @@ export class RoomService {
       ...(atlasVisible(room)?{atlas:{...p.atlas}}:{}),
       ...(voyager?{voyager:{...structuredClone(p.voyager),validLaps:p.voyager.validLaps.map(ms=>Math.round(ms*1000)/1000)}}:{}),
       ...(odysseyActive(room)?{odyssey:{...p.odyssey}}:{}),
+      ...(expeditionEnabled(room)?{expedition:expeditionPlayer(p)}:{}),
+      ...(room.cup?{cup:cupPlayer(room,p)}:{}),
       ...(summitEventsEnabled(room)?{summit:{...p.summit,validLaps:p.summit.validLaps.map(ms=>Math.round(ms*1000)/1000)},...(room.summit?.settings.weekend&&['race','sprint'].includes(room.summit.stage)?{gridIndex:p.gridIndex??p.slot}:{})}:{}),
       ...(room.evolution.mode !== 'race' ? { team: room.evolution.teams[p.id] ?? null,
         releaseDelaySeconds: room.evolution.mode === 'pursuit' ? room.evolution.releaseDelays[p.id] ?? 0 : 0,
@@ -863,10 +886,12 @@ export class RoomService {
     return { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP,
       trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision,
       code: room.code, hostId: room.hostId, hostManagement: { lobbyRevision: room.lobbyRevision }, arena: arenaPublic(room), replay,
+      cup:room.cup?structuredClone(room.cup):null,
       ...(atlasVisible(room)?{atlas:structuredClone(atlasEnsure(room))}:{}),...(voyager?{voyager}:{}),
       ...(odysseyActive(room)?{odyssey:odysseyPublic(room)}:{}),
+      ...(expeditionEnabled(room)?{expedition:structuredClone(room.expedition)}:{}),
       ...(summitEventsEnabled(room)?{summit:summitPublic(room)}:{}),capabilities: { lobbyOptions: true, championship: true, roomRules: true, horizon: true, replay: true, nexusArena: true,
-        odysseyRacing:true,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
+        expeditionRacing:true,odysseyRacing:true,frontierCup:FRONTIER_CUP_VERSION,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
         ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: true, seriesResume: this.checkpoints.capability() } : {}) }, roomRules: { ...room.roomRules },
       ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: { ...structuredClone(room.evolution), teamStandings: this.teamStandings(room) } } : {}),
       horizon: { ...room.horizon }, spectators: [...room.spectators.values()].map(v => ({ id: v.id, name: v.name, loaded: v.loaded })),

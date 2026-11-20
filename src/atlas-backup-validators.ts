@@ -10,6 +10,15 @@ import {parseCoopHistory} from './atlas-coop-history';
 import {parseVoyagerComfort} from './voyager-comfort';
 import {parseWorkshopGhostStorage} from './voyager-workshop-ghost';
 import {parsePadPreferences} from './odyssey-pad-settings';
+import {parseHudLayouts} from './expedition-hud';
+import {validCoachStoreRaw} from './expedition-coach';
+import {validDailyStoreRaw} from './expedition-daily';
+import {parseRallyRecords,parseCrewRecords} from './expedition-duty-records';
+import {parseSocialResults} from './expedition-social-history';
+import {parsePerformanceHistory} from './frontier-performance-history';
+import {parseRallyResults} from './frontier-rally-history';
+import {parseDutyMissionRecords} from './frontier-duty-records';
+import {parsePracticeGhost,parsePracticeResults} from './frontier-tandem-practice';
 import type {AtlasBackup} from './atlas-backup';
 const obj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const num=(v:unknown,lo=0,hi=Number.MAX_SAFE_INTEGER):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>=lo&&v<=hi;
@@ -17,7 +26,7 @@ const integer=(v:unknown,lo=0,hi=Number.MAX_SAFE_INTEGER)=>num(v,lo,hi)&&Number.
 export function validateAtlasBackup(b:AtlasBackup,main:(text:string)=>{ok:boolean;dropped?:string[]}) {
   for(const {key,raw} of b.slots) {
     if(raw===null)continue;
-    const v:unknown=key==='taipei-gp-multiplayer-quality-v1'?raw:JSON.parse(raw);
+    const v:unknown=['taipei-gp-multiplayer-quality-v1','taipei-gp-expedition-network-v1'].includes(key)?raw:JSON.parse(raw);
     let valid=false;
     const memory={getItem:()=>raw,setItem:()=>{throw Error('驗證不可寫入');},removeItem:()=>{throw Error('驗證不可刪除');}};
     switch(key){
@@ -34,6 +43,18 @@ export function validateAtlasBackup(b:AtlasBackup,main:(text:string)=>{ok:boolea
       case 'taipei-gp-voyager-workshop-ghost-v1':valid=!!parseWorkshopGhostStorage(v);break;
       case 'taipei-gp-odyssey-pad-v1':valid=!!parsePadPreferences(v);break;
       case 'taipei-gp-odyssey-road-duty-v1':valid=!!parseRoadDutyRecords(v);break;
+      case 'taipei-gp-expedition-hud-v1':valid=!!parseHudLayouts(raw);break;
+      case 'taipei-gp-expedition-network-v1':valid=['balanced','responsive','stable'].includes(raw);break;
+      case 'taipei-gp-expedition-coach-v1':valid=validCoachStoreRaw(raw);break;
+      case 'taipei-gp-expedition-daily-v1':valid=validDailyStoreRaw(raw);break;
+      case 'taipei-gp-expedition-rally-v1':valid=!!parseRallyRecords(v);break;
+      case 'taipei-gp-expedition-crew-results-v1':valid=!!parseCrewRecords(v);break;
+      case 'taipei-gp-expedition-social-results-v1':valid=!!parseSocialResults(v);break;
+      case 'taipei-gp-frontier-performance-v1':valid=!!parsePerformanceHistory(raw);break;
+      case 'taipei-gp-frontier-rally-results-v1':valid=!!parseRallyResults(v);break;
+      case 'taipei-gp-frontier-crew-v2':valid=!!parseDutyMissionRecords(v);break;
+      case 'taipei-gp-frontier-tandem-ghost-v1':valid=!!parsePracticeGhost(v);break;
+      case 'taipei-gp-frontier-tandem-results-v1':valid=!!parsePracticeResults(v);break;
       case 'taipei-gp-multiplayer-quality-v1':valid=['auto','standard','economy'].includes(String(v));break;
       case 'taipei-gp-multiplayer-fps-v1':valid=v===30||v===60;break;
       case 'taipei-gp-scenarios-v1':valid=obj(v)&&Object.keys(v).length<=100&&Object.entries(v).every(([k,r])=>k.length<150&&obj(r)&&integer(r.wins,1,999999)&&num(r.best,.000001,1800));break;

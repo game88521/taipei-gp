@@ -42,7 +42,7 @@ export class MultiplayerHorizonPanel {
     $('mp-claim-seat').hidden=!viewer||r?.phase!=='lobby';$<HTMLButtonElement>('mp-claim-seat').disabled=!connected||busy||!!r?.series?.locked||(r?.players.length??4)>=4;
     if(viewer){$('mp-ready').hidden=true;$('mp-start').hidden=true;$('mp-controls').hidden=true;$('mp-evolution').hidden=true;$('mp-series-setup').hidden=true;}
     else $('mp-ready').hidden=false;
-    $('mp-controls').hidden=viewer||!!me&&(me.dnf||me.finishMs!==null||!!me.timeTrialDone||!!me.eliminated||!!me.eliminationWinner||!!me.block?.ghost||me.arena?.active===false);
+    $('mp-controls').hidden=viewer||!!me&&(me.dnf||me.finishMs!==null||!!me.timeTrialDone||!!me.eliminated||!!me.eliminationWinner||!!me.block?.ghost||me.arena?.active===false||me.cup?.active===false);
     $('mp-viewers').textContent=cap?`觀眾 ${r?.spectators?.length??0} / 8${viewer?' · 你正在觀戰，不佔車手席；下局有空位時可選擇參賽。':''}`:'';
     $('mp-grid-order').textContent=h?.reverseGrid?`發車格序：${[...(r?.players??[])].sort((a,b)=>(a.gridIndex??0)-(b.gridIndex??0)).map(p=>`${(p.gridIndex??0)+1}. ${p.name}`).join(' → ')}。後排依實際距離由共同終點線後起跑。`:'';
     if(viewer){$('mp-map-status').textContent=connected?'觀戰中；地圖載好後可切換追看。':'觀戰連線已中斷，請離開後重新觀戰。';$('mp-race-message').textContent=connected?'觀戰中，不參與本場排名。':'觀戰連線已中斷，請離開後重新觀戰。';}

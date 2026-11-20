@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {CityReplayRecorder} from '../../server/frontier-city-replay-service.mjs';
+import {COOP_STATIONS} from '../../shared/nexus-coop.ts';
+import {FrontierBrowserHarness,click,protectedSave} from './frontier-browser-harness.mjs';
+const h=new FrontierBrowserHarness('frontier-city-replay-import-browser',new URL(import.meta.url),['src/frontier-city-replay-ui.ts','src/frontier-city-replay.css','src/frontier-crown-visual.ts','src/frontier-friends.ts','shared/frontier-city-replay.ts','server/frontier-city-replay-service.mjs','src/main.ts','tools/dev-tests/frontier-browser-harness.mjs']);let error;
+try{
+ await h.start(1);const p=h.pages[0],station=COOP_STATIONS[0],r=new CityReplayRecorder({source:'social',mode:'cruise'});for(let i=0;i<=10;i++)r.sample(1000+i*200,[{key:'fixture-private-key',slot:0,vehicle:'sedan',pose:{x:station.x,y:station.y,z:station.z,h:station.h,vx:0,vz:0}}]);r.finish(3000,'complete');assert.equal(r.descriptor().ready,true);
+ const valid=path.join(h.evidence,'anonymous-import-fixture.json'),invalid=path.join(h.evidence,'invalid-import-fixture.json');await writeFile(valid,r.text);await writeFile(invalid,'{"schema":999,"token":"reject-fixture"}');h.report.limitations.push('匯入使用真recorder產生的靜止道路兩秒匿名fixture，不代表真人駕駛錄影。');
+ let chooser=null;p.on('Page.fileChooserOpened',e=>chooser=e);await p.send('Page.setInterceptFileChooserDialog',{enabled:true});
+ async function select(file){chooser=null;await click(p,'frontier-city-replay-import');for(let n=0;n<100&&!chooser;n++)await new Promise(res=>setTimeout(res,20));assert.ok(chooser,'native import button must request a file');await p.send('DOM.setFileInputFiles',{backendNodeId:chooser.backendNodeId,files:[file]});}
+ async function assertClosed(stage){
+  // Match the city-watch contract: only the original hidden reusable crown may remain until module dispose().
+  const cleanup=await p.evaluate('(()=>{const g=__gp.scene.getObjectByName("frontier-city-replay-actors"),crown=__frontierImportCrown,transient=__frontierImportTransient;return{active:__gp.frontierCityReplay.active,busy:__gp.frontierCityReplay.busy,archive:__gp.frontierCityReplay.archive,graphicsHidden:g.visible===false,children:g.children.map(child=>({name:child.name,visible:child.visible})),sameCrown:!!crown&&g.children[0]===crown,transientCount:transient.length,transientsDetached:transient.every(child=>child.parent===null)};})()');
+  (h.report.replayCleanupChecks??=[]).push({stage,...cleanup});assert.equal(cleanup.active,false);assert.equal(cleanup.busy,false);assert.equal(cleanup.archive,null);assert.equal(cleanup.graphicsHidden,true);assert.deepEqual(cleanup.children,[{name:'frontier-moving-crown',visible:false}]);assert.equal(cleanup.sameCrown,true);assert.ok(cleanup.transientCount>=2);assert.equal(cleanup.transientsDetached,true);assert.equal(await p.evaluate('__gp.state'),'paused');assert.equal(await p.evaluate(protectedSave),await p.evaluate('__frontierProtected'));return cleanup;
+ }
+ await h.test('真匯入按鈕與原生檔案事件載入匿名檔，原城市renderer與存檔保持',async()=>{await p.evaluate('window.__frontierImportRenderer=__gp.renderer;window.__frontierImportCrown=__gp.scene.getObjectByName("frontier-city-replay-actors").children.find(child=>child.name==="frontier-moving-crown");true');await select(valid);await p.until('__gp.frontierCityReplay.active',180000);assert.equal(await p.evaluate('__gp.frontierCityReplay.archive.frames.length'),11);assert.equal(await p.evaluate('__gp.renderer===__frontierImportRenderer'),true);assert.equal(await p.evaluate('__gp.state'),'paused');assert.equal(await p.evaluate(protectedSave),await p.evaluate('__frontierProtected'));await p.evaluate('window.__frontierImportTransient=__gp.scene.getObjectByName("frontier-city-replay-actors").children.filter(child=>child!==__frontierImportCrown);true');});
+ await h.test('關閉匯入回放釋放所有actor且仍paused，不恢復舊車操控',async()=>{await click(p,'frontier-city-replay-close');return assertClosed('after-close');});
+ await h.test('不相容檔案真file事件拒絕，不開始播放或覆寫原存檔',async()=>{await select(invalid);await p.until('document.getElementById("toast")?.textContent.includes("不相容")',10000);return assertClosed('after-invalid-import');});
+}catch(e){error=e;}finally{await h.finish(error);}

@@ -2,6 +2,14 @@
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
 import { COOP_VERSION } from '../shared/nexus-coop.ts';
 import { CITY_RACE_VERSION } from '../shared/summit-city-race.ts';
+import {SOCIAL_VERSION} from '../shared/expedition-social.ts';
+import {CONVOY_VERSION} from '../shared/frontier-convoy.ts';
+import {CROWN_VERSION} from '../shared/frontier-crown.ts';
+import {FRONTIER_RALLY_VERSION} from '../shared/frontier-rally.ts';
+import {DUTY_MISSIONS_VERSION} from '../shared/frontier-duty-missions.ts';
+import {EXPEDITION_DUTY_VERSION} from '../shared/expedition-duty.ts';
+import {CITY_REPLAY_VERSION} from '../shared/frontier-city-replay.ts';
+import {CITY_AUTO_RESUME_VERSION} from '../shared/frontier-city-resume.ts';
 export function createDiagnostics(allowed, now = Date.now) {
   const requests = new Map();
   return (req, res) => {
@@ -17,6 +25,6 @@ export function createDiagnostics(allowed, now = Date.now) {
     let window = requests.get(address);
     if (!window) { if (requests.size >= 1024) requests.delete(requests.keys().next().value); window = { at, count: 0 }; requests.set(address, window); }
     if (++window.count > 30) { res.setHeader('Retry-After', String(Math.max(1, Math.ceil((60_000 - at + window.at) / 1000)))); return send(429, { error: 'RATE_LIMITED' }); }
-    return send(200, { schema: 1, status: 'ok', originAllowed: allowed.has(origin), protocol: { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, coopVersion: COOP_VERSION, cityRaceVersion: CITY_RACE_VERSION }, capabilities: { odysseyDiagnostics: true } });
+    return send(200, { schema: 1, status: 'ok', originAllowed: allowed.has(origin), protocol: { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, coopVersion: COOP_VERSION, cityRaceVersion: CITY_RACE_VERSION }, capabilities: { odysseyDiagnostics: true, socialVersion:SOCIAL_VERSION,dutyVersion:EXPEDITION_DUTY_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:CITY_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,rallyVersion:FRONTIER_RALLY_VERSION,dutyMissionsVersion:DUTY_MISSIONS_VERSION } });
   };
 }

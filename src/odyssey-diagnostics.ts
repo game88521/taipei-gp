@@ -1,13 +1,24 @@
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol';
-import { COOP_VERSION } from '../shared/nexus-coop';
+import { COOP_VERSION, COOP_CITY_STAMP } from '../shared/nexus-coop';
 import { CITY_RACE_VERSION } from '../shared/summit-city-race';
+import { SOCIAL_VERSION } from '../shared/expedition-social';
+import { EXPEDITION_DUTY_VERSION } from '../shared/expedition-duty';
+import {CITY_REPLAY_VERSION} from '../shared/frontier-city-replay';
+import {CITY_AUTO_RESUME_VERSION} from '../shared/frontier-city-resume';
+import {CONVOY_VERSION} from '../shared/frontier-convoy';
+import {CROWN_VERSION} from '../shared/frontier-crown';
+import {FRONTIER_RALLY_VERSION} from '../shared/frontier-rally';
+import {DUTY_MISSIONS_VERSION} from '../shared/frontier-duty-missions';
 import './odyssey-network.css';
 const localProtocol = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, coopVersion: COOP_VERSION, cityRaceVersion: CITY_RACE_VERSION };
 export type DiagnosticCode = 'CONFIGURATION' | 'UNREADABLE' | 'SERVICE_HTTP' | 'ORIGIN_DENIED' | 'VERSION_MISMATCH' | 'WS_UNCONFIRMED' | 'PASS' | 'CANCELLED';
-export interface DiagnosticReport { schema: 1; time: string; pageOrigin: string; serviceOrigin: string; code: DiagnosticCode; local: typeof localProtocol; remote?: typeof localProtocol }
+const localCapabilities={socialVersion:SOCIAL_VERSION,dutyVersion:EXPEDITION_DUTY_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:CITY_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,rallyVersion:FRONTIER_RALLY_VERSION,dutyMissionsVersion:DUTY_MISSIONS_VERSION};
+type Capabilities=Partial<typeof localCapabilities>;
+export interface DiagnosticReport { schema: 1; time: string; pageOrigin: string; serviceOrigin: string; endpointPath?:string; code: DiagnosticCode; local: typeof localProtocol; remote?: typeof localProtocol; localCapabilities?:typeof localCapabilities; remoteCapabilities?:Capabilities }
 export function diagnosticEndpoints(endpoint: string, secure: boolean) {
   try { const u = new URL(endpoint); if (!['ws:', 'wss:'].includes(u.protocol) || u.username || u.password || u.search || u.hash || secure && u.protocol !== 'wss:') return null;
-    u.pathname = '/ws'; const ws = u.href; u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'; u.pathname = '/diagnostics'; return { http: u.href, ws, origin: u.origin };
+    if(!['/ws','/coop','/city-race','/city-social','/city-duty','/city-rally'].includes(u.pathname))return null;
+    const ws = u.href; u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'; u.pathname = '/diagnostics'; return { http: u.href, ws, origin: u.origin };
   } catch { return null; }
 }
 export function parseDiagnostic(raw: unknown) {
@@ -15,7 +26,9 @@ export function parseDiagnostic(raw: unknown) {
   const v = raw as Record<string, unknown>, p = v.protocol as Record<string, unknown> | undefined;
   if (v.schema !== 1 || v.status !== 'ok' || typeof v.originAllowed !== 'boolean' || !p || typeof p !== 'object' || Array.isArray(p) || !Number.isSafeInteger(p.version) || Number(p.version) < 1 || !Number.isSafeInteger(p.coopVersion) || Number(p.coopVersion) < 1 || !['physics', 'catalogStamp', 'cityRaceVersion'].every(k => typeof p[k] === 'string' && (p[k] as string).length > 0 && (p[k] as string).length <= 180)) return null;
   // Select known fields only; never export an untrusted body or arbitrary service text.
-  return { allowed: v.originAllowed, protocol: { version: Number(p.version), physics: String(p.physics), catalogStamp: String(p.catalogStamp), coopVersion: Number(p.coopVersion), cityRaceVersion: String(p.cityRaceVersion) } };
+  const capabilities:Capabilities={},c=v.capabilities;
+  if(c&&typeof c==='object'&&!Array.isArray(c))for(const key of ['socialVersion','dutyVersion','cityReplayVersion','autoResumeVersion','convoyVersion','crownVersion','rallyVersion','dutyMissionsVersion'] as const){const value=(c as Record<string,unknown>)[key];if(value!==undefined){if(typeof value!=='string'||!value||value.length>80)return null;capabilities[key]=value;}}
+  return { allowed: v.originAllowed, protocol: { version: Number(p.version), physics: String(p.physics), catalogStamp: String(p.catalogStamp), coopVersion: Number(p.coopVersion), cityRaceVersion: String(p.cityRaceVersion) }, capabilities };
 }
 const labels: Record<DiagnosticCode, string> = {
   CONFIGURATION: '對戰服務網址尚未設定或格式不符，請核對前端部署設定。', UNREADABLE: '未能讀取服務回應，原因尚未確認。可能仍在啟動，亦可能是網路、CORS 或舊版服務；稍後可重試。',
@@ -24,8 +37,9 @@ const labels: Record<DiagnosticCode, string> = {
 };
 export async function runDiagnostic(endpoint: string, pageOrigin: string, signal: AbortSignal): Promise<DiagnosticReport> {
   const urls = diagnosticEndpoints(endpoint, pageOrigin.startsWith('https:'));
-  const report: DiagnosticReport = { schema: 1, time: new Date().toISOString(), pageOrigin, serviceOrigin: urls?.origin ?? '', code: 'CONFIGURATION', local: { ...localProtocol } };
+  const report: DiagnosticReport = { schema: 1, time: new Date().toISOString(), pageOrigin, serviceOrigin: urls?.origin ?? '', code: 'CONFIGURATION', local: { ...localProtocol },localCapabilities:{...localCapabilities} };
   if (!urls) return report;
+  const endpointPath=new URL(urls.ws).pathname;report.endpointPath=endpointPath;
   if (signal.aborted) return { ...report, code: 'CANCELLED' };
   try {
     const response = await fetch(urls.http, { signal, mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' });
@@ -33,15 +47,23 @@ export async function runDiagnostic(endpoint: string, pageOrigin: string, signal
     const text = await response.text(); if (text.length > 4096) return { ...report, code: 'SERVICE_HTTP' };
     const parsed = parseDiagnostic(JSON.parse(text)); if (!parsed) return { ...report, code: 'SERVICE_HTTP' };
     report.remote = parsed.protocol;
+    report.remoteCapabilities=parsed.capabilities;
     if (!parsed.allowed) return { ...report, code: 'ORIGIN_DENIED' };
     if (Object.keys(localProtocol).some(k => parsed.protocol[k as keyof typeof localProtocol] !== localProtocol[k as keyof typeof localProtocol])) return { ...report, code: 'VERSION_MISMATCH' };
+    if(endpointPath==='/city-social'&&parsed.capabilities.socialVersion!==SOCIAL_VERSION||endpointPath==='/city-duty'&&(parsed.capabilities.dutyVersion!==EXPEDITION_DUTY_VERSION||parsed.capabilities.dutyMissionsVersion!==DUTY_MISSIONS_VERSION)||endpointPath==='/city-rally'&&parsed.capabilities.rallyVersion!==FRONTIER_RALLY_VERSION)return {...report,code:'VERSION_MISMATCH'};
     report.code = 'WS_UNCONFIRMED';
     const okay = await new Promise<boolean>(resolve => {
-      let ws: WebSocket | null = null, done = false;
-      const finish = (pass: boolean) => { if (done) return; done = true; signal.removeEventListener('abort', aborted); if (ws) { ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null; try { ws.close(); } catch {} } resolve(pass); };
+      let ws: WebSocket | null = null, done = false,hello=endpointPath==='/ws';
+      const timer=setTimeout(()=>finish(false),7000);
+      const finish = (pass: boolean) => { if (done) return; done = true;clearTimeout(timer); signal.removeEventListener('abort', aborted); if (ws) { ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null; try { ws.close(); } catch {} } resolve(pass); };
       const aborted = () => finish(false); signal.addEventListener('abort', aborted, { once: true });
       if (signal.aborted) { finish(false); return; }
-      try { const sentAt = Date.now(); ws = new WebSocket(urls.ws); ws.onopen = () => ws?.send(JSON.stringify({ type: 'ping', sentAt })); ws.onerror = ws.onclose = () => finish(false); ws.onmessage = e => { if (typeof e.data !== 'string' || e.data.length > 4096) { finish(false); return; } try { const m = JSON.parse(e.data); finish(m.type === 'pong' && m.sentAt === sentAt && Number.isFinite(m.serverTime)); } catch { finish(false); } }; } catch { finish(false); }
+      try { const sentAt = Date.now(); ws = new WebSocket(urls.ws); ws.onopen = () => {if(hello)ws?.send(JSON.stringify({ type: 'ping', sentAt }));}; ws.onerror = ws.onclose = () => finish(false); ws.onmessage = e => { if (typeof e.data !== 'string' || e.data.length > 4096) { finish(false); return; } try { const m = JSON.parse(e.data);
+        if(!hello){const expected=endpointPath==='/coop'?COOP_VERSION:endpointPath==='/city-race'?CITY_RACE_VERSION:endpointPath==='/city-social'?SOCIAL_VERSION:endpointPath==='/city-rally'?FRONTIER_RALLY_VERSION:EXPEDITION_DUTY_VERSION;
+          if(m.type!=='hello'||m.v!==expected||endpointPath==='/coop'&&m.cityStamp!==COOP_CITY_STAMP){finish(false);return;}hello=true;
+          // Cooperative delivery uses "ping" for map markers. Its versioned greeting proves this endpoint accepted the socket.
+          if(endpointPath==='/coop'){finish(true);return;}ws?.send(JSON.stringify({type:'ping',sentAt}));return;}
+        finish(m.type === 'pong' && m.sentAt === sentAt && Number.isFinite(m.serverTime)); } catch { finish(false); } }; } catch { finish(false); }
     });
     return { ...report, code: signal.aborted ? 'CANCELLED' : okay ? 'PASS' : 'WS_UNCONFIRMED' };
   } catch { return { ...report, code: signal.aborted ? 'CANCELLED' : 'UNREADABLE' }; }

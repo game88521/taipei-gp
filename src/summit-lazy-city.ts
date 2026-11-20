@@ -2,10 +2,11 @@ import { SummitLazy } from './summit-lazy';
 type WorkshopMount = typeof import('./nexus-workshop-ui').mountNexusWorkshop;
 type CoopMount = typeof import('./nexus-coop-ui').mountNexusCoop;
 
-function lazyCity<T extends object>(options: {
+export function lazyCity<T extends object>(options: {
   id: string; text: string; insert(button: HTMLButtonElement): void;
   load(): Promise<(hooks: never) => T>; hooks: object; notify(message: string): void;
   fallback: Record<string, unknown>; prime?: () => void;
+  selection?: (button: HTMLButtonElement) => unknown[];
 }): T {
   let mounted: T | null = null, disposed = false;
   const button = document.createElement('button'); button.type = 'button'; button.id = options.id;
@@ -14,14 +15,15 @@ function lazyCity<T extends object>(options: {
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'ghost-btn'; cancel.textContent = '取消載入'; cancel.hidden = true; button.after(cancel);
   const refresh = () => { button.disabled = loader.loading; button.setAttribute('aria-busy', String(loader.loading)); button.textContent = loader.loading ? '正在載入…' : options.text; cancel.hidden = !loader.loading; };
   cancel.onclick = () => { loader.cancel(); refresh(); button.focus(); };
-  const open = async () => {
+  const open = async (...args: unknown[]) => {
     if (disposed || loader.loading) return;
-    if (mounted) return (mounted as { open?: () => unknown }).open?.();
+    if(!args.length&&options.selection)args=options.selection(button);
+    if (mounted) return (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args);
     options.prime?.();
     const job = loader.open(async mount => {
       if (disposed) return;
       button.remove(); cancel.remove(); mounted = mount(options.hooks as never);
-      await (mounted as { open?: () => unknown }).open?.();
+      await (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args);
     });
     refresh(); await job; refresh();
     if (loader.error) { if (!mounted && !disposed) options.insert(button); options.notify(`功能載入失敗：${loader.error}。請再試一次。`); }

@@ -3,14 +3,14 @@ import type { Track } from './track';
 
 export function opponentRadar(room: RoomSnapshot, viewer: RoomPlayer, track: Pick<Track, 'py' | 'bank'>) {
   const height = (p: RoomPlayer) => track.py[p.car.pos.i] + Math.max(-7, Math.min(7, p.car.pos.lat)) * track.bank[p.car.pos.i];
-  return room.players.filter(p => p.id !== viewer.id && p.connected && p.loaded && !p.dnf && p.finishMs === null)
+  return room.players.filter(p => p.id !== viewer.id && p.cup?.active!==false && p.connected && p.loaded && !p.dnf && p.finishMs === null)
     .map(p => { const dx = p.car.x - viewer.car.x, dz = p.car.z - viewer.car.z;
       const forward = dx * Math.sin(viewer.car.h) + dz * Math.cos(viewer.car.h), right = dx * Math.cos(viewer.car.h) - dz * Math.sin(viewer.car.h);
       return { name: p.name, forward, right, distance: Math.hypot(dx, dz), sameLevel: Math.abs(height(p) - height(viewer)) < 3 };
     }).filter(p => p.sameLevel && p.distance <= 35).sort((a, b) => a.distance - b.distance).slice(0, 3);
 }
 export function raceGaps(room: RoomSnapshot, viewer: RoomPlayer) {
-  const peers = room.players.filter(p => p.id !== viewer.id && !p.dnf && p.connected && p.loaded);
+  const peers = room.players.filter(p => p.id !== viewer.id && p.cup?.active!==false && !p.dnf && p.connected && p.loaded);
   const label = (p: RoomPlayer, delta: number) => `${p.name} ${Math.round(Math.abs(delta))} m${Math.abs(delta) >= room.trackLength ? '（套圈）' : ''}`;
   const ahead = peers.filter(p => p.progress >= viewer.progress).sort((a, b) => a.progress - b.progress)[0];
   const behind = peers.filter(p => p.progress < viewer.progress).sort((a, b) => b.progress - a.progress)[0];
@@ -48,8 +48,9 @@ export class MultiplayerAwareness {
       const points = []; for (let i = 0; i < track.N; i += Math.max(1, Math.ceil(track.N / 512))) { const p = this.project(track.px[i], track.pz[i]); points.push(`${p.x.toFixed(2)},${p.y.toFixed(2)}`); }
       points.push(points[0]); this.path.setAttribute('points', points.join(' '));
     }
-    const ids = new Set(room.players.map(p => p.id)); for (const [id, marker] of this.markers) if (!ids.has(id)) { marker.remove(); this.markers.delete(id); }
-    for (const p of room.players) {
+    const activePlayers=room.players.filter(p=>p.cup?.active!==false);
+    const ids = new Set(activePlayers.map(p => p.id)); for (const [id, marker] of this.markers) if (!ids.has(id)) { marker.remove(); this.markers.delete(id); }
+    for (const p of activePlayers) {
       let marker = this.markers.get(p.id); if (!marker) { marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); this.svg.append(marker); this.markers.set(p.id, marker); }
       const pos = this.project!(p.car.x, p.car.z); marker.setAttribute('cx', String(pos.x)); marker.setAttribute('cy', String(pos.y)); marker.setAttribute('r', p.id === viewerId ? '4' : '3'); marker.setAttribute('fill', p.color); marker.setAttribute('stroke', p.id === viewerId ? '#fff' : '#071321'); marker.style.opacity = p.connected && !p.dnf ? '1' : '.3';
     }

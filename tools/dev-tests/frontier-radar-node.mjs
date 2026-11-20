@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {pureUrl} from './pure-module-loader.mjs';
+import {startAudit,finishAudit} from './summit-workshop-audit.mjs';
+const root=fileURLToPath(new URL('../../',import.meta.url)),before=path.resolve(root,'../taipei-gp-frontier-before-d5068bed213b');
+const report={status:'RUNNING',localOnly:true,externalRequests:0,cases:[],...await startAudit(root,new URL(import.meta.url),['src/frontier-radar.ts','src/minimap.ts','src/main.ts'])};
+const {radarPoint}=await import(await pureUrl(root,'frontier-radar.ts')),{Minimap}=await import(await pureUrl(root,'minimap.ts')),{Minimap:OldMinimap}=await import(await pureUrl(root,path.join(before,'src/minimap.ts')));
+async function test(name,fn){try{report.cases.push({name,status:'PASS',details:await fn()});}catch(e){report.cases.push({name,status:'FAIL',error:String(e.stack)});}console.log(JSON.stringify(report.cases.at(-1)));}
+const friend={x:0,z:20,h:0,color:'#64d8ff',label:'2 朋友',slot:1,dy:0};
+await test('前後左右雷達與實際道路旋轉使用相同座標，同行車頭朝上',()=>{for(const h of [0,.7,Math.PI/2,-Math.PI/2,Math.PI]){const f={...friend,x:Math.sin(h)*20,z:Math.cos(h)*20,h},p=radarPoint(0,0,h,f);assert.ok(Math.abs(p.x)<1e-9);assert.ok(Math.abs(p.y+20)<1e-9);assert.ok(Math.abs(p.angle)<1e-9);}assert.ok(radarPoint(0,0,0,{...friend,x:-20,z:0}).x>0);});
+await test('遠距好友停在雷達圓內並朝外指引，不影響原始快照',()=>{const original=structuredClone(friend);for(const h of [0,1,2,3])for(const d of [1,220,500,10000]){const f={...friend,x:Math.sin(h)*d,z:Math.cos(h)*d},p=radarPoint(0,0,0,f);assert.ok(Math.hypot(p.x,p.y)<=220*.83+1e-9);assert.equal(p.edge,d>220*.83);assert.ok(Math.abs(p.distance-d)<1e-8);}assert.deepEqual(friend,original);assert.equal(radarPoint(0,0,0,{...friend,x:NaN}),null);assert.equal(radarPoint(0,0,0,friend,0),null);});
+function drawing(MapClass,friends){const calls=[],ctx=new Proxy({},{get(_target,key){return(...args)=>calls.push([key,...args]);},set(_target,key,value){calls.push(['style',key,value]);return true;}}),canvas={clientWidth:300,clientHeight:300,getContext:()=>ctx},net={segGrid:{query:()=>[{way:{c:1},x1:-10,z1:5,x2:20,z2:30}]},deckGrid:{query:()=>[]}};globalThis.devicePixelRatio=1;new MapClass(canvas,net).draw(0,0,.3,{route:[[0,0],[1,1]],next:[1,1],rivals:[{x:2,z:3}],flags:[{x:4,z:5}],...friends?{friends}:{}});return calls;}
+await test('真Minimap未傳好友時與不可變前版逐繪圖命令完全一致',()=>{assert.deepEqual(drawing(Minimap),drawing(OldMinimap));return{control:'real baseline Minimap source',sameDrawCommands:true};});
+await test('真Minimap畫好友方向與高度編號，最多三名，文字未當HTML',()=>{const fs=[0,1,2,3].map(i=>({...friend,x:i*20,dy:i===1?3:i===2?-3:0,slot:i})),calls=drawing(Minimap,fs),texts=calls.filter(c=>c[0]==='fillText').map(c=>c[1]);assert.deepEqual(texts,['1','2↑','3↓']);assert.equal(calls.filter(c=>c[0]==='rotate').length,4);return{texts};});
+await finishAudit(root,new URL(import.meta.url),report);report.summary={PASS:report.cases.filter(c=>c.status==='PASS').length,FAIL:report.cases.filter(c=>c.status==='FAIL').length};report.status=!report.summary.FAIL&&report.sourceUnchangedDuringTests&&report.scriptUnchangedDuringTests?'PASS':'FAIL';await writeFile(new URL('frontier-radar-node-result.json',import.meta.url),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,...report.summary}));if(report.status!=='PASS')process.exitCode=1;

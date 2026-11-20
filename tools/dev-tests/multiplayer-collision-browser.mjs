@@ -119,7 +119,9 @@ try {
       const state = await page.evaluate(`(() => {const s=__mp.scene;s.frame(0,__mp.client.serverNow(),0,true,false);return {x:s.car.x,z:s.car.z,v:s.car.v,correction:s.correction.length(),models:s.cars.size,positions:[...s.cars.values()].map(v=>({x:v.model.root.position.x,z:v.model.root.position.z}))}})()`);
       assert.ok([state.x, state.z, state.v, state.correction].every(Number.isFinite));
       assert.ok(Math.hypot(state.x - player.car.x, state.z - player.car.z) < .05, 'collision correction must not replay through the other car');
-      assert.ok(state.correction < .01, 'collision correction must not smooth back into the old position');
+      assert.ok(state.correction <= .65+1e-9, 'presentation continuity is capped at 65cm; authority is already exact');
+      const models=state.positions.map((position,i)=>({...room.players.values().toArray()[i].car.snapshot(),...position}));
+      assert.equal(multiplayerCarsOverlap(track,models[0],models[1]),false,'bounded continuity must not reintroduce rendered overlap');
       assert.equal(state.models, 2); details.push(state);
     }
     await shot(host, 'rear-impact-host.png'); await shot(guest, 'rear-impact-guest.png');

@@ -13,7 +13,8 @@ export async function pureSource(base, name) {
   for (const spec of new Set(specs)) {
     if (spec.startsWith('.')) {
       const dependency = resolve(dirname(file), extname(spec) ? spec : `${spec}.ts`);
-      mappings.set(spec, await pureUrl(base, dependency));
+      // Keep native JSON import attributes and real catalog bytes; JSON is not TypeScript.
+      mappings.set(spec, extname(dependency)==='.json'?pathToFileURL(dependency).href:await pureUrl(base, dependency));
     } else if (!spec.startsWith('node:')) mappings.set(spec, pathToFileURL(createRequire(resolve(base, 'package.json')).resolve(spec)).href);
   }
   return code.replace(/\bfrom\s+(['"])([^'"]+)\1/g, (all, q, spec) => mappings.has(spec) ? `from ${q}${mappings.get(spec)}${q}` : all);

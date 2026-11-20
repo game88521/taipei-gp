@@ -1,0 +1,1646 @@
+{
+  "status": "PASS",
+  "baseline": "a387c72bec2931411957063aaa63120a59122749",
+  "beforeBuild": "d5068bed213b",
+  "build": "caeeecc35bef",
+  "localOnly": true,
+  "externalRequests": 0,
+  "scope": "實作與本機驗證；實機／外網／負載等限制另列，不宣稱已部署",
+  "items": [
+    {
+      "number": 1,
+      "title": "好友雷達與車頂暱稱",
+      "description": "四席識別色與編號、車頂名字、方位／高度與文字名單，含過期資料和競技資訊限制。",
+      "document": "FRONTIER_FRIENDS.md",
+      "suites": [
+        "frontier-friends",
+        "frontier-radar"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 2,
+      "title": "城市房主管理",
+      "description": "房主鎖房、移除確認與取消、revision和原席續接保護。",
+      "document": "FRONTIER_ROOMS.md",
+      "suites": [
+        "frontier-room"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 3,
+      "title": "城市觀戰與匿名回放",
+      "description": "獨立觀眾席、競技延遲視角、匿名有界記錄、分塊下載、原場景播放及匯入匯出。",
+      "document": "FRONTIER_CITY_REPLAY.md",
+      "suites": [
+        "frontier-city-replay",
+        "frontier-city-watch",
+        "frontier-city-replay-import"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 4,
+      "title": "城市短斷線自動續接",
+      "description": "原15秒期限內最多三次，單socket與token輪替，服務端確認前禁止操控。",
+      "document": "FRONTIER_CITY_RECONNECT.md",
+      "suites": [
+        "frontier-city-reconnect",
+        "frontier-social-reconnect",
+        "frontier-duty-reconnect"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 5,
+      "title": "效能採樣與可驗證調校",
+      "description": "最多60分鐘、有效駕駛／背景分離、5分鐘分段、最近五份摘要與暫時解析度對照。",
+      "document": "FRONTIER_PERFORMANCE_UI.md",
+      "suites": [
+        "frontier-performance"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證",
+      "realPhoneValidated": false
+    },
+    {
+      "number": 6,
+      "title": "碰撞事實分析",
+      "description": "接觸前後原始速度、相對位置、朝向與缺資料提示，匯出事實報告；不判責、不加罰。",
+      "document": "FRONTIER_INCIDENTS.md",
+      "suites": [
+        "frontier-incidents"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 7,
+      "title": "車隊巡遊",
+      "description": "2～4人三條真路網、3／4／5站，順序門、同層停穩和全隊共同進度。",
+      "document": "FRONTIER_CONVOY.md",
+      "suites": [
+        "frontier-convoy"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 8,
+      "title": "移動王冠",
+      "description": "2～4人三分鐘、持冠秒數、真接觸轉移、三秒保護與出界／斷線停分。",
+      "document": "FRONTIER_CROWN.md",
+      "suites": [
+        "frontier-crown"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 9,
+      "title": "多人定速拉力",
+      "description": "2～4人權威FreeCar、無車碰、同一路線四計時點、早晚與超速罰分、獨立成績。",
+      "document": "FRONTIER_RALLY.md",
+      "suites": [
+        "frontier-rally"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 10,
+      "title": "多事故合作救援",
+      "description": "1～3件不同事故、三難度、每件完整作業、同一平板車與下場交換職責。",
+      "document": "FRONTIER_DUTY_MISSIONS.md",
+      "suites": [
+        "frontier-duty-missions"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 11,
+      "title": "追走單人陪練",
+      "description": "真操控錄製領跑軌跡、跟車距離／滑角／失分原因、明確保存與獨立結果。",
+      "document": "FRONTIER_TANDEM_PRACTICE.md",
+      "suites": [
+        "frontier-tandem-practice"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    },
+    {
+      "number": 12,
+      "title": "四人好友盃",
+      "description": "四原席準決賽A／B→季軍／冠軍，兩人比兩人觀戰、逐場重備、重賽與公開JSON。",
+      "document": "FRONTIER_CUP.md",
+      "suites": [
+        "frontier-cup"
+      ],
+      "status": "PASS",
+      "scope": "實作與本機驗證"
+    }
+  ],
+  "nodeSuites": 34,
+  "nodeReportReused": true,
+  "nodeSourceHashesRecheckedAtSeal": true,
+  "browserSuites": 14,
+  "reusedBrowsers": [
+    "frontier-friends",
+    "frontier-room",
+    "frontier-city-watch"
+  ],
+  "browserCases": 96,
+  "fixedBaselines": 3,
+  "physicalCoreUnchanged": [
+    "src/car.ts",
+    "src/track.ts",
+    "src/rivals.ts",
+    "src/pitlane.ts"
+  ],
+  "limitations": [
+    "實體手機、真手把、跨網路真人、玩法平衡、免費主機容量、30分鐘實機溫度／耗電未驗證；桌面viewport不能列作實機PASS。",
+    "效能採樣的draw CPU不是GPU時間；0.65解析度的像素量減少57.75%，不等於FPS提升。",
+    "巡遊與定速拉力另有真FreeCar完整道路證據；救援六腿完整道路不等於真人精準停靠。救援browser明示停靠fixture；四人盃browser明示finish fixture，完整真Car／WS四場由Node另驗。",
+    "追走browser用真Input／FreeCar錄製，停renderer後以固定步加速；不是真人時間試駕。中立跟隨0分基準驗規則，不宣稱真人正分平衡。",
+    "COPY隔離smoke是Windows Node24啟動集合驗證，沒有執行Docker／Alpine image build。",
+    "本輪只使用localhost，沒有commit、push或部署。前後端上線須同步：city-duty-v2、city-rally與新增能力；公開網址目前不包含本輪。"
+  ],
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "9e25b60c8f0c25fd3ef87f735e646be88055b2716a10288f2c6f360618e68759"
+    },
+    {
+      "path": "FRONTIER_CITY_RECONNECT.md",
+      "sha256": "3d119872168791f69cc76c40da07bf91d988b0848c895f853d6922f4ad76e635"
+    },
+    {
+      "path": "FRONTIER_CITY_REPLAY.md",
+      "sha256": "7f5f9b1700f68201aafa5f27d6ad98a8a4e974eae931fc346eec5d0ed02ac83a"
+    },
+    {
+      "path": "FRONTIER_CONVOY.md",
+      "sha256": "b9bab79b8d3035912d48f7cff5bcfbcd7070c26b6d33ea64f2b61a13826e6332"
+    },
+    {
+      "path": "FRONTIER_CROWN.md",
+      "sha256": "6392a767f77476f7425a50ed74f583b5be6ccff838eb558c0b0f685a975e6826"
+    },
+    {
+      "path": "FRONTIER_CUP.md",
+      "sha256": "a4accc0c5c42686514131c9879f5df0ef038152c79d605d9749dfcb5ac67afcb"
+    },
+    {
+      "path": "FRONTIER_DUTY_MISSIONS.md",
+      "sha256": "9945f356e001b2ad4a60772f092e9758e38ded709b9eab9848f52525a9b67da1"
+    },
+    {
+      "path": "FRONTIER_DUTY_RECONNECT.md",
+      "sha256": "b422a14814f6b64f3e51f1e6ad048311fd81ef7087b6367dc69c584d194635f8"
+    },
+    {
+      "path": "FRONTIER_DUTY_WATCH.md",
+      "sha256": "fbc9847020a787a59b8b489246f57e40f37e73440237c0b17058da836b1645c4"
+    },
+    {
+      "path": "FRONTIER_FIXES.md",
+      "sha256": "ffaf3b57ed503fb5475acf8d22815e23b17def81a1fce57e4efb180b4d8bea7f"
+    },
+    {
+      "path": "FRONTIER_FRIENDS.md",
+      "sha256": "f2f292b93f8ce571d03ae0f2585174848abe9c6b7f40e21e1be3fa1652b90bbb"
+    },
+    {
+      "path": "FRONTIER_INCIDENTS.md",
+      "sha256": "61529757f3df053ac41ba1e6e05dfe10dd57a6e2a238673ad6f0823b89aa1bf4"
+    },
+    {
+      "path": "FRONTIER_PERFORMANCE_CORE.md",
+      "sha256": "c5802a25bbb83dcc35bd2b25eea1ac15035d9ad4f4ae62af79e8ea015ac47393"
+    },
+    {
+      "path": "FRONTIER_PERFORMANCE_UI.md",
+      "sha256": "df48d6e9250c552dc741cfa70ff433cfa0fc2e6c7dc8e810a2ae396d2b2f62ae"
+    },
+    {
+      "path": "FRONTIER_PLAN.md",
+      "sha256": "2ac3da37fec7b9ad9ca7d1ad0a007fbc7e0ef5a54b29074c28d6562211df2ffc"
+    },
+    {
+      "path": "FRONTIER_PROGRESS.md",
+      "sha256": "031bb30566e8ad0b61f879a798de3f8b57a5d5cb2d88be0c0c2035e6da546a56"
+    },
+    {
+      "path": "FRONTIER_RALLY.md",
+      "sha256": "735d068051c99c2dbe90eed0011642198f7457106929fceef5453d43a3b7c2ae"
+    },
+    {
+      "path": "FRONTIER_ROOMS.md",
+      "sha256": "bd7cc2f1504390f759c698bee9736b53b71fca56d0ab63523e19c69812d79051"
+    },
+    {
+      "path": "FRONTIER_SOCIAL_RECONNECT.md",
+      "sha256": "4809c6be9fcfe53ab04bfaaf354f9d2cec3df77089ab1252be9eda59b836a224"
+    },
+    {
+      "path": "FRONTIER_SOCIAL_REPLAY.md",
+      "sha256": "1e87e73a8c22a2e5ed62f804770b8b0731588b7104b197f143739f0d5c6f8f87"
+    },
+    {
+      "path": "FRONTIER_TANDEM_PRACTICE.md",
+      "sha256": "0ebd6eaff05241c726678b9d95ce694eb4e3792b4b3038bc0d89d76fe06845da"
+    },
+    {
+      "path": "FRONTIER_VALIDATION.md",
+      "sha256": "173753a0b1001824cb5da8909dd0ad21bf879aac1bd0810818f1945579452f15"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "e128e24c5020289f9564fba7353ed81a50f971bba3188c17d8d4753d7fb4096a"
+    },
+    {
+      "path": "server/Dockerfile",
+      "sha256": "b6d52f7e71300b6a45d96f31be6092382025a008ffbfd15a3749ba44f1a2cafa"
+    },
+    {
+      "path": "server/expedition-duty-service.mjs",
+      "sha256": "fc2dc0ce7fe0338f99ba9232e5dec2a9eacc2b917b8566896e3e22c4bdfa94f2"
+    },
+    {
+      "path": "server/expedition-social-service.mjs",
+      "sha256": "767648e66159715c31dbda99bf293dcf0792f298723be651a11c7fef927ec184"
+    },
+    {
+      "path": "server/frontier-city-replay-service.mjs",
+      "sha256": "06f3ca34b5a239edecc1209dbce8b2442591c74f6452c07d680fe019ac0f3f8c"
+    },
+    {
+      "path": "server/frontier-convoy-service.mjs",
+      "sha256": "adcc6eb35e953a0498dad8eb36f7f96c803060ba84b1527c46ec8312dc7cf549"
+    },
+    {
+      "path": "server/frontier-crown-service.mjs",
+      "sha256": "ea7d8463ef1917ad1043fbff187b44dc02962fd259f9156e37cb1b3452a2e9a9"
+    },
+    {
+      "path": "server/frontier-cup-service.mjs",
+      "sha256": "a07d73eef6e260b6a71d6c1b96f9bd7e3c48e91cb7b2bc8955e652b4b3765b22"
+    },
+    {
+      "path": "server/frontier-rally-service.mjs",
+      "sha256": "0ef032bbb0daf7bf7856b5fb660e8ea47d7025f212f0b25093ef7353db51ba4c"
+    },
+    {
+      "path": "server/index.mjs",
+      "sha256": "a353dd41e446c91abe60020301534e39462649371ef8d84438df2edf252bda35"
+    },
+    {
+      "path": "server/nexus-replay-service.mjs",
+      "sha256": "79643105e2a96c8c4a92a283e7d2f3bd859416c0922f4657dfba292c8e0273c2"
+    },
+    {
+      "path": "server/odyssey-diagnostics.mjs",
+      "sha256": "7babe9898bb06ae6ae54aed4bd2184acbbf50c592a884477d99aacf69657dfe0"
+    },
+    {
+      "path": "server/room-service.mjs",
+      "sha256": "ab390f5836cdd55eb82e86c93bfbe5f4485ae256bd09328ba5474e55b2517063"
+    },
+    {
+      "path": "shared/expedition-duty.ts",
+      "sha256": "e971d9a108543de2f308c0023d2761615574da02da6edc388808305b437108af"
+    },
+    {
+      "path": "shared/expedition-social.ts",
+      "sha256": "7fa5d601f68e25d76ea63bc6ac2574ece4ba43c9afd4e4c18e82eb7cdd4f16f0"
+    },
+    {
+      "path": "shared/frontier-city-replay.ts",
+      "sha256": "6ec38bf4911c36349a6d22ea29589eae2e6e41f7b7a829df5aa7b5f9c3e92a5b"
+    },
+    {
+      "path": "shared/frontier-city-resume.ts",
+      "sha256": "16d8f3ed17a37382091be0a7bc57fc35b90ab5a260283118a618b6fc4234a8a5"
+    },
+    {
+      "path": "shared/frontier-convoy.ts",
+      "sha256": "d29ad3c4a4334d2d864b27f2d85e66313a813fd204fd49e67821f7347468dae5"
+    },
+    {
+      "path": "shared/frontier-crown.ts",
+      "sha256": "222cf5f5cb337306d4fa35ec729ed5f777e18b62f5b3ccc3675589d2e6d4f00a"
+    },
+    {
+      "path": "shared/frontier-cup.ts",
+      "sha256": "727ce27e6138f88a40ad49e325ef5b2a6816f08d0872d6da0f4a67b1ef06427f"
+    },
+    {
+      "path": "shared/frontier-duty-missions.ts",
+      "sha256": "3e8dfe4df8b598057d2ed85d541df0cd9c240a00f9fb5705067c6ada6e85b1ea"
+    },
+    {
+      "path": "shared/frontier-incidents.ts",
+      "sha256": "bf74633bb620d84ab5b657e1472a254779b73ed66af4333dd6e9a364a7edaab5"
+    },
+    {
+      "path": "shared/frontier-rally.ts",
+      "sha256": "15c26ae5f26b85a4c3340ba110c2508af5fa4a919587d33b0a5916a645ad0b1f"
+    },
+    {
+      "path": "shared/multiplayer-horizon.ts",
+      "sha256": "2a7504331820afc3d5fe90e9c4b02f29fd083f6553c1925180b43fc3d76c9b9f"
+    },
+    {
+      "path": "shared/multiplayer-protocol.ts",
+      "sha256": "e585ebb062c9088d591a439b657d1c8c6a3c24f801cc889ad7be78c45591ab30"
+    },
+    {
+      "path": "shared/summit-racing.ts",
+      "sha256": "5d60b7d5d9428beeb544673c76a2ba76b8b630d378c807355a4278d8723d4ac3"
+    },
+    {
+      "path": "src/atlas-backup-validators.ts",
+      "sha256": "511a5a96a6bc2ddec7985861ba8d2f042981b5b0c68c64e4975e94e54c4a8aea"
+    },
+    {
+      "path": "src/atlas-backup.ts",
+      "sha256": "bc14da1fdf0e4a14088638025616622d9c496d2a68a51ace7f1da269018be695"
+    },
+    {
+      "path": "src/atlas-modes.ts",
+      "sha256": "6b1c85c2ea896d648df2dafd32dc1dbf9f1c972d42356b2fdaa89291f579e871"
+    },
+    {
+      "path": "src/expedition-duty-client.ts",
+      "sha256": "50a2bd0f1c13bf8deb071b71e9e066f5359f78a91dfd8d533f151cf0bb9b7dc4"
+    },
+    {
+      "path": "src/expedition-duty-ui.ts",
+      "sha256": "607fd6d5817ca06165d28bc4249269312717d083d4124c771a38a7f8e6153541"
+    },
+    {
+      "path": "src/expedition-duty.css",
+      "sha256": "acbdb05b02d33e6e0eaffe8fab85f106035c2da1349ec730acc989571790793d"
+    },
+    {
+      "path": "src/expedition-lazy-city.ts",
+      "sha256": "aade9e5d65dd0098e7f63fc877fac6b2f27e14339228ac04a7a390625ff33f8c"
+    },
+    {
+      "path": "src/expedition-performance-ui.ts",
+      "sha256": "99f0264c039c4c7109c619af8b4d1347278084a16a5d8e831c9ecc6e2a1d3bfb"
+    },
+    {
+      "path": "src/expedition-performance.css",
+      "sha256": "735b9d637d23720c6b0b9b0b3e98323962d0bcc7138e0c42e92b1dce797fd388"
+    },
+    {
+      "path": "src/expedition-performance.ts",
+      "sha256": "3224f4cde0f9e0c208129c3238d588e629eadd1d9c564f34a715e7eac8b55e43"
+    },
+    {
+      "path": "src/expedition-social-client.ts",
+      "sha256": "1103fc15c50e038e119165f572f2d3ccabcce57e495eea7cee9ac20d1440948b"
+    },
+    {
+      "path": "src/expedition-social-history.ts",
+      "sha256": "41e601f614f1e93d264230807ddddb83e6bf61cc84fd14d6fb940044ac8f69d8"
+    },
+    {
+      "path": "src/expedition-social-labels.ts",
+      "sha256": "166ce3c4067ef219ba189f457c8a2f6478177d3e1d595c1cbd7dfe99c434d5e8"
+    },
+    {
+      "path": "src/expedition-social-ui.ts",
+      "sha256": "b7680af0b8d2ea991efc355ea3d75631bb9a168cd23152ca65f5fcb254fad1d4"
+    },
+    {
+      "path": "src/expedition-social.css",
+      "sha256": "93e52b4f6111bd6048ffd06161669c04196e84ff8025c5deddde5db87850d470"
+    },
+    {
+      "path": "src/frontier-city-reconnect.ts",
+      "sha256": "3f7542c601a88eccd16697b49257369d9a81554f906194324d1848d199c88792"
+    },
+    {
+      "path": "src/frontier-city-replay-client.ts",
+      "sha256": "44dbd75c3b54a92f84dbd9f27b105cb16e7ce49f7921e355522aeedd699726ea"
+    },
+    {
+      "path": "src/frontier-city-replay-ui.ts",
+      "sha256": "4aa4ded3a424bf06041018a23c2211a9753154b87c45a3d8907f846a30dfaf7c"
+    },
+    {
+      "path": "src/frontier-city-replay.css",
+      "sha256": "93c8a4f09d19f993e3a5d975e009228711dee306df47b06d2940a6ecc2332bf5"
+    },
+    {
+      "path": "src/frontier-crown-visual.ts",
+      "sha256": "91f47c50a1bbe17cb6a66ac0095493576bcfd8a3cb3cb8c1021eb1e99e337f47"
+    },
+    {
+      "path": "src/frontier-cup-ui.ts",
+      "sha256": "a7f001d45295f6006281dd6291553a744218ee12ed8b94207984bf368c270b8a"
+    },
+    {
+      "path": "src/frontier-cup.css",
+      "sha256": "7a68535c74ec4c97d7a114b86f90b7f6e461ea0a953832ec3a87a91a6e2694f4"
+    },
+    {
+      "path": "src/frontier-duty-records.ts",
+      "sha256": "7c6dfadd139ff829d229a22219be511b33647ddb2c38a26cc192a6c6a1fa1a09"
+    },
+    {
+      "path": "src/frontier-friends.ts",
+      "sha256": "195ecd4ab13bfa788e644d530b42ea60014565457b443b913391cb419c02004b"
+    },
+    {
+      "path": "src/frontier-incidents-ui.ts",
+      "sha256": "02c2be4fa0cf0fc900b9ef4e3d01899f3902d1b6de5a751c2ad64af761d27fe2"
+    },
+    {
+      "path": "src/frontier-incidents.css",
+      "sha256": "d63f180f9b2030441bd262dbb4eeb590d0551c88ce654a8e6a90893744be7b6a"
+    },
+    {
+      "path": "src/frontier-lazy-city.ts",
+      "sha256": "a1342f0f76035c8e68755cb132fa098eaf63567d0e67ce2efdb1f19e68beccf3"
+    },
+    {
+      "path": "src/frontier-performance-history.ts",
+      "sha256": "b926f1f66ab90344d06e4b759f38a577ee803279f119a462b5fd6949ec72a4e5"
+    },
+    {
+      "path": "src/frontier-radar.ts",
+      "sha256": "d2a97c1a713c367bb5dc227cfdda15041eef002277e12d360142be3c2879f023"
+    },
+    {
+      "path": "src/frontier-rally-client.ts",
+      "sha256": "4dd6bd04e3edfde4e820b7af1e49f9fd9163dad12ee7f709e60e7b04ceee0c7d"
+    },
+    {
+      "path": "src/frontier-rally-history.ts",
+      "sha256": "6d00088f658d72a8ae6e2831d18034031cf8355a54edb781a3dc2ff2cf63cf26"
+    },
+    {
+      "path": "src/frontier-rally-ui.ts",
+      "sha256": "87d5e64f285cc18b3d275a3e2a09433c58446cc827cd64cd362c9a861987004b"
+    },
+    {
+      "path": "src/frontier-rally.css",
+      "sha256": "95a30768f20e9d24d3a6080d51479f1da3322274871eae62545e43bd0ffaf44d"
+    },
+    {
+      "path": "src/frontier-records.ts",
+      "sha256": "d1fdac764e77897ebddb83acea385904933872253200fd45fe4f55992e779988"
+    },
+    {
+      "path": "src/frontier-tandem-practice-ui.ts",
+      "sha256": "6ebde93c1c5d49a66d76fa6ea3a86ab185ccd3d4be557ef784e94961c497b4db"
+    },
+    {
+      "path": "src/frontier-tandem-practice.css",
+      "sha256": "b624e1d4879b410f0989bc4cbf7ff6c1c7c636e9ab6d7027e1832ae9b14fa5e7"
+    },
+    {
+      "path": "src/frontier-tandem-practice.ts",
+      "sha256": "8637f54a60bc732bc8aceb9498e7e40d23946014384e9163019d874473c8b20b"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "863fbb3dcac328813107bbfbacafe792d56598620956e614e185af74ed181d33"
+    },
+    {
+      "path": "src/minimap.ts",
+      "sha256": "301f8282b3f793d4a89ca807d0551426805d1de2691bd38f2a4624856f7b61e5"
+    },
+    {
+      "path": "src/multiplayer-awareness.ts",
+      "sha256": "5831b6c5d46f738480e5638131ec72e65fa31c8bec6146912e1f464670e44025"
+    },
+    {
+      "path": "src/multiplayer-client.ts",
+      "sha256": "eb22e9648ee9b227f63c4402e18851b4896a3af7088ad324463d9343128ec7b6"
+    },
+    {
+      "path": "src/multiplayer-game.ts",
+      "sha256": "164fb84bbf053d0d4a0f3948b3e726fcd2dc1222b34267477c3b31a9d52ee9c4"
+    },
+    {
+      "path": "src/multiplayer-history.ts",
+      "sha256": "8ecceb9600357a5ecea27060bb44f55621372c66651e51f36ff755b4dc68d4eb"
+    },
+    {
+      "path": "src/multiplayer-horizon-ui.ts",
+      "sha256": "5438aabbc44e4601753c7e4c68df69ee85f5c210d728a0f2e60c60075d2eaaea"
+    },
+    {
+      "path": "src/multiplayer-scene.ts",
+      "sha256": "3dbb2f79d78bf11b4316554c5f0af29a9018e99ba5241c753d814191903253ab"
+    },
+    {
+      "path": "src/multiplayer-spectator.ts",
+      "sha256": "cdc15dab845447b5dd92f43daa86febf5726b6618839459c443fb9dd7ce58e1f"
+    },
+    {
+      "path": "src/multiplayer-ui.ts",
+      "sha256": "0e40c1ae9475031bf1e1ba6d793e5789bc82521870c6b36e8998358850f4849f"
+    },
+    {
+      "path": "src/nexus-replay-ui.ts",
+      "sha256": "56211b8a55cd4e0b05586a8b16e275c55cf00289c3c77134de6a9966645c598e"
+    },
+    {
+      "path": "src/odyssey-diagnostics.ts",
+      "sha256": "53b9e91e8500ecc44a3e0f45e5bc05e919786a34184a153272ae6cb157f8a755"
+    },
+    {
+      "path": "src/voyager-result-data.ts",
+      "sha256": "e8ee86ff7569491e0c62e9aa023b95803200c0817db636f5a6579cfca022c7ae"
+    },
+    {
+      "path": "tools/dev-tests/expedition-backup-node.mjs",
+      "sha256": "618076de607747767f22ab69d02e41d6566037d345b2d1fb5d835d0b9a458a4d"
+    },
+    {
+      "path": "tools/dev-tests/expedition-main-restore-node.mjs",
+      "sha256": "94d50c7334d83de72c94f3b4136651e525783e831e0738fecdd93a0738a4f1e9"
+    },
+    {
+      "path": "tools/dev-tests/expedition-platform-node.mjs",
+      "sha256": "ff61c073d412919228daff467be461bc5ba2ffa93be363249d0f47526877eed9"
+    },
+    {
+      "path": "tools/dev-tests/expedition-social-client-node.mjs",
+      "sha256": "78867291f329c502aebac867a8a3d533f6d47fb36d4e54b19b81786c344b3067"
+    },
+    {
+      "path": "tools/dev-tests/fixtures/frontier-performance-before.ts",
+      "sha256": "e916ac622e7837a030bf850b169e35ef0e842dab15ce19240862178ccfd965a1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-browser-harness.mjs",
+      "sha256": "5c9124ead71091bb995c4277743baacd90a6fba7a4edc18a41ea935a5fa14e2f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-browser.mjs",
+      "sha256": "c9a5188d10e5b862c860251ea323582709f0f1d24a43df00747d6545ecc3e5f5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-node.mjs",
+      "sha256": "8aa6d05895f8626fba8bbf21cfe9967fb23cdbfe051baf857ce5896d4f5779c9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-capacity-node.mjs",
+      "sha256": "d2e18fb50d711bdc4940413d40a6c1d3bc1ec01e282ce4afb78c33a72b44d6b5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-browser.mjs",
+      "sha256": "a7b61ea7af0fd6a5f27e63b70d1c3a814069c9180f2c1d8a7445c978d32b115b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-node.mjs",
+      "sha256": "fb9fece88cf4cac3022664ab48e966025e5bc27f54d4356990e82fd52ca913f1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser.mjs",
+      "sha256": "96c532d09a37a5d7dc1fc779ec29ce1e0f6cc81ed91b00a5d5b38b37ba290b5d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-research.mjs",
+      "sha256": "c8289f43c6e3bc1be8a8e7b1647c0c71de43e8b4e4bf334fde04c38d38e5d19c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot.mjs",
+      "sha256": "b46b5e3632ed88fe5ab554519fb4801b161d1950d001f4e9d603ea6e9a6bf186"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-browser.mjs",
+      "sha256": "08dd724c17e0a559c90b59796ce99e3123be73dd378badecdd500ed8a3dcb3b9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-models-node.mjs",
+      "sha256": "47d7c429a82626d93a209a4fdb1adbbee9666e97313b85288d7a3373d8638492"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-path-inspect.mjs",
+      "sha256": "87cb6806cbeb552240ec4e9bc737deff2587a6d625af21342f145bd43940f655"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-route-research.mjs",
+      "sha256": "26216be70fc44e4f72b004f43b63592997b06dcaef5532aca79482945bab1b4b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-service-node.mjs",
+      "sha256": "91b0425606adebde71f1c5fce98c1121a7235f81f28f4f292e6c2cc2c56089e7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-browser.mjs",
+      "sha256": "528c1dd46c44a0e437f9bb6be93cc66265d1576131d6179beaade047c49d1cb5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-cleanup-node.mjs",
+      "sha256": "6a181c821069884d810837de34abee4796811f5ea06b2505d1e9be8c77c53576"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-models-node.mjs",
+      "sha256": "1aea4325c9c5786495aca70a3c7ce6b9fa558793615892c51e84cb3470aec4a0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-node.mjs",
+      "sha256": "7e3177f346ce757922f5669ecc61b173ebe8317af2195a4679cf935b27efed0e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-browser.mjs",
+      "sha256": "92e391e525d2afd8b5cd75cd023f2e4481c28d7e5ea7700ffe77042c3a6a1cab"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-node.mjs",
+      "sha256": "1fd202a02c5f60353c054496cd8f6f52a624a88a39b88eb04a5a33b6a9651971"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-ready-control.mjs",
+      "sha256": "fde90d0a1ac674893305237b8b080be5c60b3f08019cf91b5777e613869ec410"
+    },
+    {
+      "path": "tools/dev-tests/frontier-docker-smoke.mjs",
+      "sha256": "91b449f7f2dc21db438eeb4fa5f5ad99893cc5a8aed44e4f4e5c012ad64f4a2c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-browser.mjs",
+      "sha256": "d866b2b379353d96bcb4a054910b87b9bcdb7c4cdb113c9d418ef7bb8601d6d7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-node.mjs",
+      "sha256": "70914debca50eec61478a692425649b30f5e1635e78d7318945df7a1902e55e8"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-reconnect-node.mjs",
+      "sha256": "65de6b34299fa4944ff307be3d877add3b26473aeb5725bc68062c470ed19867"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-node.mjs",
+      "sha256": "0945bb485240f11eddf4afd28aa6120ab69eb41da50e8bcc0e3371f046442296"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-road-bot.mjs",
+      "sha256": "80391296ae48740b59a43cb23c1da133ad7ddd49a89941684dee12f2ea0406a2"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-node.mjs",
+      "sha256": "8a5ab28aa8a865fa5851d7ab25c2b0ddfd6cf346600b90d00de2c30aca1b8e49"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-waypoint-research.mjs",
+      "sha256": "b6f6c3e3cea02461411fabf0db46971edfd98dd4cdc69e010754eb3f4f6e082e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-v2-fixture-control.mjs",
+      "sha256": "bbc16a195a0e5e62bc253a524e9bab5b9630524743e300dea39e7ae645473361"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-watch-node.mjs",
+      "sha256": "fe371b760a5976d12d26bf840bf3d424d2897d19adfc8573fcadcb0546239e99"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser.mjs",
+      "sha256": "1d19d73ba641216402e707cbca852da2db9ded1c587abe4d4fc27ca98a9f3a37"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-node.mjs",
+      "sha256": "26c4b10b87675c5866043659024e1faecc4b269635ee941c3095114f57190f12"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-browser.mjs",
+      "sha256": "c482f37bda796417de83e89acfebe8f82ec78dea9de2ce642158a429d5baa3af"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-node.mjs",
+      "sha256": "184acb05de67199ecab50c6936168e5310c648391349b70c81f3324ea87737a7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-browser.mjs",
+      "sha256": "5e068d92662cbd2e3fd0c4db0f1e33fdcba4a3757899b765c11a0b1f7b5d27ec"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-fixture.mjs",
+      "sha256": "13d2bd9e615aac6df8f24f1c47b58c5e4d337e0fec0f921bf5bece3aee4016d0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-node.mjs",
+      "sha256": "faf6b49ddfa05de2e1373dc543d120a8a4767976b7c4f53cc7422185bcc6b9d5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-service-node.mjs",
+      "sha256": "601efb56579cbea4f6912aefebd266620520a026dcf3ef8b6558c8ef3a4cf3bc"
+    },
+    {
+      "path": "tools/dev-tests/frontier-integration-node.mjs",
+      "sha256": "fc90c2e8a597f8f87d336899653447b41d1d2b6921c4e1b5d94678c2d6b1468c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-browser.mjs",
+      "sha256": "d6419c4c32ca747c2a4bb9e08177fbda76976c76cda4601c759f829812558764"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-browser.mjs",
+      "sha256": "def274070c647c4598818b5d477544f4318f500e52e3099c04674f2a9c8bcb34"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-core-node.mjs",
+      "sha256": "81f9d3288301513ddd55819b1cf5e3e7ffe7ad0660efd3d259d4eea5be491b43"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-node.mjs",
+      "sha256": "4438719f48a0ffc927117b1ee8d3b2bab25173975fbe6a52e8d1755562bd21a5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-ui-node.mjs",
+      "sha256": "8e8e1fb97db5d6ba36f4b93fd35e7c0c14fab09e4562c8efc9c4fe9ce1e11961"
+    },
+    {
+      "path": "tools/dev-tests/frontier-phone-test-plan.md",
+      "sha256": "be44ae5b7d8495e543f40653ca563da21be329077c877d3082a7f25defa03da9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-radar-node.mjs",
+      "sha256": "ee1972be1bae15e8d170544a1e970b52a544e4d9a81676a8155df45301c08cc5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser.mjs",
+      "sha256": "3721e046f3381b812bb80e5cb83658b162b91dcbea9119f5771629cef212967b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-node.mjs",
+      "sha256": "4f0d7119523f34018e24ffde70cf40b20b7e69ddae0ea47f1c0fe364aecc24b7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-road-node.mjs",
+      "sha256": "07b7a5689d4611924c75fdc81a67c96a2d901f015582617817c4762e59815df7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-replay-download-node.mjs",
+      "sha256": "4ec299a3661e5d134e69bc1b7b8561d2b7d27a3d018402223a6d116623abe91f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-browser.mjs",
+      "sha256": "b6838a5c3781e4fc236b2c35b8b2f19fb0161517fb13751f488ca9be8b69819b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-node.mjs",
+      "sha256": "48bde2fb2b8dd3795394cf03765883f3f2decd61c3c0e72cefa62fc1f3e90038"
+    },
+    {
+      "path": "tools/dev-tests/frontier-server-close-barrier.mjs",
+      "sha256": "691cc7955607f39e12bbd2470f0b0f6eea6341b6d4b0fa4a9610f0e748a101c1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-reconnect-node.mjs",
+      "sha256": "52198f26fd2f7ec7b628b026bf3ba644521b0bd26932cf495835af9bb3abf426"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-node.mjs",
+      "sha256": "86ccbb693ffce006f6ee03d358c47f1592c1b93d526850b09a30ad9404e3b46e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-browser.mjs",
+      "sha256": "0cc98208a468e7bb940bb3beb3d14933c33eb2611f92b48e91efd774b0e89503"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-node.mjs",
+      "sha256": "d62665ff94443c9628b1de91e56c37c50e56bb0af29a213b9cda91b923b94a2c"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "tools/dev-tests/chain-stab-out.txt",
+      "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-build-log.txt",
+      "sha256": "5b3ba80e2674ef7bf4ab90e628f9fea7816a2c56eddfa1daf993c9af8f15d8bf"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-before-busy-result.json",
+      "sha256": "1c89c951e63d4b9d19cf2570dacfceb6668dc06e9236ed58f9b0dc24049de8f4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-before-manual-result.json",
+      "sha256": "15ba14b0f49aad122a73fd8d4bf156d368e3b539b5fcf24ac56820de9832d3c3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-browser-log.txt",
+      "sha256": "53e74a27ec2ff4d9f21cd40b0655f576a1b50ccf6599319c331786c14ead8600"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-browser-result.json",
+      "sha256": "8162038c42e0dbe94dadfe65d063e77716a14c3014d1f3aeaded7ab11039d267"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-build-log.txt",
+      "sha256": "baa13c3a789b41f03bfd01896c9133e1740481146b39f7b521548ccfaf7e0d72"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-busy-policy-before-result.json",
+      "sha256": "5db58cdb36c9e5307c0ab55f53827fc58f97d3365ec52c6424badd08743f5ec1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-final-log.txt",
+      "sha256": "03fe08b32bcc77fa3f8386a071ab0f2d3edcb4f2136914b6bab237a81c54e737"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-log.txt",
+      "sha256": "1c755886c55ef7604d56814a7a93ad0d4bad0f842e4cd08c827fc9d660ae5830"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-reconnect-node-result.json",
+      "sha256": "6af64d8708eb211316f0a26d841c2a09253525dac6aa17f7aa8175c135aac2c3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-capacity-before-result.json",
+      "sha256": "463e32dd655cfd3c38c3fd023ce3407a69299eed2d347b3374c0a01422dc009f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-capacity-final-log.txt",
+      "sha256": "f1044465f047dcd9a3f3cc0d4621a3ae8cffe4dee34db46382805a03430dd990"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-capacity-node-result.json",
+      "sha256": "0e921bf4c4ef6177c9fff137194d0f099198305765dde599023d61d17ab43887"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-event-cap-before-result.json",
+      "sha256": "8cbda54fd60630dba7a5aa948a91cc4911a29206a63bd0e9410c0cb5f9b803e0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-final-log.txt",
+      "sha256": "df772d56fe3ae56d4f83b1b503bc5bee1fe89219c2bab3967a6277d244f98998"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-browser-before-cdp-return-result.json",
+      "sha256": "6a65acb369797f3961ec90c941003d8ff793660307925486580f8eb3378025a3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-browser-before-persistent-crown-result.json",
+      "sha256": "ef9b8f6308790132b2d0cdd5e2f9c861f9fc0a838e76a3e8236b66b103ca1687"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-browser-log.txt",
+      "sha256": "74ca7db266830c19bb67a98cb3cdfd4f8f0323f79e246f890d55c92a1055a3c9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-browser-result.json",
+      "sha256": "fd43667ca85c39f4741cab0f02ef9451376ff9386b963ddcf67c775c33e0a94f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-import-final-log.txt",
+      "sha256": "f4860613ad750dae4be83a06e472876c3d63084b899766cbc5a04b0fdc104107"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-replay-node-result.json",
+      "sha256": "fecb609380bd51db78c6492cc69ce84b31e1f9cd051ddc470e598455a1a363f8"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser-before-duty-v2-fixture-result.json",
+      "sha256": "f2cffe8d2e8de62d93693a1e773dc5cfbbd09d7dd5d1249191e1a1a7dc563867"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser-before-persistent-crown-result.json",
+      "sha256": "351535b66b707906444462a964bfb298aa77b1d6a3ef43d59e613d5c229ee4d1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser-layout-before-result.json",
+      "sha256": "2284ebe966e9426948b243c1a3ab8c1b9277b175f3f0ed1fd45ae5586a6d6186"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser-log.txt",
+      "sha256": "3734f58fd0fe3e509eb81561ffbf6b631eb3ff41866a1864549d368c3fddd0dc"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-browser-result.json",
+      "sha256": "6ac0b5910cb42ddcf77a1c0aa1479dd6041d273fec41394cf8a380a0909f2745"
+    },
+    {
+      "path": "tools/dev-tests/frontier-city-watch-final-log.txt",
+      "sha256": "91fb40243fd5188490df3d75640ee8d80cdf04fb7fc4f837f01b9bb37d122d7e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-north-before-result.json",
+      "sha256": "bdee62703883d18a16c1c94d81cb3816f872db3e7f8fba89d8df42ade8b8bcb5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-research-city-loop-result.json",
+      "sha256": "ae8dc18c1ec1ff84c0dd2172760d05a2ba14173ea943f785eb2d639981ff9127"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-research-north-loop-debug-result.json",
+      "sha256": "260459d93fcc66694f81d91ad313639f73ad1a6681b7003c451bd64704e38262"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-research-north-loop-result.json",
+      "sha256": "f5d7a843e8cd508c039d20bf05a8d84bb0cb4af4961008d9f9584dd71cb9bf5e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-bot-research-result.json",
+      "sha256": "f3c878608efbb6f01cc98f751e13ed4003a347156771544cd29488452d820c76"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-browser-log.txt",
+      "sha256": "33471eb7f6079893cc7edda999e093a9aa3b029216ae9e951bd39031b30c22ae"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-browser-result.json",
+      "sha256": "865675c8e138f32ec15ee33e50103ba73ff370ccd907570a14a4849628d6c786"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-build-log.txt",
+      "sha256": "d78d8c5149ecec47e7e28fe8decd5128dfc91ee28a646f5d37b2efafce8edfc0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-final-log.txt",
+      "sha256": "097024767de7c004104302cb194a77820133c8f0426378bdd6cf974c4ea075fe"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-models-before-slots-result.json",
+      "sha256": "63f49c68216ee617beb17a20e2d042b68cc58b89248f588284a1133e2f17448c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-models-final-log.txt",
+      "sha256": "5f7cab9ed477bdb9d38c2230546ef0fe0ac67a53039cc0c728cebe773b4c7de0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-models-fixture-before-result.json",
+      "sha256": "74fddf9bc8b601f09b2a10773647bb269de958916e8150a14753b37f9c15845f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-models-node-result.json",
+      "sha256": "0b5d25d4847d2d4beb395864e5f4b37b5d79948fd1516e8cccbc76d85b17e9b3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-route-research-result.json",
+      "sha256": "65a6a6a8546c281b82684fb489eb210dfa43b0a106d2a970e3080035ce9d6e12"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-service-before-result.json",
+      "sha256": "49bbf3dd0bacee6a39c44a6ed6a2ad71dc90dc12b89071c6647238a19194c73f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-service-before-tick-result.json",
+      "sha256": "d7bab04177532f4830d7917fee0acf6099cc9f7a342ad44baa641c0a265df1ea"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-service-final-log.txt",
+      "sha256": "80dc6d8e3ae76c1b53fd801ae8882e5fff191f42cf5277b955d5f5111586aa95"
+    },
+    {
+      "path": "tools/dev-tests/frontier-convoy-service-node-result.json",
+      "sha256": "c223d0df4e2389633bbf19bbf7a543c22c471df993dc623f619a850b1aa39b8b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-browser-before-records-result.json",
+      "sha256": "394c69d1252368e9dd92acda5fcfde36b0144f35e9e2397dbb2ed919723982e0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-browser-before-selector-result.json",
+      "sha256": "f1a65a73ae2ced046a7dfb6a79a013efbe57fb284153ee21c11139d3b2bfc3f7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-browser-log.txt",
+      "sha256": "ddb06229fabc268e71b8795a1af6b29c9722d867f0e3556cc68cffadf7024ff9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-browser-result.json",
+      "sha256": "6d0189aa01762b8d026d198225e7f260ac5178c2bd5670981aec5c85aa5fe72b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-cleanup-before-result.json",
+      "sha256": "7ec1adfde9aacfe912e99298f42b6114c53a7e9f0eb49e52c443d4a4f8f59083"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-cleanup-final-log.txt",
+      "sha256": "4c49986a7e0477ddaee82067a9daebfadd75fc87a888a358b3a40eaada38e9bd"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-cleanup-node-result.json",
+      "sha256": "bc67956b7c29b2b4c662acad905615ee582d87c1a7f2321ceb381fa6e3c2abe9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-final-log.txt",
+      "sha256": "bf9e7057620ddb5a80e48819dbcb7e787fbf41d435d4fe65710e87e80742a022"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-models-before-loader-result.json",
+      "sha256": "e542457f2108dba9c65bfd3bcbb201661d5cc49aaf90aee4ac23fbc0d134ba51"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-models-final-log.txt",
+      "sha256": "693f3f18fa8a95eafb6a6010f13443fa8401621b5ba0c853287b4337eec1b07d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-models-node-result.json",
+      "sha256": "24ef10ed396f190e72c5feca8fc86e4a59aac70c6513a393e1d689204a60c56c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-before-backlog-case-result.json",
+      "sha256": "3c71f6afb12a0cfb86c816d35e88e14ca8fd9d95ffb1ecd23a82d5791c9947c8"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-before-backlog-result.json",
+      "sha256": "611dcf5a2fb4eb95cb5a123dcfcd0bcb0652a79b9d0f2c556ad7a68a92462860"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-before-driver-result.json",
+      "sha256": "b438c63542cd27db939d4845be08eb8c459a84754b61bb7dd2824b3edc409dab"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-final-before-cleanup-log.txt",
+      "sha256": "9258ac6788f43aa714a9bd03b68a04ff2e1138b452b49dd927ba10ccb45349a0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-final-before-cleanup-result.json",
+      "sha256": "8800388daa301448d5d187f4ecf2a2ef56134b23c3979389847fbe3fde13a32c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-final-log.txt",
+      "sha256": "85f26228ad65f38311a18691de512c0d7425d3c93a2d6a9c1878db079b08c795"
+    },
+    {
+      "path": "tools/dev-tests/frontier-crown-service-node-result.json",
+      "sha256": "13c5d963b9ee253f8d5648bbef180e3b8eb7de6edab3921c4da585d1ec1cb7c2"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-browser-before-controls-result.json",
+      "sha256": "5c293a8c5759c0b28684d524253e42eeb2fa21577a352cddc4e336cd476aed10"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-browser-log.txt",
+      "sha256": "027289802a4255fe0ad47cf073f5596c62afd9da6bd2a5276b2202f8848f8251"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-browser-result.json",
+      "sha256": "41ab125a153690fa1d0d56280f3416d6fce3d0a1d32bdb2daff433fe05b5ec2c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-final-log.txt",
+      "sha256": "5a1f6832a0269804f5f5a3c439c961015b23becfe5cb55b1487f074a60d1d5ce"
+    },
+    {
+      "path": "tools/dev-tests/frontier-cup-node-result.json",
+      "sha256": "b38e55715d551d80e16629d6eff20254c01384c2b0bd967f9cb5ca635d43ea7f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-diagnostics-log.txt",
+      "sha256": "42ffa661a2f517a8b6694d6718ca4fbed3b5a807c535b7a2c66b92056c84cec3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-docker-smoke-result.json",
+      "sha256": "ba000ae80af1336f518ca643cf1fc209512238a3ef8568288ceb0ef33f861aba"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-legacy-log.txt",
+      "sha256": "ab5b9bd0ee5f52803f7c604c275df55fb30ce512442e0c300795708349a9748b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-browser-before-result.json",
+      "sha256": "c630b7274347eaee171f7d148df2a6b87196d839c3c7fda54350ddeeff33b6e6"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-browser-log.txt",
+      "sha256": "4707ec567be34b2a2ba7076df6dd227a7253cac7b7ccb3f026c4e1380a18733c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-browser-result.json",
+      "sha256": "3fe2029491c84beb51572fcba9a085f7f2bb1b68c153e2749f8ffb946c6615e7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-final-log.txt",
+      "sha256": "e3d601914c61700fcce1fb9fa2ab868c73b13c093adacb764df6d26b409d0473"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-node-log.txt",
+      "sha256": "7ef8a4b96d6cb49c2ecd74fa3cf2bfc94a6696396b24b8a48d8d3c7f1ef5d0cf"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-missions-node-result.json",
+      "sha256": "7ebf904bf2a985944c13d98b146533442c31e6c739cc10331f15ffbb134541f4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-reconnect-final-log.txt",
+      "sha256": "ea54e65f72920332c9118505a44bea4f64f9c48a23e0181d14ca4161f862b90a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-reconnect-node-log.txt",
+      "sha256": "f68df960cf26261f8526b44b9246aa369c29f9edf8539aa32f91b0ac22f0c9fd"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-reconnect-node-result.json",
+      "sha256": "1ae3aa0b97852ea99b813632a7756c3b4583492d58d070c88e59e58132f4a2c9"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-authority-tick-log.txt",
+      "sha256": "952b5806b03dd50bec414cf00731f9ceb86fa1fdc3fd0dd0783099f9fbce160b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-authority-tick-result.json",
+      "sha256": "3637b284ba1f8794601cf681ba109243373abbc8aa8bae5bc3626d54962c40c6"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-final-log.txt",
+      "sha256": "913ba7cd4d94b430a49f029eb21e22479709a7efd4fe077c459a99a0cb06e85a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-node-log.txt",
+      "sha256": "6b0f9d7e9812ae8ec4d4ee1ab511ec3cd4fc1166597df41512c09f5c3bf4666e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-node-result.json",
+      "sha256": "55234ac91f72438b3b5f7e25e585d7341d36c63ab6bc14d271cc54c68ac3b501"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-parallel-capacity-result.json",
+      "sha256": "30015c98bf1fe85fa4422ee1279f20e7f10b64cf5e2dc51991a3566bcf88a269"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-parallel-final-1795189581505-log.txt",
+      "sha256": "153463ccd4fd2bc131dce8e02e78ba9328ee569452cab47ea719c72df4b1c2ec"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-replay-parallel-final-1795189581505-result.json",
+      "sha256": "b1a7eede9de284f8ba0dd2d67d93a4086d80b0accf35a853670b7a3ca4485d46"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-before-result.json",
+      "sha256": "d6b711b270588be0bab4c821075831c32fa37148a39ed1437ab1a1361600290f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-candidate-result.json",
+      "sha256": "6727c71cd6174d106cc779ae3ba25a593bb77fedb1f25e368559f754f9122e16"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-final-log.txt",
+      "sha256": "edb1f2b1a414feeb21b19a22c7c1ef27e0ddb9d4f8eee156423e32fd074351d2"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-node-result.json",
+      "sha256": "ab1b2c42ad2aaf732714acb67e3fb0b2e198071cd29d6047e1b849c61d1a1ae4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-route-start-result.json",
+      "sha256": "aa662dad0ddf701346454478268db877a67da03c2049f5c896aabacfcbf8513a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-roads-waypoint-research-result.json",
+      "sha256": "f3a912db47d2a1efbbed12cd86e74d8460404167ac3d60d39ad4841f3eebe735"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-watch-final-log.txt",
+      "sha256": "53611f6305c83ac1ab1de113efe0bb101a8a214a14ec39fb935494ee94e24157"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-watch-node-log.txt",
+      "sha256": "4a1250d2f752fa5ecc23dcf3d473b3267a63f4e2320b41d05fe6e89d9e6322be"
+    },
+    {
+      "path": "tools/dev-tests/frontier-duty-watch-node-result.json",
+      "sha256": "a8fc9cd46c5551faebbfd181d0a1c37fef90f3b794ac569c5006c5ff03f47d0c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser-before-duty-v2-fixture-result.json",
+      "sha256": "2f2c483bfb82ecc36f1cbfef188dba41a27a784f5ef25c83dbec67e2d37e99f8"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser-before-import-crown-result.json",
+      "sha256": "9b06656afe2204dd618d2fe7ddea8e4a09c0033bb3fa1c96f59711ed32566f8f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser-before-persistent-crown-result.json",
+      "sha256": "66a88694bdcdc2250745d037938508d5725131daa7aad47fbbceae2997a8ba4c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser-log.txt",
+      "sha256": "74bfe2b10d3b3433a80c09228c1688a1b63a5f159bcba351975d8707f8f3bc18"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-browser-result.json",
+      "sha256": "1cab88a4fff026342dead97c4006ab9e68f701c44d42f218adc1f01e59ddfc57"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-build-log.txt",
+      "sha256": "02758e4e5ab9af3a42844a203b037ee34e6a4075ed0dbcc173860382414819c2"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-build-result.json",
+      "sha256": "a1dd5be5b01a9984d5d963f025cafc8e126cd93af8b68a28b9472f7c96ecdfce"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-fixed-log.txt",
+      "sha256": "a6ca81fed738a905126f3406650b543ce9c476dd372604295318eb8cec503c21"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-node-before-slots-result.json",
+      "sha256": "c1b526e4603c2722152c8207f53e27cafac98f872ce3c39bfd32c6f8f9ea04b4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-node-log.txt",
+      "sha256": "3b52560fd1a05732cf7bd4fd5bbf0a709ad714b7b4f8d78c7ab4eec1eb80c975"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-node-parallel-1795189581505-result.json",
+      "sha256": "0d776d926eab80c6eecce56b755851249955b7bc43071d2833e4498971bc5b0d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-node-result.json",
+      "sha256": "13eb5e52848f3636aa1fad9744e47cd7703b96c10e48272cf436f30fe838e18e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-run-before-duty-fixture-result.json",
+      "sha256": "3d47cd4c8e6ef5e8399f9b203e7f5ac6ec6fef6156693d6a79693f1cb1ec2514"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-run-before-import-fixture-result.json",
+      "sha256": "81c105ae81201c137052c915bf95de2b125b870112403424b1ba19d62ddb4a59"
+    },
+    {
+      "path": "tools/dev-tests/frontier-final-run-result.json",
+      "sha256": "117d6d050ee7644f98e65138d78a808aecb9e13784ab0a3cb54f195da72a7ffc"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-browser-log.txt",
+      "sha256": "43ca60f79a6787b71d13e561ff1799878acd907badd345935538302f13009ee3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-browser-result.json",
+      "sha256": "ecb0fa458fbabcc2b517cf24c264f650e74ebbce7580cefbd321f7c9e2f5d7f3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-final-log.txt",
+      "sha256": "69c8b1bd794c5bd02ec9d4747789df85bb1769bcbcbfbc61904250d7fe06ed85"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-node-loader-before-result.json",
+      "sha256": "f00138cc5e311d8d143ada7f15ae35bda4acfd799810858e54bbbe188983acf3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-node-result.json",
+      "sha256": "4c211790ddb567a8888c7eecc305f64d8050badc808ed64b79337704659b5062"
+    },
+    {
+      "path": "tools/dev-tests/frontier-friends-stage2-log.txt",
+      "sha256": "290e30bcdd472957b7283cc1de7644ff9abf34ed0ac650e44400c9246c5fcd08"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-browser-log.txt",
+      "sha256": "1a598ecc9bd641edce70241985bdf288b0392912563545fb0d4c6c59df783d01"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-browser-result.json",
+      "sha256": "78c8b5bc9305a34d21ce696abbc65db870e44af60d99ef0460e3ef252f643768"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-build-log.txt",
+      "sha256": "61d470b9ee3a29d2a6d9cf652891824292e5097dc265e6877648fa32cd46dc98"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-final-log.txt",
+      "sha256": "598399313560b23e157d5892ba4be7fe3dcf00dd14475d20fc9954226749befe"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-node-result.json",
+      "sha256": "0618b528fc0dfb8cb1bde4d19cbd0b5c3e58f0d5f1d584693542587ff3d63473"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-service-before-result.json",
+      "sha256": "12d716ffc05adea0e71f8814ed8780ff53b824b96a0fc80d0df4d1a49b6718e0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-service-final-log.txt",
+      "sha256": "6ffe914ff3b44be75f84e579b3a13c121e32138c50807bb16b3bbc755796f335"
+    },
+    {
+      "path": "tools/dev-tests/frontier-incidents-service-node-result.json",
+      "sha256": "06f9dd34ffe5c88bf286591ce5f5be321ec2bb0207250ec5a51212266e886ce7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-integrated-build-log.txt",
+      "sha256": "72fb9c674ac3c703f969423de4ef51ac8a4dda434df94834a011fea2d6a8c48b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-integration-final-log.txt",
+      "sha256": "a3318dd752e3e6acf5e6e8e4b3b54552342b8521d35cb5daec2cedb0eba8b4f5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-integration-node-log.txt",
+      "sha256": "78d8ab473d0c2f2056eb4e1163fddff24bb4f3241a04bfa7dbe449cd4e03a550"
+    },
+    {
+      "path": "tools/dev-tests/frontier-integration-node-result.json",
+      "sha256": "4fc9471ebc6bdd2c8e3dc26d12a1dc1042761588ddf7a8a34908be7178585bcf"
+    },
+    {
+      "path": "tools/dev-tests/frontier-main-restore-log.txt",
+      "sha256": "cd76ed6f93425b7ce0b81847f9b0c492674ddabe6b98de05e665e23c891b6bd6"
+    },
+    {
+      "path": "tools/dev-tests/frontier-main-resume-before-log.txt",
+      "sha256": "3384e98e493be3e5b4b90bb4ab6b230c1b910cb8d3336339fda4094ab335b0c0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-main-resume-before-result.json",
+      "sha256": "b5124bbf4e487a18d7c6729039fd804f570ee3c3487c956c2a7cf87b05f6dcac"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-before-log.txt",
+      "sha256": "d4f02a31f910e313d5f8e44ea69252e577c814b152b8bbf241072860c3b9d8e1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-before-result.json",
+      "sha256": "6619659845264b33a35967cea631a847d827b01d79d5a1e7e722b3b48a0152c5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-browser-log.txt",
+      "sha256": "ef0dab179f6dd3c865bab78a2e9767958bf659cc1a2949678ce4cc78962b3b92"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-browser-result.json",
+      "sha256": "90515091400379240d2f65897d594ddc907cd7f4eaba5cd81fea92679abe4bf4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-mode-switch-final-log.txt",
+      "sha256": "e0723fb93ffde7ed08395c2065a35b68d408ed51fae5186ae74eaf849b34ea62"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-browser-before-lazy-client-result.json",
+      "sha256": "75238fac007592027e7a191ed901bd5b6d21d08b333a7ad6319b1ade4ac451d4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-browser-before-resume-fixture-result.json",
+      "sha256": "a8bcf0a5aee27af37f8742b3deaeb03dc0bc5a6a239653ce6d8029ae117660dd"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-browser-log.txt",
+      "sha256": "a0421a20c885f58b43be52ea2027720bfba99fd7a8e4b7912ac081dee5d4a61c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-browser-result.json",
+      "sha256": "d9eb3d91e01461951db0b7abd511c884335273e313dad1e07e4cc5265edf14ca"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-build-log.txt",
+      "sha256": "4cd341c65479c27801ebdc6ef56fb0a29bb8642735d9e8c20995a7ce20cc3e74"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-core-consistency-before-result.json",
+      "sha256": "38b8c0a5101abb9fb7cd85234c83f0abee50642144ce9fae7f38f3eefc5cca62"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-core-final-log.txt",
+      "sha256": "0f2ffe6990d3e023446d88d4d22342c6bdee94eb3be843e402bed7c762e27e9a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-core-node-result.json",
+      "sha256": "d09ea50f81851ef0cea82c003b84b675920610c03d2d728bfe50887241846f35"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-final-log.txt",
+      "sha256": "638df3bf65f89685f15e8ac8b1c98a4260bf47a7e41d16fc7f4c89a97edc1e7a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-backup-bytes-before-result.json",
+      "sha256": "9d9e4a834a9c935c781dd64c41f204a454fd4d31806f350916859e09f2b07c1e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-before-backup-bytes-result.json",
+      "sha256": "14928969d6c586b246202ccd8dbf7d49e37d11e3bda2b51de5d2d1a3c8ed84f7"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-final-log.txt",
+      "sha256": "05731bf2cf59d24926d911a1a4783abb669a98df32b9c8b62a6cda63d86d1860"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-log.txt",
+      "sha256": "6fba23b10f6f683195d8b3cc42ae4fe35ee46bdef1e99168afc8241a6665ef05"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-node-log.txt",
+      "sha256": "da485f2dc5be8748143f85f3031261cef2b32c7a3410901e3fcaa97561bf7fdc"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-history-node-result.json",
+      "sha256": "618f2d1ffc1256d9f1e69a624c07e3ed50ab087fc0f32f471312282779edc07a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-integration-tsc-log.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-ui-final-log.txt",
+      "sha256": "8cd76ec72182d3e9ee37037cca3dd68900f9007a26ac30a594d6c8a08c331d45"
+    },
+    {
+      "path": "tools/dev-tests/frontier-performance-ui-node-result.json",
+      "sha256": "8a6172476f00a20999364a6ff3c0882be98c3d91a2355a85dea836193604f4f6"
+    },
+    {
+      "path": "tools/dev-tests/frontier-platform-regression-log.txt",
+      "sha256": "f56d80bb0d5636633654c566ed12fa408ffcc2c74b3d6f913e569dae229159cb"
+    },
+    {
+      "path": "tools/dev-tests/frontier-radar-final-log.txt",
+      "sha256": "8bf32d84a8edde075c84e93c7237515ed10ceb50993af757898681707c16fa5e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-radar-node-result.json",
+      "sha256": "e72b2269968490a6c915961ecbf81117941264998fd1f893a415a87285bddad4"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser-before-timestamp-result.json",
+      "sha256": "6186a28225b7a25c610fe60f2d56b6d010f48fac2d3cf0fa85fc6fa7af65117d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser-log.txt",
+      "sha256": "0c432fa5d0a1532be8beb3465fdd5692680d8fc67bb23078fc6a3a67f52ff893"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser-result.json",
+      "sha256": "5a7cb347f88230a7d9d83d4a6d5610e4805c29b56057baea778955f2705a5915"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser-weather-before-log.txt",
+      "sha256": "30791fb2738981e15b2f92321064d4147e6bb19401c9dc1c48780b4e36d737fb"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-browser-weather-before-result.json",
+      "sha256": "cbb4431b230fffc2f158a58fe4e2643119c6890c28388392c9f13aa6db5a6007"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-final-log.txt",
+      "sha256": "27836afb7aa7ccde1dce093624d4110283ce2e587392b33cf4380784340743f0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-node-log.txt",
+      "sha256": "4c1669ef25ff8a2e157e8a29e2d3e7459e1ab63f1dc36e65266351fabe064b88"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-node-result.json",
+      "sha256": "de641248b7e3265c3980dbe508e7d8f5fc2598a267b45c4667bcc4b9b83cb597"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-road-final-log.txt",
+      "sha256": "bf1af5e24fe7b8fe28df98469980d0eab7636649066001675276009df269cab2"
+    },
+    {
+      "path": "tools/dev-tests/frontier-rally-road-node-result.json",
+      "sha256": "871805aa2cb61dc8a51b172ec23bb7158f628b4a6f77d3048772e027b6b292c3"
+    },
+    {
+      "path": "tools/dev-tests/frontier-replay-download-before-result.json",
+      "sha256": "7c542cb856ae598bfdb848dd1ca64826e905765cd381ace65c1f3bb6bb30c7ce"
+    },
+    {
+      "path": "tools/dev-tests/frontier-replay-download-final-log.txt",
+      "sha256": "666bb5ab028f5aeb9c2937b6b16eb75677eb7028d0737b8a84c14ec7726b9dc5"
+    },
+    {
+      "path": "tools/dev-tests/frontier-replay-download-log.txt",
+      "sha256": "06850179b4c1eeb11316ab61f85633ab4bb54eec555e16349a2db457da378f23"
+    },
+    {
+      "path": "tools/dev-tests/frontier-replay-download-node-result.json",
+      "sha256": "deb71802927164cc4b3eeecf9deb7fffcbc66e9daaccc62e6cb299a819b43f41"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-browser-before-result.json",
+      "sha256": "9aa357d87b3fb1991a4e17519397fe51e3c7437b4a83ad512aa28c8429b3dbcb"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-browser-log.txt",
+      "sha256": "b0f4d18f3b0033d6a1df3a0934b440588bc0210ff4f75e59ff495dff8934c85e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-browser-result.json",
+      "sha256": "ed8ff85a7c27c06a08c799defa6d31b53b13d584d392c707cd111fc95240068a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-final-log.txt",
+      "sha256": "c172e05fd6cec06266dea917a4c9e86ef8edf33901346cb717aa20602f1ed3ca"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-node-before-result.json",
+      "sha256": "e7ba29ecb6f3935db917393413e38f52bb2ad40fd011033815ef2d31dcfd83e0"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-node-result.json",
+      "sha256": "78aa42f0091ed6d302b15b38a4de2b643827bc61d5b15a3eee8841ed4352ca97"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-node-stage2-before-result.json",
+      "sha256": "1de24dfd9912398ad863a6dcc556f5e988fc96c9f94de4e1ad00bffb8516138d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-room-social-parallel-before-result.json",
+      "sha256": "70b57ca784dff0e5ab1f37c570239d0c271969923af4abe44471da62e807db6c"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-client-manual-before-result.json",
+      "sha256": "8b7fbb6474b104be898c0942c9ab6358640b5b3a59f5fcfd5dd06e909e66306f"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-reconnect-before-result.json",
+      "sha256": "1a65cca50e9cb403dda95317f211d7ca19cf03928aec1e8e931ac37d75b164cb"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-reconnect-final-log.txt",
+      "sha256": "d5d34ab64cd8859517671dba4451adf137445be02098e91936e54b96487ff56a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-reconnect-node-result.json",
+      "sha256": "dbf4d400dcb36184fe993fbc933c74e9f7d04c9d7a464f115c3084c172eca938"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-reconnect-snapshot-watchdog-before-result.json",
+      "sha256": "2262ddd7d299f40a831b1f71375c2acf5d4a68485a3ccd251a98abd834e8374b"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-authority-tick-log.txt",
+      "sha256": "13f0d50f267b05786bbc1e938559a561e404801f6b8ae8c07f62e1d8d4bdf6c1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-authority-tick-result.json",
+      "sha256": "5e7db7894e450907446f505a2ebc3fe1d8fd457774be54e49fb30e969fb18d63"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-final-log.txt",
+      "sha256": "56d751e532364912a279c655df78be03893e6795236eb85b22e4c59155df6633"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-first-result.json",
+      "sha256": "1faa03847227817758f60b6134ecea3c9aae631ce0c198669adec4ee0d8f05e6"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-long-clock-before-result.json",
+      "sha256": "1881698c2ace690479377182f8528f9521ecad77cd0b9713932d669b4cc43243"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-node-result.json",
+      "sha256": "0b2126bed0070d5b1ec603bc17dba4b29616a6898c801077486af71c694443ea"
+    },
+    {
+      "path": "tools/dev-tests/frontier-social-watch-replay-before-result.json",
+      "sha256": "2029529df3b03b79099cbb10470d2618a357f6d3361c642abd40ba7ba30d0edb"
+    },
+    {
+      "path": "tools/dev-tests/frontier-stage1-build-log.txt",
+      "sha256": "b036147d788c6d585f27ba423cddd1feafcdb4248d093cd50f860fd7e2cb483a"
+    },
+    {
+      "path": "tools/dev-tests/frontier-stage2-build-log.txt",
+      "sha256": "8128ab28be5800f5aba672239ecaac167377377b2c843b9f58c044fda6195722"
+    },
+    {
+      "path": "tools/dev-tests/frontier-stage3-build-log.txt",
+      "sha256": "8301acf762dd2547e97806195a1800352957cfdaa1c5a56b677192a2bd15866d"
+    },
+    {
+      "path": "tools/dev-tests/frontier-stage8-build-log.txt",
+      "sha256": "0c63b9fdd2994315f9c148949d4612b706928a712627cf3be435939cf3e2f4ca"
+    },
+    {
+      "path": "tools/dev-tests/frontier-stage9-build-log.txt",
+      "sha256": "da0e17b83658a885d56f4d515deeaeae3e5630d04213e836c33fc768e08bdf4e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-before-result.json",
+      "sha256": "7f205ffeb4174fde836890ad0d1951e21ed069e80c0d5ec58f6840e3098f3eb1"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-browser-before-entry-result.json",
+      "sha256": "263fddf790ac2c0718646ecede3e6c539321607d297d942b07d2771c02573eda"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-browser-log.txt",
+      "sha256": "40091de32394a84d1da7514d09258a286c5457c2efddab5d64c04b5ca416af4e"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-browser-result.json",
+      "sha256": "b84ec32fca38d9cff30205419a77f89b6094983786c8c089b1fb6e77f0d15c13"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-final-log.txt",
+      "sha256": "9cfd3205070a1e6fdaed5ba85bc29a9dfc6f81ad2c62d2a216634a95e6467245"
+    },
+    {
+      "path": "tools/dev-tests/frontier-tandem-practice-node-result.json",
+      "sha256": "27a433fe7fe5d670c60199cf333e37a066ea482117aea5869a42244f3932046a"
+    }
+  ],
+  "sealedAt": "2026-11-20T16:27:01.838Z",
+  "committed": false,
+  "pushed": false,
+  "deployed": false
+}
