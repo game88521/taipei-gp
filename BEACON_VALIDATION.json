@@ -1,0 +1,302 @@
+{
+  "schema": 1,
+  "author": "Rex <game88521@gmail.com>",
+  "status": "LOCAL_VALIDATION_PASS_PHONE_PENDING",
+  "finishedAt": "2026-11-23T06:54:20.186Z",
+  "build": "fae95fac6d0e",
+  "beforeBuild": "862f7f9c9857",
+  "head": "c56ca26e04bb1f39c144a93454ae1bc8d09d6737",
+  "branch": "main",
+  "localOnly": true,
+  "realPhoneUsed": false,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "summary": {
+    "PASS": 90,
+    "FAIL": 0,
+    "groups": {
+      "newNode": 22,
+      "existingNode": 40,
+      "newBrowser": 10,
+      "existingBrowser": 15,
+      "mandatory": 3
+    }
+  },
+  "buildReceipt": {
+    "path": "tools/dev-tests/beacon-build-result.json",
+    "sha256": "77b1eb371e64262da198622e518e86de51fd5629bf8f45cd13ca3ec09722a7f8"
+  },
+  "core": [
+    {
+      "path": "src/car.ts",
+      "sha256": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+      "bytes": 5605,
+      "unchanged": true
+    },
+    {
+      "path": "src/track.ts",
+      "sha256": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+      "bytes": 13424,
+      "unchanged": true
+    },
+    {
+      "path": "src/rivals.ts",
+      "sha256": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+      "bytes": 57505,
+      "unchanged": true
+    },
+    {
+      "path": "src/pitlane.ts",
+      "sha256": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+      "bytes": 51000,
+      "unchanged": true
+    }
+  ],
+  "rows": [
+    {
+      "name": "beacon-modes-node",
+      "category": "newNode",
+      "cases": 11,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-modes-node-result.json",
+      "receiptSha256": "16328d5f6a6b4eb2b47ccad306c1927b658c784a968be7d49f7230aedfaa3b7a",
+      "evidence": "tools/dev-tests/beacon-modes-node-evidence-1795415253311",
+      "scriptSha256": "cce6711f5cc4fb31d30552acb7090d3d6922180989a0f4e8ac78276820f24f82",
+      "sourceHashesChecked": 10
+    },
+    {
+      "name": "beacon-mobile-resources-node",
+      "category": "newNode",
+      "cases": 5,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-mobile-resources-node-result.json",
+      "receiptSha256": "9b4792573c6845ce5c42d5053977bbccba65f9f71b9affb66d982df678337a71",
+      "evidence": "tools/dev-tests/beacon-mobile-resources-node-evidence-1795414416771",
+      "scriptSha256": "0e9c6c3b3fd50f43ebbfe0373d917d47e87b1c0620a4b2e0a0d1d9ac53be32f6",
+      "sourceHashesChecked": 3
+    },
+    {
+      "name": "beacon-multiplayer-node",
+      "category": "newNode",
+      "cases": 4,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-node-result.json",
+      "receiptSha256": "af42ea8f504f05846f605c199f1c6ca558efaf549d29ab74e40ee251a84724a0",
+      "evidence": "tools/dev-tests/beacon-multiplayer-node-evidence-1795414590377-5aeb0e",
+      "scriptSha256": "4fa6f9d59e379089ca5749c4e46c686469da02093a0a81b784d3d55194a6b143",
+      "sourceHashesChecked": 12
+    },
+    {
+      "name": "beacon-multiplayer-soak",
+      "category": "newNode",
+      "cases": 1,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-soak-result.json",
+      "receiptSha256": "a226ee212612ed0a3718d9dce2b66d0333cd2db0c020660b1f1e4628391ee310",
+      "evidence": "tools/dev-tests/beacon-multiplayer-soak-evidence-1795414622553-479b07",
+      "scriptSha256": "4fa6f9d59e379089ca5749c4e46c686469da02093a0a81b784d3d55194a6b143",
+      "sourceHashesChecked": 12
+    },
+    {
+      "name": "beacon-multiplayer-long-soak",
+      "category": "newNode",
+      "cases": 1,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-long-soak-result.json",
+      "receiptSha256": "d1e9485264d5194a0961cdcd98cf9ce6b78f429c4c5b560c47a51d96dd2da317",
+      "evidence": "tools/dev-tests/beacon-multiplayer-long-soak-evidence-1795415326500-7ee264",
+      "scriptSha256": "5e762a98e60574e54ed923bc0c967aaa460498003a0011077d66e905a8bad811",
+      "sourceHashesChecked": 13
+    },
+    {
+      "name": "atlas-platform-models",
+      "category": "existingNode",
+      "cases": 15,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/atlas-platform-models-result.json",
+      "receiptSha256": "2c9986e7c48e5f829acdaca6a16eb1bfda567a5324b7c2b71ea7102ea73169cc",
+      "evidence": "tools/dev-tests/atlas-platform-models-evidence-1795415350945-269d997b",
+      "scriptSha256": "8d058b3b8ae0841a155ccb4dbd4f85e93d953f2b5dc01fbade0c3afd5157f601",
+      "sourceHashesChecked": 10
+    },
+    {
+      "name": "beacon-multiplayer-regressions",
+      "category": "wrapperOnly",
+      "cases": 2,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-regressions-result.json",
+      "receiptSha256": "678b7764d2885dfc0bd995358440d80d70476d925354f793485ca96647cf47f1",
+      "evidence": "tools/dev-tests/beacon-multiplayer-regressions-evidence-1795414836836-2b1fc5",
+      "scriptSha256": "79e467d76b662c01801b8a6ba2aa48f077ad6a508b2124dfafbb9c365006e2c0",
+      "sourceHashesChecked": 11
+    },
+    {
+      "name": "meridian-racing-node",
+      "category": "existingNode",
+      "cases": 11,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-regressions-evidence-1795414836836-2b1fc5/meridian-racing-node-result.json",
+      "receiptSha256": "460f0232c1664b714bf68e58e1cf9ce2b371efd18211869857e940e801f99dbf",
+      "evidence": "tools/dev-tests/beacon-multiplayer-regressions-evidence-1795414836836-2b1fc5",
+      "verifiedBy": "beacon-multiplayer-regressions",
+      "sourceHashesChecked": 0
+    },
+    {
+      "name": "multiplayer-server-regression",
+      "category": "existingNode",
+      "cases": 14,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-multiplayer-regressions-evidence-1795414836836-2b1fc5/multiplayer-server-summary.json",
+      "receiptSha256": "91b24c89aa4a682f81bfb9c0647947eaebf67d858192a5a9ef76e2a88fba829a",
+      "evidence": "tools/dev-tests/beacon-multiplayer-regressions-evidence-1795414836836-2b1fc5",
+      "verifiedBy": "beacon-multiplayer-regressions",
+      "sourceHashesChecked": 4
+    },
+    {
+      "name": "beacon-modes-browser",
+      "category": "newBrowser",
+      "cases": 8,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-modes-browser-result.json",
+      "receiptSha256": "f3453a1bf6c065df297d4ec003bb08df5ee35749544888c1fab0db1b544932d5",
+      "evidence": "tools/dev-tests/beacon-modes-browser-evidence-1795415675870",
+      "scriptSha256": "3abd21873f37bc08dc7381e1d62fcab983a250a3a5dca41a28b274adcb32f1fa",
+      "sourceHashesChecked": 10
+    },
+    {
+      "name": "beacon-mobile-browser",
+      "category": "newBrowser",
+      "cases": 2,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-mobile-browser-result.json",
+      "receiptSha256": "a67bff461c6f7adfb350ba2e33b2810d3f72a6a3b01da48259b6a97cc970b650",
+      "evidence": "tools/dev-tests/beacon-mobile-browser-evidence-1795415644984",
+      "scriptSha256": "2c2f04b1699b560fbd9e3ada19a44216affde0bc59f71909e6d85bd7c9409267",
+      "sourceHashesChecked": 4
+    },
+    {
+      "name": "meridian-racing-browser",
+      "category": "existingBrowser",
+      "cases": 5,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/meridian-racing-browser-result.json",
+      "receiptSha256": "bb864085a43fc59b93993dcf1b8c888c3c8c58fe86878c0068574530158f49ef",
+      "evidence": "tools/dev-tests/meridian-racing-browser-evidence-1795416422595",
+      "scriptSha256": "6cf5a3f9d0d95e14e32aced67e7431b9c7f104a0a6df16310b5a4ff05e74c806",
+      "sourceHashesChecked": 21
+    },
+    {
+      "name": "meridian-city-browser",
+      "category": "existingBrowser",
+      "cases": 10,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/meridian-city-browser-result.json",
+      "receiptSha256": "6653af90f3192a2e89544e37552ba48ff9e7d36d1074d91546291e01c6cdf2d2",
+      "evidence": "tools/dev-tests/meridian-city-browser-evidence-1795416097374",
+      "scriptSha256": "193c976017c66dd20ff859d15480bc731233dfc1df0feeadb0422a72cdb1a081",
+      "sourceHashesChecked": 15
+    },
+    {
+      "name": "beacon-chain-stab",
+      "category": "mandatory",
+      "cases": 3,
+      "status": "PASS",
+      "receipt": "tools/dev-tests/beacon-chain-stab-result.json",
+      "receiptSha256": "1521a7dcece400f3e27ecfe5c56a789054a8312d3dbd024e3d5e5b937bd4ee14",
+      "evidence": "tools/dev-tests/beacon-chain-stab-evidence-1795416709608",
+      "scriptSha256": "ea369403f309ae02a45e91751109a3ce8c5099d76da50929a2e24bb8a209653d",
+      "sourceHashesChecked": 7
+    }
+  ],
+  "beforeControls": [
+    {
+      "name": "beacon-modes-before-browser",
+      "status": "PASS",
+      "cases": 1,
+      "receipt": "tools/dev-tests/beacon-modes-before-browser-result.json",
+      "evidence": "tools/dev-tests/beacon-modes-before-browser-evidence-1795415293244",
+      "receiptSha256": "089d9ebe842465e9934cf8c2f4bdc41b36cb2ed15c3580b84e06d0848cd52a1b",
+      "build": "862f7f9c9857"
+    },
+    {
+      "name": "beacon-mobile-browser-before",
+      "status": "PASS",
+      "cases": 2,
+      "receipt": "tools/dev-tests/beacon-mobile-browser-before-result.json",
+      "evidence": "tools/dev-tests/beacon-mobile-browser-before-evidence-1795415534306",
+      "receiptSha256": "6b8be3c5bd80c1d9fe882487656172f01ec995eb14bde551b044d8016ad47a18",
+      "build": "862f7f9c9857"
+    },
+    {
+      "name": "beacon-multiplayer-before",
+      "status": "PASS",
+      "cases": 1,
+      "receipt": "tools/dev-tests/beacon-multiplayer-before-result.json",
+      "evidence": "tools/dev-tests/beacon-multiplayer-before-evidence-1795414310640-022074",
+      "receiptSha256": "59a7d9cbc815cc8d1c56ef5f24c13153938c7b0fa7be5db21064f5213855bddd",
+      "build": null
+    }
+  ],
+  "historicalFailures": [
+    {
+      "receipt": "tools/dev-tests/beacon-mobile-browser-before-evidence-1795414580439/report.json",
+      "receiptSha256": "9589cb7fe0f6c748e4f8654299f13a42d8f02bfff79152c9862ef7e496bdc6ae",
+      "summary": {
+        "PASS": 0,
+        "FAIL": 0
+      },
+      "fatal": "Error: Network did not settle\n    at quiet (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/beacon-mobile-browser.mjs:8:299)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/beacon-mobile-browser.mjs:15:742"
+    },
+    {
+      "receipt": "tools/dev-tests/beacon-mobile-network-diagnostic-evidence-1795415338479/report.json",
+      "receiptSha256": "baddff69ecc80e645a9b3f2f8ed051f3c6e3b35baa4243d317f6f2b1a4dea514",
+      "summary": null,
+      "fatal": "Error: Network remained pending for 90 seconds after stream.pending reached zero\n    at file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/beacon-mobile-network-diagnostic.mjs:40:206"
+    },
+    {
+      "receipt": "tools/dev-tests/beacon-mobile-resources-node-evidence-1795414339177/report.json",
+      "receiptSha256": "02e65afe8e9224f4ab92c61ed422299ce1a556a85672ef978e9de8290a835928",
+      "summary": {
+        "PASS": 1,
+        "FAIL": 4
+      },
+      "fatal": null
+    },
+    {
+      "receipt": "tools/dev-tests/beacon-multiplayer-node-evidence-1795414347678-dab160/report.json",
+      "receiptSha256": "78508a401d2f204736d738336643f2924d2418813a460c70cbce60f0f2724962",
+      "summary": {
+        "PASS": 2,
+        "FAIL": 2
+      },
+      "fatal": null
+    },
+    {
+      "receipt": "tools/dev-tests/meridian-racing-browser-evidence-1795415845907/report.json",
+      "receiptSha256": "548ec2fdd3bf2516c4bcfbafd3165b1f7e0559a4ab87cff831aa54593951a57c",
+      "summary": {
+        "PASS": 3,
+        "FAIL": 1
+      },
+      "fatal": "Error: meridian-racing-browser-0: {\"exceptionId\":1,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":120,\"scriptId\":\"147\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"147\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":126},{\"functionName\":\"\",\"scriptId\":\"147\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":281}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"Error\",\"description\":\"Error: button unavailable:mp-meridian-result-close\\n    at <anonymous>:1:127\\n    at <anonymous>:1:282\",\"objectId\":\"8352876707522969665.3.2\"}}\n    at CdpConnection.evaluate (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/multiplayer-ui-cdp.mjs:39:42)\n    at async click (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/multiplayer-ui-cdp.mjs:67:17)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/meridian-racing-browser.mjs:63:195\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-beacon-work/tools/dev-tests/meridian-racing-browser.mjs:62:2"
+    }
+  ],
+  "limitations": [
+    "手機實機30分鐘、FPS、溫度、耗電尚未驗證；desktop viewport與WebGL物件數不能代替。",
+    "四人長測為本機真WebSocket與真牆鐘600秒；兩部當棒車、六個明示pit pose，最後仍racing，未宣稱正常完賽、跨網路或免費主機容量。",
+    "核心加速場另以真Car完成權威607.5秒；pit及終點接近姿態明示fixture。延後與略過輸入為應用排程，非TCP真丟包。",
+    "本輪不commit、push、部署或測正式站；最終套回狀態以DCISI/TAIPEI_BEACON_DELIVERY.md與獨立收據為準。",
+    "舊錦標賽browser首輪3 PASS／1 FAIL，補有界UI前置條件與診斷後5 PASS；重跑等待前已就緒，首次失敗根因仍未確定，原收據與腳本快照保留。"
+  ],
+  "longSoakReceipt": "tools/dev-tests/beacon-multiplayer-long-soak-evidence-1795415326500-7ee264",
+  "aggregatorSha256": "1a426ea4bd9ec338c73bd4478827340da025f2186114c3e1f18638522bafe212",
+  "targetPhone": {
+    "model": "iPhone 17",
+    "browser": "Safari",
+    "osVersion": null,
+    "browserVersion": null,
+    "realDeviceValidated": false
+  },
+  "evidence": "tools/dev-tests/beacon-validation-audit-evidence-1795416860195"
+}

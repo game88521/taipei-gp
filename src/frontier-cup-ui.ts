@@ -1,4 +1,4 @@
-import {FRONTIER_CUP_VERSION,CUP_MATCH_LABELS,cupCompatible,cupStandings,type CupCommand,type FrontierCupState} from '../shared/frontier-cup';
+import {FRONTIER_CUP_VERSION,CUP_MATCH_LABELS,cupCompatible,cupStandings,leagueTable,leagueFinalWins,type CupCommand,type FrontierCupState} from '../shared/frontier-cup';
 import {getMultiplayerTrack} from '../shared/multiplayer-tracks';
 import type {RoomSnapshot} from '../shared/multiplayer-protocol';
 import type {MultiplayerClient} from './multiplayer-client';
@@ -9,6 +9,7 @@ const replayReason=(c:FrontierCupState)=>({tie:'兩位完賽成績相同', 'both
 const time=(ms:number)=>`${(ms/1000).toFixed(3)} 秒`;
 export class FrontierCupPanel {
  private lobby=make('section');private result=make('section');private live=make('p');private create=make('button','鎖定四人，建立好友盃');
+ private leagueCreate=make('button','鎖定2～4人，循環對戰＋BO3決賽');
  private start=make('button','開始這一場');private next=make('button');private cancelLobby=make('button','取消整盃');private cancelResult=make('button','結束好友盃，回一般大廳');
  private cancelLive=make('button','取消整盃');
  private download=make('button','下載本盃結果');private lobbyNote=make('p');private resultNote=make('p');private lobbyBracket=make('ol');private resultBracket=make('ol');private standings=make('ol');private bracketKey='';
@@ -23,15 +24,16 @@ export class FrontierCupPanel {
   this.create.id='mp-cup-create';this.start.id='mp-cup-start';this.next.id='mp-cup-next';this.download.id='mp-cup-download';this.cancelLobby.id='mp-cup-cancel';this.cancelResult.id='mp-cup-finish';
   this.start.className=this.next.className='mp-wide mp-primary';this.create.className='mp-wide';
   this.lobbyBracket.className=this.resultBracket.className='frontier-cup-bracket';this.standings.className='frontier-cup-standings';
-  this.lobby.append(make('h3','四人好友盃'),help,this.lobbyNote,this.lobbyBracket,this.create,this.start,this.cancelLobby,persistence);
+  this.leagueCreate.id='mp-cup-league-create';this.leagueCreate.type='button';this.leagueCreate.className='mp-wide';const leagueHelp=make('p','循環盃：2～4人每對單挑一次，勝場→完賽數→累積完賽時間→原種子排序，前兩名決賽三戰兩勝；決賽逐場交換左右發車側。候場者留在原席觀戰，每場全員重備；與四人淘汰盃分開。');leagueHelp.className='mp-hint';
+  this.lobby.append(make('h3','好友盃'),help,leagueHelp,this.lobbyNote,this.lobbyBracket,this.create,this.leagueCreate,this.start,this.cancelLobby,persistence);
   this.result.append(make('h3','好友盃賽程'),this.resultNote,this.resultBracket,this.standings,this.next,this.download,this.cancelResult);
   document.getElementById('mp-room')?.append(this.lobby);document.getElementById('mp-results')?.append(this.result);document.getElementById('mp-hud')?.append(this.live,this.cancelLive);
-  this.create.onclick=()=>this.send('cup-configure');this.start.onclick=()=>this.send('cup-start');this.next.onclick=()=>this.send(this.getClient()?.room?.cup?.status==='replay'?'cup-replay':'cup-next');
+  this.leagueCreate.onclick=()=>this.send('cup-configure-league');this.create.onclick=()=>this.send('cup-configure');this.start.onclick=()=>this.send('cup-start');this.next.onclick=()=>this.send(this.getClient()?.room?.cup?.status==='replay'?'cup-replay':'cup-next');
   this.cancelLobby.onclick=this.cancelResult.onclick=this.cancelLive.onclick=()=>{
    const client=this.getClient(),intent=client?.captureCupIntent();if(!client||!intent)return;
    if(confirm(client.room?.cup?.status==='complete'?'結束本盃並回到一般大廳？請先下載要保留的結果。':'取消整盃並放棄目前賽程？所有人會回到一般大廳。'))client.cupCommand('cup-cancel',intent);
   };
-  this.download.onclick=()=>{const c=this.getClient()?.room?.cup;if(!c||c.status!=='complete')return;const data={schema:FRONTIER_CUP_VERSION,settings:c.locked,entrants:c.entrants,matches:c.matches,standings:cupStandings(c)},url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=make('a');a.href=url;a.download='taipei-friends-cup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);};
+  this.download.onclick=()=>{const c=this.getClient()?.room?.cup;if(!c||c.status!=='complete')return;const data={schema:FRONTIER_CUP_VERSION,...(c.league?{league:c.league}:{}),settings:c.locked,entrants:c.entrants,matches:c.matches,standings:cupStandings(c)},url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=make('a');a.href=url;a.download='taipei-friends-cup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);};
  }
  private send(command:CupCommand){this.getClient()?.cupCommand(command);}
  render(room:RoomSnapshot|null,selfId:string|null,connected:boolean,busy=false){
@@ -42,24 +44,26 @@ export class FrontierCupPanel {
   const cup=room?.cup,cap=room?.capabilities?.frontierCup===FRONTIER_CUP_VERSION,host=room?.hostId===selfId,me=room?.players.find(p=>p.id===selfId);
   this.lobby.hidden=!cap||room?.phase!=='lobby';this.result.hidden=!cup||room?.phase!=='results';this.live.hidden=!cup||!['countdown','racing'].includes(room?.phase??'');
   this.cancelLive.hidden=!cup||!host||!['countdown','racing'].includes(room?.phase??'');
-  const can=!!room&&connected&&!busy&&host,loaded=!!room&&room.players.length===4&&room.players.every(p=>p.connected&&p.loaded&&!p.summit?.ai);
+  const can=!!room&&connected&&!busy&&host,loaded=!!room&&room.players.length===(cup?.entrants.length??4)&&room.players.every(p=>p.connected&&p.loaded&&!p.summit?.ai);
+  const leagueLoaded=!!room&&room.players.length>=2&&room.players.length<=4&&room.players.every(p=>p.connected&&p.loaded&&!p.summit?.ai);this.leagueCreate.hidden=!!cup||room?.capabilities?.auroraCup!=='aurora-league-v1';this.leagueCreate.disabled=!can||!leagueLoaded||!cupCompatible(room??{})||!!room?.spectators?.length;
   this.create.hidden=!!cup;this.create.disabled=!can||!loaded||!cupCompatible(room??{})||!!room?.spectators?.length;
   this.start.hidden=!cup||!host;this.start.disabled=!can||!loaded||room!.players.some(p=>!p.ready)||cup?.status!=='ready';
   this.cancelLobby.hidden=!cup||!host;this.cancelResult.hidden=!host;this.cancelLobby.disabled=this.cancelResult.disabled=this.cancelLive.disabled=!can;
   this.next.hidden=!host||!cup||cup.status==='complete';this.next.disabled=!can||!cup||!['decided','replay'].includes(cup.status);
   this.download.hidden=cup?.status!=='complete';
-  if(!cup){text(this.lobbyNote,!loaded?'需要四位新版真人都已連線並載入地圖。':!cupCompatible(room??{})?'請先關閉系列、AI 與其他特殊玩法。':room?.spectators?.length?'請外部觀眾先離房；這一盃由原四席輪流觀戰。':'先選好本盃的賽道、圈數與碰撞規則，再鎖定名單。');return;}
+  if(!cup){text(this.lobbyNote,!leagueLoaded?'循環盃需2～4位新版真人，淘汰盃需4位；原車手都要連線並載入地圖。':!cupCompatible(room??{})?'請先關閉系列、AI 與其他特殊玩法。':room?.spectators?.length?'請外部觀眾先離房；本盃由原車手輪流觀戰。':!loaded?'目前可建立循環盃；四人淘汰盃需要4位新版真人都已載圖。':'先選好本盃的賽道、圈數與碰撞規則，再鎖定名單。');return;}
   const match=cup.matches[cup.index],label=CUP_MATCH_LABELS[match.key],track=getMultiplayerTrack(cup.locked.trackId)?.name??cup.locked.trackId;
   text(this.start,`全員準備後開始${label}`);
-  text(this.lobbyNote,`${label} · 第 ${match.attempt} 次 · ${track}／${cup.locked.laps} 圈。${me?.cup?.active?'你是本場出賽車手。':'你留在原席觀戰，本場不列 DNF。'}${loaded?'請四位原車手都按準備。':'等待四個原席重新連線並載入；15 秒後仍失去席位時，請取消整盃重開。'}`);
+  text(this.lobbyNote,`${label} · 第 ${match.attempt} 次 · ${track}／${cup.locked.laps} 圈。${me?.cup?.active?'你是本場出賽車手。':'你留在原席觀戰，本場不列 DNF。'}${loaded?`請${cup.entrants.length}位原車手都按準備。`:'等待原席重新連線並載入；15 秒後仍失去席位時，請取消整盃重開。'}`);
   text(this.live,`${label} · ${me?.cup?.active?'你正在出賽':'原席觀戰，不列 DNF'} · 第 ${match.attempt} 次`);
-  text(this.resultNote,cup.status==='complete'?'四場已完成，下方是本盃最終名次。下載結果後可結束好友盃。':cup.status==='replay'?`${replayReason(cup)}，這場沒有勝負與晉級。請重賽同一組，或明確取消整盃。`:`${label}已結算；房主前往下一場後，四位原車手都要重新準備。`);
-  text(this.next,cup.status==='replay'?'重賽這一場':`前往${CUP_MATCH_LABELS[cup.matches[Math.min(3,cup.index+1)].key]}`);
+  text(this.resultNote,cup.status==='complete'?'本盃已完成，下方是最終名次。下載結果後可結束好友盃。':cup.status==='replay'?`${replayReason(cup)}，這場沒有勝負與晉級。請重賽同一組，或明確取消整盃。`:`${label}已結算；房主前往下一場後，全部原車手都要重新準備。`);
+  text(this.next,cup.status==='replay'?'重賽這一場':`前往${CUP_MATCH_LABELS[cup.matches[Math.min(cup.matches.length-1,cup.index+1)].key]}`);
   const key=JSON.stringify([cup.id,cup.revision]);if(key!==this.bracketKey){this.bracketKey=key;this.lobbyBracket.replaceChildren();this.resultBracket.replaceChildren();this.standings.replaceChildren();
    for(const m of cup.matches){const names=m.pair?.map(id=>cup.entrants.find(e=>e.playerId===id)?.name??'原車手').join(' 對 ')??(m.key==='bronze'?'兩場準決賽落敗者':'兩場準決賽勝出者'),status=m.status==='decided'?`勝出：${cup.entrants.find(e=>e.playerId===m.winnerId)?.name}`:m.status==='replay'?'需重賽':m.status==='running'?'進行中':'待出賽';
     for(const list of[this.lobbyBracket,this.resultBracket]){const li=make('li'),title=make('b',CUP_MATCH_LABELS[m.key]),body=make('span',`${names} · ${status}`);if(m.key===match.key)li.dataset.current='true';li.append(title,body);if(m.results.length)li.append(make('small',m.results.map(r=>`${cup.entrants.find(e=>e.playerId===r.playerId)?.name}：${r.dnf?'未完賽':r.finishMs===null?'未完成':time(r.finishMs)}`).join('／')));list.append(li);}
    }
    for(const row of cupStandings(cup))this.standings.append(make('li',`第 ${row.rank} 名：${row.name}`));
+   if(cup.league){const wins=leagueFinalWins(cup);for(const row of leagueTable(cup))this.standings.append(make('li',`${row.name} · 循環${row.wins}勝／${row.finishes}次完賽／累積${(row.totalMs/1000).toFixed(3)}秒 · 決賽${wins.find(e=>e.id===row.playerId)?.wins??0}勝`));}
   }
  }
 }

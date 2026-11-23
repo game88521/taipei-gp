@@ -20,6 +20,7 @@ import { buildRoads, buildCrossings, buildStreetSigns, buildLandmarks, type Land
 import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
 import { Breakables } from './breakables';
+import { releaseCityTile } from './beacon-mobile-resources';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 const TILE = 300; // 城市分區塊的大小（m）
@@ -586,17 +587,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     const gi = growing.findIndex((it) => it.g === L.group);
     if (gi >= 0) growing.splice(gi, 1);
     for (const c of L.cull) cullables.delete(c);
-    L.group.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      if (!mesh.geometry.userData.shared) mesh.geometry.dispose();
-      if ((mesh as THREE.InstancedMesh).isInstancedMesh) (mesh as THREE.InstancedMesh).dispose(); // 放掉每棵樹、每台機車的矩陣
-      for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p.userData.ownMats) { (mesh.material as THREE.Material).dispose(); break; } // 地標專屬造型自己的材質
-    });
-    // 拆開父子關係：three.js 的繪製清單會留著上幾格畫過的物件（重複使用的陣列），
-    // 只要其中一個還被參照，整個區塊（所有子物件、樹和機車的矩陣）都放不掉
-    L.group.traverse((o) => { if (o !== L.group) o.parent = null; });
-    for (const o of [L.group, ...L.group.children]) o.children.length = 0;
+    releaseCityTile(L.group); // 包含地標骨架線；共享城市幾何、材質與貼圖保留。
     collider.removeTag(i, L.bb);
     breakables.removeTag(i, L.bb);
     stream.onRemove?.();

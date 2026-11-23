@@ -1,0 +1,24 @@
+// Rex <game88521@gmail.com>. Real compiled product clients, independent stores and loopback authority.
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {fileURLToPath} from 'node:url';
+import {writeFile} from 'node:fs/promises';
+import {WebSocketServer} from '../../server/node_modules/ws/wrapper.mjs';
+import {ExpeditionSocialService} from '../../server/expedition-social-service.mjs';
+import {SOCIAL_VERSION} from '../../shared/expedition-social.ts';
+import {PARTY_VERSION} from '../../shared/aurora-social.ts';
+import {voyagerModule} from './voyager-module-loader.mjs';
+import {startAudit,finishAudit} from './summit-workshop-audit.mjs';
+const root=fileURLToPath(new URL('../../',import.meta.url));
+const {ExpeditionSocialClient}=await voyagerModule(root,'expedition-social-client.ts');
+const report={status:'FAIL',localOnly:true,externalRequests:0,cases:[],limitations:['真產品client命令與能力／世代測試；不代表瀏覽器、真人駕駛或外網容量。'],...await startAudit(root,new URL(import.meta.url),['src/expedition-social-client.ts','server/expedition-social-service.mjs','server/aurora-social-service.mjs','shared/aurora-social.ts'])};
+async function test(name,fn){try{report.cases.push({name,status:'PASS',details:await fn()});}catch(e){report.cases.push({name,status:'FAIL',error:String(e.stack).replace(/data:text\/javascript;base64,[A-Za-z0-9+/=]+/g,'[產品TS]').slice(0,4000)});}console.log(JSON.stringify(report.cases.at(-1)));}
+const service=new ExpeditionSocialService(),http=createServer(),wss=new WebSocketServer({server:http}),clients=[],wire=[];let legacy=false;wss.on('connection',ws=>{if(legacy){ws.send(JSON.stringify({type:'hello',v:SOCIAL_VERSION}));ws.on('message',raw=>wire.push(JSON.parse(String(raw))));return;}service.accept(ws);ws.on('message',raw=>wire.push(JSON.parse(String(raw))));});await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));const endpoint='ws://127.0.0.1:'+http.address().port+'/city-social';
+async function until(fn){for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('真產品client等待逾時');}
+function client(){const values=new Map(),storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},c=new ExpeditionSocialClient(endpoint,()=>{},storage);clients.push(c);return c;}
+let a,b,c,r;
+try{
+ await test('三個真產品client協商party/convoy/crown能力並啟用同房派對',async()=>{a=client();b=client();c=client();await a.enter('create','產品派對甲','sedan','cruise','dry');const code=a.room.code;await b.enter('join','產品派對乙','sedan','cruise','dry',code);await c.enter('join','產品派對丙','sedan','cruise','dry',code);await until(()=>clients.every(x=>x.room?.players.length===3));r=service.rooms.get(code);assert.ok(clients.every(x=>x.partySupported&&x.convoySupported&&x.crownSupported));assert.equal(a.party('party-enable'),true);await until(()=>clients.every(x=>!!x.room?.party));assert.ok(wire.filter(m=>['create','join'].includes(m.type)).every(m=>m.partyVersion===PARTY_VERSION));return{realLoopback:true,productClients:3};});
+ await test('真client每人投票、改票、同房換模式清ready與舊世代，未有party禁止假投票',async()=>{const code=r.code,run=r.runId;assert.equal(b.party('party-vote',{mode:'chase',ballot:r.party.ballot}),true);await until(()=>r.party.votes.size===1);assert.equal(b.party('party-vote',{mode:'convoy',ballot:r.party.ballot}),true);for(const p of[a,c])assert.equal(p.party('party-vote',{mode:'convoy',ballot:r.party.ballot}),true);await until(()=>r.party.votes.size===3&&r.party.votes.get(b.selfId)==='convoy');assert.equal(a.party('party-next'),true);await until(()=>clients.every(x=>x.room?.mode==='convoy'));assert.equal(r.code,code);assert.notEqual(r.runId,run);assert.ok([...r.players.values()].every(p=>!p.ready));assert.equal(a.room.party.votes.length,0);return{sameCode:true,newRun:true};});
+ await test('舊hello未宣告派對不送新命令，保留明確能力提示',async()=>{legacy=true;const old=client();await old.connect();const count=wire.length;assert.equal(old.partySupported,false);assert.equal(old.party('party-enable'),false);await new Promise(r=>setTimeout(r,25));assert.equal(wire.length,count);return{legacyFeatureGated:true};});
+}finally{for(const c of clients)c.leave();service.close();for(const ws of wss.clients)ws.terminate();await new Promise(r=>wss.close(r));await new Promise(r=>http.close(r));report.cleanupComplete=!http.listening&&service.clients.size===0&&service.rooms.size===0;await finishAudit(root,new URL(import.meta.url),report);report.summary={PASS:report.cases.filter(c=>c.status==='PASS').length,FAIL:report.cases.filter(c=>c.status==='FAIL').length};report.status=!report.summary.FAIL&&report.cleanupComplete&&report.sourceUnchangedDuringTests&&report.scriptUnchangedDuringTests?'PASS':'FAIL';await writeFile(new URL('aurora-social-client-node-result.json',import.meta.url),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,...report.summary}));if(report.status!=='PASS')process.exitCode=1;}

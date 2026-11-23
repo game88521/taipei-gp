@@ -81,6 +81,7 @@ export class SummitCityRaceService {
   }
   tick(now=this.now()){
     for(const r of this.rooms.values()){
+      if(this.skipBaseTick?.(r,now))continue;
       for(const p of [...r.players.values()])if(!p.client&&p.disconnectedAt&&now-p.disconnectedAt>15000){if(r.phase==='racing'||r.phase==='results'&&r.matchId){if(p.finishMs===null)p.dnf??='斷線超過15秒';}else{r.players.delete(p.id);r.revision++;for(const q of r.players.values())q.ready=false;}}
       if(!r.players.size){this.rooms.delete(r.code);continue;}if(!r.players.has(r.hostId)||!r.players.get(r.hostId).client)r.hostId=[...r.players.values()].find(p=>p.client)?.id??r.players.keys().next().value;
       // Retain disconnected results while another racer is present, but release

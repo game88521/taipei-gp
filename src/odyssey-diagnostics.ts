@@ -1,3 +1,8 @@
+import {MERIDIAN_ROTATION_VERSION} from '../shared/meridian-social';
+import {MERIDIAN_NAVIGATOR_VERSION} from '../shared/meridian-navigator';
+import {MERIDIAN_CITY_VERSION} from '../shared/meridian-city';
+import {MERIDIAN_RACING_VERSION} from '../shared/meridian-racing';
+import {MERIDIAN_CHECKPOINT_VERSION} from '../shared/meridian-checkpoints';
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol';
 import { COOP_VERSION, COOP_CITY_STAMP } from '../shared/nexus-coop';
 import { CITY_RACE_VERSION } from '../shared/summit-city-race';
@@ -12,12 +17,12 @@ import {DUTY_MISSIONS_VERSION} from '../shared/frontier-duty-missions';
 import './odyssey-network.css';
 const localProtocol = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, coopVersion: COOP_VERSION, cityRaceVersion: CITY_RACE_VERSION };
 export type DiagnosticCode = 'CONFIGURATION' | 'UNREADABLE' | 'SERVICE_HTTP' | 'ORIGIN_DENIED' | 'VERSION_MISMATCH' | 'WS_UNCONFIRMED' | 'PASS' | 'CANCELLED';
-const localCapabilities={socialVersion:SOCIAL_VERSION,dutyVersion:EXPEDITION_DUTY_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:CITY_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,rallyVersion:FRONTIER_RALLY_VERSION,dutyMissionsVersion:DUTY_MISSIONS_VERSION};
+const localCapabilities={rotationVersion:MERIDIAN_ROTATION_VERSION,navigatorVersion:MERIDIAN_NAVIGATOR_VERSION,meridianCityVersion:MERIDIAN_CITY_VERSION,meridianRacingVersion:MERIDIAN_RACING_VERSION,meridianCheckpointVersion:MERIDIAN_CHECKPOINT_VERSION,socialVersion:SOCIAL_VERSION,dutyVersion:EXPEDITION_DUTY_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:CITY_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,rallyVersion:FRONTIER_RALLY_VERSION,dutyMissionsVersion:DUTY_MISSIONS_VERSION};
 type Capabilities=Partial<typeof localCapabilities>;
 export interface DiagnosticReport { schema: 1; time: string; pageOrigin: string; serviceOrigin: string; endpointPath?:string; code: DiagnosticCode; local: typeof localProtocol; remote?: typeof localProtocol; localCapabilities?:typeof localCapabilities; remoteCapabilities?:Capabilities }
 export function diagnosticEndpoints(endpoint: string, secure: boolean) {
   try { const u = new URL(endpoint); if (!['ws:', 'wss:'].includes(u.protocol) || u.username || u.password || u.search || u.hash || secure && u.protocol !== 'wss:') return null;
-    if(!['/ws','/coop','/city-race','/city-social','/city-duty','/city-rally'].includes(u.pathname))return null;
+    if(!['/ws','/coop','/city-race','/city-social','/city-duty','/city-rally','/city-mission'].includes(u.pathname))return null;
     const ws = u.href; u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'; u.pathname = '/diagnostics'; return { http: u.href, ws, origin: u.origin };
   } catch { return null; }
 }
@@ -27,7 +32,7 @@ export function parseDiagnostic(raw: unknown) {
   if (v.schema !== 1 || v.status !== 'ok' || typeof v.originAllowed !== 'boolean' || !p || typeof p !== 'object' || Array.isArray(p) || !Number.isSafeInteger(p.version) || Number(p.version) < 1 || !Number.isSafeInteger(p.coopVersion) || Number(p.coopVersion) < 1 || !['physics', 'catalogStamp', 'cityRaceVersion'].every(k => typeof p[k] === 'string' && (p[k] as string).length > 0 && (p[k] as string).length <= 180)) return null;
   // Select known fields only; never export an untrusted body or arbitrary service text.
   const capabilities:Capabilities={},c=v.capabilities;
-  if(c&&typeof c==='object'&&!Array.isArray(c))for(const key of ['socialVersion','dutyVersion','cityReplayVersion','autoResumeVersion','convoyVersion','crownVersion','rallyVersion','dutyMissionsVersion'] as const){const value=(c as Record<string,unknown>)[key];if(value!==undefined){if(typeof value!=='string'||!value||value.length>80)return null;capabilities[key]=value;}}
+  if(c&&typeof c==='object'&&!Array.isArray(c))for(const key of ['rotationVersion','navigatorVersion','meridianCityVersion','meridianRacingVersion','meridianCheckpointVersion','socialVersion','dutyVersion','cityReplayVersion','autoResumeVersion','convoyVersion','crownVersion','rallyVersion','dutyMissionsVersion'] as const){const value=(c as Record<string,unknown>)[key];if(value!==undefined){if(typeof value!=='string'||!value||value.length>80)return null;capabilities[key]=value;}}
   return { allowed: v.originAllowed, protocol: { version: Number(p.version), physics: String(p.physics), catalogStamp: String(p.catalogStamp), coopVersion: Number(p.coopVersion), cityRaceVersion: String(p.cityRaceVersion) }, capabilities };
 }
 const labels: Record<DiagnosticCode, string> = {
@@ -50,6 +55,7 @@ export async function runDiagnostic(endpoint: string, pageOrigin: string, signal
     report.remoteCapabilities=parsed.capabilities;
     if (!parsed.allowed) return { ...report, code: 'ORIGIN_DENIED' };
     if (Object.keys(localProtocol).some(k => parsed.protocol[k as keyof typeof localProtocol] !== localProtocol[k as keyof typeof localProtocol])) return { ...report, code: 'VERSION_MISMATCH' };
+    if(endpointPath==='/city-mission'&&parsed.capabilities.meridianCityVersion!==MERIDIAN_CITY_VERSION)return {...report,code:'VERSION_MISMATCH'};
     if(endpointPath==='/city-social'&&parsed.capabilities.socialVersion!==SOCIAL_VERSION||endpointPath==='/city-duty'&&(parsed.capabilities.dutyVersion!==EXPEDITION_DUTY_VERSION||parsed.capabilities.dutyMissionsVersion!==DUTY_MISSIONS_VERSION)||endpointPath==='/city-rally'&&parsed.capabilities.rallyVersion!==FRONTIER_RALLY_VERSION)return {...report,code:'VERSION_MISMATCH'};
     report.code = 'WS_UNCONFIRMED';
     const okay = await new Promise<boolean>(resolve => {

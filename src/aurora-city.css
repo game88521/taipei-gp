@@ -1,0 +1,13 @@
+#aurora-story-editor,#aurora-bus-operation,#aurora-director{min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+#aurora-story-stages>div{display:grid;gap:6px;margin:12px 0;padding:8px;border:1px solid #456076;border-radius:8px}
+#aurora-story-editor input[type=checkbox]{width:44px;min-width:44px;height:44px;vertical-align:middle}
+#aurora-story-editor button,#aurora-bus-operation button{white-space:normal;overflow-wrap:anywhere;margin:4px;max-width:100%}
+#aurora-bus-operation select,#aurora-bus-operation input{width:100%;box-sizing:border-box;font:inherit}
+#aurora-bus-history,#aurora-director-clips{padding-left:24px}
+#aurora-director label{display:grid;gap:4px;margin:6px 0}
+#aurora-director input,#aurora-director select{width:100%;min-width:0;padding:8px;background:#142536;color:#fff;border:1px solid #648298;border-radius:6px}
+#aurora-director-download{min-height:44px;padding:10px;box-sizing:border-box;color:#a5edff}
+#aurora-director-download[hidden],#aurora-director-video[hidden],#aurora-director-caption[hidden],#aurora-story-hud[hidden]{display:none!important}
+#aurora-story-hud{box-sizing:border-box;max-height:calc(100dvh - 95px);overflow:auto;white-space:pre-line}
+#aurora-story-hud button{min-height:44px;min-width:44px;white-space:normal;margin:4px;padding:8px;border-radius:8px;background:#234359;color:#fff;border:1px solid #91b5c2}
+@media(max-height:440px){#aurora-story-hud{top:8px!important;max-height:calc(100dvh - 16px);max-width:calc(100vw - 180px)!important}}

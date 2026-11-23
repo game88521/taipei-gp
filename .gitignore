@@ -25,3 +25,15 @@ tools/dev-tests/nexus-coop-server-stderr.txt
 tools/dev-tests/frontier-*-evidence-*/
 tools/dev-tests/frontier-*-log.txt
 tools/dev-tests/frontier-*-before*.json
+
+# 本機測試產物；保留在本機，不提交截圖、錄影、私席fixture與中介輸出。
+tools/dev-tests/aurora-*-evidence-*/
+tools/dev-tests/meridian-*-evidence-*/
+tools/dev-tests/beacon-*-evidence-*/
+tools/dev-tests/atlas-*-evidence-*/
+tools/dev-tests/meridian-racing-browser-diagnosis-*/
+tools/dev-tests/*-build-final.txt
+tools/dev-tests/*-result-[0-9]*.json
+tools/dev-tests/aurora-qr-samples.json
+tools/dev-tests/meridian-telemetry-node-example.json
+tools/dev-tests/meridian-racing-node-reconstructed-initial-failure.json

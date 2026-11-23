@@ -7,3 +7,4 @@
 @media(max-height:480px){#expedition-social-hud{left:max(180px,calc(env(safe-area-inset-left) + 170px));top:72px;max-width:min(320px,calc(100vw - 200px));max-height:calc(100dvh - 84px)}}
 #social-watch-note,#social-replay{border-top:1px solid #466777;margin-top:12px;padding-top:8px;font-size:13px;line-height:1.6}#social-replay h2{font-size:16px}#social-follow{min-height:44px;max-width:100%;font:inherit}#social-watch-note[hidden],#social-follow[hidden],#social-replay[hidden]{display:none}
 #social-reconnect{border:1px solid #ffd166;border-radius:8px;margin:12px 0;padding:10px}#social-reconnect h2{font-size:16px}#social-reconnect p{font-size:13px;line-height:1.6}#social-reconnect[hidden]{display:none}
+#social-rotation{width:44px;min-width:44px;vertical-align:middle}.expedition-social-card label[hidden]{display:none!important}

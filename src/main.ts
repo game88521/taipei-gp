@@ -1,5 +1,10 @@
 import './style.css';
 import {mountExpeditionSocial,mountExpeditionDuty} from './expedition-lazy-city';
+import {mountMeridianTelemetry,type MeridianTelemetryContext} from './meridian-telemetry';
+import {PHYSICS_VERSION} from '../shared/multiplayer-protocol';
+import {mountAuroraTouch} from './aurora-touch-ui';
+import {mountMeridianLazyStrategy as mountAuroraStrategy} from './meridian-lazy-tools';
+import {AURORA_COMPOUNDS,type AuroraStrategyContext} from './aurora-strategy';
 import {mountFrontierRally,mountFrontierTandemPractice} from './frontier-lazy-city';
 import {mountFrontierCityReplay} from './frontier-city-replay-ui';
 import {mountExpeditionPerformance} from './expedition-performance-ui';
@@ -591,6 +596,7 @@ document.addEventListener('visibilitychange', () => { framePacer.reset(); render
   }
 }
 mountSoundTools($('sound-tools'), sound);
+const auroraTouch=mountAuroraTouch($('control-settings'),()=>input.release());
 mountOfflineManager($('offline-manager'));
 mountVoyagerOfflinePacks($('voyager-offline-packs'));
 mountVoyagerComfort($('voyager-comfort-host'));
@@ -605,6 +611,7 @@ const expeditionPerformance=mountExpeditionPerformance($('voyager-comfort-host')
     players:frontierRally?.client?.room?.players.length??expeditionSocial?.client?.room?.players.length??expeditionDuty?.client?.room?.players.length??(mode==='race'&&raceKind==='gp'?field.racers.length:1),
     streamLoaded:cityStream?.loaded??0,streamPending:cityStream?.pending??0,
   }),
+  position:()=>mode==='free'?{x:fcar.x,z:fcar.z}:{x:car.x,z:car.z,along:car.pos.s},
   onScale:scale=>{performanceScale=scale;updatePixelRatio();},
 });
 const expeditionHud=mountExpeditionHud($('voyager-comfort-host'),'main',[
@@ -710,7 +717,7 @@ let frontierTandemPractice:ReturnType<typeof mountFrontierTandemPractice>|undefi
 let expeditionVehicleId:string|null=null;
 const expeditionOwned=()=>!!(expeditionSocial?.active||expeditionSocial?.busy||expeditionDuty?.active||expeditionDuty?.busy||frontierCityReplay?.active||frontierRally?.active||frontierRally?.busy||frontierTandemPractice?.active||frontierTandemPractice?.busy);
 const expeditionBusy=()=>expeditionOwned()||!!(expeditionSocial?.opened||expeditionDuty?.opened||frontierCityReplay?.busy||frontierRally?.opened||frontierTandemPractice?.opened);
-input.isDriving = () => ['race', 'free', 'countdown'].includes(state) && !mapOpen && menu.classList.contains('hidden') && expeditionHud.editor.hidden && !document.querySelector('.overlay:not(.hidden)');
+input.isDriving = () => ['race', 'free', 'countdown'].includes(state) && !mapOpen && menu.classList.contains('hidden') && expeditionHud.editor.hidden && !auroraTouch.opened && !document.querySelector('.overlay:not(.hidden)');
 let countdown = 0, lightsOutAt = 0, litShown = 0;
 let lap = 1, lapTime = 0, lastLap: number | null = null;
 let sectorIdx = 0, sectorStart = 0, lapValid = true;
@@ -772,6 +779,7 @@ function startLap() {
   ghostPtr = 0;
   clearSectorsAt = performance.now() + 2500;
   racingTools?.resetTtLap();
+  if(typeof meridianTelemetry!=='undefined'){const context=meridianTelemetryContext();if(context)meridianTelemetry.begin(context);else meridianTelemetry.invalidate();}
 }
 
 function sectorDone(k: number, time: number) {
@@ -803,6 +811,7 @@ function completeLap() {
     if (!lapValid && qualifyingAttempts.limit === 1) { toast('這圈使用重置／扶正，不列入排位；請再跑一圈', ''); startLap(); return; }
     finishQualifyingAttempt(lapValid ? t : null); return;
   }
+  if(!BOT&&raceKind==='tt')meridianTelemetry.finishLap({seconds:t,valid:lapValid});
   if (raceKind === 'tt') racingTools?.finishTtLap({ time: t, valid: lapValid, newBest: lapValid && (save.best == null || t < save.best) });
   sectorDone(2, t - sectorStart);
   lastLap = t;
@@ -948,7 +957,10 @@ function step(dt: number) {
     field.playerLap(prevS, lapValid, sectorIdx === 2);
     racingTools?.observeRace(field, lapValid);
     gpLapStarted = previousLaps === 0 && me.laps === 1;
-    if (previousLaps >= 1 && me.laps > previousLaps) gpLapTime = field.raceTime - previousLapStart;
+    if (previousLaps >= 1 && me.laps > previousLaps) {
+      gpLapTime = field.raceTime - previousLapStart;
+      if(typeof auroraStrategy!=='undefined')auroraStrategy.observe({trackId:CIRCUIT?.id??'taipei',trackStamp:trackStamp(track),rules:field.rules,laps:field.laps},{lap:previousLaps,seconds:gpLapTime,compound:AURORA_COMPOUNDS[me.compound]??'medium',pits:me.pits});
+    }
     if (me.finish != null && state === 'race') {
       // 完賽會先離開 step，最後一圈仍必須保存；不改既有模擬／亂數順序。
       const t = gpLapTime ?? lapTime + dt;
@@ -966,6 +978,7 @@ function step(dt: number) {
   sound.scrape(car.touch && car.v > 8 && !inPit ? Math.min(1, car.v / 60) : 0);
   lapTime += dt;
   if (raceKind === 'tt' && !qualiRun) racingTools?.sampleTt({ time: lapTime, s: car.pos.s, speed: car.v, brake: inp.brake, valid: lapValid });
+  if(!BOT&&raceKind==='tt'&&!qualiRun)meridianTelemetry.sample({time:lapTime,s:car.pos.s,x:car.x,z:car.z,h:car.h,speed:car.v,throttle:inp.brake?0:1,brake:inp.brake,steer:inp.steer,wheelSteer:car.steer,valid:lapValid});
   if (qualiRun) {
     qualiAttemptTime += dt;
     if (qualiAttemptTime >= 150) { lapValid = false; recordSessionLap(lapTime); finishQualifyingAttempt(null); return; }
@@ -1545,6 +1558,7 @@ function updateCountdown(dt: number) {
 }
 
 function beginCountdown(quali = false) {
+  if(typeof auroraStrategy!=='undefined'&&auroraStrategy.session.report()?.actual.length)auroraStrategy.finish();
   if (typeof stopHorizonSession === 'function') stopHorizonSession();
   if (typeof practiceRewind !== 'undefined') practiceRewind.clear();
   horizonFieldOwned = false;
@@ -1611,11 +1625,14 @@ function beginCountdown(quali = false) {
   if (raceKind === 'gp') { racingTools?.resetRace(); racingTools?.observeRace(field); }
   else if (!quali) racingTools?.startTtSession(save.best);
   if (raceKind === 'gp') saveSeasonCheckpoint();
+  if(!BOT&&raceKind==='tt'&&!quali){const context=meridianTelemetryContext();if(context)meridianTelemetry.begin(context);}
 }
 
 // ---------------------------------------------------------------- 選單
 const menu = $('menu'), hud = $('hud');
 racingTools = new RacingToolsUi({ raceHost: $('race-analysis-host'), ttHost: $('tt-coach-host'), trackLength: track.length, trackKey: trackStamp(track), rules: () => field.rules });
+function meridianTelemetryContext():MeridianTelemetryContext|null{return !BOT&&mode==='race'&&raceKind==='tt'&&!qualiRun&&!practiceRun?.active&&!horizonSession&&!gpChallenge?.active?{circuit:CIRCUIT?.id??'taipei',stamp:trackStamp(track),physics:PHYSICS_VERSION,rules:field.rules,car:'f1',assist:opts.assist,length:track.length,throttleModel:'auto-on-unless-braking'}:null;}
+const meridianTelemetry=mountMeridianTelemetry($('tt-coach-host'),{context:meridianTelemetryContext});
 const aiPolicyRow = document.createElement('label'); aiPolicyRow.className = 'q'; aiPolicyRow.textContent = 'AI 並排與扶正規則 ';
 const aiPolicySelect = document.createElement('select'); aiPolicySelect.id = 'opt-ai-policy';
 for (const [v, label] of [['safe-v1', '安全並排 v1（新一般 GP）'], ['legacy', '原版（固定 BOT／賽季）']]) { const o = document.createElement('option'); o.value = v; o.textContent = label; aiPolicySelect.append(o); }
@@ -2063,7 +2080,7 @@ horizonCity = mountHorizonCity({
 });
 for (const [id, pv] of playerCars) applyAppearance(pv.model, id, save.horizonCity?.appearance[id]);
 nexusWorkshop = mountNexusWorkshop({
-  isCity: !CIRCUIT, scene, car: fcar, prepare: async () => { await userStart(); return ensureStreetSystems(); },
+  isCity: !CIRCUIT, scene, car: fcar, input:()=>input.read(), capture:()=>{renderer.render(scene,camera);return renderer.domElement;}, prepare: async () => { await userStart(); return ensureStreetSystems(); },
   city: () => cityDataRef, roads: () => roadNet, landmarks: () => landmarks,
   canEnter: () => !expeditionBusy() && !CIRCUIT && !nexusCoop?.active && !nexusCoop?.busy && !summitCityRace?.active && !summitCityRace?.busy && !summitCityRace?.opened && !(typeof summitDuty !== 'undefined' && (summitDuty?.active || summitDuty?.busy || summitDuty?.opened)) && !nexusCoop?.opened && !horizonCity?.opened && !driftChallenge.active && !streetResultOpen() && !taxiOn() && !streetRacing() && !police?.active && !evolutionCity?.active && !horizonSession && state !== 'race' && state !== 'countdown' && state !== 'settling',
   pause, release: () => input.release(), notify: text => toast(text, ''),
@@ -2214,7 +2231,7 @@ frontierTandemPractice=mountFrontierTandemPractice({scene,host:$('btn-city-chall
  drive:dt=>{const c=input.read();fcar.drift=!!c.handbrake&&Math.abs(fcar.v)>8;const hit=fcar.update(dt,c.steer,c.throttle,c.brake,collider);sound.setEngine('muscle');sound.engine(.15+Math.min(.6,Math.abs(fcar.v)/35),c.throttle?1:.2,true);return hit;},
 });
 let frontierReplayReturn:{weather:TimeKind;camera:typeof camView;mode:Mode}|null=null;
-frontierCityReplay=mountFrontierCityReplay({scene,host:$('btn-city-challenges').parentElement!,
+frontierCityReplay=mountFrontierCityReplay({scene,canvas:renderer.domElement,capture:()=>{if(frontierCityReplay?.active)camera.copy(frontierCityReplay.camera);if(composer)composer.render();else renderer.render(scene,camera);return renderer.domElement;},host:$('btn-city-challenges').parentElement!,
  canOpen:()=>canEnterExpedition()&&!expeditionOwned()&&!expeditionSocial?.opened&&!expeditionDuty?.opened,
  prepare:async current=>{const origin=state;await userStart();if(!current()||origin!==state)return false;return !!await ensureStreetSystems()&&current()&&origin===state&&!expeditionSocial?.active&&!expeditionDuty?.active;},
  begin:archive=>{frontierReplayReturn={weather:timeKind,camera:camView,mode};input.release();state='paused';mode='free';hideMenu();hud.classList.add('hidden');closeMap();timeKind=archive.weather==='dry'?'day':archive.weather;weather.pick(timeKind,true);applyWeather();sound.engine(0,0,false);clock.getDelta();},
@@ -3104,6 +3121,18 @@ function observePitCalibration() {
 let strategyLoss: number | null | undefined;
 let strategySample: { racer: Racer; compound: number; pits: number; progress: number; wear: number; wet: number; at: number } | null = null;
 let strategyObservedWear: number | undefined;
+function auroraStrategyContext():AuroraStrategyContext|null {
+  const racing=mode==='race'&&raceKind==='gp'&&!qualiRun&&['race','paused','countdown','results','settling','podium'].includes(state),me=field.me;
+  const reference=(racing?me.bestLap:null)??save.gpBest??save.best;
+  const lapSeconds=reference??track.ds*track.vTarget.reduce((sum,v)=>sum+1/Math.max(1,v),0);
+  let racingTime=0;for(let sd=PIT.LIM_IN;sd<PIT.LIM_OUT;sd+=2){const i=((Math.round(sd/track.ds)%track.N)+track.N)%track.N;racingTime+=Math.min(2,PIT.LIM_OUT-sd)/Math.max(1,track.vTarget[i]);}
+  const estimate=estimatePitStrategy({laneLength:PIT.LIM_OUT-PIT.LIM_IN,limit:field.pitlane?.speed??80/3.6,racingTime,lapTime:lapSeconds,wear:0,lapsRemaining:1});
+  const source=document.getElementById('aurora-strategy-reference');if(source)source.textContent=reference===null?'參考圈速來自賽道建議速度模型；完成有效圈後會改用已觀察圈速。':'參考圈速來自本場或本機保存的有效圈；不同車陣與操控仍會影響實績。';
+  if(!estimate)return null;
+  return {trackId:CIRCUIT?.id??'taipei',trackStamp:trackStamp(track),rules:racing?field.rules:$<HTMLSelectElement>('opt-rules').value,laps:racing?field.laps:Number($<HTMLSelectElement>('opt-laps').value),lapSeconds,wetness:racing?field.wet:$<HTMLSelectElement>('opt-gpwx').value==='wet'?1:0,startCompound:AURORA_COMPOUNDS[racing?me.compound:Number($<HTMLSelectElement>('opt-tyre').value)]??'medium',startWear:racing?me.wear:0,pitLoss:estimate.currentLap.loss,tyres:Object.fromEntries(AURORA_COMPOUNDS.map((name,i)=>[name,{grip:TYRES[i].grip,wearPerLap:TYRES[i].wear,rain:i===RAIN}])) as AuroraStrategyContext['tyres']};
+}
+const auroraStrategyHost=document.createElement('div');auroraStrategyHost.className='racing-tools';const auroraStrategyReference=document.createElement('p');auroraStrategyReference.id='aurora-strategy-reference';auroraStrategyHost.append(auroraStrategyReference);$('opt-laps').closest('fieldset')!.append(auroraStrategyHost);
+const auroraStrategy=mountAuroraStrategy(auroraStrategyHost,{context:auroraStrategyContext,notify:text=>toast(text,'')});
 function updateStrategy() {
   const wet = field.wet, previousWet = strategyWet, trend = wetTrend(previousWet, wet);
   strategyWet = wet;
@@ -3268,6 +3297,7 @@ function settleRace() {
 }
 let prizeNote = '';
 function showResults() {
+  auroraStrategy.finish();
   racingTools?.observeRace(field, lapValid); racingTools?.renderRace();
   const { st, winner, me } = settleRace();
   state = 'results';
@@ -4275,6 +4305,7 @@ function srBot() {
 // ---------------------------------------------------------------- 自由駕駛
 let roadAcc = 0, roadShown = '', lmAcc = 0, lmLast = '', lmAt = 0;
 function beginFree(practice = false) {
+  if(typeof auroraStrategy!=='undefined'&&auroraStrategy.session.report()?.actual.length)auroraStrategy.finish();
   stopHorizonSession(); practiceRewind.clear();
   practiceRun?.stop(); if (practiceUi) practiceUi.hud.hidden = true;
   cancelPendingStreetSeriesStart();
@@ -5007,6 +5038,9 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 Object.defineProperties((window as unknown as { __gp: object }).__gp, { gpChallenge: { value: gpChallenge }, activeGhost: { get: () => ghostShareUi?.active ?? save.ghost } });
 Object.defineProperties((window as unknown as { __gp: object }).__gp, { practiceRun: { get: () => practiceRun }, practiceRewind: { value: practiceRewind }, horizonSession: { get: () => horizonSession } });
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'summitDuty', { get: () => summitDuty });
+Object.defineProperty((window as unknown as { __gp: object }).__gp, 'meridianTelemetry', { get: () => meridianTelemetry });
+Object.defineProperty((window as unknown as { __gp: object }).__gp, 'auroraStrategy', { get: () => auroraStrategy });
+Object.defineProperty((window as unknown as { __gp: object }).__gp, 'auroraTouch', { get: () => auroraTouch });
 Object.defineProperties((window as unknown as { __gp: object }).__gp, { nexusCoop: { get: () => nexusCoop } });
 if (new URLSearchParams(location.search).has('horizon-weekend')) horizonUi?.show();
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'nexusWorkshop', { get: () => nexusWorkshop });

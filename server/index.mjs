@@ -1,13 +1,22 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
+import {MERIDIAN_ROTATION_VERSION} from '../shared/meridian-social.ts';
+import {MERIDIAN_NAVIGATOR_VERSION} from '../shared/meridian-navigator.ts';
+import {MeridianCheckpoints} from './meridian-checkpoints.mjs';
+import {MeridianCityService} from './meridian-city-service.mjs';
+import {MERIDIAN_CITY_VERSION} from '../shared/meridian-city.ts';
+import {MERIDIAN_RACING_VERSION} from '../shared/meridian-racing.ts';
 import { RoomService } from './room-service.mjs';
 import { NexusCoopService } from './nexus-coop-service.mjs';
 import { SummitCityRaceService } from './summit-city-race-service.mjs';
 import { ExpeditionSocialService } from './expedition-social-service.mjs';
 import { ExpeditionDutyService } from './expedition-duty-service.mjs';
 import { FrontierRallyService } from './frontier-rally-service.mjs';
-import { FRONTIER_RALLY_VERSION } from '../shared/frontier-rally.ts';
+import { FRONTIER_RALLY_VERSION, AURORA_RALLY_VERSION } from '../shared/frontier-rally.ts';
+import { PARTY_VERSION } from '../shared/aurora-social.ts';
+import { CREW_TEAM_VERSION } from '../shared/aurora-duty.ts';
+import { AURORA_CUP_VERSION } from '../shared/frontier-cup.ts';
 import { PROTOCOL_VERSION, PHYSICS_VERSION, CATALOG_STAMP } from '../shared/multiplayer-protocol.ts';
 import { COOP_VERSION } from '../shared/nexus-coop.ts';
 import { CITY_RACE_VERSION } from '../shared/summit-city-race.ts';
@@ -33,13 +42,15 @@ function originsOf(value) {
 export function createMultiplayerServer(options = {}) {
   const capacity=atlasCapacity(options.capacityEnv??process.env),runtime=new AtlasRuntime();
   const allowedOrigins = originsOf(options.allowedOrigins ?? process.env.ALLOWED_ORIGINS ?? DEFAULT_ORIGINS);
-  const service = new RoomService({maxRooms:capacity.gpRooms,maxClients:capacity.connections, ...options.roomOptions, now: options.now ?? Date.now });
+  const checkpoints=options.checkpoints??new MeridianCheckpoints({key:options.meridianCheckpointKey??process.env.MERIDIAN_CHECKPOINT_SECRET,now:options.now??Date.now});
+  const service = new RoomService({maxRooms:capacity.gpRooms,maxClients:capacity.connections, ...options.roomOptions, checkpoints, now: options.now ?? Date.now });
   const cityRaceService = new SummitCityRaceService({maxRooms:capacity.cityRooms,maxClients:capacity.connections, ...options.cityRaceOptions, now: options.now ?? Date.now });
   const coopService = new NexusCoopService({maxRooms:capacity.coopRooms,maxClients:capacity.connections, worldFactory:()=>cityRaceService.world(), ...options.coopOptions, now: options.now ?? Date.now });
-  const socialService = new ExpeditionSocialService({maxRooms:Math.min(2,capacity.cityRooms),maxClients:capacity.connections,worldFactory:()=>cityRaceService.world(),...options.socialOptions,now:options.now??Date.now});
+  const socialService = new ExpeditionSocialService({maxRooms:Math.min(2,capacity.cityRooms),maxClients:capacity.connections,worldFactory:()=>cityRaceService.world(),...options.socialOptions,checkpoints,now:options.now??Date.now});
   const dutyService = new ExpeditionDutyService({maxRooms:Math.min(2,capacity.cityRooms),maxClients:capacity.connections,worldFactory:()=>cityRaceService.world(),...options.dutyOptions,now:options.now??Date.now});
   const rallyService = new FrontierRallyService({maxRooms:Math.min(2,capacity.cityRooms),maxClients:capacity.connections,worldFactory:()=>cityRaceService.world(),...options.rallyOptions,now:options.now??Date.now});
-  const services = new Map([['/ws',service],['/coop',coopService],['/city-race',cityRaceService],['/city-social',socialService],['/city-duty',dutyService],['/city-rally',rallyService]]);
+  const missionService=new MeridianCityService({maxRooms:Math.min(2,capacity.cityRooms),maxClients:capacity.connections,worldFactory:()=>cityRaceService.world(),...options.missionOptions,now:options.now??Date.now});
+  const services = new Map([['/ws',service],['/coop',coopService],['/city-race',cityRaceService],['/city-social',socialService],['/city-duty',dutyService],['/city-rally',rallyService],['/city-mission',missionService]]);
   const connectionLimit=Math.min(capacity.connections,service.maxClients);
   const connections=()=>[...services.values()].reduce((n,s)=>n+s.clients.size,0);
   // Parse/build the shared 184-tile city before listen() or any simulation
@@ -56,7 +67,7 @@ export function createMultiplayerServer(options = {}) {
     if (diagnostics(req, res)) return;
     if (req.method === 'GET' && req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ status: 'ok', version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, rooms: service.rooms.size, connections: service.clients.size, totalConnections:connections(),coop: { version: COOP_VERSION, rooms: coopService.rooms.size, connections: coopService.clients.size }, cityRace: { version: CITY_RACE_VERSION, rooms: cityRaceService.rooms.size, connections: cityRaceService.clients.size },citySocial:{version:SOCIAL_VERSION,rooms:socialService.rooms.size,connections:socialService.clients.size},cityDuty:{version:EXPEDITION_DUTY_VERSION,rooms:dutyService.rooms.size,connections:dutyService.clients.size},cityRally:{version:FRONTIER_RALLY_VERSION,rooms:rallyService.rooms.size,connections:rallyService.clients.size},capacity:{gpRooms:service.maxRooms,coopRooms:coopService.maxRooms,cityRooms:cityRaceService.maxRooms,socialRooms:socialService.maxRooms,dutyRooms:dutyService.maxRooms,rallyRooms:rallyService.maxRooms,connections:connectionLimit},runtime:runtime.snapshot() }));
+      res.end(JSON.stringify({ status: 'ok', meridian:{rotationVersion:MERIDIAN_ROTATION_VERSION,navigatorVersion:MERIDIAN_NAVIGATOR_VERSION,cityVersion:MERIDIAN_CITY_VERSION,racingVersion:MERIDIAN_RACING_VERSION,checkpointVersion:checkpoints.version,persistentSigning:checkpoints.persistentSigning},cityMission:{version:MERIDIAN_CITY_VERSION,rooms:missionService.rooms.size,connections:missionService.clients.size},aurora:{partyVersion:PARTY_VERSION,crewTeamVersion:CREW_TEAM_VERSION,auroraCupVersion:AURORA_CUP_VERSION,auroraRallyVersion:AURORA_RALLY_VERSION}, version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, rooms: service.rooms.size, connections: service.clients.size, totalConnections:connections(),coop: { version: COOP_VERSION, rooms: coopService.rooms.size, connections: coopService.clients.size }, cityRace: { version: CITY_RACE_VERSION, rooms: cityRaceService.rooms.size, connections: cityRaceService.clients.size },citySocial:{version:SOCIAL_VERSION,rooms:socialService.rooms.size,connections:socialService.clients.size},cityDuty:{version:EXPEDITION_DUTY_VERSION,rooms:dutyService.rooms.size,connections:dutyService.clients.size},cityRally:{version:FRONTIER_RALLY_VERSION,rooms:rallyService.rooms.size,connections:rallyService.clients.size},capacity:{gpRooms:service.maxRooms,coopRooms:coopService.maxRooms,cityRooms:cityRaceService.maxRooms,socialRooms:socialService.maxRooms,dutyRooms:dutyService.maxRooms,rallyRooms:rallyService.maxRooms,missionRooms:missionService.maxRooms,connections:connectionLimit},runtime:runtime.snapshot() }));
     } else { res.writeHead(404); res.end(); }
   });
   httpServer.headersTimeout = 10_000; httpServer.requestTimeout = 10_000;
@@ -94,6 +105,8 @@ export function createMultiplayerServer(options = {}) {
     timers.push(setInterval(() => dutyService.heartbeat(),5000));
     timers.push(setInterval(() => {if(rallyService.rooms.size||rallyService.clients.size)runtime.run('cityRally',()=>rallyService.tick());},1000/60));
     timers.push(setInterval(() => rallyService.heartbeat(),5000));
+    timers.push(setInterval(()=>{if(missionService.rooms.size||missionService.clients.size)runtime.run('cityMission',()=>missionService.tick());},1000/60));
+    timers.push(setInterval(()=>missionService.heartbeat(),5000));
     for (const timer of timers) timer.unref();
   }
   let closing;
@@ -108,6 +121,7 @@ export function createMultiplayerServer(options = {}) {
       socialService.close();
       dutyService.close();
       rallyService.close();
+      missionService.close();
       for (const ws of wss.clients) ws.terminate();
       await new Promise((resolve) => wss.close(resolve));
       if (httpServer.listening) await new Promise((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
@@ -115,7 +129,7 @@ export function createMultiplayerServer(options = {}) {
     })();
     return closing;
   }
-  return { httpServer, wss, service, coopService, cityRaceService, socialService,dutyService,rallyService,runtime, capacity, close };
+  return { httpServer, wss, service, coopService, cityRaceService, socialService,dutyService,rallyService,missionService,checkpoints,runtime, capacity, close };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

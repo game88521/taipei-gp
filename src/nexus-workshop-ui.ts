@@ -1,3 +1,6 @@
+import {mountMeridianCity} from './meridian-city-ui';
+import {beaconWorkshopSection,finishBeaconModeLaunch,focusBeaconSection,type BeaconWorkshopSection} from './beacon-mode-launch';
+import { mountAuroraStory } from './aurora-story-ui';
 import * as THREE from 'three';
 import { BigMap } from './bigmap';
 import type { CityData, RoadNet } from './citydata';
@@ -11,6 +14,8 @@ import { WorkshopGhostLibrary, WorkshopGhostRecorder, parseWorkshopGhost, ghostC
 
 interface WorkshopHooks {
   isCity: boolean;
+  capture?(): HTMLCanvasElement;
+  input?(): {steer:number;throttle:boolean;brake:boolean;handbrake:boolean};
   scene: THREE.Scene; car: FreeCar;
   prepare(): Promise<boolean>; city(): CityData | null; roads(): RoadNet | null; landmarks(): Landmark[];
   canEnter(): boolean; pause(): void; release(): void; notify(text: string): void;
@@ -36,6 +41,8 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
   let ghostRecorder: WorkshopGhostRecorder | null = null, comparisonGhost: WorkshopGhost | null = null, friendGhost: WorkshopGhost | null = null, ghostVisual: THREE.Group | null = null;
   let book: WorkshopRoads | null = null, map: BigMap | null = null, mapRaf = 0, pending = 0, opening = false, open = false, previousFocus: HTMLElement | null = null;
   let anchors: number[] = [], currentRoute: WorkshopRoute | null = null, routeError = '', run: WorkshopRun | null = null, recorded = false;
+  let storyUi:ReturnType<typeof mountAuroraStory>|null=null;
+  let missionUi:ReturnType<typeof mountMeridianCity>|null=null;
   let restore: { point: WorkshopPoint & { h: number }; weather: string } | null = null;
   const launch = button('🛠 城市挑戰工坊：自訂賽道／分享挑戰', 'btn-nexus-workshop'); launch.className = 'ghost-btn';
   document.querySelector('.m-pane[data-pane="play"] .m-modes')?.after(launch);
@@ -88,7 +95,9 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
   const ghostExport = button('下載目前路線最佳幽靈', 'voyager-ghost-export'), ghostRemove = button('刪除目前路線幽靈', 'voyager-ghost-remove'), ghostImport = node('input', '', 'voyager-ghost-import'), ghostApply = button('載入朋友路線設定', 'voyager-ghost-apply'); ghostImport.type = 'file'; ghostImport.accept = '.json,application/json';
   ghostPanel.append(ghostLegend, label('顯示幽靈（半透明，無碰撞）', ghostEnabled), label('比較來源', ghostSource), ghostInfo, node('p', '每條完整挑戰碼保留一條最佳有效軌跡，5Hz、最長5分鐘；最多12條。超時不截斷當成完整成績。朋友軌跡只在本頁，匯入不會開始挑戰或改寫自己的最佳。'), ghostExport, ghostRemove, label('匯入朋友幽靈 JSON（250KB內）', ghostImport), ghostApply);
   const ghostLibraryDetails = node('details'), ghostLibraryList = node('div'); ghostLibraryDetails.append(node('summary', '管理已保存的路線幽靈'), ghostLibraryList); ghostPanel.append(ghostLibraryDetails);
-  card.append(header, intro, status, columns, note, actions, shareBox, shareTools, ghostPanel, draftLabel, draftList); overlay.append(card); document.body.append(overlay);
+  const entryGuide=node('p','','beacon-workshop-guide');entryGuide.hidden=true;
+  card.append(header, intro, entryGuide, status, columns, note, actions, shareBox, shareTools, ghostPanel, draftLabel, draftList); overlay.append(card); document.body.append(overlay);
+  let initialWorkshopSection=beaconWorkshopSection(new URLSearchParams(location.search).get('workshopSection'));
   const hud = node('section', '', 'nexus-workshop-hud'); hud.hidden = true; const hudTitle = node('b'), hudStatus = node('p', '', 'nexus-workshop-progress'), hudHelp = node('small');
   const hudActions = node('div'); hudActions.className = 'nexus-workshop-actions'; const retry = button('重新挑戰', 'nexus-workshop-retry'), exit = button('離開挑戰', 'nexus-workshop-exit'), ghostToggle = button('隱藏幽靈', 'voyager-ghost-toggle'); hudActions.append(retry, exit, ghostToggle); const lapDetails = node('details', '', 'atlas-workshop-times'), lapTable = node('ol', '', 'atlas-workshop-lap-times'); lapDetails.append(node('summary', '逐圈與分段成績'), lapTable); hud.append(hudTitle, hudStatus, lapDetails, hudHelp, hudActions); document.body.append(hud);
   const marker = new THREE.Group();
@@ -116,7 +125,7 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
     routeList.replaceChildren(); anchors.forEach((id, i) => { const p = book!.nodes.get(id)!; const row = node('li'); row.append(node('span', `${i === 0 ? '起點' : i === anchors.length - 1 ? '終點' : `途經 ${i}`}：${p.name}（${p.elevated ? '高架／隧道' : '地面'}，${p.y.toFixed(1)}m）`));
       for (const [text, delta] of [['上移', -1], ['下移', 1]] as const) { const b = button(text); b.setAttribute('aria-label', `第 ${i + 1} 點${text}`); b.disabled = i + delta < 0 || i + delta >= anchors.length; b.onclick = () => { [anchors[i], anchors[i + delta]] = [anchors[i + delta], anchors[i]]; refreshRoute(); }; row.append(b); }
       const remove = button('移除'); remove.setAttribute('aria-label', `移除第 ${i + 1} 點`); remove.onclick = () => { anchors.splice(i, 1); refreshRoute(); }; row.append(remove); routeList.append(row); });
-    refreshGhosts();
+    refreshGhosts();storyUi?.refresh();
   }
   function apply(def: WorkshopDefinition) { if (!book) return; book.validate(def); anchors = [...def.nodes]; routeName.value = def.name; car.value = def.car; weather.value = def.weather; seconds.value = String(def.seconds); hits.value = String(def.hits); format.value = String(def.v); laps.value = String(def.v === 2 ? def.laps : 1); sections.value = String(def.v === 2 ? def.splits.length + 1 : 3); importedSplits = def.v === 2 ? [...def.splits] : null; importedNodes = JSON.stringify(anchors); refreshRoute(); message(`已載入「${def.name}」。請確認路線與條件，再按開始挑戰。`); }
   function addPoint(x: number, z: number) { if (!book) return; if (anchors.length >= 12) { message('最多 12 個路線點；可先移除不需要的點。'); return; } const hit = book.nearest(x, z, layer.value as 'ground' | 'deck' | 'all', 100); if (!hit) { message('附近找不到所選路層的主要道路，請放大地圖再選。'); return; } if (anchors.at(-1) === hit.id) { message('已經選取這個路線點。'); return; } anchors.push(hit.id); refreshRoute(); message(`已加入第 ${anchors.length} 點：${hit.point.name}`); }
@@ -133,18 +142,19 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
     if (currentRoute) { const path = currentRoute.path; g.strokeStyle = '#d2fcff'; g.lineWidth = 2; for (let i = 6; i + 1 < path.length; i += Math.max(8, Math.floor(path.length / 16))) { const a = path[i], b = path[i + 1], angle = Math.atan2(b[1] - a[1], b[0] - a[0]), x = canvas.width / 2 + (a[0] - map.cx) * map.zoom, y = canvas.height / 2 + (a[1] - map.cz) * map.zoom; g.beginPath(); g.moveTo(x - Math.cos(angle - .6) * 8, y - Math.sin(angle - .6) * 8); g.lineTo(x, y); g.lineTo(x - Math.cos(angle + .6) * 8, y - Math.sin(angle + .6) * 8); g.stroke(); } }
     mapRaf = requestAnimationFrame(drawMap);
   }
-  function closeEditor() { if (!open && !opening) return false; pending++; opening = false; open = false; overlay.hidden = true; cancelAnimationFrame(mapRaf); h.release(); previousFocus?.focus(); return true; }
-  async function openEditor() {
-    if (opening || open) return; if (!h.canEnter() || run) { h.notify('請先完成或離開目前的任務，再開啟城市挑戰工坊。'); return; }
+  function closeEditor() { missionUi?.cancelPending();if (!open && !opening) return false; pending++; opening = false; open = false; overlay.hidden = true; cancelAnimationFrame(mapRaf); h.release(); previousFocus?.focus(); return true; }
+  function focusEntry(section:BeaconWorkshopSection|null){entryGuide.hidden=!section;if(!section)return;entryGuide.textContent=section==='story'?'先設定工坊路線，再於NG3劇本編輯到站作業。確認後自行開始，入口不會啟動任務。':section==='story-coop'?'先設定工坊路線與NG3劇本，再確認暱稱並按「以目前NG3建立合作房」。此入口只開設定，不會建房。':section==='hunt-solo'?'照片尋寶不用自訂NG3；請在下方按「照片尋寶・離線單人」開始三站線索。': '照片尋寶不用自訂NG3；確認暱稱後按「建立好友尋寶房」，或輸入房碼加入。此入口尚未建房。';focusBeaconSection(section==='story'?storyUi?.panel??null:missionUi?.panel??null);}
+  async function openEditor(section:BeaconWorkshopSection|null=initialWorkshopSection):Promise<boolean> {
+    initialWorkshopSection=null;if(opening)return false;if(open){focusEntry(section);return true;} if (!h.canEnter() || run || storyUi?.active || missionUi?.active) { h.notify('請先完成或離開目前的任務，再開啟城市挑戰工坊。'); return false; }
     const token = ++pending; opening = true; launch.disabled = true;
-    try { if (!await h.prepare() || pending !== token || !h.canEnter()) return; const data = h.city(), net = h.roads(); if (!data || !net) throw Error('城市路網尚未就緒，請稍後再試'); if (!book) book = new WorkshopRoads(data);
+    try { if (!await h.prepare() || pending !== token || !h.canEnter()) return false; const data = h.city(), net = h.roads(); if (!data || !net) throw Error('城市路網尚未就緒，請稍後再試'); if (!book) book = new WorkshopRoads(data);
       previousFocus = document.activeElement as HTMLElement; h.pause(); h.release(); overlay.hidden = false; open = true;
       if (!map) { map = new BigMap(canvas, net, h.landmarks()); map.onPick = addPoint; }
       map.showAll(); renderPlaces(); example.replaceChildren(); h.suggestions().forEach((r, i) => { const e = node('option', r.name); e.value = String(i); example.append(e); });
       refreshRoute(); renderDrafts(); message(library.error || '先載入範例，或在地圖點選起終點；也可貼上朋友的分享碼。');
       try { const shared = workshopFromUrl(location.href); if (shared) { apply(shared); shareBox.value = encodeWorkshop(shared); } } catch (e) { message((e as Error).message); }
-      close.focus(); drawMap();
-    } catch (e) { h.notify((e as Error).message); } finally { if (token === pending) { opening = false; launch.disabled = false; } else launch.disabled = false; }
+      close.focus(); drawMap();focusEntry(section);return true;
+    } catch (e) { h.notify((e as Error).message);return false; } finally { if (token === pending) { opening = false; launch.disabled = false; } else launch.disabled = false; }
   }
   async function startRun() {
     if (run || !book || !h.canEnter()) { message('請先離開目前任務。'); return; } const def = definition(); if (!def) { message('請檢查名稱、車款、天氣與整數目標範圍。'); return; }
@@ -155,7 +165,7 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
       message((e as Error).message);
     }
   }
-  function updateHud() { const r = run; if (!r) { hud.hidden = true; marker.visible = false; return; } hud.hidden = !h.visible(); show(hudTitle, r.definition.name); show(hudHelp, `${h.hints()} · 可用遊戲暫停選單暫停`);
+  function updateHud() { if(missionUi?.active){hud.hidden=true;missionUi.update();return;}if(storyUi?.active){hud.hidden=true;storyUi.update();return;}const r = run; if (!r) { hud.hidden = true; marker.visible = false; return; } hud.hidden = !h.visible(); show(hudTitle, r.definition.name); show(hudHelp, `${h.hints()} · 可用遊戲暫停選單暫停`);
     updateGhost();
     show(hudStatus, r.result ? `${r.result.success ? '挑戰成功' : '挑戰結束'} · ${fmt(r.elapsed)} · 碰撞 ${r.hits}/${r.definition.hits} · ${r.result.reason}${r.result.success && library.best(r.definition) ? ` · 最佳 ${fmt(library.best(r.definition)!.best)}` : ''}` : r.phase === 'countdown' ? `${Math.ceil(r.countdown)} · 準備起跑` : `${fmt(r.elapsed)}／${fmt(r.definition.seconds)} · 檢查點 ${r.next}/${r.route.gates.length} · 碰撞 ${r.hits}/${r.definition.hits}`);
     lapDetails.hidden = r.definition.v !== 2;
@@ -164,9 +174,9 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
     if (r.definition.v === 2) { hudStatus.append(document.createTextNode(` · 第${r.currentLap}/${r.totalLaps}圈${r.currentLap === r.totalLaps && r.phase === 'running' ? ' · 最後一圈' : ''}${r.lastSegmentDelta === null ? '' : ` · 最近分段 ${r.lastSegmentDelta >= 0 ? '+' : ''}${r.lastSegmentDelta.toFixed(2)}秒`}`)); const key = JSON.stringify(r.lapTimes); if (lapTable.dataset.times !== key) { lapTable.dataset.times = key; lapTable.replaceChildren(); r.lapTimes.forEach((time, i) => lapTable.append(node('li', `第${i + 1}圈 ${fmt(time)} · ${r.segments[i].map((s, j) => `S${j + 1} ${fmt(s)}`).join('／')}`))); } } else lapTable.replaceChildren();
     const gate = r.route.gates[r.next]; marker.visible = !!gate && r.phase !== 'done' && h.visible(); if (gate) marker.position.set(gate.x, gate.y + ROAD_Y + .2, gate.z);
   }
-  function stop() { if (!run) return false; run = null; ghostRecorder = null; comparisonGhost = null; clearGhostVisual(); recorded = false; marker.visible = false; hud.hidden = true; h.release(); if (restore) { h.car.place(restore.point.x, restore.point.z, restore.point.h, restore.point.y); h.setWeather(restore.weather); } restore = null; h.leave(); return true; }
+  function stop() { if(missionUi?.active||missionUi?.busy)return missionUi.stop();if(storyUi?.active)return storyUi.stop();if (!run) return false; run = null; ghostRecorder = null; comparisonGhost = null; clearGhostVisual(); recorded = false; marker.visible = false; hud.hidden = true; h.release(); if (restore) { h.car.place(restore.point.x, restore.point.z, restore.point.h, restore.point.y); h.setWeather(restore.weather); } restore = null; h.leave(); return true; }
   if (!h.isCity) launch.textContent = '🛠 回台北城市挑戰工坊';
-  launch.onclick = () => { if (!h.isCity) { location.href = '/?workshop=1'; return; } void openEditor(); }; close.onclick = closeEditor;
+  launch.onclick = () => { const section=beaconWorkshopSection(launch.dataset.workshopSection),id=launch.dataset.beaconLaunchId;delete launch.dataset.workshopSection;if (!h.isCity) { const url=new URL('/',location.href);url.searchParams.set('workshop','1');if(section)url.searchParams.set('workshopSection',section);location.href=url.href;finishBeaconModeLaunch(launch,id,true);return; } void openEditor(section??initialWorkshopSection).then(opened=>finishBeaconModeLaunch(launch,id,opened)); };launch.addEventListener('beacon-mode-cancel',()=>{if(opening)closeEditor();}); close.onclick = closeEditor;
   zoomIn.onclick = () => map?.setZoom(map.zoom * 1.6); zoomOut.onclick = () => map?.setZoom(map.zoom / 1.6); zoomAll.onclick = () => map?.showAll(); nearby.onclick = () => { map?.setZoom(.45); map?.focus(h.car.x, h.car.z); };
   addPlace.onclick = () => { const p = book?.nodes.get(Number(places.value)); if (p) addPoint(p.x, p.z); }; addHere.onclick = () => addPoint(h.car.x, h.car.z);
   undo.onclick = () => restoreEdit(history.undo()); redo.onclick = () => restoreEdit(history.redo()); clear.onclick = () => { anchors = []; refreshRoute(); message('路線已清除；可按復原找回，已儲存的草稿仍保留。'); };
@@ -192,13 +202,17 @@ export function mountNexusWorkshop(h: WorkshopHooks) {
   retry.onclick = () => { if (!run) return; h.release(); h.car.place(run.route.start.x, run.route.start.z, run.route.start.h, run.route.start.y + ROAD_Y); run = new WorkshopRun(run.definition, run.route, h.car, h.vmax(run.definition.car), library.best(run.definition)?.segments); ghostRecorder = new WorkshopGhostRecorder(run.definition, h.car); comparisonGhost = ghostSource.value === 'friend' ? friendGhost && ghostCompatible(friendGhost, run.definition) ? friendGhost : null : ghosts.get(run.definition); if (comparisonGhost) buildGhostVisual(run.definition.car); else clearGhostVisual(); recorded = false; updateHud(); };
   exit.onclick = () => { stop(); h.notify('已離開城市挑戰，回到原來的位置與天氣。'); };
   overlay.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !/^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName) && e.key.toLowerCase() === 'z') { e.preventDefault(); restoreEdit(e.shiftKey ? history.redo() : history.undo()); return; } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeEditor(); } if (e.key !== 'Tab') return; const focusable = [...overlay.querySelectorAll<HTMLElement>('button:not(:disabled),input,select,textarea,[tabindex="0"]')].filter(e => e.getClientRects().length); const first = focusable[0], last = focusable.at(-1); if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); } });
+  storyUi=mountAuroraStory({...h,book:()=>book,definition,apply,closeEditor,canEnter:()=>!run&&!missionUi?.active&&h.canEnter(),marker:point=>{marker.visible=!!point&&h.visible();if(point)marker.position.set(point.x,point.y+ROAD_Y+.2,point.z);}});settings.append(storyUi.panel);
+  missionUi=mountMeridianCity({...h,book:()=>book,story:()=>storyUi!.definition(),canEnter:()=>!run&&!storyUi?.active&&h.canEnter(),closeEditor,input:()=>h.input?.()??{steer:0,throttle:false,brake:false,handbrake:false}});settings.append(missionUi.panel);
+  const photoLaunch=button('📷 城市照片尋寶／NG3好友合作','btn-meridian-photo');photoLaunch.className='ghost-btn';launch.after(photoLaunch);photoLaunch.onclick=()=>void openEditor();
   return {
-    get ownsDriving() { return run !== null; }, get busy() { return opening || open || !!run; }, get visible() { return open; }, get run() { return run; }, get library() { return library; }, get roads() { return book; }, get history() { return history; },
+    get story(){return storyUi;},get mission(){return missionUi;},
+    get ownsDriving() { return run !== null || !!storyUi?.active || !!missionUi?.active; }, get busy() { return opening || open || !!run || !!storyUi?.active || !!missionUi?.active || !!missionUi?.busy; }, get visible() { return open; }, get run() { return run; }, get library() { return library; }, get roads() { return book; }, get history() { return history; },
     get ghostLibrary() { return ghosts; }, reloadGhosts() { if (run) return false; const ok = ghosts.reload(); refreshGhosts(); return ok; },
-    get vehicleId() { return run?.definition.car; }, get route() { return run?.route ?? null; },
+    get vehicleId() { return missionUi?.vehicleId ?? storyUi?.vehicleId ?? run?.definition.car; }, get route() { return missionUi?.route ?? storyUi?.route ?? run?.route ?? null; },
     open: openEditor, close: closeEditor, stop, refreshHud: updateHud,
-    invalidate(reason = '使用扶正或重置，本次挑戰不計成績') { if (run) { run.fail(reason); updateHud(); } },
-    step(dt: number) { if (!run) return; if (!Number.isFinite(dt) || dt <= 0 || dt > .1) { run.fail('模擬中斷，請重新挑戰'); updateHud(); return; } const running = run.phase === 'running', impact = running ? h.drive(dt, run.definition) : 0; if (!running) h.car.vx = h.car.vz = h.car.w = 0; const result = run.step(dt, h.car, impact); if (running) ghostRecorder?.step(run.elapsed, h.car); if (result && !recorded) { recorded = true; if (result.success) { library.record(run.definition, result); const ghost = ghostRecorder?.finish(result); if (ghost) ghosts.record(ghost); } h.release(); h.car.vx = h.car.vz = h.car.w = 0; } updateHud(); },
-    navInfo() { if (!run || run.phase === 'done') return null; const p = run.route.gates[run.next]; return { path: run.route.path, ys: run.route.ys, next: p ? [p.x, p.z] as [number, number] : null }; },
+    invalidate(reason = '使用扶正或重置，本次挑戰不計成績') { if(missionUi?.active){missionUi.invalidate(reason);return;}if(storyUi?.active){storyUi.invalidate(reason);return;}if (run) { run.fail(reason); updateHud(); } },
+    step(dt: number) { if(missionUi?.active){missionUi.step(dt);return;}if(storyUi?.active){storyUi.step(dt);return;}if (!run) return; if (!Number.isFinite(dt) || dt <= 0 || dt > .1) { run.fail('模擬中斷，請重新挑戰'); updateHud(); return; } const running = run.phase === 'running', impact = running ? h.drive(dt, run.definition) : 0; if (!running) h.car.vx = h.car.vz = h.car.w = 0; const result = run.step(dt, h.car, impact); if (running) ghostRecorder?.step(run.elapsed, h.car); if (result && !recorded) { recorded = true; if (result.success) { library.record(run.definition, result); const ghost = ghostRecorder?.finish(result); if (ghost) ghosts.record(ghost); } h.release(); h.car.vx = h.car.vz = h.car.w = 0; } updateHud(); },
+    navInfo() { if(missionUi?.active)return missionUi.navInfo();if(storyUi?.active)return storyUi.navInfo();if (!run || run.phase === 'done') return null; const p = run.route.gates[run.next]; return { path: run.route.path, ys: run.route.ys, next: p ? [p.x, p.z] as [number, number] : null }; },
   };
 }

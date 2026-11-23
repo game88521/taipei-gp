@@ -989,8 +989,250 @@ function P(e, t) {
 	};
 }
 //#endregion
+//#region src/aurora-story.ts
+var F = (e) => !!e && typeof e == "object" && !Array.isArray(e);
+function I(e) {
+	try {
+		if (!F(e) || Object.keys(e).sort().join(",") !== "physics,route,stages,v" || e.v !== 1 || e.physics !== "city-story-v1" || typeof e.route != "string") return null;
+		let t = j(e.route);
+		if (t.v !== 1 || !Array.isArray(e.stages) || e.stages.length !== t.nodes.length - 1) return null;
+		let n = [];
+		for (let t of e.stages) {
+			if (!F(t) || Object.keys(t).sort().join(",") !== "action,dwell,label,optional" || typeof t.label != "string" || t.label.trim() !== t.label || t.label.length < 1 || t.label.length > 40 || /[\x00-\x1f\x7f<>]/.test(t.label) || ![
+				"arrival",
+				"parking",
+				"cargo"
+			].includes(String(t.action)) || !Number.isInteger(t.dwell) || Number(t.dwell) < 0 || Number(t.dwell) > 30 || t.action === "arrival" && t.dwell !== 0 || t.action !== "arrival" && Number(t.dwell) < 2 || typeof t.optional != "boolean") return null;
+			n.push({
+				label: t.label,
+				action: t.action,
+				dwell: Number(t.dwell),
+				optional: t.optional
+			});
+		}
+		return n.at(-1)?.optional ? null : {
+			v: 1,
+			physics: "city-story-v1",
+			route: A(t),
+			stages: n
+		};
+	} catch {
+		return null;
+	}
+}
+function L(e) {
+	let t = I(e);
+	if (!t) throw Error("劇本條件無效");
+	let n = "";
+	for (let e of new TextEncoder().encode(JSON.stringify(t))) n += String.fromCharCode(e);
+	let r = btoa(n).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+	return `NG3.${r}.${O(r)}`;
+}
+function R(e) {
+	if (e.length > 12e3) throw Error("劇本分享碼過長");
+	let t = /^NG3\.([A-Za-z0-9_-]{10,11000})\.([0-9a-f]{8})$/.exec(e.trim());
+	if (!t || O(t[1]) !== t[2]) throw Error("劇本分享碼已損壞");
+	try {
+		let e = atob(t[1].replaceAll("-", "+").replaceAll("_", "/")), n = I(JSON.parse(new TextDecoder("utf-8", { fatal: !0 }).decode(Uint8Array.from(e, (e) => e.charCodeAt(0)))));
+		if (n) return n;
+	} catch {}
+	throw Error("劇本版本或階段不支援");
+}
+function z(e, t, n) {
+	let r = I(t);
+	if (!r) throw Error("劇本無效");
+	let i = j(r.route);
+	e.validate(i), n && r.stages.some((e) => e.optional) && z(e, r, !1);
+	let a = r.stages.map((e, t) => ({
+		...e,
+		node: i.nodes[t + 1],
+		source: t
+	})).filter((e) => n || !e.optional), o = {
+		...i,
+		nodes: [i.nodes[0], ...a.map((e) => e.node)]
+	}, s = e.validate(o), c = 0, l = 0, u = [];
+	for (let e = 0; e < a.length; e++) {
+		let t = s.anchors[e + 1], n = -1;
+		for (let e = c + 1; e < s.path.length; e++) if (Math.hypot(s.path[e][0] - t.x, s.path[e][1] - t.z) < 4 && Math.abs(s.ys[e] - t.y) < 2) {
+			n = e;
+			break;
+		}
+		if (n < 0) throw Error("劇本停靠點不在重建道路");
+		for (let e = c + 1; e <= n; e++) l += Math.hypot(s.path[e][0] - s.path[e - 1][0], s.path[e][1] - s.path[e - 1][1]);
+		c = n;
+		let r = s.path[Math.max(0, c - 1)];
+		u.push({
+			...a[e],
+			...t,
+			h: Math.atan2(t.x - r[0], t.z - r[1]),
+			gateEnd: e === a.length - 1 ? s.gates.length : Math.min(s.gates.length, Math.floor(l / 30))
+		});
+	}
+	return {
+		definition: o,
+		route: s,
+		targets: u,
+		skipped: r.stages.length - a.length
+	};
+}
+//#endregion
+//#region src/meridian-city-models.ts
+var B = (e) => Math.atan2(Math.sin(e), Math.cos(e));
+function V(e) {
+	let t = e.nearest(467.12, 515.8, "ground", 250) ?? [...e.nodes].filter(([, e]) => !e.elevated).map(([e, t]) => ({
+		id: e,
+		point: t
+	}))[0];
+	if (!t) throw Error("城市沒有可用尋寶道路");
+	let n = [t.id], r = [], i = /* @__PURE__ */ new Set(), a = t.point;
+	for (let t = 0; t < 3; t++) {
+		let t = [...e.nodes].filter(([e, t]) => !t.elevated && !n.includes(e) && t.name !== "道路節點" && !i.has(t.name) && Math.hypot(t.x - a.x, t.z - a.z) > 140 && Math.hypot(t.x - a.x, t.z - a.z) < 1e3).sort((e, t) => Math.hypot(e[1].x - a.x, e[1].z - a.z) - Math.hypot(t[1].x - a.x, t[1].z - a.z) || e[0] - t[0]), o = !1;
+		for (let [s, c] of t.slice(0, 120)) try {
+			if (e.route([...n, s]).length > 6e3) continue;
+			n.push(s), i.add(c.name), r.push(c.name), a = c, o = !0;
+			break;
+		} catch {}
+		if (!o) throw Error("目前城市無法組成三站可識別路牌尋寶");
+	}
+	let o = {
+		v: 1,
+		physics: "city-story-v1",
+		route: A({
+			v: 1,
+			physics: S,
+			map: e.stamp,
+			name: "城市路牌照片尋寶",
+			nodes: n,
+			car: "sedan",
+			weather: "day",
+			seconds: 1800,
+			hits: 20
+		}),
+		stages: r.map((e) => ({
+			label: `尋找「${e}」路牌附近`.slice(0, 40),
+			action: "arrival",
+			dwell: 0,
+			optional: !1
+		}))
+	};
+	return {
+		story: o,
+		plan: z(e, o, !0),
+		code: L(o)
+	};
+}
+var H = class {
+	mode;
+	story;
+	plan;
+	index = 0;
+	gate = 0;
+	elapsed = 0;
+	dwell = 0;
+	hits = 0;
+	done = !1;
+	success = !1;
+	reason = "";
+	tasks = [];
+	photos = [];
+	lastHit = -100;
+	current = "";
+	constructor(e, t, n) {
+		this.mode = e, this.story = t, this.plan = n;
+	}
+	get target() {
+		return this.plan.targets[this.index];
+	}
+	fail(e) {
+		this.done || (this.done = !0, this.success = !1, this.reason = e);
+	}
+	role(e) {
+		return [
+			"司機：對準停穩",
+			"裝卸員：長按作業",
+			"領航員：實地核對路牌",
+			"警戒員：確認周邊淨空"
+		][e] ?? "隊員";
+	}
+	setup(e) {
+		let t = this.index + ":" + e.map((e) => e.id).join(",");
+		if (t === this.current) return;
+		this.current = t;
+		let n = this.target;
+		this.tasks = e.map((e, t) => ({
+			id: e.id,
+			role: this.mode === "hunt" ? "攝影隊員" : this.role(t),
+			seconds: 0,
+			required: this.mode === "hunt" ? 0 : t === 0 ? Math.max(.5, n.action === "arrival" ? .5 : n.dwell) : n.action === "cargo" && t === 1 ? Math.max(2, n.dwell) : t === 2 ? 1.5 : 2,
+			done: this.mode === "hunt"
+		}));
+	}
+	capture(e, t) {
+		if (this.done || this.mode !== "hunt") return !1;
+		let n = e.find((e) => e.id === t), r = this.target;
+		return !n?.connected || Math.hypot(n.pose.x - r.x, n.pose.z - r.z) >= 12 || Math.abs(n.pose.y - -.25 - r.y) >= 1.2 || Math.hypot(n.pose.vx, n.pose.vz) >= .5 || ![
+			n.pose.x,
+			n.pose.y,
+			n.pose.z,
+			n.pose.vx,
+			n.pose.vz
+		].every(Number.isFinite) ? !1 : (this.photos.push({
+			stage: this.index,
+			by: t,
+			seconds: this.elapsed
+		}), this.advance(), !0);
+	}
+	step(e, t, n, r = 0) {
+		if (this.done) return;
+		if (!Number.isFinite(e) || e <= 0 || e > .1 || !t.length || t.length > 4) return this.fail("任務模擬或隊伍無效");
+		if (this.elapsed += e, this.elapsed > this.plan.definition.seconds) {
+			this.fail("任務時間已到");
+			return;
+		}
+		if (r > 6 && this.elapsed - this.lastHit > .75 && (this.hits++, this.lastHit = this.elapsed), this.hits > this.plan.definition.hits) {
+			this.fail("碰撞超過劇本上限");
+			return;
+		}
+		this.setup(t);
+		let i = this.target, a = t[0], o = a.pose, s = this.plan.route.gates[this.gate];
+		this.mode === "story" && this.gate < i.gateEnd && s && Math.hypot(o.x - s.x, o.z - s.z) < 12 && Math.abs(o.y - -.25 - s.y) < 2.2 && this.gate++;
+		let c = (e, t) => e.connected && Math.hypot(e.pose.x - i.x, e.pose.z - i.z) < t && Math.abs(e.pose.y - -.25 - i.y) < 1.2 && Math.hypot(e.pose.vx, e.pose.vz) < .5;
+		if (this.mode === "hunt") {
+			n && this.capture(t, n);
+			return;
+		}
+		let l = this.gate >= i.gateEnd && c(a, i.action === "arrival" ? 9 : 3) && (i.action === "arrival" || Math.abs(B(o.h - i.h)) < .3);
+		this.dwell = l ? Math.min(i.dwell || .5, this.dwell + e) : 0;
+		for (let [n, r] of this.tasks.entries()) {
+			let a = t[n];
+			r.seconds = l && c(a, n === 0 ? 9 : 18) && (n === 0 && i.action !== "cargo" || a.held) ? Math.min(r.required, r.seconds + e) : 0, r.done = r.seconds >= r.required;
+		}
+		this.tasks.every((e) => e.done) && this.advance();
+	}
+	advance() {
+		this.index++, this.dwell = 0, this.current = "", this.tasks = [], this.index === this.plan.targets.length && (this.done = this.success = !0, this.reason = this.mode === "hunt" ? "全隊已依序找到並拍攝所有線索。" : "全隊已完成所有分工階段。");
+	}
+	snapshot() {
+		return {
+			mode: this.mode,
+			index: this.index,
+			total: this.plan.targets.length,
+			elapsed: this.elapsed,
+			dwell: this.dwell,
+			hits: this.hits,
+			gate: this.gate,
+			done: this.done,
+			success: this.success,
+			reason: this.reason,
+			clue: this.target?.label ?? this.reason,
+			tasks: structuredClone(this.tasks),
+			photos: structuredClone(this.photos)
+		};
+	}
+};
+//#endregion
 //#region server/summit-city-physics-entry.ts
-function F(t, n = []) {
+function U(t, n = []) {
 	let r = i(t), a = new l(r), o = new s(r);
 	a.tunnels = !0, o.groundAt = (e, t) => a.groundAt(e, t);
 	for (let t of n) o.addBuildings(e(t).buildings);
@@ -1012,4 +1254,4 @@ function F(t, n = []) {
 	};
 }
 //#endregion
-export { v as FreeCar, c as ROAD_Y, F as createCityRaceWorld, j as decodeWorkshop, A as encodeWorkshop, k as parseWorkshop, P as streetContact };
+export { H as CityMissionRun, v as FreeCar, c as ROAD_Y, V as buildPhotoHunt, z as buildStoryPlan, U as createCityRaceWorld, R as decodeStory, j as decodeWorkshop, L as encodeStory, A as encodeWorkshop, k as parseWorkshop, P as streetContact };

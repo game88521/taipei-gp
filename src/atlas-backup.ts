@@ -24,6 +24,15 @@ export const ATLAS_BACKUP_SLOTS:readonly [string,string,number][]=[
   ['taipei-gp-frontier-crew-v2','多事故合作救援紀錄',100000],
   ['taipei-gp-frontier-tandem-ghost-v1','單人追走領跑鬼車',1000000],
   ['taipei-gp-frontier-tandem-results-v1','單人追走陪練成績',100000],
+  ['taipei-gp-aurora-touch-v1','橫直向手機按鈕排版',16000],
+  ['taipei-gp-aurora-bus-v1','公車連續營運',100000],
+  ['taipei-gp-aurora-story-v1','NG3任務劇本與成績',700000],
+  ['taipei-gp-aurora-duty-results-v1','多人分工救援成績',250000],
+  ['taipei-gp-meridian-city-resume-v1','公車與NG3中途續玩',1000000],
+  ['taipei-gp-meridian-checkpoints-v1','好友盃與派對公開站間續局',1000000],
+  ['taipei-gp-meridian-city-records-v1','多人NG3與城市尋寶成績',1000000],
+  ['taipei-gp-meridian-tandem-rotation-v1','多人追走輪賽成績',65536],
+  ['taipei-gp-meridian-navigator-results-v1','雙人領航拉力共用成績',32768],
 ];
 export interface AtlasBackup {type:'taipei-gp-full-backup';v:1;at:string;build:string;slots:{key:string;raw:string|null}[];replays:unknown[]}
 export interface AtlasStorage {getItem(k:string):string|null;setItem(k:string,v:string):void;removeItem(k:string):void}
@@ -41,7 +50,7 @@ function bounded(value:unknown,depth=0):boolean {
 export function parseAtlasBackup(text:string):AtlasBackup {
   if(typeof text!=='string'||text.length>ATLAS_BACKUP_LIMIT)throw Error('整包備份上限40MB。');
   const v:unknown=JSON.parse(text);
-  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,19,26,27,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
+  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,19,26,27,31,35,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
   if(Object.keys(v).some(k=>!['type','v','at','build','slots','replays'].includes(k)))throw Error('整包備份含不支援的欄位。');
   const seen=new Set<string>();
   const slots=v.slots.map(row=>{if(!obj(row)||typeof row.key!=='string'||seen.has(row.key)||Object.keys(row).some(k=>!['key','raw'].includes(k)))throw Error('備份分類重複或無效。');const spec=ATLAS_BACKUP_SLOTS.find(s=>s[0]===row.key);if(!spec||!(row.raw===null||typeof row.raw==='string'&&slotFits(row.key,row.raw,spec[2])))throw Error('備份包含未允許的資料或分類過大。');seen.add(row.key);if(row.raw!==null){let value:unknown;try{value=['taipei-gp-multiplayer-quality-v1','taipei-gp-expedition-network-v1'].includes(row.key)?row.raw:JSON.parse(row.raw as string);}catch{throw Error(`${spec[1]}不是有效JSON，原資料尚未改動。`);}if(!bounded(value))throw Error(`${spec[1]}包含不支援的資料。`);}return {key:row.key,raw:row.raw as string|null};});
@@ -58,14 +67,18 @@ export async function captureAtlasBackup(storage:AtlasStorage,port:AtlasReplayPo
   return value;
 }
 export class AtlasRestoreError extends Error {constructor(message:string,readonly rollbackComplete:boolean){super(message);}}
-export async function restoreAtlasBackup(storage:AtlasStorage,port:AtlasReplayPort,incoming:AtlasBackup,before:AtlasBackup,options:{preserveJournal?:boolean}={}) {
+export async function restoreAtlasBackup(storage:AtlasStorage,port:AtlasReplayPort,incoming:AtlasBackup,before:AtlasBackup,options:{preserveJournal?:boolean;selectedKeys?:readonly string[];replays?:boolean}={}) {
+  const selected=options.selectedKeys===undefined?incoming.slots:incoming.slots.filter(s=>options.selectedKeys!.includes(s.key));
+  if(options.selectedKeys&&(new Set(options.selectedKeys).size!==options.selectedKeys.length||options.selectedKeys.some(k=>!incoming.slots.some(s=>s.key===k))))throw Error('還原分類不完整或重複；尚未改動。');
+  const replaceReplays=options.replays!==false;
+  if(!selected.length&&!replaceReplays)throw Error('請至少選擇一個分類或回放。');
   const put=(slot:{key:string;raw:string|null})=>slot.raw===null?storage.removeItem(slot.key):storage.setItem(slot.key,slot.raw);
   const unchanged=()=>{if(before.slots.some(s=>storage.getItem(s.key)!==s.raw))throw Error('目前資料已變更，請重新預覽；尚未還原。');};
   unchanged();if(!options.preserveJournal)await port.journal(before);let changedReplays=false;const attempted:string[]=[];
   try {
-    unchanged();await port.replace(incoming.replays,before.replays);changedReplays=true;unchanged();
-    for(const slot of incoming.slots){attempted.push(slot.key);put(slot);}
-    if(incoming.slots.some(s=>storage.getItem(s.key)!==s.raw))throw Error('寫入後核對失敗。');
+    unchanged();if(replaceReplays){await port.replace(incoming.replays,before.replays);changedReplays=true;}unchanged();
+    for(const slot of selected){attempted.push(slot.key);put(slot);}
+    if(selected.some(s=>storage.getItem(s.key)!==s.raw))throw Error('寫入後核對失敗。');
   } catch(error) {
     let recovered=true;
     try{if(changedReplays)await port.replace(before.replays,incoming.replays);}catch{recovered=false;}

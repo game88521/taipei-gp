@@ -1,0 +1,17 @@
+.meridian-racing p { white-space:pre-line; line-height:1.6; }
+.meridian-racing button, .meridian-racing select { min-height:44px; }
+.meridian-racing input { min-width:44px; min-height:44px; }
+.meridian-telemetry { margin-block:12px; padding:10px; border:1px solid #68879b; border-radius:8px; }
+.meridian-telemetry label { display:block; margin-block:10px; }
+.meridian-telemetry button { min-height:44px; }
+.meridian-telemetry input { min-height:44px; max-width:100%; box-sizing:border-box; }
+.meridian-telemetry input[type=range] { width:100%; min-width:44px; }
+.meridian-telemetry output { display:block; margin-block:8px; }
+.meridian-telemetry canvas { max-width:100%; background:#101b28; }
+#mp-meridian-live { position:fixed; z-index:3; top:calc(86px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:max-content; max-width:min(600px,calc(100vw - 480px)); max-height:calc(100dvh - 370px); overflow:auto; background:#101b28ed; padding:8px 12px; border:1px solid #68879b; border-radius:8px; font-size:13px; pointer-events:auto; }
+#mp-meridian-live p { margin:4px 0 8px; }
+#mp-meridian-live button { max-width:100%; white-space:normal; font-size:inherit; }
+@media(max-width:600px),(max-height:500px){
+ #mp-hud #mp-race-information>#mp-meridian-live { position:relative; inset:auto; transform:none; width:auto; max-width:none; max-height:none; overflow:visible; }
+}
+.beacon-mode-guide{padding:12px;margin:10px 0;border:1px solid #6c889e;border-radius:10px;overflow-wrap:anywhere}.beacon-mode-guide button{font:inherit;min-height:44px;min-width:44px}.beacon-mode-guide button:focus-visible{outline:3px solid #ffe66d;outline-offset:2px}

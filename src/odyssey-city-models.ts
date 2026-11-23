@@ -52,9 +52,16 @@ export class DutyWinch {
   confirm() { if (!this.ready || this.confirmed) return false; this.confirmed = true; return true; }
 }
 /** One penalty per junction encounter. Stopping inside the approach does not count as a crossing. */
+export type DutyRoadEncounter = 'none' | 'approach' | 'entered';
 export class DutyRoadRules {
   redLights = 0; penalty = 0; private junction: object | null = null; private entered = false;
+  private restoredEncounter: DutyRoadEncounter | null = null;
+  get encounter(): DutyRoadEncounter { return this.restoredEncounter ?? (this.junction ? this.entered ? 'entered' : 'approach' : 'none'); }
+  restoreEncounter(value: DutyRoadEncounter) { this.junction = null; this.entered = false; this.restoredEncounter = value; }
+  /** Rebind a saved encounter to the freshly created Traffic junction object. */
+  prime(signal: { id: object; red: boolean } | null) { const encounter = this.encounter; this.junction = signal?.id ?? null; this.entered = !!signal && encounter === 'entered'; this.restoredEncounter = null; }
   sample(signal: { id: object; red: boolean } | null, speed: number) {
+    if (this.restoredEncounter !== null) this.prime(signal);
     if (!signal) { this.junction = null; this.entered = false; return false; }
     if (signal.id !== this.junction) { this.junction = signal.id; this.entered = false; }
     if (!Number.isFinite(speed) || speed < 1.5 || this.entered) return false;

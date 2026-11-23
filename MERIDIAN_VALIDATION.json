@@ -1,0 +1,1728 @@
+{
+  "schema": "taipei-gp-meridian-validation-v1",
+  "status": "LOCAL_VALIDATED",
+  "author": "Rex <game88521@gmail.com>",
+  "baseline": "c56ca26e04bb1f39c144a93454ae1bc8d09d6737",
+  "beforeBuild": "bdc4e4bc9821",
+  "capturedFiles": 1264,
+  "build": "862f7f9c9857",
+  "validatedAt": "2026-11-23T05:26:54.357Z",
+  "localOnly": true,
+  "productionTested": false,
+  "realPhoneUsed": false,
+  "commitCreated": false,
+  "pushed": false,
+  "deployed": false,
+  "counts": {
+    "newNode": 84,
+    "newBrowser": 28,
+    "legacy": 87,
+    "fixed": 3
+  },
+  "suites": [
+    {
+      "name": "meridian-platform-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-platform-node-result.json",
+      "evidenceSha256": "433acc7e110d2e0aa0296a6d101c040dcd5e732bec035f20d6dc0d7ca00df6cc",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 4,
+      "limitations": []
+    },
+    {
+      "name": "meridian-backup-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 4,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-backup-node-result.json",
+      "evidenceSha256": "2b502304ab3df2f5eb6f2464a4901ece692ca62b6d44d58bf0a318075b53690e",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 2,
+      "limitations": []
+    },
+    {
+      "name": "meridian-racing-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-racing-node-result.json",
+      "evidenceSha256": "c3a14eba24a221e0a90ff638fb44eb533d2d5c166963a4539a502ace6759da44",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 0,
+      "limitations": []
+    },
+    {
+      "name": "meridian-city-models",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 15,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-city-models-result.json",
+      "evidenceSha256": "c15ce58569bd612060a580441826015e0f0c90eee2a81c85703b8422516e690c",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 10,
+      "limitations": [
+        "完整公車／NG3續玩使用明示240／360m直線fixture，真正FreeCar行駛並由產品規則結算；不代表全城真人駕駛。",
+        "合作角色邊界與照片順序使用明示姿態fixture；真城市道路與真WS實車另由meridian-city-node驗證。",
+        "相片實際像素／下載、手機排版另由本機browser驗證；未使用實機。"
+      ]
+    },
+    {
+      "name": "meridian-city-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 12,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-city-node-result.json",
+      "evidenceSha256": "7f56d6dcb92cbbffb3b4a45a187020a7b0d837aa8fcaed2650c2febe724d2578",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 6,
+      "limitations": [
+        "2／3／4車真WS操控真FreeCar完成同一段真城市直路及2秒作業，非真人全城長篇劇本。",
+        "逾時／重連與TTL明示使用伺服器時鐘；錯層／捕捉／長任務結算明示使用服務內姿態／結果fixture。",
+        "免費Render負載與手機網路未量測，未連線任何公開主機。"
+      ]
+    },
+    {
+      "name": "meridian-city-client-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-city-client-node-result.json",
+      "evidenceSha256": "3bca8e4cd007dd147bbaffe3dcb69a47b5a858d2610e5b0a4a01d760ac05a42f",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 4,
+      "limitations": [
+        "transport明示為記憶體WebSocket適配器，使用真正MeridianCityClient、MeridianCityService與FreeCar；真網路frame另由meridian-city-node／browser驗證。",
+        "長場序號以server已確認超過一萬包的明示fixture初始化，避免測試無意灌流量。"
+      ]
+    },
+    {
+      "name": "meridian-city-road-prime-fixed",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 2,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-city-road-prime-fixed-result.json",
+      "evidenceSha256": "47fbfe37ebfcdbb8e241dc58c081e96d111245bf430704c2722427191d7c3d2c",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 2,
+      "limitations": []
+    },
+    {
+      "name": "meridian-checkpoints-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-checkpoints-node-result.json",
+      "evidenceSha256": "589a1805bd9e07b6f2bf56906abb68844a49168e85e5bf8df25cb7a61e0a65ea",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 2,
+      "limitations": []
+    },
+    {
+      "name": "meridian-checkpoint-client-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-checkpoint-client-node-result.json",
+      "evidenceSha256": "9b84c6afc18ef301b8a6169941130f11887e40018b886f8d7e894f7207ff9b1f",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 3,
+      "limitations": []
+    },
+    {
+      "name": "meridian-social-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-social-node-result.json",
+      "evidenceSha256": "ab9ed08057c0458e8bc7101af4469d242b95d6664cbbabedb0fefda0522fc81b",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 10,
+      "limitations": [
+        "Full rotations use normal-duration idle FreeCars: these establish equal opportunities, lifecycle and isolation, not human drift skill or multiplayer latency quality. Party restart restores a lobby summary, never a moving car."
+      ]
+    },
+    {
+      "name": "meridian-navigator-node",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/meridian-navigator-node-result.json",
+      "evidenceSha256": "9980d04a2337d40a70bce814b8f15064e12725d391203aeab095f0792e74e8e6",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 9,
+      "limitations": [
+        "Complete road-gate scoring is checked with explicit server crossing fixtures. Actual input drives a real FreeCar, but this is not a human full-route driving, latency/balance, real-phone or remote-host capacity claim."
+      ]
+    },
+    {
+      "name": "meridian-platform-browser",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "build": "862f7f9c9857",
+      "evidence": "tools/dev-tests/meridian-platform-browser-result.json",
+      "evidenceSha256": "8980ec268a184cd6db9db7191248ce12ede56495b4ebe6a52a78dfa82e5b69d4",
+      "immutableEvidence": {
+        "path": "tools/dev-tests/meridian-platform-browser-evidence-1795411428916/report.json",
+        "sha256": "8980ec268a184cd6db9db7191248ce12ede56495b4ebe6a52a78dfa82e5b69d4"
+      },
+      "sourceHashesChecked": 8,
+      "limitations": [
+        "桌面Chrome手機尺寸模擬，不是實機效能證明。",
+        "影片使用明示靜止車輛及接觸事件fixture，真城市場景及MediaRecorder。"
+      ]
+    },
+    {
+      "name": "meridian-racing-browser",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 5,
+      "failed": 0,
+      "build": "862f7f9c9857",
+      "evidence": "tools/dev-tests/meridian-racing-browser-result.json",
+      "evidenceSha256": "64e52bafc8b5b46df7d7c85b2a2c62d0a7e0bc133058418919155a8a67836f8d",
+      "immutableEvidence": {
+        "path": "tools/dev-tests/meridian-racing-browser-evidence-1795411138848/report.json",
+        "sha256": "64e52bafc8b5b46df7d7c85b2a2c62d0a7e0bc133058418919155a8a67836f8d"
+      },
+      "sourceHashesChecked": 21,
+      "limitations": [
+        "桌面Chrome獨立context與尺寸模擬，不是真機／跨網路或人工全程試駕；fixture由個案另外明示。",
+        "主頁TT以虛擬input.read控制器、真__gp.step/Car.update駛完有效圈，非BOT參數、無手寫sample。GP排位／衝刺／正賽完賽及維修區姿態為明示權威fixture；真Car接力服務區路段另見Node1056步證據。"
+      ]
+    },
+    {
+      "name": "meridian-social-browser",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 6,
+      "failed": 0,
+      "build": "862f7f9c9857",
+      "evidence": "tools/dev-tests/meridian-social-browser-result.json",
+      "evidenceSha256": "02870fc38f72ff39ffa98ed9d00e9c95a67f15f833437964538fe6f94734901c",
+      "immutableEvidence": {
+        "path": "tools/dev-tests/meridian-social-browser-evidence-1795411303859/report.json",
+        "sha256": "02870fc38f72ff39ffa98ed9d00e9c95a67f15f833437964538fe6f94734901c"
+      },
+      "sourceHashesChecked": 20,
+      "limitations": [
+        "桌面Chrome獨立context與尺寸模擬，不是真機／跨網路或人工全程試駕；fixture由個案另外明示。",
+        "No injected phase, finish, score or car position. Rotations start through UI but their full normal-duration schedules are separately exercised in meridian-social-node. Browser tests cover native entry, waiting control gates, private proof acknowledgment and same-browser restoration, crew calls and layouts; not real phones or remote capacity."
+      ]
+    },
+    {
+      "name": "meridian-city-browser",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 10,
+      "failed": 0,
+      "build": "862f7f9c9857",
+      "evidence": "tools/dev-tests/meridian-city-browser-result.json",
+      "evidenceSha256": "d70221144f403d3ef4da7484ffe05893de921aa0cfc2e8b3057f77da3cf15500",
+      "immutableEvidence": {
+        "path": "tools/dev-tests/meridian-city-browser-evidence-1795410736796/report.json",
+        "sha256": "d70221144f403d3ef4da7484ffe05893de921aa0cfc2e8b3057f77da3cf15500"
+      },
+      "sourceHashesChecked": 15,
+      "limitations": [
+        "桌面Chrome獨立context與尺寸模擬，不是真機／跨網路或人工全程試駕；fixture由個案另外明示。",
+        "續玩UI以真規則時鐘在原地保存，完整真FreeCar續玩由Node直路測試證明。最後階段原子結算、照片拍攝與合作作業明示使用fixture到站位置／進度；不宣稱多人全城人工試駕。",
+        "合作server autoTick停用：模擬步由測試驅動；長按輸入仍經原生pointer／真WS，TTL的真時鐘邊界由Node另測。"
+      ]
+    },
+    {
+      "name": "meridian-city-save-hud-browser-fixed",
+      "legacy": false,
+      "status": "PASS",
+      "passed": 2,
+      "failed": 0,
+      "build": "862f7f9c9857",
+      "evidence": "tools/dev-tests/meridian-city-save-hud-browser-fixed-result.json",
+      "evidenceSha256": "b01600fa7c98044a34172085ee95c664ad0a30161eb5732efe3b2fe739f9c127",
+      "immutableEvidence": {
+        "path": "tools/dev-tests/meridian-city-save-hud-browser-fixed-evidence-1795410788580/report.json",
+        "sha256": "b01600fa7c98044a34172085ee95c664ad0a30161eb5732efe3b2fe739f9c127"
+      },
+      "sourceHashesChecked": 4,
+      "limitations": [
+        "桌面Chrome獨立context與尺寸模擬，不是真機／跨網路或人工全程試駕；fixture由個案另外明示。",
+        "只驗儲存失敗提示的修前／修後對照。公車到站與照片已完成狀態採明示fixture；完整行車和拍攝另由主suite及Node驗證。",
+        "--expect-fixed=0刻意測主代理保留的修前dist；source hashes僅記錄執行時工作樹，dist build為實際受測版本。"
+      ]
+    },
+    {
+      "name": "aurora-city-models",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 8,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/aurora-city-models-result.json",
+      "evidenceSha256": "94e2cab30a030f2e607cc377ea355493fb90c50ce118246f42e2a32b9a066e76",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 0,
+      "limitations": [
+        "Node測試包含真FreeCar直路fixture，不代表真手機手感。",
+        "MediaRecorder真實影片編碼與下載需本機瀏覽器驗證，Node僅驗剪輯時間與相容選擇。"
+      ]
+    },
+    {
+      "name": "aurora-platform-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 13,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/aurora-platform-node-result.json",
+      "evidenceSha256": "1c1c934e2922a9866819b5f2abccc19585c582640efb8c9eaf27ca8fb7e909cb",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 5,
+      "limitations": []
+    },
+    {
+      "name": "aurora-racing-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 14,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/aurora-racing-node-result.json",
+      "evidenceSha256": "6ec8060d56b42b8e0da7b0bae74ff506141af8b0acb010b4a2e581b1579715c9",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 0,
+      "limitations": [
+        "Cup result branches use labelled finish fixtures; full legacy four-match true-Car/WebSocket tests remain separate.",
+        "Rally road tests use actual FreeCar/collider and controls through the true service with an EventEmitter transport, not internet or human balance.",
+        "Built-in ghost traces are actual offline recorded control runs. Teaching success and real-player drift balance require human trials.",
+        "Strategy is a hypothetical estimate; assertions do not claim predicted lap-time accuracy."
+      ]
+    },
+    {
+      "name": "aurora-duty-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/aurora-duty-node-result.json",
+      "evidenceSha256": "3798aab42379e3bfeab215c3d782290a68fa08877660b2e7069c7f17aadd5c19",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 8,
+      "limitations": [
+        "作業閉環使用明示事故與勤務站停靠／檢查點fixture；真FreeCar、城市路網與服務不替換，不代表真人跑完全程。",
+        "長按與8秒期限由真30Hz服務運算；沒有外網容量、實機手機或四人真人駕駛證據。"
+      ]
+    },
+    {
+      "name": "aurora-social-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 9,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/aurora-social-node-result.json",
+      "evidenceSha256": "fbe5f9d3f57f38f5b54e6a676ed54bba6f4f2ffb5714c009db696a346a1393d9",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 7,
+      "limitations": [
+        "Crown and chase finish by actual authority ticks with normal idle spawns, not a human skill/balance test. Convoy is validated through real route construction and true input movement, not its full road journey. No browser, phone or external-host capacity claim."
+      ]
+    },
+    {
+      "name": "frontier-rally-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 17,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/frontier-rally-node-result.json",
+      "evidenceSha256": "ab1a2ad4598c765bdce5ac27859f32786726d083911bb0713293d933f528869e",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 5,
+      "limitations": [
+        "Gate/scoring cases explicitly arrange server-side previous/current poses at each real-road gate. They prove direction, level, timing and scoring rules, not human complete-route driving. A separate case advances the actual FreeCar with real controls. The browser/client cases use genuine loopback WS with no public services."
+      ]
+    },
+    {
+      "name": "frontier-performance-history-node",
+      "legacy": true,
+      "status": "PASS",
+      "passed": 17,
+      "failed": 0,
+      "build": null,
+      "evidence": "tools/dev-tests/frontier-performance-history-node-result.json",
+      "evidenceSha256": "e7f9d511cc890866b82569a36b5ef2d067eba26aff662f64fb284919e7090e48",
+      "immutableEvidence": null,
+      "sourceHashesChecked": 8,
+      "limitations": [
+        "Uses actual parsers and storage/backup code with isolated in-memory Storage ports. Compare-before-write is a change guard, not an atomic cross-tab lock. Device performance and rendering are tested separately."
+      ]
+    }
+  ],
+  "assets": {
+    "status": "PASS",
+    "build": "862f7f9c9857",
+    "localOnly": true,
+    "editors": [
+      {
+        "file": "aurora-strategy-ui-Cmj5wog1.js",
+        "bytes": 5432,
+        "gzipBytes": 2795,
+        "sha256": "08bf878415cb4bacd2808259986f7c8ef19962c050d425cbccb85d1ac203332a"
+      },
+      {
+        "file": "aurora-director-ui-CcPMvfjg.js",
+        "bytes": 10818,
+        "gzipBytes": 5454,
+        "sha256": "1c18ea6f55f56bf391fd670674c96d3b19a2ad5337cc3e989e1e3cc33e58f136"
+      }
+    ],
+    "editorGzipBytesDeferred": 8249,
+    "firstInstallPrecacheExcludesEditors": true,
+    "explicitOfflinePacksIncludeEditors": true,
+    "limitations": [
+      "This measures these editor chunks only; it is not a claim of total startup speed or mobile FPS improvement."
+    ]
+  },
+  "serverPackage": {
+    "status": "PASS",
+    "staticOnly": true,
+    "dockerExecuted": false,
+    "modules": 74,
+    "importEdges": 249,
+    "externalDependencies": [
+      "ws"
+    ],
+    "requiredAuroraModules": [
+      "server/aurora-social-service.mjs",
+      "server/aurora-duty-service.mjs",
+      "shared/aurora-social.ts",
+      "shared/aurora-duty.ts",
+      "server/meridian-city-service.mjs",
+      "server/meridian-checkpoints.mjs",
+      "server/meridian-navigator-service.mjs",
+      "server/meridian-racing-service.mjs"
+    ],
+    "runtimeAssets": 188,
+    "missingImportControl": "PASS",
+    "denyAllContextControl": "PASS",
+    "files": [
+      "server/index.mjs",
+      "shared/meridian-social.ts",
+      "shared/meridian-navigator.ts",
+      "server/meridian-checkpoints.mjs",
+      "shared/meridian-checkpoints.ts",
+      "server/meridian-city-service.mjs",
+      "server/summit-city-race-service.mjs",
+      "server/summit-city-physics.mjs",
+      "shared/summit-city-race.ts",
+      "shared/meridian-city.ts",
+      "shared/meridian-racing.ts",
+      "shared/multiplayer-tracks.ts",
+      "shared/multiplayer-catalog.json",
+      "shared/circuit-catalog.ts",
+      "shared/multiplayer-track-fingerprint.ts",
+      "server/room-service.mjs",
+      "server/physics.mjs",
+      "shared/multiplayer-protocol.ts",
+      "shared/multiplayer-series.ts",
+      "shared/multiplayer-room-rules.ts",
+      "shared/multiplayer-evolution.ts",
+      "server/series-checkpoint.mjs",
+      "shared/multiplayer-horizon.ts",
+      "shared/meridian-presets.ts",
+      "shared/summit-racing.ts",
+      "shared/voyager-racing.ts",
+      "shared/atlas-racing.ts",
+      "shared/expedition-racing.ts",
+      "shared/odyssey-racing.ts",
+      "shared/frontier-cup.ts",
+      "server/horizon-service.mjs",
+      "server/voyager-racing-service.mjs",
+      "server/summit-events-service.mjs",
+      "server/summit-racing-service.mjs",
+      "server/atlas-racing-service.mjs",
+      "server/odyssey-racing-service.mjs",
+      "server/expedition-racing-service.mjs",
+      "server/meridian-racing-service.mjs",
+      "server/meridian-presets-service.mjs",
+      "shared/multiplayer-arena.ts",
+      "server/nexus-replay-service.mjs",
+      "shared/nexus-replay.ts",
+      "server/nexus-arena-service.mjs",
+      "server/frontier-cup-service.mjs",
+      "server/meridian-room-checkpoints.mjs",
+      "server/meridian-championship-checkpoints.mjs",
+      "server/meridian-cup-checkpoints.mjs",
+      "server/nexus-coop-service.mjs",
+      "shared/nexus-coop.ts",
+      "shared/nexus-coop-city.json",
+      "shared/odyssey-coop.ts",
+      "server/expedition-social-service.mjs",
+      "shared/expedition-social.ts",
+      "shared/frontier-convoy.ts",
+      "shared/frontier-crown.ts",
+      "shared/aurora-social.ts",
+      "shared/frontier-city-resume.ts",
+      "server/frontier-convoy-service.mjs",
+      "server/frontier-crown-service.mjs",
+      "server/frontier-city-replay-service.mjs",
+      "shared/frontier-city-replay.ts",
+      "server/aurora-social-service.mjs",
+      "server/meridian-party-checkpoints.mjs",
+      "server/meridian-social-rotation.mjs",
+      "server/expedition-duty-service.mjs",
+      "shared/expedition-duty.ts",
+      "shared/frontier-duty-missions.ts",
+      "shared/aurora-duty.ts",
+      "server/aurora-duty-service.mjs",
+      "server/frontier-rally-service.mjs",
+      "shared/frontier-rally.ts",
+      "server/meridian-navigator-service.mjs",
+      "server/atlas-runtime.mjs",
+      "server/odyssey-diagnostics.mjs"
+    ],
+    "edges": [
+      {
+        "from": "server/index.mjs",
+        "to": "shared/meridian-social.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/meridian-navigator.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/meridian-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-checkpoints.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/meridian-city-service.mjs"
+      },
+      {
+        "from": "server/meridian-city-service.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/summit-city-race-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/summit-city-race-service.mjs",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/meridian-city-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/meridian-city-service.mjs",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/meridian-city-service.mjs",
+        "to": "shared/meridian-city.ts"
+      },
+      {
+        "from": "shared/meridian-city.ts",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/meridian-city.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/meridian-racing.ts"
+      },
+      {
+        "from": "shared/meridian-racing.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "shared/multiplayer-tracks.ts",
+        "to": "shared/multiplayer-catalog.json"
+      },
+      {
+        "from": "shared/multiplayer-tracks.ts",
+        "to": "shared/circuit-catalog.ts"
+      },
+      {
+        "from": "shared/multiplayer-tracks.ts",
+        "to": "shared/multiplayer-track-fingerprint.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/room-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/physics.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "shared/multiplayer-protocol.ts",
+        "to": "shared/multiplayer-catalog.json"
+      },
+      {
+        "from": "shared/multiplayer-protocol.ts",
+        "to": "shared/multiplayer-series.ts"
+      },
+      {
+        "from": "shared/multiplayer-series.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-series.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-room-rules.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-evolution.ts"
+      },
+      {
+        "from": "shared/multiplayer-evolution.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/series-checkpoint.mjs"
+      },
+      {
+        "from": "server/series-checkpoint.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "server/series-checkpoint.mjs",
+        "to": "shared/multiplayer-series.ts"
+      },
+      {
+        "from": "server/series-checkpoint.mjs",
+        "to": "shared/multiplayer-evolution.ts"
+      },
+      {
+        "from": "server/series-checkpoint.mjs",
+        "to": "shared/multiplayer-room-rules.ts"
+      },
+      {
+        "from": "server/series-checkpoint.mjs",
+        "to": "shared/multiplayer-horizon.ts"
+      },
+      {
+        "from": "shared/multiplayer-horizon.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "shared/multiplayer-horizon.ts",
+        "to": "shared/multiplayer-room-rules.ts"
+      },
+      {
+        "from": "shared/multiplayer-horizon.ts",
+        "to": "shared/meridian-presets.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/summit-racing.ts"
+      },
+      {
+        "from": "shared/summit-racing.ts",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "shared/summit-racing.ts",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "shared/atlas-racing.ts",
+        "to": "shared/expedition-racing.ts"
+      },
+      {
+        "from": "shared/summit-racing.ts",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "shared/summit-racing.ts",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "shared/summit-racing.ts",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "shared/frontier-cup.ts",
+        "to": "shared/multiplayer-room-rules.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/expedition-racing.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/meridian-racing.ts"
+      },
+      {
+        "from": "shared/meridian-presets.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/horizon-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/physics.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "shared/multiplayer-horizon.ts"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "shared/multiplayer-evolution.ts"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/voyager-racing-service.mjs"
+      },
+      {
+        "from": "server/voyager-racing-service.mjs",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/voyager-racing-service.mjs",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "server/voyager-racing-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/summit-racing-service.mjs"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "server/voyager-racing-service.mjs"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "server/atlas-racing-service.mjs"
+      },
+      {
+        "from": "server/atlas-racing-service.mjs",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "server/atlas-racing-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "server/physics.mjs"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "shared/summit-racing.ts"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/summit-racing-service.mjs",
+        "to": "server/odyssey-racing-service.mjs"
+      },
+      {
+        "from": "server/odyssey-racing-service.mjs",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "server/odyssey-racing-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/odyssey-racing-service.mjs",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/odyssey-racing-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/atlas-racing-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/expedition-racing-service.mjs"
+      },
+      {
+        "from": "server/expedition-racing-service.mjs",
+        "to": "shared/expedition-racing.ts"
+      },
+      {
+        "from": "server/expedition-racing-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/meridian-racing-service.mjs"
+      },
+      {
+        "from": "server/meridian-racing-service.mjs",
+        "to": "server/physics.mjs"
+      },
+      {
+        "from": "server/meridian-racing-service.mjs",
+        "to": "shared/meridian-racing.ts"
+      },
+      {
+        "from": "server/meridian-racing-service.mjs",
+        "to": "shared/summit-racing.ts"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/meridian-presets-service.mjs"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "shared/multiplayer-arena.ts"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "shared/expedition-racing.ts"
+      },
+      {
+        "from": "server/meridian-presets-service.mjs",
+        "to": "server/meridian-racing-service.mjs"
+      },
+      {
+        "from": "server/horizon-service.mjs",
+        "to": "server/summit-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/multiplayer-horizon.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/nexus-replay-service.mjs"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "server/voyager-racing-service.mjs"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "server/odyssey-racing-service.mjs"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "server/atlas-racing-service.mjs"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "shared/nexus-replay.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/voyager-racing.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/multiplayer-tracks.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/atlas-racing.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/summit-racing.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/odyssey-racing.ts"
+      },
+      {
+        "from": "shared/nexus-replay.ts",
+        "to": "shared/expedition-racing.ts"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/nexus-replay-service.mjs",
+        "to": "server/expedition-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/nexus-arena-service.mjs"
+      },
+      {
+        "from": "server/nexus-arena-service.mjs",
+        "to": "shared/multiplayer-arena.ts"
+      },
+      {
+        "from": "server/nexus-arena-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/summit-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/atlas-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/voyager-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/summit-events-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/odyssey-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/expedition-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/frontier-cup-service.mjs"
+      },
+      {
+        "from": "server/frontier-cup-service.mjs",
+        "to": "server/physics.mjs"
+      },
+      {
+        "from": "server/frontier-cup-service.mjs",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/meridian-checkpoints.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/meridian-racing-service.mjs"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/meridian-room-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-room-checkpoints.mjs",
+        "to": "shared/multiplayer-evolution.ts"
+      },
+      {
+        "from": "server/meridian-room-checkpoints.mjs",
+        "to": "shared/multiplayer-horizon.ts"
+      },
+      {
+        "from": "server/meridian-room-checkpoints.mjs",
+        "to": "shared/multiplayer-arena.ts"
+      },
+      {
+        "from": "server/meridian-room-checkpoints.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/meridian-championship-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "shared/multiplayer-room-rules.ts"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "shared/meridian-racing.ts"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "shared/meridian-presets.ts"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "server/meridian-presets-service.mjs"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "server/meridian-room-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-championship-checkpoints.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/room-service.mjs",
+        "to": "server/meridian-cup-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-cup-checkpoints.mjs",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "server/meridian-cup-checkpoints.mjs",
+        "to": "server/meridian-room-checkpoints.mjs"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/nexus-coop-service.mjs"
+      },
+      {
+        "from": "server/nexus-coop-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "shared/nexus-coop.ts",
+        "to": "shared/nexus-coop-city.json"
+      },
+      {
+        "from": "shared/nexus-coop.ts",
+        "to": "shared/odyssey-coop.ts"
+      },
+      {
+        "from": "server/nexus-coop-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/nexus-coop-service.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/nexus-coop-service.mjs",
+        "to": "shared/odyssey-coop.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/expedition-social-service.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/expedition-social.ts"
+      },
+      {
+        "from": "shared/expedition-social.ts",
+        "to": "shared/frontier-convoy.ts"
+      },
+      {
+        "from": "shared/expedition-social.ts",
+        "to": "shared/frontier-crown.ts"
+      },
+      {
+        "from": "shared/frontier-crown.ts",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "shared/expedition-social.ts",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "shared/expedition-social.ts",
+        "to": "shared/meridian-social.ts"
+      },
+      {
+        "from": "shared/expedition-social.ts",
+        "to": "shared/frontier-city-resume.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/frontier-convoy.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/frontier-convoy-service.mjs"
+      },
+      {
+        "from": "server/frontier-convoy-service.mjs",
+        "to": "shared/frontier-convoy.ts"
+      },
+      {
+        "from": "server/frontier-convoy-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/frontier-convoy-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/frontier-crown.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/frontier-crown-service.mjs"
+      },
+      {
+        "from": "server/frontier-crown-service.mjs",
+        "to": "shared/frontier-crown.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/frontier-city-replay-service.mjs"
+      },
+      {
+        "from": "server/frontier-city-replay-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/frontier-city-replay-service.mjs",
+        "to": "shared/frontier-city-replay.ts"
+      },
+      {
+        "from": "shared/frontier-city-replay.ts",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/frontier-city-replay.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/aurora-social-service.mjs"
+      },
+      {
+        "from": "server/aurora-social-service.mjs",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "server/aurora-social-service.mjs",
+        "to": "server/frontier-city-replay-service.mjs"
+      },
+      {
+        "from": "server/aurora-social-service.mjs",
+        "to": "server/frontier-convoy-service.mjs"
+      },
+      {
+        "from": "server/aurora-social-service.mjs",
+        "to": "server/frontier-crown-service.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/meridian-checkpoints.mjs"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/meridian-party-checkpoints.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "server/frontier-city-replay-service.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "server/frontier-convoy-service.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "server/frontier-crown-service.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "server/aurora-social-service.mjs"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "shared/expedition-social.ts"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "shared/frontier-convoy.ts"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "shared/frontier-crown.ts"
+      },
+      {
+        "from": "server/meridian-party-checkpoints.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "shared/meridian-social.ts"
+      },
+      {
+        "from": "server/expedition-social-service.mjs",
+        "to": "server/meridian-social-rotation.mjs"
+      },
+      {
+        "from": "server/meridian-social-rotation.mjs",
+        "to": "shared/meridian-social.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/expedition-duty-service.mjs"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/expedition-duty.ts"
+      },
+      {
+        "from": "shared/expedition-duty.ts",
+        "to": "shared/frontier-duty-missions.ts"
+      },
+      {
+        "from": "shared/expedition-duty.ts",
+        "to": "shared/aurora-duty.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "server/frontier-city-replay-service.mjs"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/frontier-city-replay.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/frontier-city-resume.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/frontier-duty-missions.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "shared/aurora-duty.ts"
+      },
+      {
+        "from": "server/expedition-duty-service.mjs",
+        "to": "server/aurora-duty-service.mjs"
+      },
+      {
+        "from": "server/aurora-duty-service.mjs",
+        "to": "shared/aurora-duty.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/frontier-rally-service.mjs"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "server/summit-city-race-service.mjs"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "shared/frontier-rally.ts"
+      },
+      {
+        "from": "shared/frontier-rally.ts",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "shared/frontier-rally.ts",
+        "to": "shared/meridian-navigator.ts"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "shared/meridian-navigator.ts"
+      },
+      {
+        "from": "server/frontier-rally-service.mjs",
+        "to": "server/meridian-navigator-service.mjs"
+      },
+      {
+        "from": "server/meridian-navigator-service.mjs",
+        "to": "shared/meridian-navigator.ts"
+      },
+      {
+        "from": "server/meridian-navigator-service.mjs",
+        "to": "server/summit-city-physics.mjs"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/frontier-rally.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/aurora-duty.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/expedition-social.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "shared/expedition-duty.ts"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/atlas-runtime.mjs"
+      },
+      {
+        "from": "server/index.mjs",
+        "to": "server/odyssey-diagnostics.mjs"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/meridian-social.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/meridian-navigator.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/meridian-city.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/meridian-racing.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/meridian-checkpoints.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/multiplayer-protocol.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/nexus-coop.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/summit-city-race.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/expedition-social.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-convoy.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-crown.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-rally.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/aurora-social.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/aurora-duty.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-cup.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-duty-missions.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/expedition-duty.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-city-replay.ts"
+      },
+      {
+        "from": "server/odyssey-diagnostics.mjs",
+        "to": "shared/frontier-city-resume.ts"
+      }
+    ],
+    "limitations": [
+      "靜態檢查 COPY、Dockerfile專用ignore、Node執行期import閉包（去除TS型別）、城市tile資產；未執行Docker build或容器啟動。"
+    ]
+  },
+  "fixedBaselines": {
+    "status": "PASS",
+    "transcript": "=== baseline1\nBOT lap2 54.425 hits=0\naiHits 0\nPASS: baseline1\n=== baseline2\nGP P10 陳冠宇:162.0 王柏翰:162.9 吳俊傑:163.0 黃子軒:164.9 林志豪:165.7 張家瑋:165.9 劉宇翔:166.0 蔡明哲:166.2 李承恩:166.5 你:166.9 謝承翰:- 許書豪:- 鄭宇辰:- 郭彥廷:- 洪志明:- 楊凱文:- 邱冠廷:- 廖哲瑋:- 曾柏宇:- 周家豪:- 賴俊宏:- 葉子豪:- DRS區3 回放167s 安全車無 濕0.00 雨胎0台 無線電13則（燈號熄滅！第一個彎小心，別跟人擠／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／後面的 蔡明哲 在 1 秒內，守住內線／漂亮！上到第 10 名／最後一圈！全力推！／後面的 李承恩 在 1 秒內，守住內線／漂亮！上到第 9 名／後面的 謝承翰 在 1 秒內，他很敢晚煞車，進彎前守好內線）\naiHits 8\nPASS: baseline2\n=== baseline3\nGP P22 陳冠宇:175.7(進1 2.0s) 王柏翰:177.3(進1 2.3s) 吳俊傑:180.0(進1 2.8s) 張家瑋:183.3(進1 2.2s) 黃子軒:185.5(進1 2.4s) 林志豪:186.9(進1 2.5s) 許書豪:188.3(進1 2.5s) 蔡明哲:189.4(進1 2.5s) 洪志明:191.3(進1 2.3s) 劉宇翔:192.4(進1 2.5s) 郭彥廷:195.5(進1 2.2s) 李承恩:198.2(進1 2.3s) 楊凱文:200.2(進1 2.0s) 鄭宇辰:201.4(進1 2.4s) 邱冠廷:203.1(進1 2.1s) 謝承翰:204.4(進1 2.1s) 廖哲瑋:206.3(進1 9.1s) 曾柏宇:208.1(進1 2.8s) 周家豪:210.8(進1 3.3s) 賴俊宏:211.9(進1 2.9s) 葉子豪:213.2(進1 2.2s) 你:217.3(進1 2.2s) DRS區3 回放217s 安全車無 濕0.00 雨胎0台 無線電12則（燈號熄滅！第一個彎小心，別跟人擠／Box, box！這圈進站，選好要換的胎／後面的 鄭宇辰 在 1 秒內，守住內線／許書豪 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮！上到第 11 名／漂亮！上到第 9 名／後面的 蔡明哲 在 1 秒內，守住內線／後面的 賴俊宏 在 1 秒內，他很敢晚煞車，進彎前守好內線／漂亮！上到第 20 名／廖哲瑋 很會卡位，先假裝走一邊、等他換線再從另一邊過／漂亮的停站，2.2 秒！／最後一圈！全力推！）\naiHits 5\nPASS: baseline3\n=== done: 3/3 PASS\n",
+    "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a"
+  },
+  "coreIntegrity": {
+    "status": "RAW_BYTES_UNCHANGED",
+    "hashes": {
+      "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+      "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+      "src/rivals.ts": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+      "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32"
+    }
+  },
+  "retainedDevelopmentFailures": [
+    {
+      "path": "tools/dev-tests/meridian-city-browser-evidence-1795408295255/report.json",
+      "sha256": "4d59bceeec50906648567fd93184440401e4eb71164bbc9c36cb5451f56d73f2",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 0,
+      "failed": 1,
+      "build": "784662fb2672"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-browser-evidence-1795408703474/report.json",
+      "sha256": "81fad8d761d3a8b147c50985b30f150d0fca5cec23faad929c6abf2b8584d1a6",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 1,
+      "failed": 1,
+      "build": "7c75329961ed"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-browser-evidence-1795408797723/report.json",
+      "sha256": "0596d5988f074e936a9cee2feb059307a8a5a6d84ff00eb1227060bbb578fe4f",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 4,
+      "failed": 1,
+      "build": "7c75329961ed"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-browser-evidence-1795408883282/report.json",
+      "sha256": "fa8acc303e75496e75f2d52f85897ffb02e180e23c066c23c09c85a270efcc9b",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 6,
+      "failed": 1,
+      "build": "7c75329961ed"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-browser-evidence-1795410310196/report.json",
+      "sha256": "96a00b3e543e2c7ccf05c8fa7a45df21343fe0a88168f0fd0a974d422fd85544",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 6,
+      "failed": 1,
+      "build": "35ff11abd0b0"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-clock-before-evidence-1795410513440/report.json",
+      "sha256": "3baa6c00efc355b492b6901984c877499b5ba50c5aeb8a9a07a0de3bdb283d09",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 0,
+      "failed": 1,
+      "build": "35ff11abd0b0"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-node-evidence-1795409752879/report.json",
+      "sha256": "049543e542672bf48adaa66e4eb02fcb889ece0dd8d61cf63da79a955c1ce95e",
+      "status": "RUNNING",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 1,
+      "failed": 1,
+      "build": null
+    },
+    {
+      "path": "tools/dev-tests/meridian-racing-browser-evidence-1795407725599/report.json",
+      "sha256": "c002a71791368af795b7a89058319e6c207fbab5b785dfcb21c3f7a8a73e12c2",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 0,
+      "failed": 1,
+      "build": "c98384b28756"
+    },
+    {
+      "path": "tools/dev-tests/meridian-racing-browser-evidence-1795409233307/report.json",
+      "sha256": "3aee5b7a57341269402de260fa0a3f2251243219956233c0df3419ddb39bcb86",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 2,
+      "failed": 1,
+      "build": "7c75329961ed"
+    },
+    {
+      "path": "tools/dev-tests/meridian-racing-browser-evidence-1795409729574/report.json",
+      "sha256": "eccea7a7a04e38340a8cb840de553fe96d8cd3548893610207d241b369df23a0",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 8,
+      "passed": 5,
+      "failed": 0,
+      "build": "35ff11abd0b0"
+    },
+    {
+      "path": "tools/dev-tests/meridian-racing-browser-evidence-1795410058287/report.json",
+      "sha256": "ce7e3c86c76fb5951747dafe92d069bc4b027c539d8471e73d6621013b428fb7",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 8,
+      "passed": 5,
+      "failed": 0,
+      "build": "35ff11abd0b0"
+    },
+    {
+      "path": "tools/dev-tests/meridian-racing-browser-evidence-1795410840354/report.json",
+      "sha256": "c96b2339438d415e91b49574bab3f6c947258e5f4d6dde111d9f056bcf8f984e",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 2,
+      "failed": 1,
+      "build": "862f7f9c9857"
+    },
+    {
+      "path": "tools/dev-tests/meridian-social-browser-evidence-1795407954654/report.json",
+      "sha256": "2b85fe81c23bc621b252751dc8d6c06dd40cd5066fec300752a015eed4716dc2",
+      "status": "FAIL",
+      "classification": "DEVELOPMENT_FAILURE",
+      "infrastructureExceptions": 0,
+      "passed": 0,
+      "failed": 1,
+      "build": "69c3413afb6b"
+    }
+  ],
+  "beforeControls": [
+    {
+      "path": "tools/dev-tests/meridian-platform-browser-baseline-result.json",
+      "sha256": "5731a1ad5939bc0255d5d1d1445c754e77661877600012c9203902923db661eb",
+      "status": "PASS",
+      "passed": 2,
+      "build": null,
+      "note": "成功重現修前行為的對照組，並非新版驗收。"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-save-hud-browser-before-result.json",
+      "sha256": "c73e16a705a918c989be81247be4d2b790b516e61b0774da79b1da42a5553b50",
+      "status": "PASS",
+      "passed": 2,
+      "build": "a4ac47c8001c",
+      "note": "成功重現修前行為的對照組，並非新版驗收。"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-road-prime-before-result.json",
+      "sha256": "b5a526aacd7168fd5145ec293361f9a53b51441a03da08196f0510cf8e864377",
+      "status": "PASS",
+      "passed": 2,
+      "build": null,
+      "note": "成功重現修前行為的對照組，並非新版驗收。"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-route-before-result.json",
+      "sha256": "ca4ac3da0a85030950d08f909c92aaa8cfb4bd4d3e012737674314bd7ca3188d",
+      "status": "PASS",
+      "passed": 1,
+      "build": "7c75329961ed",
+      "note": "成功重現修前行為的對照組，並非新版驗收。"
+    },
+    {
+      "path": "tools/dev-tests/meridian-city-clock-before-result.json",
+      "sha256": "66a0d2236ed1b6591719f0e6b2496d3c06296e3609d7cd94ffeca18e9f244a77",
+      "status": "PASS",
+      "passed": 1,
+      "build": "35ff11abd0b0",
+      "note": "成功重現修前行為的對照組，並非新版驗收。"
+    }
+  ],
+  "otherDevelopmentFailures": [
+    "早期 racing Node 8 PASS／1 FAIL 的原latest被子代理覆寫；另存明標依壓縮摘要重建的局部失敗紀錄，不冒充原始收據。",
+    "中間 build 曾因領航 reason 型別聯集漏項而失敗，已修正。",
+    "舊 aurora-racing-node 第一次漏 --experimental-transform-types，在任何個案前無法解析；正確命令14/14 PASS。",
+    "PowerShell重導stderr曾把Vite警告包成NativeCommandError；最終命令明確傳遞npm exit code，build為0。"
+  ],
+  "limitations": [
+    "只測本機 dist 4317 與 loopback WebSocket；隔離桌面Chrome contexts與viewport不代表實體手機或外網真人。",
+    "賽事晉級／交棒UI、城市終段／停靠／合作作業與影片事件部分使用明示fixture；真Car／FreeCar道路、真WS與控制另外驗證，不宣稱人工跑完全程。",
+    "真TT指令為轉向、煞車與自動加速模型；不是類比油門，參考走線不寫入PB。",
+    "效能資料是CPU回呼／提交採樣；8249 gzip bytes只指兩個編輯器延後量，不代表FPS、總啟動時間、GPU、耗電或溫度成效。",
+    "影片為真MediaRecorder編碼／解碼，受瀏覽器支援限制；Docker只靜態閉包，沒有image實測。",
+    "跨程序續局需要固定MERIDIAN_CHECKPOINT_SECRET；只驗簽章與原席權限，沒有持久防重播資料庫。",
+    "實體手機、真手把、外網多人、玩法平衡、免費主機四人容量及長時間GPU／溫度／耗電尚未驗證。"
+  ],
+  "reconstructedDevelopmentFailure": {
+    "path": "tools/dev-tests/meridian-racing-node-reconstructed-initial-failure.json",
+    "sha256": "a1b26228c7b983fa0e1a030c709d3d5a080f1c1f447755fad06f52fedfac24ea",
+    "originalReceiptAvailable": false,
+    "provenance": "壓縮摘要的局部重建，非原始工具輸出或收據。"
+  },
+  "additionalRouteCompatibilityControl": {
+    "path": "tools/dev-tests/meridian-city-route-fixed-result.json",
+    "sha256": "41a6180d6f1488342d885c18d8f1f482fb7fe75fed277ab488dbbf61c363e5a0",
+    "passed": 1,
+    "build": "862f7f9c9857",
+    "note": "額外修後對照，不重複納入正式suite統計。"
+  }
+}

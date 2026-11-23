@@ -17,8 +17,13 @@ import {voyagerVisible,voyagerPractice,voyagerReset,voyagerAdded,voyagerPublic,v
 import { summitEventsEnabled, summitEvent, summitContacts, summitOvertakes } from './summit-events-service.mjs';
 import {odysseyActive,odysseyReceive,odysseyStartError,odysseyStart,odysseyResetPlayer,odysseyBeforeLobby,odysseyTick,odysseyFinalize,odysseyPublic,odysseyRuleMissed} from './odyssey-racing-service.mjs';
 import {expeditionEnabled,expeditionReceive,expeditionReset,expeditionPlayer,expeditionJoinError,expeditionTick} from './expedition-racing-service.mjs';
-import {FRONTIER_CUP_VERSION} from '../shared/frontier-cup.ts';
+import {FRONTIER_CUP_VERSION,AURORA_CUP_VERSION} from '../shared/frontier-cup.ts';
 import {CUP_RESUME_MS,cupReceive,cupCanDrive,cupPlayer,cupGridCar,cupBeforeLobby,cupFinish,cupStall} from './frontier-cup-service.mjs';
+import {MeridianCheckpoints} from './meridian-checkpoints.mjs';
+import {meridianReceive,meridianAdded,meridianJoinError,meridianStartError,meridianStart,meridianGridCar,meridianCanDrive,meridianCollision,meridianBeforeStep,meridianAfterStep,meridianLap,meridianFinish,meridianDeadline,meridianPublic,meridianPlayer,meridianQualifying} from './meridian-racing-service.mjs';
+import {checkpointAck,checkpointForget} from './meridian-room-checkpoints.mjs';
+import {meridianChampionshipCheckpoints} from './meridian-championship-checkpoints.mjs';
+import {meridianCupReceive} from './meridian-cup-checkpoints.mjs';
 
 export const TICK_MS = 1000 / 60;
 export const SNAPSHOT_MS = 1000 / 20;
@@ -87,6 +92,7 @@ export class RoomService {
     this.raceLimitMs = options.raceLimitMs ?? 10 * 60_000;
     this.finishGraceMs = options.finishGraceMs ?? 60_000;
     this.checkpoints = new SeriesCheckpointSigner(options.seriesResumeSecret);
+    this.meridianCheckpoints = options.checkpoints ?? new MeridianCheckpoints({key:options.meridianCheckpointKey,now:this.now});
     this.closed = false;
   }
 
@@ -102,7 +108,7 @@ export class RoomService {
       let message;
       try { message = JSON.parse(data.toString()); }
       catch { this.fail(client, 'BAD_MESSAGE'); if (Buffer.byteLength(data) > 4096) ws.close(1009, 'Message too large'); else if (++client.badMessages >= 3) ws.close(1008, 'Invalid JSON'); return; }
-      if (message?.type !== 'resume-series' && Buffer.byteLength(data) > 4096) { this.fail(client, 'BAD_MESSAGE'); ws.close(1009, 'Message too large'); return; }
+      if (!['resume-series','checkpoint-restore'].includes(message?.type) && Buffer.byteLength(data) > 4096) { this.fail(client, 'BAD_MESSAGE'); ws.close(1009, 'Message too large'); return; }
       this.receive(client, message);
     });
     ws.on('pong', () => { client.alive = true; });
@@ -162,6 +168,10 @@ export class RoomService {
       if (typeof message.sentAt !== 'number' || !Number.isFinite(message.sentAt)) return this.fail(client, 'BAD_MESSAGE', message);
       this.send(client, { type: 'pong', sentAt: message.sentAt, serverTime: now, capabilities: { horizon: true } }); return;
     }
+    if(checkpointAck(this,client,message))return;
+    if(meridianCupReceive(this,client,message,now))return;
+    if(meridianChampionshipCheckpoints(this,client,message,now))return;
+    if (meridianReceive(this, client, message, now)) return;
     if (cupReceive(this, client, message, now)) return;
     if (receiveReplay(this, client, message, now)) return;
     if (expeditionReceive(this, client, message, now)) return;
@@ -201,6 +211,7 @@ export class RoomService {
       { const error=expeditionJoinError(room,message);if(error)return this.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:message.requestId,message:error}); }
       { const error=voyagerJoinError(room,message);if(error)return this.send(client,{type:'error',code:'VOYAGER_RULE',requestId:message.requestId,message:error}); }
       { const error=summitJoinError(room,message); if(error)return this.send(client,{type:'error',code:'SUMMIT_RULE',requestId:message.requestId,message:error}); }
+      { const error=meridianJoinError(room,message);if(error)return this.send(client,{type:'error',code:'MERIDIAN_RULE',requestId:message.requestId,message:error}); }
       if (arenaMode(room)!=='off' && message.clientCapabilities?.nexusArena!==true) return this.send(client,{type:'error',code:'ARENA_RULE',requestId:message.requestId,message:'此房已開啟接力／道具，請更新遊戲再加入。'});
       if (horizonRequired(room.horizon) && message.clientCapabilities?.horizon !== true) return this.fail(client, 'HORIZON_UNSUPPORTED', message);
       if (!defaultRoomRules(room.roomRules) && !message.clientCapabilities?.roomRules) return this.fail(client, 'RULES_UNSUPPORTED', message);
@@ -336,6 +347,7 @@ export class RoomService {
       case 'start':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
         if (room.phase !== 'lobby') return this.fail(client, 'INVALID_PHASE', message);
+        {const error=meridianStartError(room);if(error)return this.send(client,{type:'error',code:'MERIDIAN_RULE',message:error});}
         { const error=odysseyStartError(room); if(error)return this.send(client,{type:'error',code:'ODYSSEY_RULE',message:error}); }
         { const error=summitStartError(room); if(error)return this.send(client,{type:'error',code:'SUMMIT_RULE',message:error}); }
         { const error=arenaStartError(room); if(error)return this.send(client,{type:'error',code:'ARENA_RULE',message:error}); }
@@ -363,6 +375,7 @@ export class RoomService {
         for (const p of room.players.values()) this.resetPlayer(room, p, now);
         prepareArena(room);
         summitStart(room,room.startAt);voyagerStart(room);
+        meridianStart(room);
         this.broadcast(room, 'room', now); return;
       case 'reset':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
@@ -377,7 +390,7 @@ export class RoomService {
         if (!player.loaded) return this.fail(client, 'NOT_READY', message);
         if (!Number.isSafeInteger(message.seq) || message.seq < 0 || message.seq > MAX_SEQUENCE || typeof message.steer !== 'number' || !Number.isFinite(message.steer) || Math.abs(message.steer) > 1 || typeof message.brake !== 'boolean') return this.fail(client, 'BAD_MESSAGE', message);
         if (message.seq <= player.receivedSeq || player.dnf || player.finishMs !== null || player.eliminated || player.eliminationWinner || player.block?.ghost) return;
-        if (!arenaCanDrive(room,player)) return;
+        if (!arenaCanDrive(room,player)||!meridianCanDrive(room,player)) return;
         if (room.evolution.mode === 'pursuit' && now < room.startAt + (room.evolution.releaseDelays[player.id] ?? 0) * 1000) return;
         player.receivedSeq = message.seq; player.input = { steer: message.steer, brake: message.brake }; player.lastInputAt = now; return;
       default: this.fail(client, 'BAD_MESSAGE', message);
@@ -508,6 +521,7 @@ export class RoomService {
   }
 
   newCar(room, slot) {
+    const meridianGrid=meridianGridCar(room,slot);if(meridianGrid)return meridianGrid;
     const cupGrid=cupGridCar(room,slot);if(cupGrid)return cupGrid;
     const summitGrid=summitGridCar(room,slot);if(summitGrid)return summitGrid;
     const grid = gridCar(room, slot); if (grid) return grid;
@@ -553,10 +567,12 @@ export class RoomService {
     player.supportsArena = request.clientCapabilities?.nexusArena === true;
     player.supportsAtlas = request.clientCapabilities?.atlasRacing === true;
     player.supportsSummit = request.clientCapabilities?.summit === true;
+    player.supportsMeridian = request.clientCapabilities?.meridianRacing === true;
     player.supportsVoyager = request.clientCapabilities?.voyagerRacing === true;
     player.supportsOdyssey = request.clientCapabilities?.odysseyRacing === true;
     player.supportsExpedition = request.clientCapabilities?.expeditionRacing === true;
     player.supportsCup = request.clientCapabilities?.frontierCup === FRONTIER_CUP_VERSION;
+    player.supportsAuroraCup = request.clientCapabilities?.auroraCup === AURORA_CUP_VERSION;
     resetArenaPlayer(room,player);
     resetHorizonPlayer(room, player, now);
     summitResetPlayer(room,player);voyagerReset(room,player,now);odysseyResetPlayer(room,player);expeditionReset(player);
@@ -566,6 +582,7 @@ export class RoomService {
   addPlayer(client, room, name, request, now) {
     const player=this.makePlayer(room,name,request,now);player.client=client;
     client.room = room; client.player = player; room.players.set(player.id, player);
+    meridianAdded(room,player);
     voyagerAdded(room,player,now);
     room.hostId ||= player.id; room.updatedAt = now; room.emptySince = null;
     if (room.series && !room.series.originalHostId) room.series.originalHostId = room.hostId;
@@ -582,7 +599,9 @@ export class RoomService {
     if (!validCode(request.code)) return this.fail(client, 'ROOM_NOT_FOUND', request);
     const room = this.rooms.get(request.code);
     if (!room) return this.fail(client, 'ROOM_NOT_FOUND', request);
+    if(room.meridian&&request.clientCapabilities?.meridianRacing!==true)return this.send(client,{type:'error',code:'MERIDIAN_RULE',requestId:request.requestId,message:'請更新後續接 Meridian 原席。'});
     if(room.cup&&request.clientCapabilities?.frontierCup!==FRONTIER_CUP_VERSION)return this.send(client,{type:'error',code:'CUP_RULE',requestId:request.requestId,message:'此房需要好友盃新版才能續接原席。'});
+    if(room.cup?.league&&request.clientCapabilities?.auroraCup!==AURORA_CUP_VERSION)return this.send(client,{type:'error',code:'CUP_RULE',requestId:request.requestId,message:'此房需要循環好友盃新版才能續接原席。'});
     if(expeditionJoinError(room,request))return this.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:request.requestId,message:expeditionJoinError(room,request)});
     if(odysseyActive(room)&&request.clientCapabilities?.odysseyRacing!==true)return this.send(client,{type:'error',code:'ODYSSEY_RULE',requestId:request.requestId,message:'此房需要 Odyssey 新版才能續接。'});
     if(voyagerJoinError(room,request))return this.send(client,{type:'error',code:'VOYAGER_RULE',requestId:request.requestId,message:voyagerJoinError(room,request)});
@@ -591,6 +610,7 @@ export class RoomService {
     if(arenaMode(room)!=='off'&&request.clientCapabilities?.nexusArena!==true)return this.send(client,{type:'error',code:'ARENA_RULE',requestId:request.requestId,message:'此房需要接力／道具版本，請更新後續接。'});
     if (horizonRequired(room.horizon) && request.clientCapabilities?.horizon !== true) return this.fail(client, 'HORIZON_UNSUPPORTED', request);
     const player = room.players.get(request.playerId);
+    if(player?.awaitingCheckpoint)return this.fail(client,'INVALID_SESSION',request);
     if (!player) return this.fail(client, room.removedPlayerIds.has(request.playerId) ? 'REMOVED_BY_HOST' : 'INVALID_SESSION', request);
     if (!defaultRoomRules(room.roomRules) && !request.clientCapabilities?.roomRules) return this.fail(client, 'RULES_UNSUPPORTED', request);
     if ((room.evolution.mode !== 'race' || room.requiresEvolution) && !request.clientCapabilities?.evolution) return this.fail(client, 'EVOLUTION_UNSUPPORTED', request);
@@ -607,6 +627,7 @@ export class RoomService {
     }
     player.client = client; player.connected = true; player.disconnectedAt = null; player.loaded = false; player.ready = false; player.supportsRoomRules = request.clientCapabilities?.roomRules === true;
     player.supportsEvolution = request.clientCapabilities?.evolution === true;
+    player.supportsMeridian = request.clientCapabilities?.meridianRacing === true;
     player.supportsHorizon = request.clientCapabilities?.horizon === true;
     player.supportsArena = request.clientCapabilities?.nexusArena === true;
     player.supportsAtlas = request.clientCapabilities?.atlasRacing === true;
@@ -615,15 +636,17 @@ export class RoomService {
     player.supportsOdyssey = request.clientCapabilities?.odysseyRacing === true;
     player.supportsExpedition = request.clientCapabilities?.expeditionRacing === true;
     player.supportsCup = request.clientCapabilities?.frontierCup === FRONTIER_CUP_VERSION;
+    player.supportsAuroraCup = request.clientCapabilities?.auroraCup === AURORA_CUP_VERSION;
     player.input = { steer: 0, brake: true }; player.lastInputAt = now; player.receivedSeq = player.ackSeq;
     // Action sequences belong to this replacement socket; the retired socket is detached above.
-    player.summitSeq = -1; player.arenaUsedSeq = -1;player.voyagerSeq=-1;
+    player.summitSeq = -1; player.arenaUsedSeq = -1;player.voyagerSeq=-1;player.meridianSeq=-1;
     client.room = room; client.player = player; room.emptySince = null; room.updatedAt = now;
     if (!room.players.get(room.hostId)?.connected && room.hostId !== player.id) { room.hostId = player.id; room.lobbyRevision++; }
     this.welcome(client, request, now); this.broadcast(room, 'room', now);
   }
 
   resetPlayer(room, player, now) {
+    player.meridianLapValid=true;player.meridianValidLaps=[];
     player.car = this.newCar(room, player.slot); player.ackSeq = -1; player.receivedSeq = -1; player.input = { steer: 0, brake: true };
     player.lastInputAt = now; player.completedLaps = 0; player.distance = 0; player.nextGate = 1;
     player.finishMs = null; player.lapTimesMs = []; player.bestLapMs = null; player.lastLapElapsedMs = 0;
@@ -672,7 +695,7 @@ export class RoomService {
     if (!room || !player) return;
     player.client = null; player.connected = false; player.loaded = false; player.token = null; player.expired = true;
     player.disconnectedAt = now; if(cupCanDrive(room,player))this.markDnf(player, 'left'); player.input = { steer: 0, brake: true };
-    if (!room.cup&&(room.phase === 'lobby' || room.phase === 'countdown' || voyagerPractice(room))) room.players.delete(player.id);
+    if (!room.cup&&!room.meridian?.locked&&(room.phase === 'lobby' || room.phase === 'countdown' || voyagerPractice(room))) room.players.delete(player.id);
     this.electHost(room); room.updatedAt = now;
     if (![...room.players.values()].some((p) => p.connected&&!p.isAi)) room.emptySince ??= now;
     if (room.phase === 'countdown') this.toLobby(room, now);
@@ -683,9 +706,9 @@ export class RoomService {
   expireDisconnected(room, now) {
     let changed = false;
     for (const player of [...room.players.values()]) {
-      if (player.connected || player.expired || player.awaitingSeriesSeat || now - player.disconnectedAt < (room.cup?CUP_RESUME_MS:this.disconnectMs)) continue;
+      if (player.connected || player.expired || player.awaitingSeriesSeat || player.awaitingCheckpoint || now - player.disconnectedAt < (room.cup?CUP_RESUME_MS:this.disconnectMs)) continue;
       player.expired = true; player.token = null; if(cupCanDrive(room,player))this.markDnf(player, 'disconnect-expired'); changed = true;
-      if (!room.cup&&(room.phase === 'lobby' || voyagerPractice(room))) room.players.delete(player.id);
+      if (!room.cup&&!room.meridian?.locked&&(room.phase === 'lobby' || voyagerPractice(room))) room.players.delete(player.id);
     }
     if (changed) { this.electHost(room); if(summitRosterChanged(this,room,now))return; if (!this.maybeFinish(room, now)) this.broadcast(room, 'room', now); }
   }
@@ -702,6 +725,7 @@ export class RoomService {
   graceMs(room) { return room.roomRules.finishGraceSeconds === 60 ? this.finishGraceMs : room.roomRules.finishGraceSeconds * 1000; }
 
   deadline(room) {
+    const meridian=meridianDeadline(room);if(meridian)return meridian;
     if(voyagerPractice(room)&&room.startAt!==null)return{deadlineAt:room.startAt+voyagerPractice(room)*1000,deadlineReason:'race-timeout'};
     const summit=summitTimed(room)?summitDeadline(room):null;if(summit)return summit;
     if (room.startAt === null) return { deadlineAt: null, deadlineReason: null };
@@ -714,6 +738,7 @@ export class RoomService {
 
   maybeFinish(room, now) {
     if (room.phase !== 'racing') return false;
+    const meridian=meridianFinish(this,room,now);if(meridian!==null)return meridian;
     const cup=cupFinish(this,room,now);if(cup!==null)return cup;
     const practice=voyagerFinish(this,room,now);if(practice!==null)return practice;
     const summit=summitFinish(this,room,now);if(summit!==null)return summit;
@@ -743,6 +768,7 @@ export class RoomService {
     const moving = [];
     for (const player of room.players.values()) {
       if(!cupCanDrive(room,player))continue;
+      if(meridianBeforeStep(room,player,at))continue;
       if (player.dnf || player.finishMs !== null || player.timeTrialDone || player.eliminated || player.eliminationWinner) continue;
       if(voyagerPractice(room)&&(!player.loaded||player.completedLaps>=128))continue;
       if(summitBeforeStep(room,player,at))continue;
@@ -754,6 +780,7 @@ export class RoomService {
       moving.push({ player, previous, s: player.car.pos.s });
       const stale = !player.connected || at - player.lastInputAt > 700;
       const impact=player.car.update(1 / 60, track, stale ? 0 : player.input.steer, stale || player.input.brake);
+      meridianAfterStep(room,player);
       voyagerAfter(room,player,at);
       atlasImpact(room,player,impact,at);
       if(impact>.5)summitEvent(room,at,'wall',[player.id],`護牆接觸強度 ${impact.toFixed(1)}；未判肇責`);
@@ -761,7 +788,7 @@ export class RoomService {
     }
     // Every car first advances against the same step. Resolve contacts once for the room,
     // then use each final pose for progress and finish gates, including cars pushed by others.
-    if (room.roomRules.collisions){const contacts=resolveMultiplayerCollisions(track, moving.filter(({ player }) => horizonCollisionEligible(player)&&arenaCanCollide(room,player,at)&&!(player.summit?.pitUntil>at))
+    if (room.roomRules.collisions){const contacts=resolveMultiplayerCollisions(track, moving.filter(({ player }) => horizonCollisionEligible(player)&&arenaCanCollide(room,player,at)&&meridianCollision(room,player)&&!(player.summit?.pitUntil>at))
       .map(({ player, previous }) => ({ id: String(player.slot), car: player.car, previous })));contactProtection(room,contacts,at);summitContacts(room,contacts,at);atlasContacts(room,contacts,at);
       if(room.summit?.stage==='qualifying')for(const c of contacts)for(const p of room.players.values())if([c.a,c.b].includes(String(p.slot)))p.summit.lapValid=false;
     }
@@ -786,6 +813,7 @@ export class RoomService {
           player.bestLapMs = player.bestLapMs === null ? lapMs : Math.min(player.bestLapMs, lapMs);
           player.completedLaps++; player.nextGate = 1;
           if(voyagerGate(room,player,3,runningElapsed,lapMs))continue;
+          if(meridianLap(room,player,elapsed,lapMs,at))continue;
           if(summitLap(room,player,elapsed,lapMs,at))continue;
           if (room.evolution.mode === 'time-trial') {
             if (elapsed >= room.evolution.durationSeconds * 1000) { player.timeTrialDone = true; player.car.v = 0; }
@@ -844,7 +872,7 @@ export class RoomService {
     const players = [...room.players.values()].sort((a, b) => {
       if(room.cup&&cupCanDrive(room,a)!==cupCanDrive(room,b))return cupCanDrive(room,a)?-1:1;
       if(room.phase==='results'&&odysseyActive(room)){const aa=odysseyRuleMissed(room,a),bb=odysseyRuleMissed(room,b);if(a.dnf!==b.dnf)return a.dnf?1:-1;if(aa!==bb)return aa?1:-1;}
-      if(voyagerPractice(room)||room.summit?.stage==='qualifying')return Number(a.dnf)-Number(b.dnf)||(a.bestLapMs??Infinity)-(b.bestLapMs??Infinity)||a.slot-b.slot;
+      if(voyagerPractice(room)||room.summit?.stage==='qualifying'||meridianQualifying(room))return Number(a.dnf)-Number(b.dnf)||(a.bestLapMs??Infinity)-(b.bestLapMs??Infinity)||a.slot-b.slot;
       if (room.horizon.elimination) return (a.eliminationRank ?? 0) - (b.eliminationRank ?? 0) || b.distance-a.distance || a.slot-b.slot;
       if (room.evolution.mode === 'time-trial') {
         if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
@@ -877,6 +905,7 @@ export class RoomService {
       ...(odysseyActive(room)?{odyssey:{...p.odyssey}}:{}),
       ...(expeditionEnabled(room)?{expedition:expeditionPlayer(p)}:{}),
       ...(room.cup?{cup:cupPlayer(room,p)}:{}),
+      ...(room.meridian?{meridian:meridianPlayer(room,p)}:{}),
       ...(summitEventsEnabled(room)?{summit:{...p.summit,validLaps:p.summit.validLaps.map(ms=>Math.round(ms*1000)/1000)},...(room.summit?.settings.weekend&&['race','sprint'].includes(room.summit.stage)?{gridIndex:p.gridIndex??p.slot}:{})}:{}),
       ...(room.evolution.mode !== 'race' ? { team: room.evolution.teams[p.id] ?? null,
         releaseDelaySeconds: room.evolution.mode === 'pursuit' ? room.evolution.releaseDelays[p.id] ?? 0 : 0,
@@ -887,11 +916,12 @@ export class RoomService {
       trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision,
       code: room.code, hostId: room.hostId, hostManagement: { lobbyRevision: room.lobbyRevision }, arena: arenaPublic(room), replay,
       cup:room.cup?structuredClone(room.cup):null,
+      ...(room.meridian?{meridian:meridianPublic(room)}:{}),
       ...(atlasVisible(room)?{atlas:structuredClone(atlasEnsure(room))}:{}),...(voyager?{voyager}:{}),
       ...(odysseyActive(room)?{odyssey:odysseyPublic(room)}:{}),
       ...(expeditionEnabled(room)?{expedition:structuredClone(room.expedition)}:{}),
       ...(summitEventsEnabled(room)?{summit:summitPublic(room)}:{}),capabilities: { lobbyOptions: true, championship: true, roomRules: true, horizon: true, replay: true, nexusArena: true,
-        expeditionRacing:true,odysseyRacing:true,frontierCup:FRONTIER_CUP_VERSION,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
+        meridianRacing:true,expeditionRacing:true,odysseyRacing:true,frontierCup:FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
         ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: true, seriesResume: this.checkpoints.capability() } : {}) }, roomRules: { ...room.roomRules },
       ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: { ...structuredClone(room.evolution), teamStandings: this.teamStandings(room) } } : {}),
       horizon: { ...room.horizon }, spectators: [...room.spectators.values()].map(v => ({ id: v.id, name: v.name, loaded: v.loaded })),
@@ -915,6 +945,7 @@ export class RoomService {
   }
 
   destroyRoom(room) {
+    checkpointForget(this,room);
     for (const viewer of room.spectators.values()) { const client=viewer.client; detachViewer(client); this.send(client, { type: 'left' }); }
     for (const player of room.players.values()) if (player.client) {
       player.client.room = null; player.client.player = null; this.send(player.client, { type: 'left' });

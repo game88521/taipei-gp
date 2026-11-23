@@ -2,6 +2,7 @@ import {EXPEDITION_DUTY_VERSION,parseCrewRoom,parseCrewWatchState,crewCode,CREW_
 import {CITY_REPLAY_VERSION,parseCityReplayDescriptor,type CityReplayArchive,type CityReplayDescriptor} from '../shared/frontier-city-replay';
 import {CITY_AUTO_RESUME_VERSION,CityAutoResume,CityResumeError} from './frontier-city-reconnect';
 import {CityReplayDownload} from './frontier-city-replay-client';
+import {CREW_TEAM_VERSION,crewRolesFor,type TeamRole} from '../shared/aurora-duty';
 const SEAT='taipei-gp-expedition-duty-seat-v1';
 interface Seat{endpoint:string;code:string;selfId:string;token:string}
 type JoinKind='create'|'join'|'resume'|'watch'|'auto-resume';
@@ -13,7 +14,7 @@ export function dutyEndpoint(config:string,at:Pick<Location,'hostname'|'protocol
 /** Rex <game88521@gmail.com>. Retries only the original private seat; never replays driving or duty commands. */
 export class ExpeditionDutyClient{
  room:CrewRoom|null=null;selfId='';status:'idle'|'connecting'|'connected'|'closed'='idle';message='';
- spectating=false;viewerId='';watchCount=0;watchEnded=false;supportsWatching=false;supportsReplay=false;supportsAutoResume=false;capabilitiesKnown=false;
+ spectating=false;viewerId='';watchCount=0;watchEnded=false;supportsWatching=false;supportsReplay=false;supportsAutoResume=false;supportsTeam=false;capabilitiesKnown=false;
  replay:CityReplayDescriptor|null=null;readonly autoResume:CityAutoResume;private replayPull:CityReplayDownload;
  private socket:WebSocket|null=null;private generation=0;private seq=0;private run='';private seat:Seat|null=null;
  private opening:Promise<void>|null=null;private cancelOpening:(()=>void)|null=null;
@@ -32,6 +33,7 @@ export class ExpeditionDutyClient{
  get replayBusy(){return this.replayPull.busy;}
  get reconnectState(){return this.autoResume.state;}
  get controlGated(){return this.consent||this.autoResume.gated;}
+ get roles():TeamRole[]{const r=this.room;return r&&!this.spectating?crewRolesFor(r.players,r.team,this.selfId):[];}
  async downloadReplay():Promise<CityReplayArchive>{if(!this.supportsReplay||this.room?.phase!=='finished'||!this.replay?.ready)throw Error('本場匿名城市回放尚未完成。');const archive=await this.replayPull.start(this.replay);if(archive.source!=='duty'||archive.mode!=='rescue')throw Error('回放來源與本場合作救援不符。');return archive;}
  cancelReplay(reason?:string){this.replayPull.cancel(reason);}
  cancelReconnect(){this.autoEligible=false;this.autoResume.cancel('已取消自動續接；原保留期限內仍可手動續接。');this.abortTransport();this.message='已取消自動續接；可手動續接或結束還車。';this.changed();}
@@ -52,14 +54,14 @@ export class ExpeditionDutyClient{
  private remember(){try{if(this.seat)this.storage?.setItem(SEAT,JSON.stringify(this.seat));else this.storage?.removeItem(SEAT);}catch{this.message='本次可遊玩，但瀏覽器未保存續接席位。';}}
  connect():Promise<void>{
   if(this.status==='connected'&&this.socket?.readyState===1)return Promise.resolve();if(this.opening)return this.opening;if(!this.endpoint)return Promise.reject(Error('合作救援服務尚未設定。'));
-  const gen=++this.generation;this.status='connecting';this.message='';this.supportsWatching=this.supportsReplay=this.supportsAutoResume=this.capabilitiesKnown=false;this.watchEnded=false;this.changed();
+  const gen=++this.generation;this.status='connecting';this.message='';this.supportsWatching=this.supportsReplay=this.supportsAutoResume=this.supportsTeam=this.capabilitiesKnown=false;this.watchEnded=false;this.changed();
   this.opening=new Promise((resolve,reject)=>{let done=false,opened=false;const ws=new WebSocket(this.endpoint);this.socket=ws;
    const finish=(error?:Error)=>{if(done)return;done=true;clearTimeout(timeout);if(gen===this.generation){this.opening=null;this.cancelOpening=null;}if(error)reject(error);else resolve();};
    this.cancelOpening=()=>finish(Error('已取消救援連線'));const timeout=setTimeout(()=>{finish(Error('救援服務尚未回應，請稍後重試。'));ws.close();},12000);
    ws.addEventListener('message',e=>{if(gen!==this.generation||ws!==this.socket||typeof e.data!=='string'||e.data.length>300000)return;let m;try{m=JSON.parse(e.data);}catch{return;}if(!m||typeof m!=='object'||Array.isArray(m))return;
     if(m.type==='hello'){
      if(m.v!==EXPEDITION_DUTY_VERSION){this.autoEligible=false;finish(new CityResumeError('合作救援前後端版本不相容。','fatal','VERSION_MISMATCH'));ws.close();return;}
-     const features=m.features as Record<string,unknown>|undefined;this.capabilitiesKnown=true;this.supportsWatching=features?.cityWatch===1;this.supportsReplay=features?.cityReplay===1&&features?.cityReplayVersion===CITY_REPLAY_VERSION;this.supportsAutoResume=features?.autoResumeVersion===CITY_AUTO_RESUME_VERSION;this.status='connected';opened=true;
+     const features=m.features as Record<string,unknown>|undefined;this.capabilitiesKnown=true;this.supportsWatching=features?.cityWatch===1;this.supportsReplay=features?.cityReplay===1&&features?.cityReplayVersion===CITY_REPLAY_VERSION;this.supportsAutoResume=features?.autoResumeVersion===CITY_AUTO_RESUME_VERSION;this.supportsTeam=features?.crewTeamVersion===CREW_TEAM_VERSION;this.status='connected';opened=true;
      this.lastInbound=Date.now();if(this.watchdog)clearInterval(this.watchdog);this.watchdog=setInterval(()=>{if(gen!==this.generation||ws!==this.socket||!this.room||this.status!=='connected'||typeof document!=='undefined'&&document.hidden||Date.now()-this.lastInbound<4000)return;const watcher=this.session==='watch';this.abortTransport();this.status='closed';if(watcher){this.watchEnded=true;this.message='觀戰狀態逾時，已結束跟車。';}else if(this.session==='player'){this.consent=true;this.message='救援狀態超過4秒未更新，已停止操控並嘗試續接。';if(this.autoEligible)this.autoResume.start();}this.changed();},500);
      if(this.heartbeat)clearInterval(this.heartbeat);this.heartbeat=setInterval(()=>this.send({type:'ping',sentAt:Date.now()}),10000);finish();this.changed();
     }else if(opened){if(m.type==='city-replay-part'&&e.data.length>65536){this.replayPull.cancel('城市回放分塊超過連線上限。');return;}this.receive(m);}
@@ -112,7 +114,7 @@ export class ExpeditionDutyClient{
   return new Promise<void>((resolve,reject)=>{
    const timer=setTimeout(()=>{this.joining=null;reject(Error('加入救援房逾時。'));},8000);this.joining={kind,resolve,reject,timer};
    const message=kind==='watch'?{type:'watch',v:EXPEDITION_DUTY_VERSION,code}:kind==='resume'||kind==='auto-resume'?{type:'resume',v:EXPEDITION_DUTY_VERSION,code:this.seat?.code,selfId:this.seat?.selfId,token:this.seat?.token,...resumeKey?{resumeKey}:{}}:{type:kind,v:EXPEDITION_DUTY_VERSION,name,code};
-   if(!this.send(message))this.rejectJoin('救援連線未就緒');
+   if(!this.send({...message,...this.supportsTeam?{crewTeamVersion:CREW_TEAM_VERSION}:{}}))this.rejectJoin('救援連線未就緒');
   });
  }
  async join(kind:'create'|'join'|'resume'|'watch',name:string,code:string){
@@ -132,8 +134,10 @@ export class ExpeditionDutyClient{
  watch(code:string){return this.join('watch','',code);}
  private send(message:unknown){if(this.socket?.readyState!==1||this.socket.bufferedAmount>32768)return false;try{this.socket.send(JSON.stringify(message));return true;}catch{return false;}}
  command(type:string,fields:Record<string,unknown>={}){if(!this.room||this.status!=='connected'||this.spectating&&!['leave','watch-leave'].includes(type)||this.controlGated&&!['leave','watch-leave'].includes(type))return false;return this.send({type,revision:this.room.revision,runId:this.room.runId,...fields});}
- input(input:CrewInput){if(this.controlGated||!this.room||this.room.phase!=='running'||this.room.paused||this.room.players.find(p=>p.id===this.selfId)?.role!=='driver')return;const next=this.seq+1;if(this.command('input',{seq:next,...input}))this.seq=next;}
- operate(kind:string,pull=0,side=0){if(!this.controlGated&&this.room?.phase==='running'&&!this.room.paused&&this.room.players.find(p=>p.id===this.selfId)?.role==='technician')this.command('operate',{kind,pull,side});}
+ input(input:CrewInput){if(this.controlGated||!this.room||this.room.phase!=='running'||this.room.paused||!this.roles.includes('driver'))return;const next=this.seq+1;if(this.command('input',{seq:next,...input}))this.seq=next;}
+ operate(kind:string,pull=0,side=0){if(!this.controlGated&&this.room?.phase==='running'&&!this.room.paused&&this.roles.includes('technician'))this.command('operate',{kind,pull,side});}
+ safety(action:'front'|'rear'|'clear'|'stop'){if(this.supportsTeam&&this.roles.includes('safety'))return this.command('safety',{action});return false;}
+ dispatch(action:'brief'|'depot'){const r=this.room;if(this.supportsTeam&&r&&this.roles.includes('dispatcher'))return this.command('dispatch',{action,incidentId:r.mission.settings.incidents[r.mission.caseIndex]});return false;}
  leave(){const viewer=this.spectating||this.watchEnded||!!this.viewerId||this.session==='watch';this.command(viewer?'watch-leave':'leave');this.autoEligible=false;this.session=null;this.autoResume.reset();this.consent=false;this.resumeKey='';this.keyEpisode=-1;if(!viewer){this.seat=null;this.remember();}this.abortTransport();this.changed();}
  disconnect(){this.autoEligible=false;this.autoResume.cancel('已手動中斷連線。');this.abortTransport();this.changed();}
  dispose(){this.leave();this.autoResume.dispose();}

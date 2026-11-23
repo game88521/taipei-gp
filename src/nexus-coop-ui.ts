@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { COOP_STATIONS, COOP_DWELL_MS, COOP_RELAY_STATION, coopStation, coopNear, validCoopCode, type CoopPose, type CoopRoom, type CoopStation, type CoopInput } from '../shared/nexus-coop';
+import {mountRoomInvite} from './aurora-invite-ui';
 import { NexusCoopClient, coopEndpoint, coopInvite } from './nexus-coop-client';
 import { ENTRY_CANCELLED, MultiplayerEntryWait } from './multiplayer-entry';
 import './nexus-coop.css';
@@ -56,6 +57,7 @@ export function mountNexusCoop(o: NexusCoopOptions) {
   const diagnostics = mountDiagnostics(entry, endpoint, 'odyssey-coop-diagnostics');
   let storage: Storage | null = null; try { storage = sessionStorage; } catch {}
   const client = new NexusCoopClient(endpoint, render, pose => o.relocate(pose), storage);
+  const inviteTools=mountRoomInvite(card,()=>client.room?{kind:'coop',code:client.room.code,label:'城市合作配送',players:client.room.players.length,capacity:4}:null,'aurora-coop-invite');
   const prediction=new AtlasCoopPrediction(o.car,o.collider);let accumulator=0;
   const waiter = new MultiplayerEntryWait(render);
   const dispatch = mountCoopDispatch(() => o.roads?.() ?? null, () => o.landmarks?.() ?? [], (type, fields) => void action(type, fields), station => o.navigate(station));
@@ -125,6 +127,7 @@ export function mountNexusCoop(o: NexusCoopOptions) {
   }
   function render() {
     if (disposed) return;
+    inviteTools?.update();
     const room = client.room, active = !!room;
     dispatch.update(room, client.selfId);
     quick.update(room, client.selfId, client.status === 'connected', commandBusy || busy);

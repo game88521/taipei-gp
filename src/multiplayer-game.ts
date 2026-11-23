@@ -38,7 +38,10 @@ import {SummitRacingPanel} from './summit-racing-ui';
 import {mountDiagnostics} from './odyssey-diagnostics';
 import {mountOdysseyGamepad} from './odyssey-gamepad';
 import {FrontierCupPanel} from './frontier-cup-ui';
-import {CUP_MATCH_LABELS} from '../shared/frontier-cup';
+import {MeridianRacingPanel} from './meridian-racing-ui';
+import {cupMatchLabel} from '../shared/frontier-cup';
+import {mountAuroraTouch} from './aurora-touch-ui';
+import {mountRoomInvite} from './aurora-invite-ui';
 
 await acquireAtlasPageLease();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -50,6 +53,7 @@ const localHost = /^(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d+\.\d+|10\.\d+\.
 const endpoint = String(import.meta.env.VITE_MULTIPLAYER_URL ?? '').trim() || (localHost && location.protocol === 'http:' ? `ws://${location.hostname}:4320/ws` : '');
 const diagnostics = mountDiagnostics($('mp-entry'), endpoint, 'odyssey-mp-diagnostics');
 let client: MultiplayerClient | null = null;
+const commonInvite=mountRoomInvite($('mp-room'),()=>client?.room?{kind:'race',code:client.room.code,label:'賽道好友房',players:client.room.players.length,capacity:4}:null,'aurora-mp-invite');
 let scene: MultiplayerScene | null = null;
 let graphicsReady = false, busy = false, notice = '', soundEnabled = false;
 type EntryAction = 'create' | 'join' | 'restore' | 'resume-series' | 'claim-series' | 'watch' | 'preset';
@@ -120,11 +124,15 @@ const arenaPanel=new MultiplayerArenaPanel(()=>client,input);
 const arenaVisuals=new MultiplayerArenaVisuals();
 const summitPanel=new SummitRacingPanel(()=>client);
 const cupPanel=new FrontierCupPanel(()=>client);
+const meridianPanel=new MeridianRacingPanel(()=>client);
 mountControlSettings($('mp-control-settings'), input);
+document.querySelector<HTMLElement>('.mp-steer')!.id='mp-steer-pair';
+const auroraTouch=mountAuroraTouch($('mp-control-settings'),()=>input.release(),{ids:{'steer-btns':'mp-steer-pair',pad:'mp-pad',brake:'mp-brake'}});
 mountOdysseyGamepad({host:$('mp-control-settings'),input});
 const voyagerComfortHost=document.createElement('div');$('mp-control-settings').after(voyagerComfortHost);mountVoyagerComfort(voyagerComfortHost);
 let performanceScale:number|null=null;
 const expeditionPerformance=mountExpeditionPerformance(voyagerComfortHost,'multiplayer',{
+  position:()=>{const p=client?.room?.players.find(p=>p.id===client?.selfId);return p?{x:p.car.x,z:p.car.z,along:p.car.pos.s,label:client?.room?.trackId}:null;},
   context:()=>({
     mode:client?.room?[client.room.arena?.mode&&client.room.arena.mode!=='off'?'arena-'+client.room.arena.mode:client.room.evolution?.mode??'race',client.room.summit?.stage??'single',client.room.summit?.settings.endurance?'endurance':'',client.room.horizon?.elimination?'elimination':'',client.room.series?'series':''].filter(Boolean).join(':'):'lobby',track:client?.room?.trackId??$<HTMLSelectElement>('mp-track').value,
     quality:scene?.performanceContext.quality??autoQuality.level,fpsCap:renderLimit,
@@ -151,7 +159,7 @@ feelLabel.append(feelSelect);voyagerComfortHost.append(feelLabel,feelNote);
 mountResultCard($('mp-results'),()=>multiplayerResultCardData(client?.room,client?.room?getMultiplayerTrack(client.room.trackId)?.name:undefined),'voyager-mp-result-card');
 mountControlHints(input, { multiplayer: true, steering: () => 'drag' });
 const sound = new Sound();
-const canDrive = () => !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.cup?.active!==false && p.finishMs === null) && focused && !document.hidden && expeditionHud.editor.hidden && !scene.contextLost;
+const canDrive = () => !auroraTouch.opened && !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.cup?.active!==false&&p.meridian?.active!==false && p.finishMs === null) && focused && !document.hidden && expeditionHud.editor.hidden && !scene.contextLost;
 input.isDriving = canDrive;
 
 function desiredMap() {
@@ -209,8 +217,9 @@ function synchronizeMap(force = false) {
 }
 
 function renderUi() {
+  commonInvite.update();
   if (!canDrive()) input.release();
-  if (!client?.room?.cup&&recentHistory.capture(client?.room ?? null, client?.selfId ?? null)) historyPanel.render();
+  if (!client?.room?.cup&&!client?.room?.meridian&&recentHistory.capture(client?.room ?? null, client?.selfId ?? null)) historyPanel.render();
   historyPanel.render();
   const room = client?.room, me = room?.players.find(p => p.id === client?.selfId);
   const phase = room?.phase ?? '', active = phase === 'countdown' || phase === 'racing';
@@ -286,7 +295,7 @@ function renderUi() {
     $<HTMLButtonElement>('mp-start').disabled = !connected || !localMapReady || room.players.length < 2 || !teamsReady || room.players.some(p => !p.ready || !p.connected || !p.loaded);
     setText($('mp-start'), !teamsReady ? '需要四人、每隊兩人與系列路線' : room.players.length < 2 ? '等待朋友加入' : room.players.some(p => !p.loaded) ? '等待地圖載入' : room.players.some(p => !p.ready || !p.connected) ? '等待全員準備' : '開始倒數');
     setText($('mp-result-track'), `${trackLabel} · ${modeLabel(room.evolution?.mode)} · ${room.evolution?.mode === 'time-trial' ? `${room.evolution.durationSeconds / 60} 分鐘` : `${room.laps} 圈`}`);
-    setText($('mp-race-track'), room.cup ? `${CUP_MATCH_LABELS[room.cup.matches[room.cup.index].key]} · ${trackLabel}` : room.series ? `系列 ${room.series.roundIndex + 1}/${room.series.trackIds.length} · ${trackLabel}` : trackLabel);
+    setText($('mp-race-track'), room.cup ? `${cupMatchLabel(room.cup.matches[room.cup.index])} · ${trackLabel}` : room.series ? `系列 ${room.series.roundIndex + 1}/${room.series.trackIds.length} · ${trackLabel}` : trackLabel);
     if (phase === 'results') playerLists.results.update(room, client?.selfId);
     if (phase === 'results') {
       syncLapDriver(room, client?.selfId ?? null);
@@ -294,6 +303,7 @@ function renderUi() {
       setText($('mp-laps-summary'), lapSummaryText(room, lapDriverId));
     } else { lapList.clear(); lapDriverId = null; lapDriversKey = ''; }
     const invitationUrl = buildMultiplayerInviteUrl(location.href, room.code) ?? '';
+    commonInvite.update();
     if ($<HTMLInputElement>('mp-invite-url').value !== invitationUrl) $<HTMLInputElement>('mp-invite-url').value = invitationUrl;
     $<HTMLButtonElement>('mp-copy-link').disabled = !invitationUrl;
     $<HTMLButtonElement>('mp-share-link').disabled = !invitationUrl;
@@ -330,6 +340,7 @@ function renderUi() {
   horizonPanel.render(busy);
   summitPanel.render(room??null,client?.selfId??null,connected,busy,client?.serverNow()??Date.now());
   cupPanel.render(room??null,client?.selfId??null,connected,busy);
+  meridianPanel.render(room??null,client?.selfId??null,connected,busy,client?.serverNow()??Date.now());
 }
 
 function syncHostTargets(room: NonNullable<MultiplayerClient['room']>, selfId: string | null) {
@@ -542,6 +553,7 @@ try {
       arenaPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
       summitPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
       cupPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy);
+      meridianPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,client?.serverNow()??Date.now());
       if(scene&&graphicsReady)arenaVisuals.update(scene.scene,scene.track,room??null,now);
       renderElapsed = 0;
       setText($('mp-countdown'), room?.phase === 'countdown' && room.startAt ? String(Math.max(1, Math.ceil((room.startAt - now) / 1000))) : '');

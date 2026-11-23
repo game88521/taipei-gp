@@ -7,6 +7,9 @@ import {summitActive,summitJoinError} from './summit-racing-service.mjs';
 import {odysseyActive} from './odyssey-racing-service.mjs';
 import {atlasJoinError} from './atlas-racing-service.mjs';
 import {expeditionJoinError} from './expedition-racing-service.mjs';
+import {meridianJoinError,meridianAdded} from './meridian-racing-service.mjs';
+import {applyMeridianPreset,meridianPresetCapabilities} from './meridian-presets-service.mjs';
+import {summitResetPlayer} from './summit-racing-service.mjs';
 export { defaultHorizon, horizonRequired };
 export const emptyBlock = () => ({ ghost: false, reason: null, warningAt: null, recoveryAt: null });
 const validName = v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 16 && !/[\u0000-\u001f\u007f<>"'`\\]/u.test(v);
@@ -22,6 +25,7 @@ export function horizonReceive(service, client, m, now) {
     if (m.type === 'watch') {
       const target = codeValid(m.code) && service.rooms.get(m.code);
       if (!target) { service.fail(client, 'ROOM_NOT_FOUND', m); return true; }
+      if(meridianJoinError(target,m,true)){service.send(client,{type:'error',code:'MERIDIAN_RULE',requestId:m.requestId,message:meridianJoinError(target,m,true)});return true;}
       if(expeditionJoinError(target,m)){service.send(client,{type:'error',code:'EXPEDITION_RULE',requestId:m.requestId,message:expeditionJoinError(target,m)});return true;}
       if(odysseyActive(target)&&m.clientCapabilities?.odysseyRacing!==true){service.send(client,{type:'error',code:'ODYSSEY_RULE',requestId:m.requestId,message:'此房使用 Odyssey 房規，請更新後再觀戰。'});return true;}
       if(atlasJoinError(target,m)){service.send(client,{type:'error',code:'ATLAS_RULE',requestId:m.requestId,message:atlasJoinError(target,m)});return true;}
@@ -29,16 +33,16 @@ export function horizonReceive(service, client, m, now) {
       if(summitActive(target)&&m.clientCapabilities?.summit!==true){service.send(client,{type:'error',code:'SUMMIT_RULE',requestId:m.requestId,message:'請更新遊戲後觀戰排位週末／AI／耐久。'});return true;}
       if(target.arena?.mode&&target.arena.mode!=='off'&&m.clientCapabilities?.nexusArena!==true){service.send(client,{type:'error',code:'ARENA_RULE',requestId:m.requestId,message:'此房使用接力／道具玩法，請更新後觀戰。'});return true;}
       if (target.spectators.size >= 8) { service.fail(client, 'SPECTATORS_FULL', m); return true; }
-      const viewer = { id: randomUUID(), name: m.name.trim(), client, loaded: false, supportsExpedition:m.clientCapabilities?.expeditionRacing===true,supportsOdyssey:m.clientCapabilities?.odysseyRacing===true,supportsAtlas:m.clientCapabilities?.atlasRacing===true,supportsArena:m.clientCapabilities?.nexusArena===true,supportsVoyager:m.clientCapabilities?.voyagerRacing===true,supportsSummit:m.clientCapabilities?.summit===true };
+      const viewer = { id: randomUUID(), name: m.name.trim(), client, loaded: false, supportsMeridian:m.clientCapabilities?.meridianRacing===true,supportsExpedition:m.clientCapabilities?.expeditionRacing===true,supportsOdyssey:m.clientCapabilities?.odysseyRacing===true,supportsAtlas:m.clientCapabilities?.atlasRacing===true,supportsArena:m.clientCapabilities?.nexusArena===true,supportsVoyager:m.clientCapabilities?.voyagerRacing===true,supportsSummit:m.clientCapabilities?.summit===true };
       client.room = target; client.viewer = viewer; client.player = null; target.spectators.set(viewer.id, viewer);
       service.send(client, { type: 'watching', spectatorId: viewer.id, room: service.snapshot(target, now), requestId: m.requestId });
       service.broadcast(target, 'room', now); return true;
     }
     const preset = parseRoomPreset(m.preset);
-    if (!preset) { service.fail(client, 'INVALID_PRESET', m); return true; }
+    if (!preset||!meridianPresetCapabilities(preset,m.clientCapabilities)) { service.fail(client, 'INVALID_PRESET', m); return true; }
     if (service.rooms.size >= service.maxRooms) { service.fail(client, 'SERVER_FULL', m); return true; }
     let selected;
-    try { for (const id of new Set([preset.trackId, ...preset.trackIds])) { const t = service.trackFor(id); if (id === preset.trackId) selected = t; } }
+    try { for (const id of new Set([preset.trackId, ...preset.trackIds,...(preset.advanced?.meridian.mode==='championship'?preset.advanced.meridian.trackIds:[])])) { const t = service.trackFor(id); if (id === preset.trackId) selected = t; } }
     catch { service.fail(client, 'TRACK_UNAVAILABLE', m); return true; }
     let code; do { code = randomUUID().replaceAll('-', '').slice(0,6).toUpperCase().replace(/[01]/g, 'A'); } while (service.rooms.has(code));
     const event = defaultEvolution(); event.mode = preset.mode; event.durationSeconds = preset.durationSeconds;
@@ -49,7 +53,11 @@ export function horizonReceive(service, client, m, now) {
     // No room is visible until every setting and every track has been validated.
     if (preset.trackIds.length) created.series = { id: randomUUID(), originalHostId: '', revision: 1, trackIds: preset.trackIds,
       roundIndex: 0, locked: false, complete: false, entrants: [], rounds: [], standings: [] };
-    service.rooms.set(code, created); service.addPlayer(client, created, m.name.trim(), m, now);
+    applyMeridianPreset(created,preset.advanced);
+    const host=service.makePlayer(created,m.name.trim(),m,now);host.client=client;created.players.set(host.id,host);created.hostId=host.id;meridianAdded(created,host);
+    if(created.arena?.mode==='relay')created.arena.teams[host.id]='red';
+    for(let i=0;i<(preset.advanced?.summit.ai??0);i++){const bot=service.makePlayer(created,`巡航 AI ${i+1}`,m,now);bot.isAi=true;bot.token=null;bot.client=null;summitResetPlayer(created,bot);created.players.set(bot.id,bot);}
+    service.rooms.set(code, created);client.room=created;client.player=host;service.welcome(client,m,now);service.broadcast(created,'room',now);
     if (created.series) created.series.originalHostId = created.hostId;
     return true;
   }
@@ -64,6 +72,7 @@ export function horizonReceive(service, client, m, now) {
       if (m.roomCode !== room.code || m.expectedLobbyRevision !== room.lobbyRevision) service.fail(client, 'STALE_LOBBY', m);
       else if (room.phase !== 'lobby') service.fail(client, 'INVALID_PHASE', m);
       else if (room.series?.locked) service.fail(client, 'SERIES_LOCKED', m);
+      else if(room.meridian?.locked||room.meridian&&!client.viewer.supportsMeridian)service.send(client,{type:'error',code:'MERIDIAN_RULE',requestId:m.requestId,message:'Meridian名單已鎖定，或觀眾版本不支援。'});
       else if (room.players.size >= 4) service.fail(client, 'ROOM_FULL', m);
       else if(summitJoinError(room,{clientCapabilities:{odysseyRacing:client.viewer.supportsOdyssey,summit:client.viewer.supportsSummit,atlasRacing:client.viewer.supportsAtlas}}))service.send(client,{type:'error',code:'SUMMIT_RULE',requestId:m.requestId,message:'這場週末已鎖定或需更新遊戲，現在無法轉入參賽。'});
       else if(room.arena?.mode&&room.arena.mode!=='off'&&!client.viewer.supportsArena)service.send(client,{type:'error',code:'ARENA_RULE',requestId:m.requestId,message:'請更新後再轉入接力／道具參賽。'});

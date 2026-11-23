@@ -288,7 +288,8 @@ export class MultiplayerScene {
     if (!this.matchesMap(room) || room.players.some(player => !Number.isInteger(player.car.pos.i) || player.car.pos.i < 0 || player.car.pos.i >= this.track.N)) return;
     const newMatch = room.matchId !== this.matchId;
     const arenaChanged=(room.arena?.revision??0)!==this.arenaRevision;this.arenaRevision=room.arena?.revision??0;
-    if(arenaChanged){this.inputHistory=[];this.accumulator=0;}
+    const meridianChanged=room.players.find(p=>p.id===selfId)?.meridian?.generation!==this.room?.players.find(p=>p.id===selfId)?.meridian?.generation;
+    if(arenaChanged||meridianChanged){this.inputHistory=[];this.accumulator=0;this.correction.set(0,0,0);}
     this.room = room; this.selfId = selfId;
     this.watchingId = spectatorTarget(room, selfId, newMatch ? null : this.watchingId);
     // 暫態 peer 與自車從同一份權威時間起步；絕不更動 room 快照或回傳位置。
@@ -371,7 +372,7 @@ export class MultiplayerScene {
   }
   private predict(dt: number, steer: number, brake: boolean, now: number) {
     const self=this.room?.players.find(p => p.id === this.selfId);
-    if (self?.timeTrialDone || self?.block?.ghost || self?.eliminated || self?.eliminationWinner || self?.arena?.active===false || self?.cup?.active===false || self?.summit?.pitUntil&&self.summit.pitUntil>this.predictionAt || this.room?.spectators?.some(v=>v.id===this.selfId)) return;
+    if (self?.timeTrialDone || self?.block?.ghost || self?.eliminated || self?.eliminationWinner || self?.arena?.active===false || self?.cup?.active===false||self?.meridian?.active===false || self?.summit?.pitUntil&&self.summit.pitUntil>this.predictionAt || this.room?.spectators?.some(v=>v.id===this.selfId)) return;
     let remaining = Math.min(.18, Math.max(0, dt));
     if (this.room?.evolution?.mode === 'pursuit' && this.room.startAt !== null && this.selfId) {
       const releaseAt = this.room.startAt + (this.room.evolution.releaseDelays[this.selfId] ?? 0) * 1000;
@@ -391,7 +392,7 @@ export class MultiplayerScene {
         peer.x += Math.sin(peer.h) * peer.v * d; peer.z += Math.cos(peer.h) * peer.v * d;
         locate(this.track, peer.x, peer.z, peer.pos);
       }
-      for (const contact of this.room?.roomRules?.collisions === false || !!self&&!arenaCollision(self,this.predictionAt) ? [] : resolveMultiplayerCollisions(this.track, bodies, d)) if (contact.a === this.selfId || contact.b === this.selfId) {
+      for (const contact of this.room?.roomRules?.collisions === false || this.room?.meridian?.stage==='qualifying'||!!self&&!arenaCollision(self,this.predictionAt) ? [] : resolveMultiplayerCollisions(this.track, bodies, d)) if (contact.a === this.selfId || contact.b === this.selfId) {
         this.predictionContact = true;
         this.correction.set(0, 0, 0);
         this.collisionVisualUntil.set(contact.a === this.selfId ? contact.b : contact.a, now + MULTIPLAYER_COLLISION_FEEDBACK_MS);
@@ -448,11 +449,11 @@ export class MultiplayerScene {
     }
     // 校正偏移與插值也可能跨入車身；僅對呈現副本做最後分離，權威狀態不受影響。
     const activeIds = new Set(this.room?.players.filter(p=>horizonCollisionEligible(p)&&arenaCollision(p,now)&&!(p.summit?.pitUntil&&p.summit.pitUntil>now)).map(p => p.id));
-    if (this.room?.roomRules?.collisions !== false) resolveMultiplayerCollisions(this.track, [...presented].filter(([id]) => activeIds.has(id)).map(([id, car]) => ({ id, car })), 0);
+    if (this.room?.roomRules?.collisions !== false&&this.room?.meridian?.stage!=='qualifying') resolveMultiplayerCollisions(this.track, [...presented].filter(([id]) => activeIds.has(id)).map(([id, car]) => ({ id, car })), 0);
     for (const [id, car] of presented) {
       const visual = this.cars.get(id)!;
       const player=this.room?.players.find(p=>p.id===id);
-      visual.model.root.visible=player?.cup?.active!==false&&(this.room?.phase==='lobby'||player?.arena?.active!==false);
+      visual.model.root.visible=player?.cup?.active!==false&&(this.room?.phase==='lobby'||player?.arena?.active!==false&&player?.meridian?.active!==false);
       const ghost=!!player?.block?.ghost||!!(player?.summit?.pitUntil&&player.summit.pitUntil>now);
       if(visual.model.root.userData.horizonGhost!==ghost){visual.model.root.userData.horizonGhost=ghost;visual.model.root.traverse(object=>{
         const mesh=object as THREE.Mesh;if(!mesh.material)return;for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){

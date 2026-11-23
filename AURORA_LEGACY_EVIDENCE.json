@@ -1,0 +1,712 @@
+{
+  "baseline": "c56ca26e04bb1f39c144a93454ae1bc8d09d6737",
+  "note": "原始回歸收據複本，包含保留的失敗；未改寫status。",
+  "receipts": [
+    {
+      "originalPath": "tools/dev-tests/atlas-platform-models-evidence-1795401191138-029b7cc2/report.json",
+      "sha256": "7509c919ce877062f71b0303a2507c6fc3c45e5ff9f6e7898bd0633e537f6e3e",
+      "report": {
+        "status": "PASS",
+        "cases": [
+          {
+            "name": "1 所有玩法id唯一，分類／多字搜尋／最近順序正確",
+            "status": "PASS"
+          },
+          {
+            "name": "1 壞收藏／重複／陌生模式不覆寫成預設",
+            "status": "PASS"
+          },
+          {
+            "name": "2 完整白名單、空分類與原始bytes往返，憑證不匯出",
+            "status": "PASS"
+          },
+          {
+            "name": "2 拒絕版本、漏分類、重複key、房間憑證、巢狀secret與過大資料",
+            "status": "PASS"
+          },
+          {
+            "name": "2 非同步讀取時變更資料即取消，不匯出混合世代",
+            "status": "PASS"
+          },
+          {
+            "name": "2 完整還原包含明示清除、原始bytes及回放，保留其他資料",
+            "status": "PASS"
+          },
+          {
+            "name": "2 保存還原前資料失敗時零變更",
+            "status": "PASS"
+          },
+          {
+            "name": "2 localStorage中途容量失敗會還原已寫欄位及回放",
+            "status": "PASS"
+          },
+          {
+            "name": "2 回復亦被拒時保留journal，不假報恢復成功",
+            "status": "PASS"
+          },
+          {
+            "name": "2 第三方修改不被錯誤rollback覆蓋",
+            "status": "PASS"
+          },
+          {
+            "name": "3 容量設定拒絕空白、負值、小數、字串尾碼與超上限",
+            "status": "PASS"
+          },
+          {
+            "name": "3 真WS共用連線容量及health數值，第三人503後釋放可再加入",
+            "status": "PASS",
+            "details": {
+              "capacity": {
+                "gpRooms": 12,
+                "coopRooms": 4,
+                "cityRooms": 4,
+                "socialRooms": 2,
+                "dutyRooms": 2,
+                "rallyRooms": 2,
+                "connections": 2
+              },
+              "measuredRss": 89563136
+            }
+          },
+          {
+            "name": "3 真autoTick保留空合作連線45秒到期，不誤關GP／城市；清理後停止樣本",
+            "status": "PASS",
+            "details": {
+              "fakeElapsedMs": 46000,
+              "firstSamples": {
+                "gp": 5,
+                "city": 4,
+                "coop": 2
+              },
+              "finalSamples": {
+                "gp": 10,
+                "city": 9,
+                "coop": 3
+              },
+              "emptySamplesStopped": true
+            }
+          },
+          {
+            "name": "2 中斷復原再次失敗仍保留最初journal，重試成功才清除",
+            "status": "PASS"
+          },
+          {
+            "name": "3 tick量測有界、清楚區分尚無樣本，不改回傳與例外",
+            "status": "PASS"
+          }
+        ],
+        "localOnly": true,
+        "externalRequests": 0,
+        "sourceHashes": {
+          "src/atlas-backup.ts": "33c65d4261a8baf8054baf752441f3283ebd47815f1e936a7cfbbb3a275f4068",
+          "src/atlas-modes.ts": "fb7f3a52ecccca5c4fa5e47cb9be7af56bded2812784fc4fa2686c1dd0cd9178",
+          "src/atlas-profile-db.ts": "1a363fb78f1b48e3c878e120f05233a938ee48ddc311596345be93a2ff311b34",
+          "src/atlas-storage-lease.ts": "380118c679c83dd01785040787a058b54e9ccfb06f4dab1c5cad11283cf941f7",
+          "src/atlas-backup-validators.ts": "25ff2e7b1a8d8b31677b2a28b68d22e38db88c0c12939f4375645dab5b716c2c",
+          "src/atlas-backup-ui.ts": "a8171d1477b5cfb83c52e61e258d3f3d65c2fb62ef88ab21b667bac854dfc59d",
+          "src/atlas-platform.ts": "b70445f36dcce260e51d1d487edb4b4efc1846386a88fc582b42dc010df8150f",
+          "src/save.ts": "d1c577d0c01bcff8d75566f48e2164a4dcf2b58b8bb43ada87500b7f6e5eb5db",
+          "server/atlas-runtime.mjs": "dac27c56792b8871a6521e9f02ff069a9cba06061058212f7c37d2b1731bad8d",
+          "server/index.mjs": "b2356c895b5fabc974742ba82f6bd0aaf57ae263e92c3b384121810a98e63ff7"
+        },
+        "scriptSha256": "8d058b3b8ae0841a155ccb4dbd4f85e93d953f2b5dc01fbade0c3afd5157f601",
+        "evidence": "tools/dev-tests/atlas-platform-models-evidence-1795401191138-029b7cc2",
+        "sourceUnchanged": true,
+        "summary": {
+          "PASS": 15,
+          "FAIL": 0
+        }
+      }
+    },
+    {
+      "originalPath": "tools/dev-tests/atlas-platform-models-evidence-1795401015757-d0bca18c/report.json",
+      "sha256": "2c5d32649c7d1094647ded328de14011dc2c6c2cb0c4521d88a52ef66e51dc94",
+      "report": {
+        "status": "FAIL",
+        "cases": [
+          {
+            "name": "1 所有玩法id唯一，分類／多字搜尋／最近順序正確",
+            "status": "PASS"
+          },
+          {
+            "name": "1 壞收藏／重複／陌生模式不覆寫成預設",
+            "status": "PASS"
+          },
+          {
+            "name": "2 完整白名單、空分類與原始bytes往返，憑證不匯出",
+            "status": "PASS"
+          },
+          {
+            "name": "2 拒絕版本、漏分類、重複key、房間憑證、巢狀secret與過大資料",
+            "status": "PASS"
+          },
+          {
+            "name": "2 非同步讀取時變更資料即取消，不匯出混合世代",
+            "status": "PASS"
+          },
+          {
+            "name": "2 完整還原包含明示清除、原始bytes及回放，保留其他資料",
+            "status": "PASS"
+          },
+          {
+            "name": "2 保存還原前資料失敗時零變更",
+            "status": "PASS"
+          },
+          {
+            "name": "2 localStorage中途容量失敗會還原已寫欄位及回放",
+            "status": "PASS"
+          },
+          {
+            "name": "2 回復亦被拒時保留journal，不假報恢復成功",
+            "status": "PASS"
+          },
+          {
+            "name": "2 第三方修改不被錯誤rollback覆蓋",
+            "status": "PASS"
+          },
+          {
+            "name": "3 容量設定拒絕空白、負值、小數、字串尾碼與超上限",
+            "status": "PASS"
+          },
+          {
+            "name": "3 真WS共用連線容量及health數值，第三人503後釋放可再加入",
+            "status": "FAIL",
+            "error": "Error: Unexpected server response: 503\n    at ClientRequest.<anonymous> (C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\Rex\\taipei-gp\\server\\node_modules\\ws\\lib\\websocket.js:930:7)\n    at ClientRequest.emit (node:events:509:28)\n    at HTTPParser.parserOnIncomingClient (node:_http_client:798:27)\n    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)\n    at Socket.socketOnData (node:_http_client:633:22)\n    at Socket.emit (node:events:509:28)\n    at addChunk (node:internal/streams/readable:563:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)\n    at Readable.push (node:internal/streams/readable:394:5)\n    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)"
+          },
+          {
+            "name": "3 真autoTick保留空合作連線45秒到期，不誤關GP／城市；清理後停止樣本",
+            "status": "PASS",
+            "details": {
+              "fakeElapsedMs": 46000,
+              "firstSamples": {
+                "gp": 9,
+                "coop": 5,
+                "city": 5
+              },
+              "finalSamples": {
+                "gp": 19,
+                "coop": 7,
+                "city": 14
+              },
+              "emptySamplesStopped": true
+            }
+          },
+          {
+            "name": "2 中斷復原再次失敗仍保留最初journal，重試成功才清除",
+            "status": "PASS"
+          },
+          {
+            "name": "3 tick量測有界、清楚區分尚無樣本，不改回傳與例外",
+            "status": "PASS"
+          }
+        ],
+        "localOnly": true,
+        "externalRequests": 0,
+        "sourceHashes": {
+          "src/atlas-backup.ts": "33c65d4261a8baf8054baf752441f3283ebd47815f1e936a7cfbbb3a275f4068",
+          "src/atlas-modes.ts": "fb7f3a52ecccca5c4fa5e47cb9be7af56bded2812784fc4fa2686c1dd0cd9178",
+          "src/atlas-profile-db.ts": "1a363fb78f1b48e3c878e120f05233a938ee48ddc311596345be93a2ff311b34",
+          "src/atlas-storage-lease.ts": "380118c679c83dd01785040787a058b54e9ccfb06f4dab1c5cad11283cf941f7",
+          "src/atlas-backup-validators.ts": "25ff2e7b1a8d8b31677b2a28b68d22e38db88c0c12939f4375645dab5b716c2c",
+          "src/atlas-backup-ui.ts": "a8171d1477b5cfb83c52e61e258d3f3d65c2fb62ef88ab21b667bac854dfc59d",
+          "src/atlas-platform.ts": "b70445f36dcce260e51d1d487edb4b4efc1846386a88fc582b42dc010df8150f",
+          "src/save.ts": "d1c577d0c01bcff8d75566f48e2164a4dcf2b58b8bb43ada87500b7f6e5eb5db",
+          "server/atlas-runtime.mjs": "dac27c56792b8871a6521e9f02ff069a9cba06061058212f7c37d2b1731bad8d",
+          "server/index.mjs": "b2356c895b5fabc974742ba82f6bd0aaf57ae263e92c3b384121810a98e63ff7"
+        },
+        "scriptSha256": "96e6b04af4c1ac620a984ca6444b3b88eaa9025328065d3423061bd60edb978f",
+        "evidence": "tools/dev-tests/atlas-platform-models-evidence-1795401015757-d0bca18c",
+        "sourceUnchanged": true,
+        "summary": {
+          "PASS": 14,
+          "FAIL": 1
+        }
+      }
+    },
+    {
+      "originalPath": "tools/dev-tests/frontier-cup-node-evidence-1795400743055/result.json",
+      "sha256": "f116dc0fb0777f298a0aaa659778d94f69c250af1cfaf4e4cd91310b6e412d2e",
+      "report": {
+        "status": "PASS",
+        "localOnly": true,
+        "externalRequests": 0,
+        "realLoopbackWebSocket": true,
+        "trueCarPhysics": true,
+        "browserUsed": false,
+        "cases": [
+          {
+            "name": "四位原席固定種子、準決賽1v4／2v3，其他兩席是候場而非DNF",
+            "status": "PASS",
+            "details": {
+              "seeds": [
+                1,
+                4,
+                2,
+                3
+              ]
+            }
+          },
+          {
+            "name": "候場操控被拒、權威simulate不移動且不計圈；兩位出賽使用相同緊湊格",
+            "status": "PASS"
+          },
+          {
+            "name": "鎖盃後所有改圖／房規／模式／series／普通start-reset皆不變更",
+            "status": "PASS"
+          },
+          {
+            "name": "非房主、舊revision／房碼／matchId／trackRevision／多餘欄位意圖均被拒",
+            "status": "PASS"
+          },
+          {
+            "name": "不允AI／series／endurance／weekend／relay／其他特殊玩法混用或外部觀眾",
+            "status": "PASS"
+          },
+          {
+            "name": "原四位新版能力才能鎖盃，外人join/watch與舊版resume都拒絕",
+            "status": "PASS"
+          },
+          {
+            "name": "單DNF等待另一位真完賽才晉級，重複maybeFinish不重複結算（明示finish fixture）",
+            "status": "PASS"
+          },
+          {
+            "name": "雙DNF及完全同時成績只可同組重賽，不晉級（明示finish fixture）",
+            "status": "PASS"
+          },
+          {
+            "name": "server-stall 即使已有一人完賽仍重賽；倒數跨起跑停頓也重賽（明示fixture）",
+            "status": "PASS"
+          },
+          {
+            "name": "候場leave與15秒逾期保留固定名單、不造DNF、不允替補",
+            "status": "PASS"
+          },
+          {
+            "name": "15秒內原席續接、舊socket退出與倒數取消保留同組不晉級",
+            "status": "PASS"
+          },
+          {
+            "name": "主動離房與逾期活動席標DNF；不讓尚未完賽對手自動晉級",
+            "status": "PASS"
+          },
+          {
+            "name": "四場分支、季軍與冠軍完整名次且鎖定設定；取消回一般大廳（明示finish fixture）",
+            "status": "PASS"
+          },
+          {
+            "name": "嚴格快照拒絕偽造晉級／重複席位／候場DNF／鎖定設定／混用玩法",
+            "status": "PASS",
+            "details": {
+              "tamperedSnapshots": 10
+            }
+          },
+          {
+            "name": "原有普通四人競速沒有cup時仍可start、模擬、reset及換設定",
+            "status": "PASS"
+          },
+          {
+            "name": "真Cup UI模組：候場明示、設定持續鎖定、取消確認綁原意圖、結果匯出無私席",
+            "status": "PASS",
+            "details": {
+              "realUiModule": true,
+              "syntheticDom": true,
+              "exportPublicOnly": true
+            }
+          },
+          {
+            "name": "Cup準備綁目前小場世代：舊ready／舊unready／前盃訊息不會影響新大廳，普通GP維持相容",
+            "status": "PASS",
+            "details": {
+              "staleReadyRejected": true,
+              "staleUnreadyRejected": true,
+              "cancelledCupRejected": true,
+              "ordinaryBareReadyAccepted": true
+            }
+          },
+          {
+            "name": "Cup準備嚴格欄位、錯誤型別／世代與缺少binding均拒絕；換房主使舊lobby確認失效",
+            "status": "PASS",
+            "details": {
+              "rejected": 9,
+              "hostTransferBound": true
+            }
+          },
+          {
+            "name": "真圈速UI helper不把候場當未完成單圈，候場列不建立逐圈成績",
+            "status": "PASS",
+            "details": {
+              "waitingNoLapPrompt": true
+            }
+          },
+          {
+            "name": "真四人loopback WS＋真Car.update跑完四場，候場不移動／不DNF，冠軍與季軍由伺服器圈線產生",
+            "status": "PASS",
+            "details": {
+              "rounds": [
+                {
+                  "round": "semi-a",
+                  "attempt": 1,
+                  "finishMs": [
+                    59628.796,
+                    58755.41
+                  ],
+                  "waitingDnf": [
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "round": "semi-b",
+                  "attempt": 1,
+                  "finishMs": [
+                    59628.796,
+                    58755.41
+                  ],
+                  "waitingDnf": [
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "round": "bronze",
+                  "attempt": 1,
+                  "finishMs": [
+                    59628.796,
+                    58755.41
+                  ],
+                  "waitingDnf": [
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "round": "final",
+                  "attempt": 1,
+                  "finishMs": [
+                    59628.796,
+                    58755.41
+                  ],
+                  "waitingDnf": [
+                    false,
+                    false
+                  ]
+                }
+              ],
+              "standings": [
+                {
+                  "seed": 3,
+                  "rank": 1
+                },
+                {
+                  "seed": 4,
+                  "rank": 2
+                },
+                {
+                  "seed": 2,
+                  "rank": 3
+                },
+                {
+                  "seed": 1,
+                  "rank": 4
+                }
+              ],
+              "realInputsOnly": true
+            }
+          },
+          {
+            "name": "真MultiplayerClient走loopback能力、意圖與防舊確認；候場sendInput及觀戰目標真模組",
+            "status": "PASS",
+            "details": {
+              "realClient": true,
+              "waitingTargets": 2,
+              "staleIntentRejected": true
+            }
+          }
+        ],
+        "limitations": [
+          "Browser rendering and mobile UI are not tested here. Tie, DNF and stall branches use explicit authoritative state fixtures; the complete four-match cup is driven through real Car.update and WebSocket controls without assigning progress, pose, finish or bracket winners."
+        ],
+        "sourceHashes": {
+          "shared/frontier-cup.ts": "9b404f62d7f6da40840daa93a9dd9162b7ee5cf03ba2b687ce9c8b5499e7277b",
+          "server/frontier-cup-service.mjs": "a05300957f2dd73c04a81b8ef72ea8ece6c8dcb45857634ec98d32b69d5c189a",
+          "server/room-service.mjs": "2937e8b5339f7b4cf096002f672988a016bf8ab210ff813178d280417ccd5975",
+          "shared/multiplayer-protocol.ts": "61d26754255eb869ef019825c911841b1030d07dfec46083934c4377102d9c29",
+          "shared/multiplayer-horizon.ts": "2a7504331820afc3d5fe90e9c4b02f29fd083f6553c1925180b43fc3d76c9b9f",
+          "shared/summit-racing.ts": "5d60b7d5d9428beeb544673c76a2ba76b8b630d378c807355a4278d8723d4ac3",
+          "src/multiplayer-client.ts": "dc9adc88e55f0b7696db957214b9ac847b9f7f4b10cf1012082ccf2edd6b0cfb",
+          "src/frontier-cup-ui.ts": "2827d97008df388aa10b2cadb81d1170cb4cda0a3fd2394d37aa0f33a4df1532",
+          "src/frontier-cup.css": "7a68535c74ec4c97d7a114b86f90b7f6e461ea0a953832ec3a87a91a6e2694f4",
+          "src/multiplayer-game.ts": "eeecb41a8c7ab902213487d476ac6856cd963edbc6ad90c20e3b03e67bcef7ce",
+          "src/multiplayer-scene.ts": "3dbb2f79d78bf11b4316554c5f0af29a9018e99ba5241c753d814191903253ab",
+          "src/multiplayer-spectator.ts": "cdc15dab845447b5dd92f43daa86febf5726b6618839459c443fb9dd7ce58e1f",
+          "src/multiplayer-ui.ts": "0e40c1ae9475031bf1e1ba6d793e5789bc82521870c6b36e8998358850f4849f",
+          "src/multiplayer-awareness.ts": "5831b6c5d46f738480e5638131ec72e65fa31c8bec6146912e1f464670e44025",
+          "src/multiplayer-history.ts": "8ecceb9600357a5ecea27060bb44f55621372c66651e51f36ff755b4dc68d4eb",
+          "src/voyager-result-data.ts": "e8ee86ff7569491e0c62e9aa023b95803200c0817db636f5a6579cfca022c7ae",
+          "server/nexus-replay-service.mjs": "79643105e2a96c8c4a92a283e7d2f3bd859416c0922f4657dfba292c8e0273c2"
+        },
+        "scriptSha256": "0a2ef18c9ab915641fc3cae857d917c41de7621cb341dc8f352b702b11150857",
+        "startedAt": "2026-11-23T02:25:02.511Z",
+        "cleanupComplete": true,
+        "summary": {
+          "PASS": 21,
+          "FAIL": 0
+        },
+        "sourceUnchangedDuringTests": true,
+        "scriptUnchangedDuringTests": true,
+        "finishedAt": "2026-11-23T02:25:43.055Z"
+      }
+    },
+    {
+      "originalPath": "tools/dev-tests/frontier-rally-node-evidence-1795399866123/result.json",
+      "sha256": "9919b29afa194415baab6db8db0311078f0e6ed3b2361e0235155def63793356",
+      "report": {
+        "status": "PASS",
+        "externalRequests": 0,
+        "localOnly": true,
+        "cases": [
+          {
+            "name": "真路網固定路線與三種均速／四計時點；四人同起點、無車碰與容量",
+            "status": "PASS",
+            "details": {
+              "averages": 3,
+              "maxPlayers": 4,
+              "trueRoads": true
+            }
+          },
+          {
+            "name": "版本／能力／房主與revision起跑gate，不接受自訂位置、成績、路線或碰撞",
+            "status": "PASS"
+          },
+          {
+            "name": "實際FreeCar固定步操控會移動；同點友車不分離／不計接觸，權威快照可解析",
+            "status": "PASS",
+            "details": {
+              "movementM": 4.29450006476733,
+              "actualFreeCar": true,
+              "noVehicleContact": true
+            }
+          },
+          {
+            "name": "順序門須正向同層，不能跳門或反向通過",
+            "status": "PASS"
+          },
+          {
+            "name": "四個時差分項使用真路網門；早到／晚到相同絕對罰分、同分同名次",
+            "status": "PASS",
+            "details": {
+              "latePenaltyMs": 2000,
+              "earlyPenaltyMs": 2000,
+              "tiedRanks": [
+                1,
+                1
+              ]
+            }
+          },
+          {
+            "name": "超速獨立積分：60km/h持續1秒加2秒，未完賽無名次",
+            "status": "PASS"
+          },
+          {
+            "name": "四人完整權威結算依總罰分排序；同分跳名次、單DNF無名次",
+            "status": "PASS"
+          },
+          {
+            "name": "短斷線不暫停時鐘，原15秒nonce冪等／舊token不同key拒絕／確認前不操控",
+            "status": "PASS"
+          },
+          {
+            "name": "server stall取消全場並無名次；timeout個別DNF，權威結果一致",
+            "status": "PASS"
+          },
+          {
+            "name": "倒數跨過起跑後停頓超過1秒同樣明確取消，不冒稱正常完場",
+            "status": "PASS"
+          },
+          {
+            "name": "回大廳再戰拒絕舊revision；其他玩家未確認續席的原期限不被重開延長",
+            "status": "PASS"
+          },
+          {
+            "name": "嚴格parser拒絕偽造罰分／名次／計時點／多餘欄位且不共享參照",
+            "status": "PASS"
+          },
+          {
+            "name": "沒有可用Storage時明示不可保存，仍可匯出本場",
+            "status": "PASS"
+          },
+          {
+            "name": "結果明確保存／去重／深拷貝，排除私席且嚴格驗分",
+            "status": "PASS"
+          },
+          {
+            "name": "損壞／跨頁原文／quota與寫入後衝突保留資料，不誤報保存成功",
+            "status": "PASS"
+          },
+          {
+            "name": "產品client真WS雙人起跑與實際操控；斷線自動接原席、ACK前不送舊操控",
+            "status": "PASS",
+            "details": {
+              "actualLoopback": true,
+              "originalSeat": true,
+              "ackRequired": true
+            }
+          },
+          {
+            "name": "產品client真WS：welcome遺失同key重試不重rotate；快照停更但pong仍通不遮蔽watchdog",
+            "status": "PASS",
+            "details": {
+              "sameNonceRetries": 2,
+              "pongsWhileSnapshotStale": 32
+            }
+          }
+        ],
+        "limitations": [
+          "Gate/scoring cases explicitly arrange server-side previous/current poses at each real-road gate. They prove direction, level, timing and scoring rules, not human complete-route driving. A separate case advances the actual FreeCar with real controls. The browser/client cases use genuine loopback WS with no public services."
+        ],
+        "sourceHashes": {
+          "shared/frontier-rally.ts": "038feecede1527b0023d441f6aed031de68a68a978ce1f560fa1700886e52033",
+          "server/frontier-rally-service.mjs": "b3dca928ba7fcb4abe05c3b98e4a7179cebde539a4787a05aae8c096eb062b44",
+          "src/frontier-rally-client.ts": "6fc4f70aeaf171f62269e188f902da69c3f597f37d78fa5a07deaad8b02933e9",
+          "src/frontier-rally-history.ts": "8f65b5f4cd1ddf630b81f37027b3db5a9bf0215d97044099a51c474b80db993a",
+          "server/summit-city-race-service.mjs": "9a913fbea137302b6c79c0ee2ed192955aee5097f6fa86fb9d61625f0c255e5e"
+        },
+        "scriptSha256": "7adc8a6fc226cc29b43ea09a041ab228848d01e35c7215180207755c733101f4",
+        "startedAt": "2026-11-23T02:11:06.134Z",
+        "cleanupComplete": true,
+        "sourceUnchangedDuringTests": true,
+        "scriptUnchangedDuringTests": true,
+        "finishedAt": "2026-11-23T02:11:15.332Z",
+        "summary": {
+          "PASS": 17,
+          "FAIL": 0
+        }
+      }
+    },
+    {
+      "originalPath": "tools/dev-tests/nexus-workshop-models-evidence-1795399481512/report.json",
+      "sha256": "cb45dc68fa59f74b067795bd947a7cda18cc2fab5fb4cf1dd9cbb07c888c3286",
+      "report": {
+        "status": "PASS",
+        "localOnly": true,
+        "cases": [
+          {
+            "name": "5 分享碼繁中設定/URL完整往返且不含查詢憑證",
+            "status": "PASS",
+            "details": {
+              "bytes": 221
+            }
+          },
+          {
+            "name": "5 損毀/超長/未知前綴/非法UTF8碼拒絕",
+            "status": "PASS"
+          },
+          {
+            "name": "5 版本/物理/map/額外欄位/原型鍵不接受",
+            "status": "PASS"
+          },
+          {
+            "name": "5 車款/天氣/目標/點數嚴格型別與上下限",
+            "status": "PASS"
+          },
+          {
+            "name": "6 真Router重建可達路線/高度/順序密集檢查點",
+            "status": "PASS"
+          },
+          {
+            "name": "6 單行反向必須繞路，不能直接穿越逆向路段",
+            "status": "PASS",
+            "details": {
+              "forward": 200,
+              "reverse": 528.8245611270737
+            }
+          },
+          {
+            "name": "6 不存在節點/過短/不可達的孤島均拒絕",
+            "status": "PASS"
+          },
+          {
+            "name": "6 路層選點不混淆高架與地面，同座標也可區分",
+            "status": "PASS"
+          },
+          {
+            "name": "5/6 地圖改動會換stamp，舊挑戰不可默默套用新版路線",
+            "status": "PASS"
+          },
+          {
+            "name": "5 真FreeCar完整起跑/逐點/完賽，不傳送或改寫車輛物理",
+            "status": "PASS",
+            "details": {
+              "ticks": 1770,
+              "position": 192.03104097170564,
+              "success": true,
+              "elapsed": 11.74166666666664,
+              "hits": 0,
+              "reason": "已依序完成所有檢查點並達成目標"
+            }
+          },
+          {
+            "name": "5 暫停不step不扣時，倒數結束前不完成檢查點",
+            "status": "PASS"
+          },
+          {
+            "name": "5 瞬移/負dt/NaN/超大dt均不列成績",
+            "status": "PASS"
+          },
+          {
+            "name": "5 同水平檢查點但錯路層不能通過，跨點不能直接完賽",
+            "status": "PASS"
+          },
+          {
+            "name": "5 碰撞計次有冷卻，超標/超時/扶正失敗與結果冪等",
+            "status": "PASS"
+          },
+          {
+            "name": "5 草稿/最佳成績/車款天候目標分類獨立且正式存檔不變",
+            "status": "PASS"
+          },
+          {
+            "name": "5/6 草稿上限24/成績上限80，編輯不覆寫其他設定",
+            "status": "PASS"
+          },
+          {
+            "name": "5/6 壞工坊存檔保留原bytes且不覆寫，儲存拒絕仍可本頁遊玩",
+            "status": "PASS"
+          },
+          {
+            "name": "6 真城市解碼路網可建構、地面/高架可選並能重建路線",
+            "status": "PASS",
+            "details": {
+              "nodes": 16170,
+              "map": "roads-v1:dd68a6fb",
+              "length": 1280.673547510216
+            }
+          },
+          {
+            "name": "核心五檔與本輪before逐位元相同",
+            "status": "PASS"
+          }
+        ],
+        "scriptSha256": "e71437f3a4ee25cd9496f157727e40820c61dabe61b217f42f3bb6a549695e74",
+        "sourceHashes": {
+          "src/nexus-workshop.ts": "977a7ef986dd2f3f970ade65f2f1a02d097258819d18afd9a0e0f96203775e4c",
+          "src/nexus-workshop-ui.ts": "5b10471ea5f762bd1f05b4d1c2409c2e078f742be0553f8248871ee94e19e898",
+          "src/nexus-workshop.css": "eb59ed768cdba41d6663083e2e2b90cce357613dcf61fe1551549988af2be650",
+          "src/main.ts": "d9ffd0cbb24d81e0e9ad4b44b99164f3de0d5ac80fa2f9123283e38ed0a92176",
+          "src/freecar.ts": "99813a7aec638eb6a7c8c5d3b4bc1cb07ea4730f024cebce15db274280847cfb",
+          "src/router.ts": "63c0a3db693e40ae3a188339bd54f615d66d67b743e68a890bb0df5d0f0b8e8e"
+        },
+        "limitations": [
+          "直線挑戰以真FreeCar物理跑完，其餘防護採明示的模型/路網fixture；不是全城市真人駕駛或難度平衡。",
+          "分享碼checksum只檢查意外損壞，並非伺服器簽章或防作弊成績。"
+        ],
+        "evidence": "tools/dev-tests/nexus-workshop-models-evidence-1795399481512",
+        "summary": {
+          "PASS": 19,
+          "FAIL": 0
+        }
+      }
+    }
+  ]
+}

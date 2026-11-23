@@ -1,6 +1,6 @@
 import {randomBytes,randomUUID} from 'node:crypto';
 import {Car} from './physics.mjs';
-import {FRONTIER_CUP_VERSION,CUP_MATCH_KEYS,cupActiveIds,cupCompatible,cupExpectedPair} from '../shared/frontier-cup.ts';
+import {FRONTIER_CUP_VERSION,AURORA_CUP_VERSION,CUP_MATCH_KEYS,cupActiveIds,cupCompatible,cupExpectedPair,leaguePairs,cupIsComplete} from '../shared/frontier-cup.ts';
 export const CUP_RESUME_MS=15000;
 export const cupCanDrive=(room,player)=>!room.cup||cupActiveIds(room.cup).includes(player.id);
 export const cupPlayer=(room,player)=>room.cup?{active:cupCanDrive(room,player),seed:room.cup.entrants.find(e=>e.playerId===player.id).seed}:null;
@@ -17,7 +17,7 @@ export function cupBeforeLobby(room){if(room.cup?.status==='running'){clearMatch
 export function cupReceive(s,c,m,now){
  const target=c.room??(['join','watch'].includes(m.type)?s.rooms.get(m.code):null);
  if(target?.cup&&['join','watch','claim-seat'].includes(m.type))return fail(s,c,m,'好友盃已鎖定四位原車手；請原車手用原席續接，或等房主結束整盃。');
- const r=c.room,p=c.player,command=['cup-configure','cup-start','cup-next','cup-replay','cup-cancel'].includes(m.type);
+ const r=c.room,p=c.player,command=['cup-configure','cup-configure-league','cup-start','cup-next','cup-replay','cup-cancel'].includes(m.type);
  if(!command){
   if(m.type==='ready'&&r&&!r.cup&&m.cupReady!==undefined)return fail(s,c,m,'這是先前好友盃的準備操作；請在目前大廳重新確認。');
   if(!r?.cup)return false;
@@ -35,11 +35,12 @@ export function cupReceive(s,c,m,now){
   if(!r.cup)return fail(s,c,m,'目前沒有進行中的好友盃。');
   r.cup=null;for(const q of [...r.players.values()])if(q.expired&&!q.connected)r.players.delete(q.id);s.toLobby(r,now);return true;
  }
- if(m.type==='cup-configure'){
-  if(r.cup||r.phase!=='lobby'||!cupCompatible(r)||r.spectators.size||r.players.size!==4||[...r.players.values()].some(q=>q.isAi||!q.connected||!q.loaded||!q.supportsCup))return fail(s,c,m,'好友盃需要四位已載入的新版真人、沒有外部觀眾，並先關閉系列／AI／其他特殊玩法。');
+ if(m.type==='cup-configure'||m.type==='cup-configure-league'){
+  const league=m.type==='cup-configure-league';if(r.cup||r.phase!=='lobby'||!cupCompatible(r)||r.spectators.size||r.players.size<(league?2:4)||r.players.size>4||[...r.players.values()].some(q=>q.isAi||!q.connected||!q.loaded||!q.supportsCup||league&&!q.supportsAuroraCup))return fail(s,c,m,league?'循環好友盃需要2～4位已載入的Aurora真人、沒有外部觀眾，並先關閉其他特殊玩法。':'好友盃需要四位已載入的新版真人、沒有外部觀眾，並先關閉系列／AI／其他特殊玩法。');
   const entrants=[...r.players.values()].sort((a,b)=>a.slot-b.slot).map((q,i)=>({playerId:q.id,name:q.name,color:q.color,seed:i+1}));
-  r.cup={version:FRONTIER_CUP_VERSION,id:randomBytes(12).toString('hex'),revision:1,index:0,status:'ready',locked:{trackId:r.trackId,trackStamp:r.trackStamp,laps:r.laps,roomRules:{...r.roomRules}},entrants,matches:CUP_MATCH_KEYS.map(pending)};
-  r.cup.matches[0].pair=cupExpectedPair(r.cup,0);r.cup.matches[1].pair=cupExpectedPair(r.cup,1);s.toLobby(r,now);return true;
+  const matchKeys=league?[...leaguePairs(entrants).map((_,i)=>`round-${i+1}`),'final-1','final-2','final-3']:CUP_MATCH_KEYS;
+  r.cup={version:FRONTIER_CUP_VERSION,id:randomBytes(12).toString('hex'),revision:1,index:0,status:'ready',locked:{trackId:r.trackId,trackStamp:r.trackStamp,laps:r.laps,roomRules:{...r.roomRules}},entrants,matches:matchKeys.map(pending),...(league?{league:{version:AURORA_CUP_VERSION}}:{})};
+  for(let i=0;i<r.cup.matches.length;i++)r.cup.matches[i].pair=cupExpectedPair(r.cup,i);s.toLobby(r,now);return true;
  }
  const cup=r.cup,match=cup?.matches[cup.index];
  if(!cup)return fail(s,c,m,'請先建立好友盃。');
@@ -52,7 +53,7 @@ export function cupReceive(s,c,m,now){
  }
  if(r.phase!=='results')return fail(s,c,m,'請等待本小場結算，再前往下一場或重賽。');
  if(m.type==='cup-next'){
-  if(cup.status!=='decided'||cup.index>=3)return fail(s,c,m,'本小場還沒有可晉級的勝負；平手、雙方未完賽或伺服器停頓必須重賽。');
+  if(cup.status!=='decided'||cup.index>=cup.matches.length-1)return fail(s,c,m,'本小場還沒有可晉級的勝負；平手、雙方未完賽或伺服器停頓必須重賽。');
   cup.index++;cup.status='ready';cup.revision++;s.toLobby(r,now);return true;
  }
  if(m.type==='cup-replay'){
@@ -78,9 +79,9 @@ export function cupFinish(s,r,now){
  const reason=r.cupStalled?'server-stall':finish.length===0?'both-dnf':finish.length===2&&finish[0].finishMs===finish[1].finishMs?'tie':null;
  m.results=results;m.reason=reason;
  if(reason){m.status='replay';cup.status='replay';}
- else{m.status='decided';m.winnerId=finish[0].playerId;m.loserId=m.pair.find(id=>id!==m.winnerId);cup.status=cup.index===3?'complete':'decided';}
+ else{m.status='decided';m.winnerId=finish[0].playerId;m.loserId=m.pair.find(id=>id!==m.winnerId);cup.status=cupIsComplete(cup)?'complete':'decided';}
  cup.revision++;r.cupStalled=false;
- for(let i=2;i<4;i++)cup.matches[i].pair=cupExpectedPair(cup,i);
+ for(let i=0;i<cup.matches.length;i++)cup.matches[i].pair=cupExpectedPair(cup,i);
  for(const p of r.players.values())p.car.v=0;
  r.phase='results';r.updatedAt=now;s.broadcast(r,'room',now);return true;
 }

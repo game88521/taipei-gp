@@ -1,0 +1,7 @@
+import {normalizeMultiplayerRoomCode} from './multiplayer-invite';
+export type RoomInviteKind='race'|'cityrace'|'coop'|'social'|'crew'|'rally';
+export interface RoomInvite {kind:RoomInviteKind;code:string;label:string;players:number;capacity:number;mode?:string}
+export function roomInviteUrl(page:string,room:RoomInvite):string|null {try{const current=new URL(page),code=normalizeMultiplayerRoomCode(room.code);if(!code||!['http:','https:'].includes(current.protocol)||current.username||current.password)return null;const url=new URL(room.kind==='race'?'/multiplayer.html':'/',current.origin);url.searchParams.set(room.kind==='race'?'room':room.kind,code);if(room.kind==='social'){if(!['cruise','chase','tandem','convoy','crown'].includes(room.mode??''))return null;url.searchParams.set('socialMode',room.mode!);}return url.href;}catch{return null;}}
+export async function deliverRoomInvite(url:string,label:string,kind:'share'|'copy',port:{share?:(data:{title:string;text:string;url:string})=>Promise<void>;copy?:(text:string)=>Promise<void>}) {
+ try{if(kind==='share'){if(!port.share)return {status:'manual',message:'此裝置未提供原生分享，請使用複製連結或QR。'};await port.share({title:'台北街道賽｜'+label,text:'開啟後確認暱稱，再按加入房間。',url});return {status:'shared',message:'已開啟分享。朋友仍需確認加入。'};}if(!port.copy)throw Error('clipboard unavailable');await port.copy(url);return {status:'copied',message:'邀請網址已複製。'};}catch(e){return e&&typeof e==='object'&&'name'in e&&e.name==='AbortError'?{status:'cancelled',message:'已取消分享。'}:{status:'manual',message:'分享或複製未完成；請長按下方網址複製，或掃描QR。'};}
+}

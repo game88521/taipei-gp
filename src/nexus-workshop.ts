@@ -12,6 +12,13 @@ interface WorkshopBase { map: string; name: string; nodes: number[]; car: Worksh
 export type WorkshopDefinition = (WorkshopBase & { v: 1; physics: typeof WORKSHOP_VERSION }) | (WorkshopBase & { v: 2; physics: typeof WORKSHOP_VERSION_2; laps: 1 | 3 | 5; splits: number[] });
 export interface WorkshopPoint { x: number; z: number; y: number }
 export interface WorkshopRoute { path: [number, number][]; ys: number[]; length: number; anchors: WorkshopPoint[]; gates: WorkshopPoint[]; start: WorkshopPoint & { h: number } }
+export interface WorkshopRouteSignature { route: string; heading: number }
+export function workshopRouteSignature(route: WorkshopRoute): WorkshopRouteSignature { return { route: JSON.stringify(route), heading: route.start.h }; }
+export function workshopRoutesMatch(expected: WorkshopRouteSignature, actual: WorkshopRoute): boolean {
+  // Math.atan2 may differ by the last bit across Node/Chrome. All other road values stay exact.
+  const heading = actual.start.h;
+  return Number.isFinite(expected.heading) && Number.isFinite(heading) && Math.abs(expected.heading - heading) <= 1e-12 && expected.route === JSON.stringify({ ...actual, start: { ...actual.start, h: expected.heading } });
+}
 export interface WorkshopResult { success: boolean; elapsed: number; hits: number; reason: string; lapTimes?: number[]; segments?: number[][] }
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);

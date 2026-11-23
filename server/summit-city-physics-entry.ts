@@ -7,6 +7,8 @@ export { FreeCar } from '../src/freecar';
 export { streetContact } from '../shared/atlas-city-contact';
 export { ROAD_Y } from '../src/surface';
 export { decodeWorkshop, encodeWorkshop, parseWorkshop } from '../src/nexus-workshop';
+export {decodeStory,encodeStory,buildStoryPlan} from '../src/aurora-story';
+export {buildPhotoHunt,CityMissionRun} from '../src/meridian-city-models';
 export function createCityRaceWorld(raw: CityData, tiles: TileData[] = []) {
   const data = decodeCity(raw), surface = new Surface(data), collider = new Collider(data);
   surface.tunnels = true; collider.groundAt = (x, z) => surface.groundAt(x, z);

@@ -13,6 +13,10 @@ import type {CityReplayArchive} from '../shared/frontier-city-replay';
 import {DUTY_INCIDENTS,DUTY_DIFFICULTIES,type DutyIncidentId} from '../shared/frontier-duty-missions';
 import {DUTY_MISSION_RECORDS_KEY,parseDutyMissionRecords,dutyMissionRecord} from './frontier-duty-records';
 import {FrontierRecords} from './frontier-records';
+import {TEAM_ROLE_LABELS} from '../shared/aurora-duty';
+import {mountAuroraDutyTeam} from './aurora-duty-ui';
+import {AURORA_DUTY_RECORDS_KEY,parseAuroraDutyRecords,auroraDutyRecord} from './aurora-duty-records';
+import {mountRoomInvite} from './aurora-invite-ui';
 import './expedition-duty.css';
 export interface ExpeditionDutyOptions{
  scene:THREE.Scene;host:HTMLElement;isCity:boolean;car:FreeCar;city():CityData|null;collider():Collider|null;
@@ -25,15 +29,16 @@ const make=<K extends keyof HTMLElementTagNameMap>(tag:K,text='')=>{const e=docu
 const button=(id:string,text:string,fn:()=>void)=>{const b=make('button',text);b.type='button';b.id=id;b.className='ghost-btn';b.onclick=fn;return b;};
 const idle=():CrewInput=>({steer:0,throttle:false,brake:false,handbrake:false,active:false});
 export function mountExpeditionDuty(o:ExpeditionDutyOptions){
- const launch=button('btn-expedition-duty','🛟 雙人合作救援／定速拉力',()=>{const selected=launch.dataset.dutyMode;delete launch.dataset.dutyMode;open(selected==='rally'?'rally':'crew');});o.host.append(launch);
+ let teamTools:ReturnType<typeof mountAuroraDutyTeam>|null=null,inviteTools:ReturnType<typeof mountRoomInvite>|null=null;
+ const launch=button('btn-expedition-duty','🛟 2～4人合作救援／定速拉力',()=>{const selected=launch.dataset.dutyMode;delete launch.dataset.dutyMode;open(selected==='rally'?'rally':'crew');});o.host.append(launch);
  const overlay=make('div');overlay.id='expedition-duty-overlay';overlay.className='overlay hidden';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
  const card=make('div');card.className='card wide expedition-duty-card';const title=make('h1','合作救援與定速拉力');title.id='expedition-duty-title';overlay.setAttribute('aria-labelledby',title.id);
  const info=make('p');info.id='expedition-duty-status';info.setAttribute('role','status');
- const lead=make('p','合作救援：兩位玩家共用一輛平板車，司機駕駛及定位／固定，協助者設警示、操作絞盤及卸載。定速拉力：按目標時間通過四個計時點，早到／晚到同樣計罰，超過50km/h另加罰分。');
+ const lead=make('p','合作救援：2～4位玩家共用一輛平板車，司機駕駛定位、技師操作絞盤，第三位警戒員布置前後警示及確認淨空，第四位調度員負責事故簡報與返站接收；原雙人流程仍保留。定速拉力：按目標時間通過四個計時點，早到／晚到同樣計罰，超過50km/h另加罰分。');
  const name=make('input');name.id='expedition-duty-name';name.value='救援隊員';name.maxLength=20;name.setAttribute('autocomplete','nickname');const nameLabel=make('label','隊員暱稱 ');nameLabel.append(name);
  const code=make('input');code.id='expedition-duty-code';code.maxLength=6;code.autocapitalize='characters';const codeLabel=make('label','六碼救援房間 ');codeLabel.append(code);
  const create=button('expedition-duty-create','建立救援房（司機）',()=>void join('create'));
- const enter=button('expedition-duty-join','加入救援房（協助者）',()=>void join('join'));
+ const enter=button('expedition-duty-join','加入救援房（技師／警戒／調度）',()=>void join('join'));
  const watch=button('expedition-duty-watch','以觀眾加入（不占隊員席）',()=>void join('watch'));
  const checkService=button('expedition-duty-check-service','重新檢查觀戰／回放服務',()=>{if(entered||busy)return;client.disconnect();void client.connect().catch(e=>{message=String(e instanceof Error?e.message:e);render();});});
  const watchCount=make('p');watchCount.id='expedition-duty-watch-count';
@@ -42,14 +47,14 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
  const reconnectCancel=button('expedition-duty-reconnect-cancel','取消自動續接',()=>{release();client.cancelReconnect();});
  const reconnectConfirm=button('expedition-duty-reconnect-confirm','確認恢復操控／作業',()=>{release();o.open();if(client.confirmReconnect()){message='席位已恢復，請重新按下操控或作業按鈕。';closePanel();}});
  const ready=button('expedition-duty-ready','準備',()=>{const r=client.room,p=r?.players.find(p=>p.id===client.selfId);client.command('ready',{ready:!p?.ready});});
- const start=button('expedition-duty-start','兩人準備後出勤',()=>client.command('start'));
+ const start=button('expedition-duty-start','全員準備後出勤',()=>client.command('start'));
  const again=button('expedition-duty-again','重新接班',()=>client.command('again'));
  const cancelMission=button('expedition-duty-cancel-mission','取消本次救援',()=>client.command('cancel'));
  const missionBox=make('fieldset'),missionTitle=make('legend','本場事故與難度（房主大廳設定）'),missionDifficulty=make('select'),missionChoices=new Map<DutyIncidentId,HTMLInputElement>(),missionNote=make('p');missionBox.id='frontier-duty-settings';missionDifficulty.id='frontier-duty-difficulty';
  const difficultyLabel=make('label','停靠難度 ');difficultyLabel.append(missionDifficulty);for(const [id,value]of Object.entries(DUTY_DIFFICULTIES)){const option=make('option',value.label);option.value=id;missionDifficulty.append(option);}missionDifficulty.value='standard';missionBox.append(missionTitle,difficultyLabel);
  for(const incident of DUTY_INCIDENTS){const input=make('input');input.type='checkbox';input.id='frontier-duty-case-'+incident.id;input.checked=incident.id==='xinan';const label=make('label');label.append(input,document.createTextNode(incident.name));missionBox.append(label);missionChoices.set(incident.id,input);}
  const applyMission=button('frontier-duty-apply','套用事故與難度',()=>{release();client.command('mission-settings',{settings:{incidents:[...missionChoices].filter(([,input])=>input.checked).map(([id])=>id),difficulty:missionDifficulty.value}});});
- const swapRoles=button('frontier-duty-swap','交換下場司機／協助者',()=>{release();client.command('swap-roles');});missionBox.append(missionNote,applyMission,swapRoles);
+ const swapRoles=button('frontier-duty-swap','輪換下場全隊職責',()=>{release();client.command('swap-roles');});missionBox.append(missionNote,applyMission,swapRoles);
  let missionSelectionKey='';
  const replayDownload=button('expedition-duty-replay-download','下載本場匿名回放',()=>void getReplay(false));
  const replayPlay=button('expedition-duty-replay-play','離房並播放本場回放',()=>void getReplay(true));
@@ -68,7 +73,7 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
  const line=make('p');line.id='expedition-duty-hud-status';line.setAttribute('role','status');const detail=make('p');detail.id='expedition-duty-readout';
  const confirm=button('expedition-duty-confirm','司機確認定位／固定',()=>client.command('action'));
  let heldKind='stop',pull=0,side=0;
- function release(){heldKind='stop';pull=side=0;if(client.room){client.input(idle());client.operate('stop');}}
+ function release(){heldKind='stop';pull=side=0;teamTools?.release();if(client.room){client.input(idle());client.operate('stop');}}
  function hold(id:string,text:string,kind:string,p=0,s=0){const b=button(id,text,()=>{});b.addEventListener('pointerdown',e=>{if(b.disabled)return;e.preventDefault();b.setPointerCapture?.(e.pointerId);heldKind=kind;pull=p;side=s;});for(const t of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(t,release);b.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();heldKind=kind;pull=p;side=s;}});b.addEventListener('keyup',release);return b;}
  const warning=hold('expedition-duty-warning','長按設置警示','warning'),unload=hold('expedition-duty-unload','長按卸載','unload');
  const left=hold('expedition-duty-winch-left','絞盤左修','winch',0,-1),right=hold('expedition-duty-winch-right','絞盤右修','winch',0,1),wind=hold('expedition-duty-winch-pull','收絞盤','winch',1,0),unwind=hold('expedition-duty-winch-release','放絞盤','winch',-1,0);
@@ -78,7 +83,10 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
  hud.append(line,detail,confirm,warning,left,right,wind,unwind,unload,nav,follow,inspect,exit);document.body.append(hud);
  let storage:Storage|null=null;try{storage=sessionStorage;}catch{}
  const client=new ExpeditionDutyClient(dutyEndpoint(String(import.meta.env.VITE_MULTIPLAYER_URL??''),location),changed,storage);
+ teamTools=mountAuroraDutyTeam(client);card.insertBefore(teamTools.root,missionBox);hud.insertBefore(teamTools.hud,nav);
+ inviteTools=mountRoomInvite(card,()=>{const r=client.room;return r?{kind:'crew',code:r.code,label:'合作道路救援',players:r.players.length,capacity:r.team?4:2}:null;},'aurora-duty-invite');
  let missionStorage:Storage|null=null;try{missionStorage=localStorage;}catch{}const missionResults=new FrontierRecords(DUTY_MISSION_RECORDS_KEY,parseDutyMissionRecords,missionStorage);let missionSaved='';
+ const teamResults=new FrontierRecords(AURORA_DUTY_RECORDS_KEY,parseAuroraDutyRecords,missionStorage);let teamSaved='';
  let entered=false,kind:'crew'|'watch'|'rally'|null=null,busy=false,generation=0,disposed=false,run:RegularityRun|null=null,accumulator=0,lastUi=0;
  let visualPose:{x:number;z:number;y:number;h:number}|null=null,visualRun='';
  let prior:{spec:CarSpec;geometry:FreeCarGeometry|undefined}|null=null;
@@ -116,29 +124,30 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
   if(kind==='crew'&&entered&&client.controlGated){recoveryPanel=true;release();if(!isOpen()){lastFocus=document.activeElement as HTMLElement;o.open();overlay.classList.remove('hidden');}}else if(recoveryPanel&&kind==='crew'&&entered&&r&&client.status==='connected'&&!busy){recoveryPanel=false;closePanel();}
   if(kind==='watch'&&entered&&!busy&&!r&&(client.watchEnded||client.status==='closed')){message=client.message||'觀戰已結束';stop(false);closePanel();return;}
   if(r){if(kind==='crew'&&!client.spectating&&r.players.some(p=>p.id===client.selfId)&&r.stage==='complete'){
-    if(r.mission.settings.incidents.length===1&&!crewRecords.some(s=>s.id===r.runId)){crewRecords.unshift({id:r.runId,at:Date.now(),seconds:r.elapsed,integrity:r.integrity,crew:r.players.map(p=>p.name+' · '+(p.role==='driver'?'司機':'協助者')) as [string,string]});crewRecords=crewRecords.slice(0,30);persist('crew');}
-    if(missionSaved!==r.runId){missionSaved=r.runId;const record=dutyMissionRecord(r);if(record)missionResults.add(record);}
+    if(!r.team&&r.mission.settings.incidents.length===1&&!crewRecords.some(s=>s.id===r.runId)){crewRecords.unshift({id:r.runId,at:Date.now(),seconds:r.elapsed,integrity:r.integrity,crew:r.players.map(p=>p.name+' · '+TEAM_ROLE_LABELS[p.role]) as [string,string]});crewRecords=crewRecords.slice(0,30);persist('crew');}
+    if(!r.team&&missionSaved!==r.runId){missionSaved=r.runId;const record=dutyMissionRecord(r);if(record)missionResults.add(record);}
+    if(r.team&&teamSaved!==r.runId){teamSaved=r.runId;const record=auroraDutyRecord(r);if(record)teamResults.add(record);}
    }code.value=r.code;}render();
  }
- function render(){if(disposed)return;const r=client.room,p=r?.players.find(p=>p.id===client.selfId);info.textContent=client.message||message||'救援需要兩位玩家；定速拉力可以單人離線遊玩。';
-  missionBox.hidden=!r;const editable=!!r&&r.phase==='lobby'&&r.hostId===client.selfId&&!client.spectating&&!client.controlGated;missionDifficulty.disabled=applyMission.disabled=!editable;for(const input of missionChoices.values())input.disabled=!editable;swapRoles.disabled=!editable||r?.players.length!==2||!!r.players.some(p=>!p.connected);
+ function render(){if(disposed)return;const r=client.room,p=r?.players.find(p=>p.id===client.selfId);info.textContent=client.message||message||'救援支援2～4位玩家；定速拉力可以單人離線遊玩。';teamTools?.render();inviteTools?.update();
+  missionBox.hidden=!r;const editable=!!r&&r.phase==='lobby'&&r.hostId===client.selfId&&!client.spectating&&!client.controlGated;missionDifficulty.disabled=applyMission.disabled=!editable;for(const input of missionChoices.values())input.disabled=!editable;swapRoles.disabled=!editable||(r?.players.length??0)<2||!!r.players.some(p=>!p.connected);
   const selectionKey=r?`${r.runId}:${r.revision}`:'';if(selectionKey!==missionSelectionKey){missionSelectionKey=selectionKey;if(r){missionDifficulty.value=r.mission.settings.difficulty;for(const[id,input]of missionChoices)input.checked=r.mission.settings.incidents.includes(id);}}
-  missionNote.textContent=r?`依選單順序完成 ${r.mission.settings.incidents.length} 件救援，每件均須沿路出勤、完整作業、返站卸載後再出發；不切案傳送。每件最多30分鐘，總勤務依件數最多30～90分鐘。\n${DUTY_DIFFICULTIES[r.mission.settings.difficulty].label}：停靠半徑 ${DUTY_DIFFICULTIES[r.mission.settings.difficulty].radius}m，角度差小於 ${(DUTY_DIFFICULTIES[r.mission.settings.difficulty].angle*180/Math.PI).toFixed(1)}°，停穩 ${DUTY_DIFFICULTIES[r.mission.settings.difficulty].dwell} 秒。交換職責不更換房主，雙方須重新準備。`:'';
-  create.disabled=enter.disabled=busy||entered;checkService.disabled=busy||entered||client.status==='connecting';watch.disabled=busy||entered||client.capabilitiesKnown&&!client.supportsWatching;watch.textContent=client.capabilitiesKnown&&!client.supportsWatching?'救援服務需更新才能觀戰':client.capabilitiesKnown?'以觀眾加入（不占隊員席）':'連線確認並以觀眾加入';name.disabled=code.disabled=busy||entered;resume.disabled=busy||!client.resumable||!!run||client.spectating;ready.disabled=!r||r.phase!=='lobby'||client.spectating;start.disabled=!r||r.hostId!==client.selfId||r.phase!=='lobby'||r.players.length!==2||r.players.some(p=>!p.ready||!p.connected);again.disabled=!r||r.hostId!==client.selfId||r.phase!=='finished';cancelMission.disabled=!r||r.hostId!==client.selfId||r.phase==='lobby';rally.disabled=average.disabled=busy||entered;watchCount.textContent='觀眾 '+client.watchCount+'/'+CREW_MAX_VIEWERS+(client.spectating?' · 唯讀跟車，不占兩位隊員席':'');
-  ready.textContent=p?.ready?'取消準備':'準備';roster.textContent=r?'房間 '+r.code+' ｜ '+r.players.map(p=>p.name+'（'+(p.role==='driver'?'司機':'協助者')+'／'+(!p.connected?'斷線':p.ready?'已準備':'未準備')+'）').join('、'):'無救援房間';copy.disabled=!r;
+  missionNote.textContent=r?`依選單順序完成 ${r.mission.settings.incidents.length} 件救援，每件均須沿路出勤、完整作業、返站卸載後再出發；不切案傳送。每件最多30分鐘，總勤務依件數最多30～90分鐘。\n${DUTY_DIFFICULTIES[r.mission.settings.difficulty].label}：停靠半徑 ${DUTY_DIFFICULTIES[r.mission.settings.difficulty].radius}m，角度差小於 ${(DUTY_DIFFICULTIES[r.mission.settings.difficulty].angle*180/Math.PI).toFixed(1)}°，停穩 ${DUTY_DIFFICULTIES[r.mission.settings.difficulty].dwell} 秒。輪換職責不更換房主，全隊須重新準備。`:'';
+  create.disabled=enter.disabled=busy||entered;checkService.disabled=busy||entered||client.status==='connecting';watch.disabled=busy||entered||client.capabilitiesKnown&&!client.supportsWatching;watch.textContent=client.capabilitiesKnown&&!client.supportsWatching?'救援服務需更新才能觀戰':client.capabilitiesKnown?'以觀眾加入（不占隊員席）':'連線確認並以觀眾加入';name.disabled=code.disabled=busy||entered;resume.disabled=busy||!client.resumable||!!run||client.spectating;ready.disabled=!r||r.phase!=='lobby'||client.spectating;start.disabled=!r||r.hostId!==client.selfId||r.phase!=='lobby'||r.players.length<2||r.paused||r.players.some(p=>!p.ready||!p.connected);again.disabled=!r||r.hostId!==client.selfId||r.phase!=='finished';cancelMission.disabled=!r||r.hostId!==client.selfId||r.phase==='lobby';rally.disabled=average.disabled=busy||entered;watchCount.textContent='觀眾 '+client.watchCount+'/'+CREW_MAX_VIEWERS+(client.spectating?' · 唯讀跟車，不占隊員席':'');
+  ready.textContent=p?.ready?'取消準備':'準備';roster.textContent=r?'房間 '+r.code+' ｜ '+r.players.map(p=>p.name+'（'+TEAM_ROLE_LABELS[p.role]+'／'+(!p.connected?'斷線':p.ready?'已準備':'未準備')+'）').join('、'):'無救援房間';copy.disabled=!r;
   const recovery=client.reconnectState,retrying=recovery.phase==='waiting'||recovery.phase==='connecting',gated=client.controlGated&&kind==='crew';reconnectStatus.hidden=!gated;reconnectStatus.dataset.phase=recovery.phase;reconnectStatus.textContent=gated?(client.confirmPending?'正在等待伺服器確認，操控保持停止。':r&&client.status==='connected'&&!retrying?'席位已恢復，尚未恢復操控；請確認並重新按下操作。':retrying?'自動續接 '+recovery.attempts+'/3 · 剩餘 '+Math.ceil(recovery.remainingMs/1000)+' 秒\n'+recovery.reason:recovery.reason||client.message):'';reconnectCancel.hidden=!gated||!retrying;reconnectConfirm.hidden=!gated||!r||client.status!=='connected'||retrying;reconnectConfirm.disabled=busy||client.confirmPending;resume.disabled=resume.disabled||retrying;closeButton.disabled=gated;closeButton.textContent=gated?'確認後才能返回駕駛':'返回駕駛／選單';if(gated)for(const b of [ready,start,again,cancelMission])b.disabled=true;
   const replayReady=client.supportsReplay&&r?.phase==='finished'&&client.replay?.ready;replayDownload.disabled=!replayReady||client.replayBusy;replayPlay.disabled=!replayReady||client.replayBusy||!o.replay;replayCancel.hidden=!client.replayBusy;
   replayInfo.textContent=client.capabilitiesKnown&&!client.supportsReplay?'救援服務需更新才能提供匿名回放。':client.replayBusy?'正在逐塊取得匿名回放，可取消；離房或換場會清除未完成下載。':replayReady?'本場可下載及離線播放；不含暱稱、房碼或席位憑證。'+(client.replay?.truncated?'僅保留有界錄製區間，並非全場。':''):'勤務結束後提供匿名車況、絞盤與作業階段回放。';
-  const key=JSON.stringify([rallyRecords,crewRecords,rallyWritable,crewWritable,missionResults.records,missionResults.error]);if(recordsKey!==key){recordsKey=key;history.replaceChildren();if(!rallyWritable||!crewWritable)history.append(make('p','部分舊紀錄無法讀取或儲存，原資料未覆寫；新紀錄僅保留本頁，請下載保存。'));if(missionResults.error)history.append(make('p',missionResults.error));for(const v of missionResults.records)history.append(make('p',`${DUTY_DIFFICULTIES[v.mission.settings.difficulty].label} · ${v.mission.completed.length}件完成 · ${v.seconds.toFixed(1)}秒 · 完整度${v.integrity.toFixed(0)}% · ${v.mission.completed.map(c=>DUTY_INCIDENTS.find(i=>i.id===c.incidentId)!.name+' '+c.seconds.toFixed(1)+'秒').join('／')}`));for(const v of rallyRecords)history.append(make('p',v.route+' · '+v.penalty.toFixed(2)+'罰分（超速'+v.speedPenalty.toFixed(2)+'）'));for(const v of crewRecords)history.append(make('p','合作救援 '+Math.round(v.seconds)+'秒 · 完整度'+v.integrity.toFixed(0)+'% · '+v.crew.join('／')));}
+  const key=JSON.stringify([rallyRecords,crewRecords,rallyWritable,crewWritable,missionResults.records,missionResults.error,teamResults.records,teamResults.error]);if(recordsKey!==key){recordsKey=key;history.replaceChildren();if(!rallyWritable||!crewWritable)history.append(make('p','部分舊紀錄無法讀取或儲存，原資料未覆寫；新紀錄僅保留本頁，請下載保存。'));if(missionResults.error)history.append(make('p',missionResults.error));if(teamResults.error)history.append(make('p',teamResults.error));for(const v of teamResults.records)history.append(make('p',v.crew.length+'人救援 · '+v.seconds.toFixed(1)+'秒 · 完整度'+v.integrity.toFixed(0)+'% · '+v.work.map(w=>TEAM_ROLE_LABELS[w.role]+' '+w.actions+'次').join('／')));for(const v of missionResults.records)history.append(make('p',`${DUTY_DIFFICULTIES[v.mission.settings.difficulty].label} · ${v.mission.completed.length}件完成 · ${v.seconds.toFixed(1)}秒 · 完整度${v.integrity.toFixed(0)}% · ${v.mission.completed.map(c=>DUTY_INCIDENTS.find(i=>i.id===c.incidentId)!.name+' '+c.seconds.toFixed(1)+'秒').join('／')}`));for(const v of rallyRecords)history.append(make('p',v.route+' · '+v.penalty.toFixed(2)+'罰分（超速'+v.speedPenalty.toFixed(2)+'）'));for(const v of crewRecords)history.append(make('p','合作救援 '+Math.round(v.seconds)+'秒 · 完整度'+v.integrity.toFixed(0)+'% · '+v.crew.join('／')));}
  }
- function download(){const current=client.room&&!client.spectating?dutyMissionRecord(client.room):null;const blob=new Blob([JSON.stringify({v:2,type:'expedition-duty-records',rally:rallyRecords,crew:crewRecords,missions:missionResults.records,current},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=make('a');a.href=url;a.download='taipei-expedition-duty.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+ function download(){const current=client.room&&!client.spectating?dutyMissionRecord(client.room):null;const blob=new Blob([JSON.stringify({v:2,type:'expedition-duty-records',rally:rallyRecords,crew:crewRecords,missions:missionResults.records,team:teamResults.records,currentTeam:client.room&&!client.spectating?auroraDutyRecord(client.room):null,current},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=make('a');a.href=url;a.download='taipei-expedition-duty.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  async function getReplay(play:boolean){const g=generation,key=client.replay?.key;if(client.replayBusy||!key)return;try{const archive=replayArchive??await client.downloadReplay();if(disposed||g!==generation||client.replay?.key!==key)return;replayArchive=archive;if(play){if(!o.replay)throw Error('城市回放播放器尚未就緒');stop();closePanel();await o.replay(archive);}else{const blob=new Blob([JSON.stringify(archive)],{type:'application/json'}),url=URL.createObjectURL(blob),a=make('a');a.href=url;a.download='taipei-city-rescue-replay.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);message='已下載本場匿名城市回放。';}}catch(e){if(g===generation)message=String(e instanceof Error?e.message:e);}finally{render();}}
  function step(dt:number){if(!entered||disposed)return;if(kind==='rally'&&run){if(run.phase==='running')o.drive(dt);run.step(dt);const result=run.result();if(result){rallyRecords.unshift(result);rallyRecords=rallyRecords.slice(0,30);persist('rally');o.notify('定速拉力完成：'+result.penalty.toFixed(2)+'罰分');render();}return;}
-  if(kind==='watch'||client.controlGated)return;
+  teamTools?.step(dt,kind==='crew'&&o.isDriving()&&!isOpen()&&!document.hidden&&document.hasFocus());if(kind==='watch'||client.controlGated)return;
   const r=client.room;if(!r||client.status!=='connected'){o.car.vx=o.car.vz=o.car.w=0;return;}accumulator+=Math.max(0,Math.min(dt,.1));if(accumulator<.1)return;accumulator%=.1;
   const p=r.players.find(p=>p.id===client.selfId),focused=!document.hidden&&document.hasFocus(),controls=focused&&o.isDriving()&&!isOpen()?o.input():idle();
-  if(p?.role==='driver')client.input({...controls,active:focused&&o.isDriving()&&!isOpen()});
-  else if(p?.role==='technician'){let k=heldKind,a=pull,b=side;if(!focused){k='stop';a=b=0;}if(r.stage==='winch'&&focused&&o.isDriving()&&!isOpen()&&(controls.throttle||controls.brake||Math.abs(controls.steer)>.1)){k='winch';a=(controls.throttle?1:0)-(controls.brake?1:0);b=controls.steer;}client.operate(k,a,b);}
+  if(client.roles.includes('driver'))client.input({...controls,active:focused&&o.isDriving()&&!isOpen()});
+  else if(client.roles.includes('technician')){let k=heldKind,a=pull,b=side;if(!focused){k='stop';a=b=0;}if(r.stage==='winch'&&focused&&o.isDriving()&&!isOpen()&&(controls.throttle||controls.brake||Math.abs(controls.steer)>.1)){k='winch';a=(controls.throttle?1:0)-(controls.brake?1:0);b=controls.steer;}client.operate(k,a,b);}
  }
  function frame(dt:number){if(disposed)return;const visible=entered&&o.isDriving();graphics.visible=visible;hud.hidden=!visible||isOpen();const r=client.room,c=o.car;
   if((kind==='crew'||kind==='watch')&&r){const p=r.pose,key=r.runId+':'+r.revision;
@@ -148,12 +157,12 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
   if(sedan){sedan.root.position.set(c.x,c.y,c.z);sedan.root.rotation.set(-c.pitch,c.h,c.roll,'YXZ');}
   const t=target();marker.visible=!!t;if(t)marker.position.set(t.x,t.y+3,t.z);
   lastUi+=dt;if(lastUi<.15)return;lastUi=0;
-  const me=r?.players.find(p=>p.id===client.selfId);if(r){line.textContent='🛟 '+(client.spectating?'觀眾・唯讀跟車':me?.role==='driver'?'司機':'協助者')+' · 第'+(r.mission.caseIndex+1)+'/'+r.mission.settings.incidents.length+'件 · '+CREW_STAGE_LABEL[r.stage]+' · '+Math.floor(r.elapsed)+'秒'+(r.paused?' · 隊員未齊，安全暫停':'');
+  const me=r?.players.find(p=>p.id===client.selfId);if(r){line.textContent='🛟 '+(client.spectating?'觀眾・唯讀跟車':client.roles.map(role=>TEAM_ROLE_LABELS[role]).join('／')||'等候職責')+' · 第'+(r.mission.caseIndex+1)+'/'+r.mission.settings.incidents.length+'件 · '+CREW_STAGE_LABEL[r.stage]+' · '+Math.floor(r.elapsed)+'秒'+(r.paused?' · 隊員未齊，安全暫停':'');
    const angle=Math.abs(Math.atan2(Math.sin(r.pose.h-r.route.target.h),Math.cos(r.pose.h-r.route.target.h)))*180/Math.PI;
    detail.textContent='檢查點 '+r.next+'/'+r.route.gates.length+' · 停穩 '+r.dwell.toFixed(1)+'/'+DUTY_DIFFICULTIES[r.mission.settings.difficulty].dwell+'秒 · 角度差 '+angle.toFixed(1)+'° · 完整度 '+r.integrity.toFixed(0)+'% · 作業 '+r.operation.toFixed(1)+'秒\n絞盤：收進 '+r.winch.along.toFixed(2)+'/4.20m、左右 '+r.winch.lateral.toFixed(2)+'m'+(r.winch.blocked?'；先修到±0.35m內':'')+(r.reason?'\n'+r.reason:'')+(client.message?'\n'+client.message:'');
   }else if(run){line.textContent='⏱ '+run.plan.name+' · '+(run.phase==='countdown'?Math.ceil(run.countdown)+'秒倒數':run.phase==='running'?run.elapsed.toFixed(1)+'秒':run.reason);detail.textContent='檢查點 '+run.next+'/'+run.plan.gates.length+' · 下個目標 '+run.target.due.toFixed(1)+'秒 · 總罰分 '+(run.penalty+run.speedPenalty).toFixed(2)+'（超速 '+run.speedPenalty.toFixed(2)+'）';}
   else if(entered){line.textContent='合作救援連線已停止';detail.textContent=client.message+' 請開房間面板續接，或結束還車。';}
-  confirm.hidden=me?.role!=='driver'||!['positioning','securing'].includes(r?.stage??'');warning.hidden=me?.role!=='technician'||r?.stage!=='warning';unload.hidden=me?.role!=='technician'||r?.stage!=='unloading';for(const b of [left,right,wind,unwind])b.hidden=me?.role!=='technician'||r?.stage!=='winch';
+  confirm.hidden=!client.roles.includes('driver')||!['positioning','securing'].includes(r?.stage??'');warning.hidden=!client.roles.includes('technician')||r?.stage!=='warning';unload.hidden=!client.roles.includes('technician')||r?.stage!=='unloading';for(const b of [left,right,wind,unwind])b.hidden=!client.roles.includes('technician')||r?.stage!=='winch';
   follow.hidden=!client.spectating;
  }
  const blur=()=>release();addEventListener('blur',blur);const visibility=()=>{if(document.hidden)release();};document.addEventListener('visibilitychange',visibility);
@@ -163,5 +172,5 @@ export function mountExpeditionDuty(o:ExpeditionDutyOptions){
  return{client,get active(){return entered;},get busy(){return busy;},get opened(){return isOpen();},get online(){return entered&&(kind==='crew'||kind==='watch');},get run(){return run;},get vehicleOverride(){return entered;},
   open,close:closePanel,stop,step,frame,navInfo(){const r=client.room;if(r)return{path:r.route.path,ys:r.route.ys,next:[target()!.x,target()!.z] as [number,number]};if(run)return{path:run.plan.path,ys:run.plan.ys,next:[run.target.x,run.target.z] as [number,number]};return null;},
   invalidate(){if(run)run.invalidate();else if(client.room)client.command('cancel');},
-  dispose(){if(disposed)return;stop();disposed=true;client.dispose();removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility);marker.geometry.dispose();marker.material.dispose();graphics.removeFromParent();overlay.remove();hud.remove();launch.remove();}};
+  dispose(){if(disposed)return;stop();disposed=true;client.dispose();teamTools?.dispose();inviteTools?.dispose();removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility);marker.geometry.dispose();marker.material.dispose();graphics.removeFromParent();overlay.remove();hud.remove();launch.remove();}};
 }

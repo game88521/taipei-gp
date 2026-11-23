@@ -2,6 +2,7 @@ import type { MultiplayerClient } from './multiplayer-client';
 import { defaultHorizon, parseRoomPreset, type RoomPreset } from '../shared/multiplayer-horizon';
 import { MultiplayerPresets } from './multiplayer-presets';
 import './multiplayer-horizon.css';
+import {defaultMeridianAdvanced} from '../shared/meridian-presets';
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 export class MultiplayerHorizonPanel {
   readonly presets:MultiplayerPresets; private key=''; private configKey=''; private message='';
@@ -14,8 +15,11 @@ export class MultiplayerHorizonPanel {
     $('mp-preset-clear').addEventListener('click',()=>{if(confirm('清除這個瀏覽器的全部房間範本？不影響戰績或車手憑證。')){this.presets.clear();this.refresh();}});
     $('mp-preset-save').addEventListener('click',()=>{
       const r=this.client()?.room;if(!r||!r.capabilities?.horizon)return;
+      if(r.cup){this.message='好友盃含固定原席與賽程，請使用跨日站間續局；不會另存成一般房間範本。';this.refresh();return;}
       const tracks=r.series?.trackIds??[];
-      const preset=parseRoomPreset({schema:1,name:$<HTMLInputElement>('mp-preset-name').value,trackId:tracks[0]??r.trackId,laps:r.laps,roomRules:r.roomRules,
+      const advanced=defaultMeridianAdvanced();advanced.summit=r.summit?.settings??advanced.summit;advanced.atlas=r.atlas?.settings??advanced.atlas;advanced.voyager=r.voyager?.settings??advanced.voyager;advanced.odyssey=r.odyssey?.settings??advanced.odyssey;advanced.expedition=r.expedition?.settings??advanced.expedition;advanced.arena=r.arena?.mode??'off';advanced.meridian=r.meridian?.settings??advanced.meridian;
+      const selectedTrack=r.meridian?.settings.mode==='championship'?r.meridian.settings.trackIds[0]:tracks[0]??r.trackId;
+      const preset=parseRoomPreset({schema:2,advanced,name:$<HTMLInputElement>('mp-preset-name').value,trackId:selectedTrack,laps:r.meridian?.raceLaps??r.odyssey?.weekend?.raceLaps??r.laps,roomRules:r.roomRules,
         mode:r.evolution?.mode??'race',durationSeconds:r.evolution?.durationSeconds??180,trackIds:tracks,horizon:r.horizon??defaultHorizon()});
       this.message=preset&&this.presets.save(preset)?'已保存純設定範本；下次建房需全員重新準備。':this.presets.error||'請輸入範本名稱並確認設定。';this.refresh();
     });

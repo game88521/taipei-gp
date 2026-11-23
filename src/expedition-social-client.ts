@@ -4,6 +4,10 @@ import {CityReplayDownload} from './frontier-city-replay-client';
 import {CityAutoResume,CityResumeError} from './frontier-city-reconnect';
 import {CONVOY_VERSION,type ConvoyRouteId} from '../shared/frontier-convoy';
 import {CROWN_VERSION} from '../shared/frontier-crown';
+import {PARTY_VERSION} from '../shared/aurora-social';
+import {MeridianCheckpointClient} from './meridian-checkpoint-client';
+import {MERIDIAN_ROTATION_VERSION} from '../shared/meridian-social';
+import {MERIDIAN_CHECKPOINT_VERSION} from '../shared/meridian-checkpoints';
 export const SOCIAL_SEAT_KEY='taipei-gp-expedition-social-seat-v1';
 interface Seat {endpoint:string;code:string;selfId:string;token:string}
 export function socialEndpoint(config:string,location:Pick<Location,'hostname'|'protocol'>) {
@@ -16,13 +20,15 @@ export function socialEndpoint(config:string,location:Pick<Location,'hostname'|'
 export class ExpeditionSocialClient {
   room:SocialRoom|null=null;watchRoom:SocialWatchRoom|null=null;selfId='';status:'idle'|'connecting'|'connected'|'closed'='idle';message='';lastExit:''|'removed'|'expired'='';
   replay:CityReplayDescriptor|null=null;private replayDownload=new CityReplayDownload(m=>this.send(m),()=>this.changed());
-  capabilitiesKnown=false;watchSupported=false;replaySupported=false;autoResumeSupported=false;convoySupported=false;crownSupported=false;
+  readonly checkpoints:MeridianCheckpointClient;rotationSupported=false;checkpointSupported=false;
+  capabilitiesKnown=false;watchSupported=false;replaySupported=false;autoResumeSupported=false;convoySupported=false;crownSupported=false;partySupported=false;
   private ws:WebSocket|null=null;private generation=0;private seq=0;private epoch=-1;private offset=0;private seat:Seat|null=null;
   private connecting:Promise<void>|null=null;private cancelOpen:(()=>void)|null=null;private watcherSession=false;
   private autoResume:CityAutoResume;private resumeEpisode=0;private resumeKey:string|null=null;private manualConsent=false;private joinKind='';
   private lastStateAt=0;
   private joining:{resolve():void;reject(e:Error):void;timer:ReturnType<typeof setTimeout>}|null=null;
   constructor(readonly endpoint:string,private changed:()=>void,private storage:Pick<Storage,'getItem'|'setItem'|'removeItem'>|null=null){
+    this.checkpoints=new MeridianCheckpointClient(endpoint,m=>this.send(m),()=>this.changed());
     try{const raw=storage?.getItem(SOCIAL_SEAT_KEY);if(raw&&raw.length<1500){const v=JSON.parse(raw);if(v.endpoint===endpoint&&socialCode(v.code)&&/^[a-f0-9]{20}$/.test(v.selfId)&&/^[a-f0-9]{64}$/.test(v.token))this.seat=v;}}catch{}
     this.autoResume=new CityAutoResume({resume:(signal,context)=>this.autoResumeAttempt(signal,context),abortTransport:()=>this.abortTransport(),eligible:()=>!!this.seat&&!this.watcherSession&&!this.lastExit,changed:()=>this.changed(),visible:()=>typeof document==='undefined'||!document.hidden});
   }
@@ -53,7 +59,7 @@ export class ExpeditionSocialClient {
     if(this.status==='connected'&&this.ws?.readyState===1)return Promise.resolve();
     if(this.connecting)return this.connecting;
     if(!this.endpoint)return Promise.reject(Error('城市新玩法服務尚未設定。'));
-    const generation=++this.generation;this.lastExit='';this.capabilitiesKnown=false;this.watchSupported=this.replaySupported=this.autoResumeSupported=this.convoySupported=this.crownSupported=false;this.status='connecting';this.changed();
+    const generation=++this.generation;this.lastExit='';this.capabilitiesKnown=false;this.rotationSupported=this.checkpointSupported=false;this.watchSupported=this.replaySupported=this.autoResumeSupported=this.convoySupported=this.crownSupported=this.partySupported=false;this.status='connecting';this.changed();
     this.connecting=new Promise((resolve,reject)=>{
       const socket=new WebSocket(this.endpoint);this.ws=socket;let opened=false,settled=false;
       const finish=(error?:Error)=>{if(settled)return;settled=true;clearTimeout(timer);if(this.generation===generation){this.connecting=null;this.cancelOpen=null;}if(error)reject(error);else resolve();};
@@ -63,7 +69,7 @@ export class ExpeditionSocialClient {
         if(this.ws!==socket||generation!==this.generation||typeof event.data!=='string'||event.data.length>64*1024)return;
         let m:Record<string,unknown>;try{m=JSON.parse(event.data);if(!m||typeof m!=='object'||Array.isArray(m))return;}catch{return;}
         if(m.type!=='city-replay-part'&&event.data.length>32*1024)return;
-        if(m.type==='hello'){if(m.v!==SOCIAL_VERSION){finish(new CityResumeError('城市新玩法需要配套更新伺服器。','fatal','VERSION_MISMATCH'));socket.close();return;}const caps=m.capabilities as Record<string,unknown>|undefined;this.capabilitiesKnown=true;this.watchSupported=caps?.cityWatchVersion===SOCIAL_WATCH_VERSION;this.replaySupported=caps?.cityReplayVersion===CITY_REPLAY_VERSION;this.autoResumeSupported=caps?.autoResumeVersion===SOCIAL_AUTO_RESUME_VERSION;this.convoySupported=caps?.convoyVersion===CONVOY_VERSION;this.crownSupported=caps?.crownVersion===CROWN_VERSION;opened=true;this.status='connected';finish();this.changed();}
+        if(m.type==='hello'){if(m.v!==SOCIAL_VERSION){finish(new CityResumeError('城市新玩法需要配套更新伺服器。','fatal','VERSION_MISMATCH'));socket.close();return;}const caps=m.capabilities as Record<string,unknown>|undefined;this.capabilitiesKnown=true;this.watchSupported=caps?.cityWatchVersion===SOCIAL_WATCH_VERSION;this.replaySupported=caps?.cityReplayVersion===CITY_REPLAY_VERSION;this.autoResumeSupported=caps?.autoResumeVersion===SOCIAL_AUTO_RESUME_VERSION;this.convoySupported=caps?.convoyVersion===CONVOY_VERSION;this.crownSupported=caps?.crownVersion===CROWN_VERSION;this.partySupported=caps?.partyVersion===PARTY_VERSION;this.rotationSupported=caps?.rotationVersion===MERIDIAN_ROTATION_VERSION;this.checkpointSupported=caps?.checkpointVersion===MERIDIAN_CHECKPOINT_VERSION;opened=true;this.status='connected';finish();this.changed();}
         else if(opened)this.receive(m);
       });
       socket.addEventListener('close',()=>{if(this.ws!==socket||generation!==this.generation)return;const watching=this.watching,driver=!!this.room&&!!this.selfId,canAuto=this.autoResumeSupported;this.ws=null;this.status='closed';finish(Error('城市連線已中斷'));this.rejectJoin(watching?'觀戰連線已中斷，請重新觀戰。':'城市連線已中斷，可於15秒內續接原席位。');this.message=watching?'觀戰連線已中斷，請重新觀戰。':canAuto?'連線中斷，已停止輸入；將在15秒期限內嘗試恢復原席。':'連線中斷；此後端尚未宣告安全自動續接，可手動續接並確認操控。';this.room=null;this.watchRoom=null;this.replay=null;this.watcherSession=false;if(watching)this.lastExit='expired';if(driver)this.manualConsent=true;this.replayDownload.cancel('連線中斷，已取消城市回放下載。');if(driver&&canAuto&&!watching&&!this.lastExit)this.autoResume.start();this.changed();});
@@ -72,7 +78,7 @@ export class ExpeditionSocialClient {
   }
   private rejectJoin(text:string,error:Error=Error(text)){if(this.joining){clearTimeout(this.joining.timer);this.joining.reject(error);this.joining=null;}}
   private receive(m:Record<string,unknown>){
-    if(this.replayDownload.receive(m))return;
+    if(this.checkpoints.receive(m)||this.replayDownload.receive(m))return;
     if(m.type==='watch-welcome'||m.type==='watch-state'){
       const room=parseSocialWatch(m.room);if(!room||room.mode==='convoy'&&!this.convoySupported||room.mode==='crown'&&!this.crownSupported||m.type==='watch-state'&&(!this.watchRoom||this.watchRoom.code!==room.code||room.serverTime<this.watchRoom.serverTime)){if(m.type==='watch-welcome'){this.message='觀戰資料無效，已停止連線。';this.disconnect();}return;}
       if(m.type==='watch-welcome'){this.lastExit='';this.selfId='';this.room=null;if(this.joining){clearTimeout(this.joining.timer);this.joining.resolve();this.joining=null;}}
@@ -92,15 +98,18 @@ export class ExpeditionSocialClient {
     else if(m.type==='removed'||m.type==='expired'||m.type==='left'){this.lastExit=m.type==='left'?'':m.type;this.message=typeof m.message==='string'&&m.message.trim()?m.message.slice(0,150):m.type==='removed'?'房主已將你移出這次房間；原席位已清除。':m.type==='expired'?'城市房間已到期；原席位已清除。':'已離開城市房間';this.disconnect();}
   }
   private send(m:unknown){if(this.ws?.readyState!==1||this.ws.bufferedAmount>32768)return false;this.ws.send(JSON.stringify(m));return true;}
-  private join(fields:Record<string,unknown>){return new Promise<void>((resolve,reject)=>{if(this.joining){reject(Error('正在加入房間'));return;}const timer=setTimeout(()=>{this.joining=null;reject(Error('進房逾時，請取消後手動續接，避免重複建房。'));},10000);this.joining={resolve,reject,timer};if(!this.send({...fields,v:SOCIAL_VERSION,...this.convoySupported&&fields.type!=='watch'?{convoyVersion:CONVOY_VERSION}:{},...this.crownSupported&&fields.type!=='watch'?{crownVersion:CROWN_VERSION}:{}})){this.rejectJoin('城市連線未就緒');}});}
-  async enter(type:'create'|'join',name:string,vehicle:string,mode:SocialMode,weather:SocialWeather,code='',convoyRoute:ConvoyRouteId='south-loop'){if(this.room||this.watchRoom)throw Error('請先離開目前房間');this.autoResume.reset();this.manualConsent=false;this.resumeKey=null;this.joinKind=type;this.watcherSession=false;await this.connect();if(type==='create'&&mode==='convoy'&&!this.convoySupported)throw Error('伺服器尚未宣告車隊巡遊能力，請更新後端。');if(type==='create'&&mode==='crown'&&!this.crownSupported)throw Error('伺服器尚未宣告移動王冠能力，請更新後端。');await this.join({type,name,vehicle,mode,weather,code,...type==='create'&&mode==='convoy'?{convoyRoute}:{}});}
+  private join(fields:Record<string,unknown>){return new Promise<void>((resolve,reject)=>{if(this.joining){reject(Error('正在加入房間'));return;}const timer=setTimeout(()=>{this.joining=null;reject(Error('進房逾時，請取消後手動續接，避免重複建房。'));},10000);this.joining={resolve,reject,timer};if(!this.send({...fields,v:SOCIAL_VERSION,...this.convoySupported&&fields.type!=='watch'?{convoyVersion:CONVOY_VERSION}:{},...this.crownSupported&&fields.type!=='watch'?{crownVersion:CROWN_VERSION}:{},...this.partySupported&&fields.type!=='watch'?{partyVersion:PARTY_VERSION}:{},...this.rotationSupported&&fields.type!=='watch'?{rotationVersion:MERIDIAN_ROTATION_VERSION}:{}})){this.rejectJoin('城市連線未就緒');}});}
+  async enter(type:'create'|'join',name:string,vehicle:string,mode:SocialMode,weather:SocialWeather,code='',convoyRoute:ConvoyRouteId='south-loop',rotation=false){if(this.room||this.watchRoom)throw Error('請先離開目前房間');this.autoResume.reset();this.manualConsent=false;this.resumeKey=null;this.joinKind=type;this.watcherSession=false;await this.connect();if(type==='create'&&mode==='convoy'&&!this.convoySupported)throw Error('伺服器尚未宣告車隊巡遊能力，請更新後端。');if(type==='create'&&mode==='crown'&&!this.crownSupported)throw Error('伺服器尚未宣告移動王冠能力，請更新後端。');if(type==='create'&&rotation&&!this.rotationSupported)throw Error('伺服器尚未支援三四人輪賽');await this.join({type,name,vehicle,mode,weather,code,...type==='create'&&rotation?{rotation:true}:{},...type==='create'&&mode==='convoy'?{convoyRoute}:{}});}
+  exportCheckpoint(){const r=this.room;return !!r&&this.checkpointSupported&&!this.controlGated&&this.send({type:'checkpoint-export',revision:r.revision,runId:r.runId});}
+  async restoreCheckpoint(ticket:string){if(this.room||this.watchRoom)throw Error('請先離開目前房間');const proof=this.checkpoints.proof(ticket,'party');if(!proof)throw Error(this.checkpoints.message);this.autoResume.reset();this.manualConsent=false;this.joinKind='checkpoint';this.watcherSession=false;await this.connect();if(!this.checkpointSupported)throw Error('伺服器尚未支援站間續局');await this.join({type:'checkpoint-restore',...proof});}
   async watch(code:string){if(this.room||this.watchRoom)throw Error('請先離開目前房間');this.autoResume.reset();this.manualConsent=false;this.joinKind='watch';this.watcherSession=true;await this.connect();if(!this.watchSupported)throw Error('伺服器尚未宣告觀戰能力，請更新後端。');await this.join({type:'watch',code});}
   follow(slot:number){const r=this.watchRoom;return !!r&&this.send({type:'follow',code:r.code,runId:r.runId,slot});}
   async resume(){if(!this.seat)throw Error('沒有可續接的席位');this.autoResume.cancel('改由手動續接，先前自動嘗試已停止。');this.manualConsent=true;this.joinKind='resume';this.watcherSession=false;const seat={...this.seat},connection=this.connect(),generation=this.generation;try{await connection;await this.join({type:'resume',code:seat.code,selfId:seat.selfId,token:seat.token,...this.resumeKey?{resumeKey:this.resumeKey}:{}});if(generation!==this.generation||!this.room||this.selfId!==seat.selfId)throw Error('手動續接已取消或席位已更新。');this.autoResume.restored();}catch(error){if(generation===this.generation){this.manualConsent=true;this.abortTransport();this.message=error instanceof Error?error.message:'手動續接未成功；原期限內可再試或離房。';this.changed();}throw error;}}
   command(type:'ready'|'start'|'again'|'mark'|'recover'|'configure',fields:Record<string,unknown>={}){if(this.controlGated||!this.room||this.status!=='connected')return false;return this.send({...fields,type,...type==='configure'?{}:{revision:this.room.revision}});}
+  party(type:'party-enable'|'party-vote'|'party-next'|'party-end'|'party-finish',fields:Record<string,unknown>={}){const r=this.room;if(!this.partySupported||this.controlGated||!r||this.status!=='connected')return false;return this.send({...fields,type,revision:r.revision,runId:r.runId});}
   /** Send the captured intent unchanged. A changed host/roster must require a fresh confirmation. */
   manage(intent:SocialManagement){if(this.controlGated||!this.room||this.status!=='connected')return false;return this.send({...intent,type:'manage'});}
-  input(value:SocialInput){const p=this.room?.players.find(p=>p.id===this.selfId);if(this.controlGated||!p||this.room?.phase!=='running'||this.status!=='connected')return null;
+  input(value:SocialInput){const p=this.room?.players.find(p=>p.id===this.selfId);if(this.controlGated||!p||this.room?.rotation&&(this.room.rotation.paused||p.role==='driver')||this.room?.phase!=='running'||this.status!=='connected')return null;
     const seq=this.seq+1;if(!this.send({...value,type:'input',seq,epoch:p.epoch,runId:this.room.runId}))return null;this.seq=seq;return seq;}
   leave(){this.lastExit='';if(this.room||this.watchRoom)this.send({type:'leave'});this.disconnect();}
   disconnect(clearSeat=true){

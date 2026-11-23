@@ -1,6 +1,6 @@
 import { FreeCar, type CarSpec, type FreeCarGeometry } from './freecar';
 import type { Router } from './router';
-import { dockingReadout, DutyWinch, DutyRoadRules, parseDutyDetails, DUTY_STAGE_LABELS, type DutyDetails, type DutyDetailItem, type DutyLossReason } from './odyssey-city-models';
+import { dockingReadout, DutyWinch, DutyRoadRules, parseDutyDetails, DUTY_STAGE_LABELS, type DutyRoadEncounter, type DutyDetails, type DutyDetailItem, type DutyLossReason } from './odyssey-city-models';
 
 export type DutyKind = 'bus' | 'rescue';
 export interface DutyPose { x: number; z: number; y: number; h: number }
@@ -88,6 +88,24 @@ export function parseDutyRecords(value: unknown): DutyRecord[] | null {
 export function exportDutyRecords(records: DutyRecord[]) { return JSON.stringify({ v: 1, type: 'taipei-duty-records', records }, null, 2); }
 export function parseRoadDutyRecords(value: unknown): DutyRecord[] | null { const records = parseDutyRecords(value); return records && records.every(record => record.kind === 'bus' && record.service?.routeId === 'south' && record.details?.environment === 'road') ? records : null; }
 export function importDutyRecords(text: string): DutyRecord[] | null { if (text.length > DUTY_IMPORT_MAX_BYTES) return null; try { const v = JSON.parse(text); return v?.v === 1 && v.type === 'taipei-duty-records' ? parseDutyRecords(v.records) : null; } catch { return null; } }
+export interface BusCheckpoint {
+ v:1;phase:'driving'|'doors';elapsed:number;legIndex:number;gateIndex:number;stops:number;impacts:number;comfort:number;punctuality:number;dwell:number;operationTime:number;doorOpen:boolean;onboard:number;boarded:number;alighted:number;leftBehind:number;ramp:CityDutyRun['ramp'];rampTime:number;wheelchairOnboard:number;wheelchairBoarded:number;wheelchairAlighted:number;bellSequence:number;bellText:string;bellLeg:number;scoredArrival:boolean;exchange:ReturnType<typeof busExchange>|null;requests:{board:number;alight:number}[];detailItems:DutyDetailItem[];detail:DutyDetailItem|null;detailImpacts:number;redLights:number;roadPenalty:number;roadEncounter?:DutyRoadEncounter;
+}
+export function parseBusCheckpoint(raw:unknown):BusCheckpoint|null {
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;const s=raw as Record<string,unknown>;
+ const keys='alighted,bellLeg,bellSequence,bellText,boarded,comfort,detail,detailImpacts,detailItems,doorOpen,dwell,elapsed,exchange,gateIndex,impacts,leftBehind,legIndex,onboard,operationTime,phase,punctuality,ramp,rampTime,redLights,requests,roadPenalty,scoredArrival,stops,v,wheelchairAlighted,wheelchairBoarded,wheelchairOnboard';
+ if(Object.keys(s).sort().join(',')!==('roadEncounter'in s?[...keys.split(','),'roadEncounter'].sort().join(','):keys)||s.v!==1||!['driving','doors'].includes(String(s.phase))||typeof s.doorOpen!=='boolean'||typeof s.scoredArrival!=='boolean'||!['stowed','deploying','deployed','retracting'].includes(String(s.ramp))||typeof s.bellText!=='string'||s.bellText.length>180)return null;
+ if('roadEncounter'in s&&!['none','approach','entered'].includes(String(s.roadEncounter)))return null;
+ const n=(key:string,a:number,b:number,integer=false)=>typeof s[key]==='number'&&Number.isFinite(s[key])&&Number(s[key])>=a&&Number(s[key])<=b&&(!integer||Number.isInteger(s[key]));
+ if(!n('elapsed',0,3600)||!n('legIndex',0,9,true)||!n('gateIndex',0,2000,true)||!n('stops',0,9,true)||!n('comfort',0,100)||!n('punctuality',0,100)||!n('dwell',0,3600)||!n('operationTime',0,3600)||!n('rampTime',0,2)||!n('bellLeg',-1,9,true)||!n('roadPenalty',0,100)||!n('redLights',0,10000,true))return null;
+ for(const k of ['onboard','boarded','alighted','leftBehind','wheelchairOnboard','wheelchairBoarded','wheelchairAlighted','bellSequence','detailImpacts','impacts'])if(!n(k,0,100000,true))return null;
+ if(s.onboard as number>32||s.wheelchairOnboard as number>1||s.phase==='doors'!==s.doorOpen||s.ramp!=='stowed'&&!s.doorOpen)return null;
+ if(!Array.isArray(s.requests)||s.requests.length>10||s.requests.some(r=>!r||typeof r!=='object'||Object.keys(r).sort().join(',')!=='alight,board'||!Number.isInteger(r.board)||r.board<0||r.board>1000||!Number.isInteger(r.alight)||r.alight<0||r.alight>1000))return null;
+ if(s.exchange!==null){const e=s.exchange as ReturnType<typeof busExchange>;if(!e||typeof e!=='object'||Object.keys(e).sort().join(',')!=='alighted,boarded,leftBehind,onboard,seconds'||!['alighted','boarded','leftBehind','onboard','seconds'].every(k=>typeof e[k as keyof typeof e]==='number'&&Number.isFinite(e[k as keyof typeof e])&&e[k as keyof typeof e]>=0&&e[k as keyof typeof e]<=1000))return null;}
+ if(!Array.isArray(s.detailItems)||s.detailItems.length>10)return null;
+ const details=parseDutyDetails({v:1,environment:'road',items:[...s.detailItems,...s.detail===null?[]:[s.detail]],redLights:s.redLights,roadPenalty:s.roadPenalty});if(!details)return null;
+ return structuredClone(s) as unknown as BusCheckpoint;
+}
 interface Gate { x: number; z: number; y: number }
 function gates(leg: DutyLeg) {
   const out: Gate[] = []; let leftover = 0;
@@ -110,6 +128,15 @@ export class CityDutyRun {
   readonly roadRules = new DutyRoadRules(); winch: DutyWinch | null = null;
   private detailItems: DutyDetailItem[] = []; private detail: DutyDetailItem | null = null; private detailIntegrity = 100; private detailImpacts = 0;
   constructor(public readonly plan: DutyPlan, public readonly car: FreeCar) { this.previous = { ...plan.start }; this.routeGates = gates(plan.legs[0]); this.onboard = plan.passengers?.initial ?? 0; this.boarded = this.onboard; this.beginDetail(plan.kind === 'bus' ? 'stop' : 'approach'); }
+  checkpoint():BusCheckpoint|null {
+    if(this.plan.kind!=='bus'||this.finished)return null;
+    return {v:1,phase:this.phase as 'driving'|'doors',elapsed:this.elapsed,legIndex:this.legIndex,gateIndex:this.gateIndex,stops:this.stops,impacts:this.impacts,comfort:this.comfort,punctuality:this.punctuality,dwell:this.dwell,operationTime:this.operationTime,doorOpen:this.doorOpen,onboard:this.onboard,boarded:this.boarded,alighted:this.alighted,leftBehind:this.leftBehind,ramp:this.ramp,rampTime:this.rampTime,wheelchairOnboard:this.wheelchairOnboard,wheelchairBoarded:this.wheelchairBoarded,wheelchairAlighted:this.wheelchairAlighted,bellSequence:this.bellSequence,bellText:this.bellText,bellLeg:this.bellLeg,scoredArrival:this.scoredArrival,exchange:this.exchange&&{...this.exchange},requests:this.plan.passengers?.requests.map(r=>({...r}))??[],detailItems:structuredClone(this.detailItems),detail:structuredClone(this.detail),detailImpacts:this.detailImpacts,redLights:this.roadRules.redLights,roadPenalty:this.roadRules.penalty,roadEncounter:this.roadRules.encounter};
+  }
+  restoreCheckpoint(raw:unknown){
+    const s=parseBusCheckpoint(raw);if(this.plan.kind!=='bus'||!s||s.legIndex>=this.plan.legs.length||s.stops!==s.legIndex||s.requests.length!==(this.plan.passengers?.requests.length??0))throw Error('公車續玩班次版本或站序不同，原文保留');
+    const routeGates=gates(this.plan.legs[s.legIndex]);if(s.gateIndex>routeGates.length||s.onboard>(this.plan.passengers?.capacity??0)||s.boarded-s.alighted!==s.onboard||s.doorOpen&&s.gateIndex!==routeGates.length||s.exchange&&(!this.plan.passengers||JSON.stringify(s.exchange)!==JSON.stringify(busExchange(s.onboard,this.plan.passengers.capacity,s.requests[s.legIndex]))))throw Error('公車續玩乘客或道路進度無效');
+    const {v,requests,redLights,roadPenalty,roadEncounter,...state}=s;Object.assign(this,state);if(this.plan.passengers)this.plan.passengers.requests=requests.map(r=>({...r}));this.roadRules.redLights=redLights;this.roadRules.penalty=roadPenalty;this.roadRules.restoreEncounter(roadEncounter??'none');this.previous={x:this.car.x,y:this.car.y,z:this.car.z,h:this.car.h};this.previousSpeed=0;this.routeGates=routeGates;this.recorded=false;
+  }
   get leg() { return this.plan.legs[this.legIndex]; }
   get finished() { return this.phase === 'complete' || this.phase === 'failed'; }
   get locked() { return this.doorOpen || this.ramp !== 'stowed' || this.phase === 'loading' || this.rescueStage === 'winch' || this.finished; }

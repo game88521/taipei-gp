@@ -1,3 +1,67 @@
+<!-- beacon-release-20261123 -->
+# 2026-11-23 Aurora／Meridian／Beacon 最新版發布
+
+作者：Rex <game88521@gmail.com>。使用者已授權「幫我推上最新版」，本次將三輪已驗證成果提交並正常推送main與multiplayer-test；原網址https://taipei-gp.vercel.app/保持，前端公開設定為wss://taipei-gp.onrender.com/ws。下方原HANDOFF bytes完整保留，舊章節未提交／未部署文字是當時狀態。
+
+本段是發布準備，不代替成功收據。實際提交、推送、Vercel Production與Render狀態，以DCISI/taipei-beacon-release-receipt.json及TAIPEI_BEACON_RELEASE.md為準。Render設定autoDeploy:false，需在控制台Manual Deploy最新提交並核對SHA／Live；尚未確認前不能宣稱多人後端已更新。
+
+原案產品未改，僅增加本發布前綴與測試產物.gitignore規則。三輪119個產品差異與48份測試收據已獨立核對；最新本機功能驗證build fae95fac6d0e、90PASS及固定三基準保持。另以正式公開WSS設定本機重建並fresh跑固定三基準，證據另存外層release收據，不改寫原驗證。時間戳測試證據／截圖／錄影完整留本機，延續原Git排除策略。
+
+Render請保留正式ALLOWED_ORIGINS與既有續局金鑰；Meridian固定站間續局須在Render私密環境設定有效MERIDIAN_CHECKPOINT_SECRET，不放進前端或Git。沒有該設定仍可遊玩，但服務重啟後續局簽章失效；格式錯誤會阻止啟動。不可把能力旗標相符當作精確後端SHA已驗證。
+
+本次只讀公開部署中繼資料與靜態產物，不在正式站開房或試玩。iPhone 17／Safari實機、公網真人長場及免費主機容量仍未驗。
+
+---
+
+# 最新交接：Beacon（2026-11-23）
+
+作者：Rex <game88521@gmail.com>
+
+本輪依使用者選擇完成第1、3、4項本機修正，build `fae95fac6d0e`，承接未提交的Meridian `862f7f9c9857`。原案main/HEAD仍 `c56ca26e04bb1f39c144a93454ae1bc8d09d6737`，本輪不commit、push、部署或測正式站。下方完整保留原HANDOFF，不可用HEAD覆蓋既有dirty成果。
+
+- 玩法搜尋入口27→38，補11個深層入口；收藏／最近相容、人數及時間建議，首次lazy mount與取消ACK、既有房間保護。入口仍須玩家手動建房／套用／開始。
+- 城市卸載改為釋放Mesh／Line／Points自有幾何與材質，保留shared所有權；真區塊三輪卸載幾何由81→82→83改為80→80→80，貼圖52固定。手機實機30分鐘未驗。
+- 原席resume成功時重設該連線meridianSeq，恢復重載後合法換棒；保留退休socket隔離及driverGeneration。四人本機真WS600秒穩定，六次pit姿態fixture、兩次續接／背景停控；末段仍racing，不冒稱真人完賽或跨網路。
+- 最終90 PASS／0 FAIL、完整build、固定三基準與四核心raw hash核對通過。保存所有本輪失敗與修前對照。
+
+先讀[本輪進度](BEACON_PROGRESS.md)、[驗證及限制](BEACON_VALIDATION.md)、[回歸補充](BEACON_REGRESSION_NOTES.md)。實作說明：[入口](BEACON_MODES.md)、[手機](BEACON_MOBILE.md)、[多人](BEACON_MULTIPLAYER.md)、[手機實機計畫](BEACON_PHONE_TEST_PLAN.md)。外層套回工具DCISI/Apply-TaipeiBeacon.ps1及DCISI/verify-taipei-beacon-delivery.mjs，套回前先備份並CAS，不碰Git或其他檔案；實際交付結果以DCISI/TAIPEI_BEACON_DELIVERY.md為準。
+
+---
+
+<!-- meridian-current-20261123 -->
+# 2026-11-23 最新：Meridian 十二項完整實作與本機驗證
+
+作者：Rex <game88521@gmail.com>。承接已套回、未提交的 Aurora build `bdc4e4bc9821`，本輪在 `DCISI/taipei-gp-meridian-work`／`feature/meridian-12` 完成十二項功能，最終本機 build **862f7f9c9857**。HEAD／原案main維持 `c56ca26e04bb1f39c144a93454ae1bc8d09d6737`；開始前已逐檔核對1264檔raw bytes，不以乾淨Git HEAD覆蓋既有成果。
+
+固定編號：1進階工具按需載入與路段效能建議、2公車／NG3中途續玩、3好友盃／派對跨日站間續局、4完整進階房規範本與衝突檢查、5好友真操作遙測與走線比較、6真事件自動精華影片、7三至四人追走輪賽、8四人兩隊耐久接力、9跨圖排位／衝刺／正賽錦標賽、10NG3二至四人合作、11雙人領航拉力、12單人或朋友城市照片／文字線索尋寶。入口與文件見 [MERIDIAN_PROGRESS.md](./MERIDIAN_PROGRESS.md)。
+
+最終驗證：完整npm build、新增Node 84案、五套本機瀏覽器28案、既有回歸87案、chain-stab固定3案通過。固定54.425／162.0／175.7與aiHits0／8／5保持；car／track／rivals／pitlane四核心raw bytes未改。完整來源hash、時間戳收據、保留FAIL與修前對照見 [MERIDIAN_VALIDATION.md](./MERIDIAN_VALIDATION.md)／[JSON](./MERIDIAN_VALIDATION.json)。
+
+**本輪沒有commit、push或部署，不能把本機結果視為公開站已更新。** 本段是套回前封版紀錄；原案 `Investment/Rex/taipei-gp` 實際套回只以 `DCISI/taipei-gp-meridian-delivery/apply-result-latest.json` 的APPLIED_BUILD_VERIFIED、verified:true及相同build核對。`Apply-TaipeiMeridian.ps1` 無參數只預檢；-Apply -Build先備份全部待覆寫檔，再逐檔CAS、套用、離線build及hash驗證，保留其他既有／未知檔，不install、不commit、不push。勿重產交付包取代before證據，也勿重跑歷史Apply。
+
+前後端須同步；新增/city-mission與Meridian racing／rotation／navigator／checkpoint能力。跨伺服器程序續局需於Render設定固定64小寫hex的MERIDIAN_CHECKPOINT_SECRET（私密，不進前端／Git／備份）；沒設定仍能玩，但重啟後舊簽章失效。有固定key也不等同持久防重播資料庫。新備份40類仍讀舊15／17／19／26／27／31／35類，私密原席證明不進公開備份。部署說明見server/README.md。
+
+驗證只用本機dist4317與loopback。TT遙測為真轉向／煞車／自動加速指令，不是類比油門；參考資料不寫PB。部分賽事晉級、交棒位置、城市作業終段與影片事件用明示fixture，真Car／FreeCar道路及真WS另驗，不宣稱人工跑完全程。影片真編碼／解碼；兩個編輯器延後8249gzip bytes只指該chunk，不代表FPS或總啟動提升。Docker靜態閉包74模組／249依賴／188資產，未跑image。實體手機、真手把、外網真人、玩法平衡、免費主機四人承載及長時間GPU／耗電／溫度未驗，最後依 [MERIDIAN_PHONE_TEST_PLAN.md](./MERIDIAN_PHONE_TEST_PLAN.md) 補驗。AGENTS持續適用。
+
+以下完整保留本輪開始前HANDOFF原bytes；各歷史狀態依當時時間理解。
+
+<!-- aurora-current-20261123 -->
+# 2026-11-23 最新：Aurora 十二項完整實作與本機驗證
+
+作者：Rex <game88521@gmail.com>。本輪承接已發布的 main `c56ca26e04bb1f39c144a93454ae1bc8d09d6737`，於 `DCISI/taipei-gp-aurora-work`／`feature/aurora-12` 完成十二項實作，最終本機 build **bdc4e4bc9821**。本輪使用者只授權實作與測試，**沒有 commit、push 或部署，公開網址尚未包含 Aurora**；下方歷史章節的發布授權只適用當時範圍。
+
+固定編號：1好友派對同房投票連玩、2兩至四人分工救援、3追走分級教學與好友鬼車庫、4多賽段定速拉力、5二至四人循環盃＋BO3、6多停A/B策略與GP實績、7公車連續營運、8NG3多階段工坊劇本、9城市精華影片、10個別觸控按鈕排版、11逐類／逐場備份還原及較佳PB、12六種房間統一邀請。完整入口與規則由 [AURORA_PROGRESS.md](./AURORA_PROGRESS.md) 連到各功能文件。
+
+最終驗證：完整 `npm.cmd run build`、11套新功能93案（含四套隔離瀏覽器28案）、四套既有回歸72案、伺服器打包靜態閉包、`tools/dev-tests/chain-stab.sh` 固定三基準皆通過。固定54.425／162.0／175.7、aiHits0／8／5保持；`car.ts`、`track.ts`、`rivals.ts`、`pitlane.ts` 原文未改。詳細來源hash、不可變收據、保留FAIL與測試範圍見 [AURORA_VALIDATION.md](./AURORA_VALIDATION.md)／[JSON](./AURORA_VALIDATION.json)，既有回歸收據完整複本另存 [AURORA_LEGACY_EVIDENCE.json](./AURORA_LEGACY_EVIDENCE.json)。
+
+原專案 `Investment/Rex/taipei-gp` 的套回必須獨立核對 `DCISI/taipei-gp-aurora-delivery/apply-result-latest.json`：只有 `APPLIED_BUILD_VERIFIED`、`verified:true` 且 build 相同才算完成。本段是套回前封版紀錄，不代替成功收據。新工具位於 DCISI：`prepare-taipei-aurora-delivery.mjs` 只產包；`Apply-TaipeiAurora.ps1` 無參數只預檢，`-Apply -Build` 會先備份，再逐檔CAS、套用、離線build與驗證，保留其他既有／未知檔。不可重跑歷史Apply或以舊HEAD覆蓋本輪改動；成功後也不要重新產包取代原始before證據。兩支工具經另一代理唯讀審查，未知參數、junction／hardlink、CRLF baseline及收據寫入失敗有明確處理。
+
+新前後端需同步。能力包含 `partyVersion:aurora-social-party-v1`、`crewTeamVersion:aurora-duty-team-v1`、`auroraCupVersion:aurora-league-v1`、`auroraRallyVersion:aurora-rally-v1`；health／diagnostics取自shared常數。派對僅在同一社交服務四玩法換場，不跨GP／救援；NG3此版僅單人。新救援仍讀舊雙人協定；新備份35類仍讀舊15／17／19／26／27／31類。不備份私席token、房碼或登入資料。
+
+測試只使用本機dist與loopback；四人救援browser含明示停靠／道路門fixture，循環盃含明示finish fixture，策略是公開資料估計、不是未來預測或真Car預跑。導演已真編碼／解碼／下載WebM，實際相容性依MediaRecorder；Docker只靜態驗58模組／171依賴／188資產，沒有容器實測。手機實機、真手把、跨網真人、原生分享面板／掃碼、免費主機四人承載及長時間GPU／溫度／耗電尚未驗證，最後依 [AURORA_PHONE_TEST_PLAN.md](./AURORA_PHONE_TEST_PLAN.md) 補驗；不要沿用舊手機文件的正式站測試步驟。
+
+AGENTS持續適用：繁體中文、虛構品牌、署名Rex、不自行push、只測本機、手機最後。以下完整保留本輪開始前的交接原文；各歷史狀態依日期理解。
+
 <!-- frontier-release-20261121 -->
 # 2026-11-21 Frontier 新版發布準備
 

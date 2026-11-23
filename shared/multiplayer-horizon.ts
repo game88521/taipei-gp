@@ -1,11 +1,12 @@
 import { getMultiplayerTrack } from './multiplayer-tracks.ts';
 import { parseRoomRules, type MultiplayerRoomRules } from './multiplayer-room-rules.ts';
 import type { MultiplayerEventMode } from './multiplayer-evolution';
+import {parseMeridianAdvanced,type MeridianAdvancedPreset} from './meridian-presets.ts';
 export interface HorizonSettings { antiBlock: boolean; reverseGrid: boolean; elimination: boolean }
 export interface BlockState { ghost: boolean; reason: 'idle' | 'reverse' | null; warningAt: number | null; recoveryAt: number | null }
 export interface EliminationState { nextAt: number; intervalMs: number; winnerId: string | null }
 export interface RoomPreset {
-  schema: 1; name: string; trackId: string; laps: 1 | 3 | 5; roomRules: MultiplayerRoomRules;
+  schema: 1|2; advanced?:MeridianAdvancedPreset;name: string; trackId: string; laps: 1 | 3 | 5; roomRules: MultiplayerRoomRules;
   mode: MultiplayerEventMode; durationSeconds: 180 | 300; trackIds: string[]; horizon: HorizonSettings;
 }
 export const defaultHorizon = (): HorizonSettings => ({ antiBlock: false, reverseGrid: false, elimination: false });
@@ -18,7 +19,8 @@ export const horizonRequired = (v: HorizonSettings) => v.antiBlock || v.reverseG
 /** Projection rejects identity-bearing or unknown fields instead of retaining them. */
 export function parseRoomPreset(v: unknown): RoomPreset | null {
   const keys = ['schema','name','trackId','laps','roomRules','mode','durationSeconds','trackIds','horizon'];
-  if (!object(v) || Object.keys(v).length !== keys.length || Object.keys(v).some(k => !keys.includes(k)) || v.schema !== 1
+  if(object(v)&&v.schema===2)keys.push('advanced');
+  if (!object(v) || Object.keys(v).length !== keys.length || Object.keys(v).some(k => !keys.includes(k)) || ![1,2].includes(Number(v.schema))||typeof v.schema!=='number'
     || typeof v.name !== 'string' || !v.name.trim() || v.name.length > 32 || /[\u0000-\u001f<>]/.test(v.name)
     || typeof v.trackId !== 'string' || !getMultiplayerTrack(v.trackId) || ![1,3,5].includes(Number(v.laps))
     || typeof v.laps !== 'number' || !['race','time-trial','pursuit','teams'].includes(String(v.mode)) || ![180,300].includes(Number(v.durationSeconds)) || typeof v.durationSeconds !== 'number'
@@ -28,12 +30,12 @@ export function parseRoomPreset(v: unknown): RoomPreset | null {
   if (!roomRules || !horizon || v.trackIds.length && v.trackIds[0] !== v.trackId
     || v.mode === 'time-trial' && roomRules.collisions || v.mode === 'teams' && (!roomRules.collisions || !v.trackIds.length)
     || horizon.elimination && (v.mode !== 'race' || v.trackIds.length || horizon.reverseGrid)) return null;
-  return { schema: 1, name: v.name.trim(), trackId: v.trackId, laps: v.laps as 1|3|5, roomRules, mode: v.mode as MultiplayerEventMode,
-    durationSeconds: v.durationSeconds as 180|300, trackIds: [...v.trackIds] as string[], horizon };
+  const base={schema:v.schema as 1|2,name:v.name.trim(),trackId:v.trackId,laps:v.laps as 1|3|5,roomRules,mode:v.mode as MultiplayerEventMode,durationSeconds:v.durationSeconds as 180|300,trackIds:[...v.trackIds] as string[],horizon};
+  if(v.schema===2){const advanced=parseMeridianAdvanced(v.advanced,base);if(!advanced)return null;return{...base,advanced};}return base;
 }
 /** Shared authority eligibility; no client clock can grant collision immunity. */
-export function horizonCollisionEligible(p: { connected: boolean; loaded: boolean; dnf: boolean; finishMs: number | null; eliminated?: boolean; eliminationWinner?: boolean; block?: BlockState;cup?:{active:boolean} }) {
-  return p.connected && p.loaded && !p.dnf && p.finishMs === null && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && p.cup?.active!==false;
+export function horizonCollisionEligible(p: { connected: boolean; loaded: boolean; dnf: boolean; finishMs: number | null; eliminated?: boolean; eliminationWinner?: boolean; block?: BlockState;cup?:{active:boolean};meridian?:{active:boolean} }) {
+  return p.connected && p.loaded && !p.dnf && p.finishMs === null && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && p.cup?.active!==false&&p.meridian?.active!==false;
 }
 export function validateHorizonSnapshot(room: Record<string, unknown>) {
   const cap = object(room.capabilities) ? room.capabilities.horizon : undefined;

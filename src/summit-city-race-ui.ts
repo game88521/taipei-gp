@@ -4,10 +4,11 @@ import type { Collider } from './citydata';
 import { VoyagerCityPrediction, VoyagerCityClock } from './voyager-city-prediction';
 import type { CityData } from './citydata';
 import { vehicleById } from './vehicles';
-import { WorkshopRoads, encodeWorkshop, decodeWorkshop, parseWorkshop, type WorkshopDefinition, type WorkshopRoute } from './nexus-workshop';
+import { WorkshopRoads, encodeWorkshop, decodeWorkshop, parseWorkshop, workshopRouteSignature, workshopRoutesMatch, type WorkshopDefinition, type WorkshopRoute } from './nexus-workshop';
 import { SummitCityRaceClient, cityRaceEndpoint } from './summit-city-race-client';
 import {cityRaceLaps,type CityRaceInput,type CityRaceRoom} from '../shared/summit-city-race';
 import './summit-city-race.css';
+import {mountRoomInvite} from './aurora-invite-ui';
 interface Hooks {
   scene:THREE.Scene;host:HTMLElement;isCity:boolean;car:FreeCar;city():CityData|null;
   prepare():Promise<boolean>;canEnter():boolean;open():void;close():void;enter(def:WorkshopDefinition,route:WorkshopRoute):void;leave():void;
@@ -17,6 +18,7 @@ const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',id='')=>{const e=
 const button=(text:string,id:string,run:()=>void)=>{const b=el('button',text,id);b.type='button';b.onclick=run;return b;};
 const fmt=(ms:number)=>`${(ms/1000).toFixed(3)}秒`;
 export function mountSummitCityRace(h:Hooks){
+  let inviteTools:ReturnType<typeof mountRoomInvite>|undefined;
   let book:WorkshopRoads|null=null,busy=false,entered=false,intent=0,wasActive=false,lastHudAt=0,lastPhase='',previousFocus:HTMLElement|null=null;
   const prediction=new VoyagerCityPrediction(h.car,h.collider),predictionClock=new VoyagerCityClock();
   let restore:{x:number;y:number;z:number;h:number;weather:string}|null=null;
@@ -42,7 +44,8 @@ export function mountSummitCityRace(h:Hooks){
   const gateGeo=new THREE.RingGeometry(7,7.5,32).rotateX(-Math.PI/2),gateMat=new THREE.MeshBasicMaterial({color:'#fbc86a',side:THREE.DoubleSide,depthWrite:false}),gate=new THREE.Mesh(gateGeo,gateMat);group.add(gate);gate.visible=false;
   let storage:Storage|null=null;try{storage=sessionStorage;}catch{}
   const client=new SummitCityRaceClient(cityRaceEndpoint(String(import.meta.env.VITE_MULTIPLAYER_URL??''),location),render,validate,storage);
-  function validate(r:CityRaceRoom){const def=parseWorkshop(r.definition);if(!def||!book)throw Error('城市路線尚未就緒');const local=book.validate(def);if(JSON.stringify(local)!==JSON.stringify(r.route))throw Error('前後端城市道路版本不同，請更新後重試');}
+  inviteTools=mountRoomInvite(card,()=>client.room?{kind:'cityrace',code:client.room.code,label:'城市路線競速',players:client.room.players.length,capacity:4}:null,'aurora-city-race-invite');
+  function validate(r:CityRaceRoom){const def=parseWorkshop(r.definition);if(!def||!book)throw Error('城市路線尚未就緒');const local=book.validate(def);if(!workshopRoutesMatch(workshopRouteSignature(local),r.route))throw Error('前後端城市道路版本不同，請更新後重試');}
   function open(def?:WorkshopDefinition){if(!h.isCity){location.href='/?cityrace=1';return;}if(!entered&&!busy&&!h.canEnter()){h.notify('請先離開目前任務，再開啟城市競速');return;}if(def)challenge.value=encodeWorkshop(def);previousFocus=document.activeElement as HTMLElement;h.open();panel.hidden=false;render();close.focus();}
   function closePanel(){if(busy){status.textContent='正在連線，可先按取消等待';return;}panel.hidden=true;h.release();h.close();if(entered)h.focusDriving();else previousFocus?.focus();}
   async function enter(kind:'create'|'join'|'resume'){
@@ -53,7 +56,7 @@ export function mountSummitCityRace(h:Hooks){
   }
   function leaveRoom(){intent++;busy=false;client.leave();prediction.reset();predictionClock.reset();if(entered){entered=false;if(restore){const p=restore;restore=null;h.car.place(p.x,p.z,p.h,p.y);h.setWeather(p.weather);}h.leave();}clearPeers();render();}
   function clearPeers(){for(const p of peers.values()){group.remove(p.root);p.dispose();}peers.clear();gate.visible=false;}
-  function render(){if(!client)return;const r=client.room,me=r?.players.find(p=>p.id===client.selfId);if(entered&&r?.phase!==lastPhase){lastPhase=r?.phase??'';if(r?.phase==='countdown'){panel.hidden=true;h.release();h.close();}else if(r?.phase==='results'){panel.hidden=false;h.release();h.open();}}status.textContent=client.message||(!client.endpoint?'服務尚未設定；請先設定對戰服務網址。':'請建立或加入城市競速房');
+  function render(){if(!client)return;inviteTools?.update();const r=client.room,me=r?.players.find(p=>p.id===client.selfId);if(entered&&r?.phase!==lastPhase){lastPhase=r?.phase??'';if(r?.phase==='countdown'){panel.hidden=true;h.release();h.close();}else if(r?.phase==='results'){panel.hidden=false;h.release();h.open();}}status.textContent=client.message||(!client.endpoint?'服務尚未設定；請先設定對戰服務網址。':'請建立或加入城市競速房');
     create.disabled=join.disabled=busy||!!r||!client.endpoint;resume.hidden=!client.resumable;resume.disabled=busy;cancel.hidden=!busy&&client.status!=='reconnecting';cancel.textContent=client.status==='reconnecting'?'取消重連並離房':'取消等待';ready.hidden=start.hidden=!r||r.phase!=='lobby';ready.disabled=client.status!=='connected';ready.textContent=me?.ready?'取消準備':'確認路線並準備';start.disabled=client.status!=='connected'||!r||r.hostId!==client.selfId||r.players.length<2||!r.players.every(p=>p.connected&&p.ready);again.hidden=r?.phase!=='results'||r.hostId!==client.selfId;leave.disabled=!entered&&!r;copy.hidden=invite.hidden=!r;challenge.disabled=name.disabled=code.disabled=collisions.disabled=busy||!!r;if(r)collisions.value=r.collisions?'on':'off';recover.hidden=r?.phase!=='racing';recover.disabled=client.status!=='connected'||!me||!!me.dnf||me.finishMs!==null||Math.hypot(h.car.vx,h.car.vz)>2;
     if(client.status==='reconnecting')status.textContent=`${client.message} · 原席剩約${Math.ceil(client.retryRemainingMs/1000)}秒`;
     routeInfo.textContent=r?`房間 ${r.code} · ${r.definition.name} · 每圈${(r.route.length/1000).toFixed(2)}公里 · ${cityRaceLaps(r.definition)}圈 · ${r.definition.car} · ${r.definition.weather} · ${r.collisions?'實體碰撞':'友車穿透'} · 每圈${r.route.gates.length}檢查點 · ${Math.min(600,r.definition.seconds)}秒時限`:'';

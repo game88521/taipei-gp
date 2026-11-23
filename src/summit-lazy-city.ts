@@ -1,4 +1,5 @@
 import { SummitLazy } from './summit-lazy';
+import {takeBeaconModeSelection,finishBeaconModeLaunch} from './beacon-mode-launch';
 type WorkshopMount = typeof import('./nexus-workshop-ui').mountNexusWorkshop;
 type CoopMount = typeof import('./nexus-coop-ui').mountNexusCoop;
 
@@ -14,21 +15,24 @@ export function lazyCity<T extends object>(options: {
   const loader = new SummitLazy(options.load);
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'ghost-btn'; cancel.textContent = '取消載入'; cancel.hidden = true; button.after(cancel);
   const refresh = () => { button.disabled = loader.loading; button.setAttribute('aria-busy', String(loader.loading)); button.textContent = loader.loading ? '正在載入…' : options.text; cancel.hidden = !loader.loading; };
-  cancel.onclick = () => { loader.cancel(); refresh(); button.focus(); };
+  const cancelOpen=()=>{loader.cancel();const close=mounted&&Reflect.get(mounted,'close');if(typeof close==='function')close.call(mounted);refresh();button.focus();};
+  cancel.onclick = cancelOpen;button.addEventListener('beacon-mode-cancel',cancelOpen);
   const open = async (...args: unknown[]) => {
-    if (disposed || loader.loading) return;
-    if(!args.length&&options.selection)args=options.selection(button);
-    if (mounted) return (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args);
+    if (disposed || loader.loading) return false;
+    if(!args.length)args=takeBeaconModeSelection(button)??options.selection?.(button)??[];
+    if (mounted) return await (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args)!==false;
     options.prime?.();
+    let opened=false;
     const job = loader.open(async mount => {
       if (disposed) return;
       button.remove(); cancel.remove(); mounted = mount(options.hooks as never);
-      await (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args);
+      opened=await (mounted as { open?: (...args: unknown[]) => unknown }).open?.(...args)!==false;
     });
-    refresh(); await job; refresh();
+    refresh(); const current=await job; refresh();
     if (loader.error) { if (!mounted && !disposed) options.insert(button); options.notify(`功能載入失敗：${loader.error}。請再試一次。`); }
+    return current&&opened;
   };
-  button.onclick = () => { void open(); };
+  button.onclick = () => { const id=button.dataset.beaconLaunchId;void open().then(opened=>finishBeaconModeLaunch(button,id,opened)); };
   return new Proxy({} as T, { get(_target, key) {
     if (key === 'then') return undefined;
     if (key === 'lazyMetrics') return { attempts: loader.attempts, downloadMs: loader.downloadMs, mounted: !!mounted, loading: loader.loading };

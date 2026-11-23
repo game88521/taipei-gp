@@ -15,6 +15,12 @@ import {SOCIAL_PHASE_LABELS,SOCIAL_REASON_LABELS,SOCIAL_OUTCOME_LABELS,socialFin
 import {collectFriendViews,friendRadarPoints,friendReadout,createFriendName,FRIEND_STALE_MS,type FriendRadarPoint,type FriendNameVisual} from './frontier-friends';
 import './expedition-social.css';
 import type {CityReplayArchive} from '../shared/frontier-city-replay';
+import {mountAuroraParty} from './aurora-social-ui';
+import {mountRoomInvite} from './aurora-invite-ui';
+import {mountMeridianCheckpoints} from './meridian-checkpoint-ui';
+import {MeridianRotationHistory} from './meridian-social-history';
+import {rotationTable} from '../shared/meridian-social';
+import {finishBeaconModeLaunch,focusBeaconSection} from './beacon-mode-launch';
 export interface ExpeditionSocialOptions {
   scene:THREE.Scene;host:HTMLElement;isCity:boolean;car:FreeCar;collider():Collider|null;input():SocialInput;
   canEnter():boolean;enter(start:{x:number;z:number;y:number;h:number},isCurrent:()=>boolean):Promise<boolean>;
@@ -37,10 +43,11 @@ class SocialPrediction {
 }
 export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   let disposed=false,entered=false,busy=false,generation=0,lastFocus:HTMLElement|null=null,accumulator=0,configured='',lastHud=-Infinity,lastBoard='';
-  const launch=button('btn-expedition-social','城市巡航／警匪／追走／車隊／王冠',()=>{const mode=launch.dataset.socialMode;delete launch.dataset.socialMode;open(SOCIAL_MODES.includes(mode as SocialMode)?mode as SocialMode:undefined);});o.host.append(launch);
+  const launch=button('btn-expedition-social','城市巡航／警匪／追走／車隊／王冠',()=>{const mode=launch.dataset.socialMode,rotation=launch.dataset.socialRotation,guide=launch.dataset.socialGuide,id=launch.dataset.beaconLaunchId;delete launch.dataset.socialMode;delete launch.dataset.socialRotation;delete launch.dataset.socialGuide;finishBeaconModeLaunch(launch,id,open(SOCIAL_MODES.includes(mode as SocialMode)?mode as SocialMode:undefined,rotation==='true'?true:rotation==='false'?false:undefined,guide==='party'));});o.host.append(launch);
   const overlay=make('div');overlay.id='expedition-social-overlay';overlay.className='overlay hidden';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','expedition-social-title');
   const card=make('div');card.className='card wide expedition-social-card';const title=make('h1','城市好友同樂');title.id='expedition-social-title';
-  const note=make('p','私人房共用真實台北道路與天候。巡航1～4人可中途加入；追捕、車隊與王冠2～4人，追走固定2人。獨立玩法不增加單人錢包、正式圈速或成就。');
+  const note=make('p','私人房共用真實台北道路與天候。巡航1～4人可中途加入；追捕、車隊與王冠2～4人，追走可選雙人或三四人輪賽。獨立玩法不增加單人錢包、正式圈速或成就。');
+  const entryGuide=make('p');entryGuide.id='beacon-social-guide';entryGuide.hidden=true;
   const rules=make('p');rules.id='social-rules';rules.className='sub';
   const entry=make('section');entry.id='social-entry';const name=make('input');name.id='social-name';name.value='城市車手';name.maxLength=20;name.setAttribute('autocomplete','nickname');
   const code=make('input');code.id='social-code';code.maxLength=6;code.autocapitalize='characters';code.autocomplete='off';
@@ -49,6 +56,7 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   const vehicle=make('select');vehicle.id='social-vehicle';for(const v of VEHICLES){const option=make('option',v.name);option.value=v.id;vehicle.append(option);}vehicle.value=o.vehicle();
   for(const [text,control]of[['暱稱',name],['六碼房間碼',code],['建房玩法',mode],['共用天候',weather],['巡航車款',vehicle]] as const){const label=make('label',text+' ');label.append(control);entry.append(label);}
   const convoyRoute=make('select');convoyRoute.id='social-convoy-route';for(const def of CONVOY_ROUTES){const option=make('option',def.name+' · '+def.stations.length+'站');option.value=def.id;convoyRoute.append(option);}const convoyRouteLabel=make('label','車隊巡遊路線 ');convoyRouteLabel.append(convoyRoute);entry.append(convoyRouteLabel);
+  const rotation=make('input');rotation.id='social-rotation';rotation.type='checkbox';const rotationLabel=make('label','三四人公平追走輪賽（每人輪流領跑／追走） ');rotationLabel.append(rotation);entry.append(rotationLabel);
   const create=button('social-create','建立房間',()=>void enter('create')),join=button('social-join','加入房間',()=>void enter('join')),resume=button('social-resume','續接原席位',()=>void enter('resume'));
   const watch=button('social-watch','以觀眾加入',()=>void enter('watch'));entry.append(create,join,resume,watch);
   const change=button('social-configure','套用巡航車款／房主天候',()=>{const r=client.room,self=r?.players.find(p=>p.id===client.selfId);if(!r||!self)return;const fields:Record<string,unknown>={};if(self.vehicle!==vehicle.value)fields.vehicle=vehicle.value;if(r.hostId===client.selfId&&r.weather!==weather.value)fields.weather=weather.value;if(!Object.keys(fields).length){setMessage('車款與天候已是目前設定。');return;}releaseInput();client.command('configure',fields);});entry.append(change);
@@ -79,11 +87,15 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   const replayBox=make('section');replayBox.id='social-replay';const replayTitle=make('h2','匿名城市回放'),replayNote=make('p','本場結束後可取得匿名軌跡；每200毫秒採樣，最多保留前12分鐘，截短會明示。不包含暱稱、房間碼或續接憑證，不寫入參賽成績。'),replayStatus=make('p');replayStatus.id='social-replay-status';replayStatus.setAttribute('role','status');
   let replayArchive:CityReplayArchive|null=null,replayKey='',replayGeneration=0;
   const replayDownload=button('social-replay-download','取得匿名回放',()=>void downloadReplay()),replayCancel=button('social-replay-cancel','取消取得回放',()=>client.cancelReplay()),replayPlay=button('social-replay-play','播放匿名回放',()=>{const archive=replayArchive;if(!archive||!o.replay)return;leaveRoom();overlay.classList.add('hidden');o.replay(archive);}),replayExport=button('social-replay-export','下載匿名JSON',()=>{if(!replayArchive)return;const url=URL.createObjectURL(new Blob([JSON.stringify(replayArchive)],{type:'application/json'})),a=make('a');a.href=url;a.download='taipei-city-replay.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);});replayBox.append(replayTitle,replayNote,replayStatus,replayDownload,replayCancel,replayPlay,replayExport);
-  card.append(title,note,entry,rules,info,reconnectBox,exitClose,watchNote,follow,waiting,board,convoyPanel,crownPanel,management,removeBox,friends,ready,start,again,station,mark,recover,invite,copy,cancel,leave,close,replayBox,history);overlay.append(card);document.body.append(overlay);
+  card.append(title,note,entryGuide,entry,rules,info,reconnectBox,exitClose,watchNote,follow,waiting,board,convoyPanel,crownPanel,management,removeBox,friends,ready,start,again,station,mark,recover,invite,copy,cancel,leave,close,replayBox,history);overlay.append(card);document.body.append(overlay);
   const hud=make('details');hud.id='expedition-social-hud';hud.className='hidden';const summary=make('summary','城市好友同樂'),hudText=make('p');hudText.id='social-hud-status';const hudFriends=make('ul');hudFriends.id='social-friends-hud';hudFriends.setAttribute('aria-label','可辨識好友位置');const hudRoom=button('social-hud-room','房間／成績',()=>open());hud.append(summary,hudText,hudFriends,hudRoom);document.body.append(hud);
   const endpoint=socialEndpoint(String(import.meta.env.VITE_MULTIPLAYER_URL??''),location);let storage:Storage|null=null;try{storage=sessionStorage;}catch{}
   const client=new ExpeditionSocialClient(endpoint,clientChanged,storage),prediction=new SocialPrediction(o.car,o.collider);
-  let historyStorage:Storage|null=null;try{historyStorage=localStorage;}catch{}const results=new SocialResults(historyStorage);let historyKey='';
+  const checkpointPanel=mountMeridianCheckpoints({host:card,model:client.checkpoints,kind:'party',id:'meridian-party-checkpoint',canCreate:()=>!!client.room?.party&&client.room.hostId===client.selfId&&['lobby','finished'].includes(client.room.phase)&&!client.controlGated,create:()=>client.exportCheckpoint(),restore:async ticket=>{if(busy||!o.canEnter()&&!entered)throw Error('請先結束目前玩法');await enter('checkpoint',ticket);}});
+  const rotationPanel=make('section');rotationPanel.id='meridian-tandem';card.insertBefore(rotationPanel,waiting);
+  const partyPanel=mountAuroraParty(client);card.insertBefore(partyPanel.root,waiting);
+  const inviteTools=mountRoomInvite(card,()=>{const r=client.room,w=client.watchRoom;return r?{kind:'social',code:r.code,label:SOCIAL_LABELS[r.mode],players:r.players.length,capacity:4,mode:r.mode}:w?{kind:'social',code:w.code,label:SOCIAL_LABELS[w.mode],players:w.roster.length,capacity:4,mode:w.mode}:null;},'aurora-social-invite');
+  let historyStorage:Storage|null=null;try{historyStorage=localStorage;}catch{}const rotationHistory=new MeridianRotationHistory(historyStorage);const results=new SocialResults(historyStorage);let historyKey='';
   const diagnostic=mountDiagnostics(entry,endpoint,'expedition-social-diagnostics');
   const graphics=new THREE.Group();graphics.name='expedition-social-players';o.scene.add(graphics);
   const crownVisual=createCrownVisual();graphics.add(crownVisual.root);let crownArena:THREE.Mesh|null=null;
@@ -107,10 +119,12 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
     reconnectModal=false;lastReconnectPhase='';if(confirmRequested&&!client.controlGated&&client.room){confirmRequested=false;render();closePanel();return;}
     render();
   }
-  function open(selected?:SocialMode){
-    if(!o.isCity){const u=new URL(location.href);u.search='';u.searchParams.set('social','1');if(selected)u.searchParams.set('socialMode',selected);location.assign(u.href);return;}
-    if(!o.canEnter()&&!entered){o.notify('先結束目前玩法，再開啟城市好友同樂。');return;}
-    if(selected&&!client.room)mode.value=selected;lastFocus=document.activeElement as HTMLElement;releaseInput();o.open();overlay.classList.remove('hidden');render();close.focus();
+  function open(selected?:SocialMode,selectedRotation?:boolean,partyGuide=false){
+    if(!o.isCity){const u=new URL('/',location.href);u.searchParams.set('social','1');if(selected)u.searchParams.set('socialMode',selected);if(selectedRotation!==undefined)u.searchParams.set('socialRotation',String(selectedRotation));if(partyGuide)u.searchParams.set('socialGuide','party');location.assign(u.href);return true;}
+    if(!o.canEnter()&&!entered){o.notify('先結束目前玩法，再開啟城市好友同樂。');return false;}
+    if(!client.room&&!busy){if(selected)mode.value=selected;if(selectedRotation!==undefined)rotation.checked=selectedRotation;}
+    entryGuide.hidden=!partyGuide&&selectedRotation===undefined;entryGuide.textContent=client.room||busy?'已開啟目前房間；保留既有玩法及設定，不另建房或切換。':partyGuide?'先建立或加入2～4人的巡航房，再由房主在「好友派對連玩」啟用派對。搜尋入口不會自動建房或啟用。':selectedRotation?'已預選三四人追走輪賽。確認暱稱後建立房間，邀請3～4人到齊再準備。':'已預選雙人追走。確認暱稱後建立或加入房間。';
+    lastFocus=document.activeElement as HTMLElement;releaseInput();o.open();overlay.classList.remove('hidden');render();close.focus();if(!entryGuide.hidden)focusBeaconSection(entryGuide);return !busy&&(!client.room||(!selected||client.room.mode===selected)&&(selectedRotation===undefined||!!client.room.rotation===selectedRotation)&&(!partyGuide||!!client.room.party));
   }
   function closePanel(){if(busy){setMessage('正在進房，可先取消等待。');return;}if(client.controlGated){setMessage('操控仍停止；請確認恢復操控，或明確離開房間。');return;}cancelRemoval(false);overlay.classList.add('hidden');o.close();lastFocus?.focus();}
   function cancelRemoval(restoreFocus=true){pendingRemove=null;removeBox.hidden=true;if(restoreFocus&&removeFocus?.isConnected)removeFocus.focus();removeFocus=null;}
@@ -131,7 +145,7 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   function renderFriendList(){const now=performance.now();if(client.room&&friendList.childElementCount&&now-lastFriendRefresh<250)return;lastFriendRefresh=now;const views=currentFriends(),stale=!!client.room&&client.serverNow()-client.room.serverTime>FRIEND_STALE_MS,texts=views.map(friendReadout),empty=client.watching?'觀戰僅提供跟車畫面，不提供其他車手雷達。':stale?'好友位置更新暫停，等待服務同步。':!client.room?'加入房間後顯示好友位置。':(client.room.mode==='chase'||client.room.mode==='crown')?'目前沒有可辨識位置；對手只在80公尺內且同層顯示。':'目前沒有已連線的其他好友。',key=JSON.stringify([texts,empty]);if(key===lastFriendText)return;lastFriendText=key;for(const list of[friendList,hudFriends]){list.replaceChildren();if(!views.length)list.append(make('li',empty));else for(const view of views){const row=make('li');row.dataset.slot=String(view.slot);const badge=make('strong',String(view.slot+1));badge.className='frontier-friend-badge';badge.style.borderColor=view.color;badge.style.color=view.color;row.append(badge,document.createTextNode(' '+friendReadout(view).slice(String(view.slot+1).length+1)));list.append(row);}}}
   function releaseBorrowedSession(){generation++;replayGeneration++;replayArchive=null;busy=false;confirmRequested=false;reconnectModal=false;lastReconnectPhase='';cancelRemoval(false);prediction.reset();clearGraphics();configured='';accumulator=0;if(entered){o.car.vx=o.car.vz=o.car.w=0;entered=false;o.left();}}
   function leaveRoom(text=''){client.leave();releaseBorrowedSession();message=text;render();}
-  async function enter(kind:'create'|'join'|'resume'|'watch'){
+  async function enter(kind:'create'|'join'|'resume'|'watch'|'checkpoint',checkpointTicket=''){
     if(disposed||busy||client.room||client.watching)return;if(!o.canEnter()&&!entered){setMessage('請先結束目前玩法。');return;}
     const n=name.value.trim(),c=code.value.trim().toUpperCase();if((kind==='create'||kind==='join')&&(!n||n.length>20||/[\x00-\x1f\x7f<>]/.test(n))){setMessage('暱稱請填1～20字。');return;}
     if((kind==='join'||kind==='watch')&&!/^[A-HJ-NP-Z2-9]{6}$/.test(c)){setMessage('請填六碼房間碼。');return;}
@@ -139,13 +153,15 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
     try{
       if(!entered){entered=true;if(!await o.enter(COOP_STATIONS[0],current))throw Error('城市尚未就緒，請稍後再試。');}
       if(!current())return;
-      if(kind==='resume')await client.resume();else if(kind==='watch')await client.watch(c);else await client.enter(kind,n,vehicle.value,mode.value as SocialMode,weather.value as SocialWeather,c,convoyRoute.value as ConvoyRouteId);
+      if(kind==='checkpoint')await client.restoreCheckpoint(checkpointTicket);else if(kind==='resume')await client.resume();else if(kind==='watch')await client.watch(c);else await client.enter(kind,n,vehicle.value,mode.value as SocialMode,weather.value as SocialWeather,c,convoyRoute.value as ConvoyRouteId,mode.value==='tandem'&&rotation.checked);
       if(!current())return;message=kind==='watch'?'已加入觀戰；返回畫面可跟車觀看，沒有駕駛或參賽權限。':'已加入房間，確認規則後準備。';
-    }catch(e){if(current()){const text=e instanceof Error?e.message:String(e);if(kind==='resume')setMessage(text);else leaveRoom(text);}}
+    }catch(e){if(current()){const text=e instanceof Error?e.message:String(e);if(kind==='resume')setMessage(text);else leaveRoom(text);if(kind==='checkpoint')throw e;}}
     finally{if(current()){busy=false;render();}}
   }
   function render(){
     if(disposed)return;const r=client.room,w=client.watchRoom,self=r?.players.find(p=>p.id===client.selfId),host=r?.hostId===client.selfId,occupied=!!(r||w);
+    partyPanel.render();checkpointPanel.update();rotationLabel.hidden=(r?.mode??mode.value)!=='tandem';rotation.disabled=occupied||busy;rotationPanel.hidden=!r?.rotation;if(r?.rotation){const state=r.rotation,heat=state.heats[state.cursor],label=(slot:number)=>r.players.find(p=>p.slot===slot)?.name??('席位'+(slot+1));rotationPanel.replaceChildren(make('h2','三四人追走輪賽'),make('p',r.phase==='lobby'?'3～4人全部準備後，逐一完成每組領跑／追走。每段60秒，候場不操控、不碰撞、不計分。':state.paused?'原席斷線或尚未確認操控，整場安全暫停；15秒內全員恢復，否則取消完整排名。':'第'+(state.cursor+1)+'/'+state.heats.length+'段 · 領跑 '+label(heat.leaderSlot)+' · 追走 '+label(heat.followerSlot)+(self?.role==='driver'?' · 你在候場':'')));const list=make('ol');for(const row of rotationTable(state,r.players.map(p=>p.slot)))list.append(make('li',label(row.slot)+' · 已追走 '+row.turns+'/'+Math.max(0,r.players.length-1)+'次 · '+row.points.toFixed(1)+'分'));rotationPanel.append(list);rotationHistory.observe(r);const recent=make('details');recent.id='meridian-tandem-history';recent.append(make('summary','最近20場完整輪賽'));for(const row of rotationHistory.records)recent.append(make('p',new Date(row.at).toLocaleString()+' · '+row.players.map(p=>p.name+' '+p.points.toFixed(1)+'分／'+p.turns+'次追走').join('、')));if(rotationHistory.error)recent.append(make('p',rotationHistory.error));rotationPanel.append(recent);}
+    inviteTools.update();
     const convoy=r?.convoy,definition=convoyDefinition(convoy?.routeId??convoyRoute.value),selectedMode=r?.mode??w?.mode??mode.value;convoyRouteLabel.hidden=selectedMode!=='convoy';convoyRoute.disabled=busy||occupied||client.controlGated;if(convoy)convoyRoute.value=convoy.routeId;convoyPanel.hidden=!convoy;if(convoy&&definition){
       const remaining=convoy.participants.filter(p=>!p.withdrawn&&!p.arrived).map(p=>r!.players.find(q=>q.slot===p.slot)?.name??'車手'),completed=convoy.completed===definition.stations.length;
       convoyTitle.textContent=definition.name+' · '+(convoy.totalLength/1000).toFixed(1)+'公里';convoyStatus.textContent='全隊完成 '+convoy.completed+'/'+definition.stations.length+'站 · '+(completed?'全隊巡遊完成。':r!.phase==='finished'?SOCIAL_REASON_LABELS[r!.reason]+'，巡遊未全隊完成。':r!.phase==='lobby'?'所有隊員準備後，由房主開始。':'前往 '+convoy.leg.target.name+'；'+(remaining.length?'等待 '+remaining.join('、')+' 依序過門、同層低速停留兩秒。':'全員已到齊。'));
@@ -161,7 +177,7 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
     exitClose.hidden=!client.lastExit||!!r;management.hidden=!r;lock.hidden=!host;lock.disabled=!r||!socialManageable(r);lock.textContent=r?.locked?'開放新加入':'鎖定新加入';lockStatus.textContent=r?(r.locked?'新加入已鎖定；原席位可續接。':'新加入開放中。')+(host?' 你是房主。':' 房主：'+(r.players.find(p=>p.id===r.hostId)?.name??'同步中')):'';
     waiting.hidden=!r||r.phase!=='lobby';if(r?.phase==='lobby'){const unready=r.players.filter(p=>!p.connected||!p.ready),minimum=r.mode==='cruise'?1:2;waiting.textContent=r.players.length<minimum?'還需要'+(minimum-r.players.length)+'位車手加入，並由所有人準備。':unready.length?'等待 '+unready.map(p=>p.name+(!p.connected?'（斷線待續接）':'（未準備）')).join('、')+'；全部就緒後由房主開始。':'所有人已準備，等待房主開始。';}
     renderFriendList();
-    if(r?.phase==='finished')results.add(r);
+    if(r?.phase==='finished'&&!r.rotation)results.add(r);
     const nextHistory=JSON.stringify([results.records,results.error]);if(nextHistory!==historyKey){historyKey=nextHistory;historyBody.replaceChildren();if(results.error)historyBody.append(make('p',results.error));if(!results.records.length)historyBody.append(make('p','完成一場後會保留本機摘要；不包含房間碼或續接憑證。'));
       for(const row of results.records){const item=make('p',new Date(row.at).toLocaleString()+' · '+SOCIAL_LABELS[row.mode]+' · '+SOCIAL_REASON_LABELS[row.reason]+(row.convoy?' · '+(convoyDefinition(row.convoy.routeId)?.name??'巡遊')+' '+row.convoy.completed+'/'+row.convoy.total+'站':'')+' · '+row.players.map(p=>p.name+' '+socialFinishLabel(row,p)+(row.mode==='crown'?' '+p.points.toFixed(1)+'秒':row.mode==='tandem'?' '+Math.floor(p.points)+'分／最長'+p.maxCombo.toFixed(1)+'秒':'')).join('／'));historyBody.append(item);}}
     create.disabled=join.disabled=busy||occupied||gated;watch.disabled=busy||occupied||gated||client.capabilitiesKnown&&!client.watchSupported;resume.disabled=busy||occupied||!client.resumable||['waiting','connecting'].includes(reconnect.phase);for(const e of[name,code,mode])e.disabled=busy||occupied||gated;
@@ -174,7 +190,7 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
     const selected=r?.mode??w?.mode??mode.value;rules.textContent=selected==='cruise'?'最多30分鐘。友車穿透；可標記集合點，中途加入與低速返回集合區。':
       selected==='crown'?'全員同款城市轎車，2～4人比賽180秒，權威計算有效持冠秒數；真車接觸可奪冠，護冠三秒內不能再轉移。同一步多人碰撞按席位編號較小者優先、只轉移一次。競賽限地面220公尺圓域；出界或不同路層立即停分，五秒內未返回即退出。斷線保留15秒但停分；剩不足兩人中斷。退出後重新發還王冠另列事件，不算碰撞轉移；同分可共同得冠。':selected==='convoy'?'三條真實道路路線，各3～5站，最多30分鐘。依序通過每個順序門，同層停在本站12公尺內、時速7.2以下連續兩秒；全隊至少兩人同時停妥才前往下一站。友車穿透、途中不傳送。斷線15秒內等候續接；退出者不計完成，剩不足兩人則中斷。':selected==='chase'?'三秒倒數後開始三分鐘追逐，前十秒保護。追捕方須在同層6公尺內、雙方低速，連續攔截兩秒。所有逃跑方被捕則追捕勝；超時未被捕者逃脫。離線中斷另列，不算逮捕。':'固定同款紫電GT，兩段各60秒，交換領跑／追走。追走須同向同層、距離3～25公尺、時速25.2以上並產生滑角；越貼近目標距離與角度得分越高。車碰斷連段且一秒不計分。';
     const boardKey=r?JSON.stringify([r.phase,r.reason,r.hostId,r.revision,r.players.map(p=>[p.id,p.connected,p.ready,p.role,p.outcome,(r.mode==='crown'?p.points:Math.floor(p.points))]),r.crown?[r.crown.holderSlot,r.crown.winnerPoints]:null,r.convoy?.participants.map(p=>[p.slot,p.arrived,p.withdrawn])]):w?JSON.stringify(['watch',w.phase,w.roster]):'';
-    if(lastBoard!==boardKey){lastBoard=boardKey;board.replaceChildren();if(r){const list=make('ol');for(const p of r.players){const status=r.phase==='finished'?socialFinishLabel(r,p)+(r.mode==='crown'?' · '+p.points.toFixed(1)+'秒':r.mode==='tandem'?' · '+Math.floor(p.points)+'分':''):r.phase==='lobby'?(p.ready?'已準備':'未準備'):p.outcome?SOCIAL_OUTCOME_LABELS[p.outcome]:r.mode==='crown'?p.points.toFixed(1)+'秒'+(p.slot===r.crown?.holderSlot?' · 持冠':''):r.mode==='tandem'?Math.floor(p.points)+'分':r.mode==='chase'?(p.role==='pursuer'?'追捕中':'逃跑中'):r.mode==='convoy'?(r.convoy?.participants.find(q=>q.slot===p.slot)?.arrived?'已到站，等候隊友':'巡遊前往本站'):'自由巡航中',row=make('li',p.name+(p.id===client.selfId?'（你）':'')+(p.id===r.hostId?'（房主）':'')+' · '+ROLES[p.role]+' · '+status+(!p.connected?' · 已斷線':''));row.dataset.slot=String(p.slot);if(host&&p.id!==client.selfId&&socialManageable(r)){const remove=button('social-remove-'+p.slot,'移除席位'+(p.slot+1),()=>askRemoval(p,remove));remove.classList.add('social-remove');remove.dataset.slot=String(p.slot);row.append(remove);}list.append(row);}board.append(list);}}
+    if(lastBoard!==boardKey){lastBoard=boardKey;board.replaceChildren();if(r){const list=make('ol');for(const p of r.players){const status=r.phase==='finished'?socialFinishLabel(r,p)+(r.mode==='crown'?' · '+p.points.toFixed(1)+'秒':r.mode==='tandem'?' · '+Math.floor(p.points)+'分':''):r.phase==='lobby'?(p.ready?'已準備':'未準備'):p.outcome?SOCIAL_OUTCOME_LABELS[p.outcome]:r.mode==='crown'?p.points.toFixed(1)+'秒'+(p.slot===r.crown?.holderSlot?' · 持冠':''):r.mode==='tandem'?Math.floor(p.points)+'分':r.mode==='chase'?(p.role==='pursuer'?'追捕中':'逃跑中'):r.mode==='convoy'?(r.convoy?.participants.find(q=>q.slot===p.slot)?.arrived?'已到站，等候隊友':'巡遊前往本站'):'自由巡航中',row=make('li',p.name+(p.id===client.selfId?'（你）':'')+(p.id===r.hostId?'（房主）':'')+' · '+(r.rotation&&p.role==='driver'?'候場':ROLES[p.role])+' · '+status+(!p.connected?' · 已斷線':''));row.dataset.slot=String(p.slot);if(host&&p.id!==client.selfId&&socialManageable(r)){const remove=button('social-remove-'+p.slot,'移除席位'+(p.slot+1),()=>askRemoval(p,remove));remove.classList.add('social-remove');remove.dataset.slot=String(p.slot);row.append(remove);}list.append(row);}board.append(list);}}
     if(w&&lastBoard===boardKey){board.replaceChildren();const list=make('ol');for(const p of w.roster)list.append(make('li',(p.slot+1)+' '+p.name+' · '+ROLES[p.role]+(w.mode==='crown'?' · '+p.points.toFixed(1)+'秒'+(p.slot===w.crown?.holderSlot?' · 持冠':''):'')+(!p.connected?' · 斷線':'')));board.append(list);}
     hud.classList.toggle('hidden',!entered||!occupied||!o.isDriving());
     if(self&&r){const key=self.vehicle+':'+r.weather;if(configured!==key){configured=key;vehicle.value=self.vehicle;weather.value=r.weather;o.configure?.(self.vehicle,r.weather);const spec=vehicleById(self.vehicle).spec;o.car.spec={...spec,grip:spec.grip*(r.weather==='rain'?.82:1)};}
@@ -183,9 +199,9 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   }
   mode.onchange=render;
   overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();if(pendingRemove)cancelRemoval();else closePanel();}else if(event.key==='Tab'){const list=[...card.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary')].filter(e=>e.getClientRects().length),first=list[0],last=list.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}});
-  const query=new URLSearchParams(location.search),wanted=query.get('social'),selected=query.get('socialMode');if(SOCIAL_MODES.includes(selected as SocialMode))mode.value=selected!;if(wanted&&wanted!=='1')code.value=wanted.toUpperCase();
+  const query=new URLSearchParams(location.search),wanted=query.get('social'),selected=query.get('socialMode');if(SOCIAL_MODES.includes(selected as SocialMode))mode.value=selected!;if(query.get('socialRotation')==='true')rotation.checked=true;if(query.get('socialGuide')==='party'){entryGuide.hidden=false;entryGuide.textContent='先建立或加入2～4人的巡航房，再由房主啟用好友派對；目前尚未建房。';}if(wanted&&wanted!=='1')code.value=wanted.toUpperCase();
   function step(dt:number){
-    if(!entered||disposed||client.watching)return;const r=client.room,p=r?.players.find(p=>p.id===client.selfId);if(client.controlGated||!r||!p||r.phase!=='running'||p.outcome){o.car.vx=o.car.vz=o.car.w=0;return;}
+    if(!entered||disposed||client.watching)return;const r=client.room,p=r?.players.find(p=>p.id===client.selfId);if(client.controlGated||!r||!p||r.phase!=='running'||p.outcome||r.rotation&&(r.rotation.paused||p.role==='driver')){o.car.vx=o.car.vz=o.car.w=0;return;}
     accumulator=Math.min(.15,accumulator+Math.max(0,dt));while(accumulator>=SOCIAL_STEP){accumulator-=SOCIAL_STEP;const raw=o.input(),active=o.isDriving()&&document.visibilityState==='visible'&&document.hasFocus(),input={steer:active?raw.steer:0,throttle:active&&raw.throttle,brake:active&&raw.brake,handbrake:active&&raw.handbrake,active};const seq=client.input(input);if(seq!==null)prediction.advance(seq,input);}
   }
   function frame(dt:number){
@@ -211,7 +227,7 @@ export function mountExpeditionSocial(o:ExpeditionSocialOptions){
   }
   render();
   const publicApi={get active(){return entered;},get busy(){return busy;},get opened(){return !overlay.classList.contains('hidden');},open,close(){if(overlay.classList.contains('hidden'))return false;closePanel();return true;},leave(){leaveRoom('已離開城市房間。');},stop(){leaveRoom();},client,step,frame,radarInfo,navInfo,
-    dispose(){if(disposed)return;leaveRoom();disposed=true;client.dispose();removeEventListener('blur',releaseInput);document.removeEventListener('visibilitychange',visibility);diagnostic.dispose();crownVisual.dispose();graphics.removeFromParent();overlay.remove();hud.remove();launch.remove();}};
+    dispose(){if(disposed)return;leaveRoom();disposed=true;client.dispose();inviteTools.dispose();checkpointPanel.dispose();removeEventListener('blur',releaseInput);document.removeEventListener('visibilitychange',visibility);diagnostic.dispose();crownVisual.dispose();graphics.removeFromParent();overlay.remove();hud.remove();launch.remove();}};
   (window as unknown as {__social:unknown}).__social={get client(){return client;},get peers(){return peers.size;},get active(){return entered;}};
   return publicApi;
 }

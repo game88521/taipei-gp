@@ -1,5 +1,7 @@
 import {parseConvoyState,type ConvoyState,CONVOY_MIN_PLAYERS,convoyDefinition} from './frontier-convoy.ts';
 import {parseCrownState,validCrownWatch,crownZone,type CrownState,type CrownWatchState} from './frontier-crown.ts';
+import {parsePartyState,type PartyState} from './aurora-social.ts';
+import {parseRotation,type RotationState} from './meridian-social.ts';
 /** City social games have their own authority and never write official race progress. */
 export const SOCIAL_VERSION = 'frontier-social-v2';
 export const SOCIAL_MAX_PLAYERS = 4;
@@ -25,7 +27,7 @@ export interface SocialRoom {
   phase: SocialPhase; revision: number; locked: boolean; runId: string; round: number; leg: number;
   serverTime: number; startAt: number | null; endsAt: number | null;
   reason: '' | 'timeout' | 'captured' | 'left' | 'complete' | 'server-stall';
-  players: SocialPlayer[]; marks: SocialMark[];convoy?:ConvoyState;crown?:CrownState;
+  players: SocialPlayer[]; marks: SocialMark[];convoy?:ConvoyState;crown?:CrownState;party?:PartyState;rotation?:RotationState;
 }
 export const SOCIAL_MAX_WATCHERS=4;
 export const SOCIAL_WATCH_DELAY_MS=5000;
@@ -51,7 +53,7 @@ const integer = (v: unknown, lo: number, hi: number): v is number => number(v, l
 const text = (v: unknown, size: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= size && !/[\x00-\x1f\x7f<>]/.test(v);
 export const socialCode = (v: unknown): v is string => typeof v === 'string' && /^[A-HJ-NP-Z2-9]{6}$/.test(v);
 export function parseSocialRoom(raw: unknown): SocialRoom | null {
-  if (!object(raw) || !exact(raw,['v','code','hostId','mode','weather','phase','revision','locked','runId','round','leg','serverTime','startAt','endsAt','reason','players','marks',...raw.mode==='convoy'?['convoy']:[],...raw.mode==='crown'?['crown']:[]]) || raw.v !== SOCIAL_VERSION || !socialCode(raw.code) || !text(raw.hostId, 40) || typeof raw.locked!=='boolean' ||
+  if (!object(raw) || !exact(raw,['v','code','hostId','mode','weather','phase','revision','locked','runId','round','leg','serverTime','startAt','endsAt','reason','players','marks',...raw.mode==='convoy'?['convoy']:[],...raw.mode==='crown'?['crown']:[],...raw.party!==undefined?['party']:[],...raw.rotation!==undefined?['rotation']:[]]) || raw.v !== SOCIAL_VERSION || !socialCode(raw.code) || !text(raw.hostId, 40) || typeof raw.locked!=='boolean' ||
     !SOCIAL_MODES.includes(raw.mode as SocialMode) || !['dry','rain','night'].includes(String(raw.weather)) ||
     !['lobby','countdown','running','finished'].includes(String(raw.phase)) || !integer(raw.revision,1,1e9) ||
     !text(raw.runId,40) || !integer(raw.round,0,1e6) || !integer(raw.leg,0,1) || !number(raw.serverTime,0,1e16) ||
@@ -60,7 +62,7 @@ export function parseSocialRoom(raw: unknown): SocialRoom | null {
     !Array.isArray(raw.players) || raw.players.length<1 || raw.players.length>4 || !Array.isArray(raw.marks) || raw.marks.length>4) return null;
   if (raw.phase==='lobby' ? raw.startAt!==null||raw.endsAt!==null||raw.reason!=='' :
     raw.startAt===null||raw.endsAt===null||Number(raw.endsAt)<=Number(raw.startAt)||raw.phase==='finished'&&raw.reason===''||raw.phase!=='finished'&&raw.reason!=='') return null;
-  if (raw.mode==='tandem'&&raw.players.length>2 || raw.mode!=='tandem'&&raw.leg!==0) return null;
+  if (raw.mode==='tandem'&&raw.players.length>2&&!raw.rotation || raw.mode!=='tandem'&&raw.leg!==0) return null;
   const ids=new Set<string>(),slots=new Set<number>(),players:SocialPlayer[]=[];
   for (const value of raw.players) {
     if (!object(value)||!exact(value,['id','name','slot','vehicle','connected','ready','role','pose','ack','epoch','points','combo','maxCombo','captureMs','outcome'])||!text(value.id,40)||ids.has(value.id)||!text(value.name,20)||!integer(value.slot,0,3)||slots.has(value.slot)||
@@ -75,6 +77,8 @@ export function parseSocialRoom(raw: unknown): SocialRoom | null {
     players.push({...value,pose:{...p}} as unknown as SocialPlayer);
   }
   if (!ids.has(raw.hostId)) return null;
+  if(raw.rotation!==undefined){const rot=parseRotation(raw.rotation,players.map(p=>p.slot),String(raw.phase));if(raw.mode!=='tandem'||!rot)return null;if(raw.phase!=='lobby'){const heat=rot.heats[rot.cursor];if(players.some(p=>p.role!==(p.slot===heat.leaderSlot?'leader':p.slot===heat.followerSlot?'follower':'driver')||p.vehicle!=='muscle'))return null;}}
+  if(raw.party!==undefined&&(!parsePartyState(raw.party,players.map(p=>p.slot))||raw.mode==='tandem'))return null;
   const marks:SocialMark[]=[],markPlayers=new Set();
   for (const value of raw.marks) {
     if (!object(value)||!exact(value,['playerId','stationId','expiresAt'])||typeof value.playerId!=='string'||!ids.has(value.playerId)||markPlayers.has(value.playerId)||

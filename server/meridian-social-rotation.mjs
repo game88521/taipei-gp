@@ -1,0 +1,15 @@
+// Rex <game88521@gmail.com>. Active pair only; waiting cars never simulate, collide or score.
+import {MERIDIAN_ROTATION_VERSION,rotationPairs,rotationTable} from '../shared/meridian-social.ts';
+export const createRotation=()=>({version:MERIDIAN_ROTATION_VERSION,cursor:0,heats:[],paused:false,pausedUntil:null});
+export const rotationCanDrive=(r,p)=>!r.rotation||r.rotation.heats.length>0&&[r.rotation.heats[r.rotation.cursor].leaderSlot,r.rotation.heats[r.rotation.cursor].followerSlot].includes(p.slot);
+export function rotationStart(r){if(r.rotation){r.rotation=createRotation();r.rotation.heats=rotationPairs([...r.players.values()].map(p=>p.slot));for(const p of r.players.values())p.rotationConfirm=true;}}
+export function rotationAssign(r){if(!r.rotation)return false;const heat=r.rotation.heats[r.rotation.cursor];for(const p of r.players.values()){p.role=p.slot===heat?.leaderSlot?'leader':p.slot===heat?.followerSlot?'follower':'driver';p.vehicle='muscle';}return true;}
+export function rotationSnapshot(r){if(!r.rotation)return{};const {version,cursor,heats,paused,pausedUntil}=r.rotation;return{rotation:{version,cursor,heats:structuredClone(heats),paused,pausedUntil}};}
+export function rotationEndHeat(r){if(!r.rotation)return false;const heat=r.rotation.heats[r.rotation.cursor],follower=[...r.players.values()].find(p=>p.slot===heat.followerSlot),prior=r.rotation.heats.filter((h,i)=>i<r.rotation.cursor&&h.followerSlot===heat.followerSlot).reduce((n,h)=>n+(h.points??0),0);heat.points=Math.round(Math.max(0,(follower?.points??0)-prior)*10)/10;for(const p of r.players.values())p.points=rotationTable(r.rotation,[p.slot])[0].points;return r.rotation.cursor<r.rotation.heats.length-1;}
+/** Freeze simulation and its clock together. A missing original seat cancels the whole rotation after 15 s. */
+export function rotationPause(s,r,now){
+ if(!r.rotation||!['countdown','running'].includes(r.phase))return false;
+ const missing=[...r.players.values()].some(p=>!p.client||p.rotationConfirm===false);
+ if(missing){if(!r.rotation.paused){r.rotation.paused=true;r.rotation.pausedUntil=now+15000;r.rotation.remaining=Math.max(0,r.endsAt-Math.max(now,r.startAt));r.rotation.pauseAt=now;r.rotation.pauseTick=now;}const delta=Math.max(0,now-r.rotation.pauseTick);r.rotation.pauseTick=now;r.startAt+=delta;r.endsAt+=delta;r.simAt+=delta;for(const p of r.players.values()){p.input={steer:0,throttle:false,brake:false,handbrake:false,active:false};p.queue=[];p.car.vx=p.car.vz=p.car.w=0;}if(now>=r.rotation.pausedUntil){r.rotation.paused=false;r.rotation.pausedUntil=null;s.finish(r,'left',now);}else if(now-r.lastBroadcast>=50)s.broadcast(r,now);return true;}
+ if(r.rotation.paused){const delta=Math.max(0,now-r.rotation.pauseTick);r.startAt+=delta;r.endsAt+=delta;r.simAt+=delta;r.rotation.paused=false;r.rotation.pausedUntil=null;r.phase='countdown';r.startAt=now+3000;r.endsAt=r.startAt+r.rotation.remaining;r.simAt=r.startAt;for(const p of r.players.values()){p.ready=true;p.epoch++;p.queue=[];p.received=p.ack=0;}s.broadcast(r,now);return true;}return false;
+}

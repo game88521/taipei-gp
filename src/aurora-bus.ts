@@ -1,0 +1,33 @@
+/** Rex <game88521@gmail.com>. Deterministic service clock; isolated from campaign progress. */
+import { BUS_ROUTES, type DutyPlan, type DutyRecord } from './summit-city-duty';
+export const AURORA_BUS_STORAGE = 'taipei-gp-aurora-bus-v1';
+const STATIONS=BUS_ROUTES.flatMap(r=>r.demand.flatMap((d,leg)=>d.board?[{route:r.id,leg,initial:d.board}]:[]));
+export type BusDispatch = 'regular' | 'short' | 'extra';
+export interface BusShiftRecord { at:number; route:string; dispatch:BusDispatch; seconds:number; score:number; boarded:number; leftBehind:number; waiting:number }
+export interface BusOperationSave { v:1; clock:number; queues:number[]; served:number; shifts:BusShiftRecord[]; ledger?:{stops:string[];shifts:string[]} }
+const validNumber=(v:unknown,max:number)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=max;
+const keys=(v:object,k:string)=>Object.keys(v).sort().join(',')===k;
+export function parseBusOperation(raw:unknown):BusOperationSave|null {
+ if(!raw||typeof raw!=='object'||Array.isArray(raw)||!keys(raw,'ledger'in raw?'clock,ledger,queues,served,shifts,v':'clock,queues,served,shifts,v'))return null;
+ const v=raw as BusOperationSave;
+ if(v.v!==1||!validNumber(v.clock,1e9)||!Number.isSafeInteger(v.served)||!validNumber(v.served,1e9)||!Array.isArray(v.queues)||v.queues.length!==STATIONS.length||v.queues.some(n=>!validNumber(n,1000))||!Array.isArray(v.shifts)||v.shifts.length>30)return null;
+ for(const r of v.shifts)if(!r||typeof r!=='object'||!keys(r,'at,boarded,dispatch,leftBehind,route,score,seconds,waiting')||!validNumber(r.at,1e15)||!BUS_ROUTES.some(q=>q.id===r.route)||!['regular','short','extra'].includes(r.dispatch)||!validNumber(r.seconds,3600)||!Number.isInteger(r.score)||!validNumber(r.score,100)||![r.boarded,r.leftBehind,r.waiting].every(n=>Number.isSafeInteger(n)&&validNumber(n,3000)))return null;
+ if('ledger'in v&&(!v.ledger||typeof v.ledger!=='object'||Array.isArray(v.ledger)||!keys(v.ledger,'shifts,stops')||!Array.isArray(v.ledger.stops)||!Array.isArray(v.ledger.shifts)||v.ledger.stops.length>600||v.ledger.shifts.length>60||[...v.ledger.stops,...v.ledger.shifts].some(id=>typeof id!=='string'||!/^[a-f0-9-]{36}(?::[0-9])?$/.test(id))||new Set(v.ledger.stops).size!==v.ledger.stops.length||new Set(v.ledger.shifts).size!==v.ledger.shifts.length))return null;
+ return {v:1,clock:v.clock,queues:[...v.queues],served:v.served,shifts:v.shifts.map(r=>({...r})),...(v.ledger?{ledger:{stops:[...v.ledger.stops],shifts:[...v.ledger.shifts]}}:{})};
+}
+export class BusOperation {
+ value:BusOperationSave={v:1,clock:0,queues:STATIONS.map(r=>r.initial),served:0,shifts:[]};
+ error='';private readOnly=false;private lastSave=0;private expectedRaw:string|null=null;
+ constructor(private storage:Pick<Storage,'getItem'|'setItem'>|null,private canWrite:()=>boolean=()=>true){try{const raw=storage?.getItem(AURORA_BUS_STORAGE)??null;this.expectedRaw=raw;if(raw!==null){if(raw.length>100000)throw Error();const v=parseBusOperation(JSON.parse(raw));if(!v)throw Error();this.value=v;}}catch{this.readOnly=true;this.error='營運存檔無法讀取，原文保留；本頁可試玩，請先下載原文。';}}
+ tick(dt:number){if(!Number.isFinite(dt)||dt<=0||dt>.1)return;this.value.clock=Math.min(1e9,this.value.clock+dt);const peak=Math.floor(this.value.clock/300)%2===1?1.5:1;for(let i=0;i<this.value.queues.length;i++)this.value.queues[i]=Math.min(1000,this.value.queues[i]+dt*peak/[18,24,15,21][i]);if(this.value.clock-this.lastSave>=15)this.save();}
+ route(dispatch:BusDispatch,selected:string){if(dispatch==='short')return 'south';if(dispatch==='extra')return [...BUS_ROUTES].sort((a,b)=>this.waiting(b.id)-this.waiting(a.id))[0].id;return BUS_ROUTES.find(r=>r.id===selected)?.id??'south';}
+ waiting(route:string,index?:number){return this.value.queues.reduce((sum,n,i)=>sum+(STATIONS[i].route===route&&(index===undefined||STATIONS[i].leg===index)?Math.floor(n):0),0);}
+ configure(plan:DutyPlan){if(!plan.passengers)throw Error('營運需要乘客路線');plan.passengers.initial=0;plan.name+=' · 連續營運';this.refreshDemand(plan,0);}
+ refreshDemand(plan:DutyPlan,index:number){if(!plan.passengers)return;const original=BUS_ROUTES.find(r=>r.id===plan.passengers!.routeId);if(!original)return;const request=plan.passengers.requests[index];if(request)request.board=original.demand[index].board?this.waiting(original.id,index):0;}
+ served(plan:DutyPlan,index:number,boarded:number,eventId?:string){if(!Number.isSafeInteger(boarded)||boarded<0||boarded>32)throw Error('上車人數無效');if(eventId&&this.value.ledger?.stops.includes(eventId))return;const i=STATIONS.findIndex(r=>r.route===plan.passengers?.routeId&&r.leg===index);if(i>=0){this.value.queues[i]=Math.max(0,this.value.queues[i]-boarded);this.value.served+=boarded;if(eventId){this.value.ledger??={stops:[],shifts:[]};this.value.ledger.stops=[eventId,...this.value.ledger.stops].slice(0,600);}this.save();}}
+ finish(result:DutyRecord,dispatch:BusDispatch,eventId?:string){if(!result.service||eventId&&this.value.ledger?.shifts.includes(eventId))return;const service=result.service,waiting=this.waiting(service.routeId),score=Math.max(0,Math.round(result.score*.8+Math.min(20,service.boarded)-Math.min(20,service.leftBehind*.2)));const record:BusShiftRecord={at:result.at,route:service.routeId,dispatch,seconds:result.seconds,score,boarded:service.boarded,leftBehind:service.leftBehind,waiting};this.value.shifts=[record,...this.value.shifts].slice(0,30);if(eventId){this.value.ledger??={stops:[],shifts:[]};this.value.ledger.shifts=[eventId,...this.value.ledger.shifts].slice(0,60);}this.save();return record;}
+ save(){this.lastSave=this.value.clock;if(this.readOnly||!this.canWrite()){this.error='目前沒有營運存檔寫入權限，原文保留。';return false;}try{if(!this.storage)throw Error();if(this.storage.getItem(AURORA_BUS_STORAGE)!==this.expectedRaw){this.readOnly=true;this.error='另一頁或還原程序已更新營運資料，本頁改為唯讀；請下載本頁備份後重新載入。';return false;}const raw=JSON.stringify(this.value);this.storage.setItem(AURORA_BUS_STORAGE,raw);this.expectedRaw=raw;this.error='';return true;}catch{this.error='營運資料只保留本頁，請下載營運備份。';return false;}}
+ restore(text:string){if(text.length>100000)throw Error('營運備份過大');const v=parseBusOperation(JSON.parse(text));if(!v)throw Error('營運備份格式無效，原資料保留');if(!this.storage||!this.canWrite())throw Error('沒有存檔寫入權限，原文保留');if(this.storage.getItem(AURORA_BUS_STORAGE)!==this.expectedRaw)throw Error('營運存檔已由另一頁更新，請重新載入再還原');const raw=JSON.stringify(v);this.storage.setItem(AURORA_BUS_STORAGE,raw);if(this.storage.getItem(AURORA_BUS_STORAGE)!==raw)throw Error('營運還原後資料已變更，請重新載入');this.expectedRaw=raw;this.value=v;this.readOnly=false;this.error='';}
+ export(){return JSON.stringify(this.value,null,2);}
+ raw(){try{return this.storage?.getItem(AURORA_BUS_STORAGE)??this.export();}catch{return this.expectedRaw??this.export();}}
+}

@@ -16,3 +16,5 @@ services:
         value: 0.0.0.0
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: MERIDIAN_CHECKPOINT_SECRET
+        sync: false

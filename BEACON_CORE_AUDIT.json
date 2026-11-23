@@ -1,0 +1,203 @@
+{
+    "schema":  1,
+    "author":  "Rex \u003cgame88521@gmail.com\u003e",
+    "checkedAt":  "2026-11-23T06:41:02.0231269Z",
+    "status":  "PASS",
+    "baseline":  {
+                     "path":  "taipei-gp-beacon-baseline.json",
+                     "sha256":  "c6df3137160b11ec502169406c250207d25b78bdc2b2e01056ae89371f53d182",
+                     "capturedAt":  "2026-11-23T06:08:22.036Z",
+                     "head":  "c56ca26e04bb1f39c144a93454ae1bc8d09d6737",
+                     "beforeBuild":  "862f7f9c9857"
+                 },
+    "core":  [
+                 {
+                     "path":  "src/car.ts",
+                     "baselineSha256":  "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+                     "actualSha256":  "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+                     "baselineBytes":  5605,
+                     "actualBytes":  5605,
+                     "match":  true
+                 },
+                 {
+                     "path":  "src/track.ts",
+                     "baselineSha256":  "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+                     "actualSha256":  "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+                     "baselineBytes":  13424,
+                     "actualBytes":  13424,
+                     "match":  true
+                 },
+                 {
+                     "path":  "src/rivals.ts",
+                     "baselineSha256":  "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+                     "actualSha256":  "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+                     "baselineBytes":  57505,
+                     "actualBytes":  57505,
+                     "match":  true
+                 },
+                 {
+                     "path":  "src/pitlane.ts",
+                     "baselineSha256":  "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+                     "actualSha256":  "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+                     "baselineBytes":  51000,
+                     "actualBytes":  51000,
+                     "match":  true
+                 }
+             ],
+    "receipts":  [
+                     {
+                         "name":  "mobile-node",
+                         "immutable":  "tools/dev-tests/beacon-mobile-resources-node-evidence-1795414416771/report.json",
+                         "immutableSha256":  "9b4792573c6845ce5c42d5053977bbccba65f9f71b9affb66d982df678337a71",
+                         "latest":  "tools/dev-tests/beacon-mobile-resources-node-result.json",
+                         "latestSha256":  "9b4792573c6845ce5c42d5053977bbccba65f9f71b9affb66d982df678337a71",
+                         "latestRawBytesMatch":  true,
+                         "evidencePathMatch":  true,
+                         "status":  "PASS",
+                         "summary":  {
+                                         "PASS":  5,
+                                         "FAIL":  0
+                                     },
+                         "build":  null,
+                         "script":  "tools/dev-tests/beacon-mobile-resources-node.mjs",
+                         "scriptReceiptSha256":  "0e9c6c3b3fd50f43ebbfe0373d917d47e87b1c0620a4b2e0a0d1d9ac53be32f6",
+                         "scriptActualSha256":  "0e9c6c3b3fd50f43ebbfe0373d917d47e87b1c0620a4b2e0a0d1d9ac53be32f6",
+                         "scriptMatch":  true,
+                         "sources":  [
+                                         {
+                                             "path":  "src/city.ts",
+                                             "receiptSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "actualSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/beacon-mobile-resources.ts",
+                                             "receiptSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "actualSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/landmarks3d.ts",
+                                             "receiptSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "actualSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "match":  true
+                                         }
+                                     ],
+                         "priorSource":  {
+                                             "path":  "../taipei-gp-meridian-work/src/city.ts",
+                                             "receiptSha256":  "8ddcbb40cc04fa02aecf05061dcfc59f091229ad082b070c1dc86194e218f1a9",
+                                             "actualSha256":  "8ddcbb40cc04fa02aecf05061dcfc59f091229ad082b070c1dc86194e218f1a9",
+                                             "match":  true
+                                         },
+                         "sourceUnchangedDuringTests":  true,
+                         "scriptUnchangedDuringTests":  true,
+                         "cleanupComplete":  null
+                     },
+                     {
+                         "name":  "mobile-before",
+                         "immutable":  "tools/dev-tests/beacon-mobile-browser-before-evidence-1795415534306/report.json",
+                         "immutableSha256":  "6b8be3c5bd80c1d9fe882487656172f01ec995eb14bde551b044d8016ad47a18",
+                         "latest":  "tools/dev-tests/beacon-mobile-browser-before-result.json",
+                         "latestSha256":  "6b8be3c5bd80c1d9fe882487656172f01ec995eb14bde551b044d8016ad47a18",
+                         "latestRawBytesMatch":  true,
+                         "evidencePathMatch":  true,
+                         "status":  "PASS",
+                         "summary":  {
+                                         "PASS":  2,
+                                         "FAIL":  0
+                                     },
+                         "build":  "862f7f9c9857",
+                         "script":  "tools/dev-tests/beacon-mobile-browser.mjs",
+                         "scriptReceiptSha256":  "2c2f04b1699b560fbd9e3ada19a44216affde0bc59f71909e6d85bd7c9409267",
+                         "scriptActualSha256":  "2c2f04b1699b560fbd9e3ada19a44216affde0bc59f71909e6d85bd7c9409267",
+                         "scriptMatch":  true,
+                         "sources":  [
+                                         {
+                                             "path":  "src/city.ts",
+                                             "receiptSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "actualSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/beacon-mobile-resources.ts",
+                                             "receiptSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "actualSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/landmarks3d.ts",
+                                             "receiptSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "actualSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "tools/dev-tests/beacon-mobile-network.mjs",
+                                             "receiptSha256":  "b3b21de7fd4bb95978bc965859bcde89f0133d57986b64a51efccdcb30a79723",
+                                             "actualSha256":  "b3b21de7fd4bb95978bc965859bcde89f0133d57986b64a51efccdcb30a79723",
+                                             "match":  true
+                                         }
+                                     ],
+                         "priorSource":  null,
+                         "sourceUnchangedDuringTests":  true,
+                         "scriptUnchangedDuringTests":  true,
+                         "cleanupComplete":  true
+                     },
+                     {
+                         "name":  "mobile-after",
+                         "immutable":  "tools/dev-tests/beacon-mobile-browser-evidence-1795415644984/report.json",
+                         "immutableSha256":  "a67bff461c6f7adfb350ba2e33b2810d3f72a6a3b01da48259b6a97cc970b650",
+                         "latest":  "tools/dev-tests/beacon-mobile-browser-result.json",
+                         "latestSha256":  "a67bff461c6f7adfb350ba2e33b2810d3f72a6a3b01da48259b6a97cc970b650",
+                         "latestRawBytesMatch":  true,
+                         "evidencePathMatch":  true,
+                         "status":  "PASS",
+                         "summary":  {
+                                         "PASS":  2,
+                                         "FAIL":  0
+                                     },
+                         "build":  "fae95fac6d0e",
+                         "script":  "tools/dev-tests/beacon-mobile-browser.mjs",
+                         "scriptReceiptSha256":  "2c2f04b1699b560fbd9e3ada19a44216affde0bc59f71909e6d85bd7c9409267",
+                         "scriptActualSha256":  "2c2f04b1699b560fbd9e3ada19a44216affde0bc59f71909e6d85bd7c9409267",
+                         "scriptMatch":  true,
+                         "sources":  [
+                                         {
+                                             "path":  "src/city.ts",
+                                             "receiptSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "actualSha256":  "f659c074e2a05fc2bc67729c1e0dc03849063f1a11f188238c32da5b354e36c1",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/beacon-mobile-resources.ts",
+                                             "receiptSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "actualSha256":  "6eef6e1ef83a3f8f03e5c11d00c727b5c9fc47f7a87e4d6cac2cf4c3d42e0a6d",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "src/landmarks3d.ts",
+                                             "receiptSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "actualSha256":  "e363e34d1196b5113b9474c7237fa1d6f8d5d5e9c861fb43416b3f361989b4dd",
+                                             "match":  true
+                                         },
+                                         {
+                                             "path":  "tools/dev-tests/beacon-mobile-network.mjs",
+                                             "receiptSha256":  "b3b21de7fd4bb95978bc965859bcde89f0133d57986b64a51efccdcb30a79723",
+                                             "actualSha256":  "b3b21de7fd4bb95978bc965859bcde89f0133d57986b64a51efccdcb30a79723",
+                                             "match":  true
+                                         }
+                                     ],
+                         "priorSource":  null,
+                         "sourceUnchangedDuringTests":  true,
+                         "scriptUnchangedDuringTests":  true,
+                         "cleanupComplete":  true
+                     }
+                 ],
+    "currentDistBuild":  "fae95fac6d0e",
+    "issues":  [
+
+               ],
+    "limitations":  [
+                        "No browser, build, simulation or physical-phone test was executed by this audit.",
+                        "Receipt sourceHashes describe the work files at test time; the before browser build is identified separately as the actually served old dist build."
+                    ]
+}

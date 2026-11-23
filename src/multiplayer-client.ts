@@ -10,11 +10,15 @@ import { validateArenaSnapshot, type ArenaMode } from '../shared/multiplayer-are
 import {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas,expeditionSettings,validateExpedition,type ExpeditionSettings,type AtlasSettings,type AtlasPitService} from '../shared/atlas-racing';
 import type {VoyagerSettings} from '../shared/voyager-racing';
 import {odysseySettings,type OdysseySettings,voyagerSettings,summitSettings,validateSummit,type SummitSettings,type SummitTyre,FRONTIER_CUP_VERSION,validateCupSnapshot,type CupIntent,type CupCommand} from '../shared/summit-racing';
+import {AURORA_CUP_VERSION} from '../shared/frontier-cup';
+import {meridianSettings,validateMeridianRacing,type MeridianSettings} from '../shared/meridian-racing';
+import {MeridianCheckpointClient} from './meridian-checkpoint-client';
+import type {CheckpointKind} from '../shared/meridian-checkpoints';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
 type SnapshotListener = (room: RoomSnapshot) => void;
-type EntryKind = 'create' | 'join' | 'resume' | 'resume-series' | 'watch' | 'claim-seat' | 'create-configured';
+type EntryKind = 'create' | 'join' | 'resume' | 'resume-series' | 'watch' | 'claim-seat' | 'create-configured'|'checkpoint-restore';
 interface SavedSession {
   endpoint: string; code: string; playerId: string; token: string;
   version: number; physics: string; catalogStamp: string; savedAt: number;
@@ -28,7 +32,7 @@ const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const SERIES_SEATS_KEY = 'taipei-gp-multiplayer-series-seats-v1';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const,expeditionRacing:true as const,frontierCup:FRONTIER_CUP_VERSION as typeof FRONTIER_CUP_VERSION } };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { meridianRacing:true as const,roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const,expeditionRacing:true as const,frontierCup:FRONTIER_CUP_VERSION as typeof FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION as typeof AURORA_CUP_VERSION } };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -36,6 +40,7 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 /** 房間憑證只存在本分頁的 sessionStorage，完全不讀寫單人存檔。 */
 export class MultiplayerClient {
   readonly url: string;
+  readonly checkpoints:MeridianCheckpointClient;
   private socket: WebSocket | null = null;
   private connection: Promise<void> | null = null;
   private connectResolve: (() => void) | null = null;
@@ -85,7 +90,15 @@ export class MultiplayerClient {
     if (!['ws:', 'wss:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash) throw new Error('連線伺服器必須使用有效的 ws 或 wss 網址。');
     if (typeof location !== 'undefined' && location.protocol === 'https:' && endpoint.protocol !== 'wss:') throw new Error('HTTPS 遊戲頁面需要使用 wss 安全連線。');
     this.url = endpoint.href;
+    this.checkpoints=new MeridianCheckpointClient(this.url,m=>this.send(m as ClientMessage),()=>this.notify());
   }
+  setMeridian(settings:MeridianSettings){const r=this._room,parsed=meridianSettings(settings);if(!parsed||!r?.capabilities?.meridianRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-meridian',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  meridianTeam(team:'red'|'blue'){const r=this._room;if(r?.meridian?.settings.mode!=='relay-endurance'||!r.hostManagement||r.phase!=='lobby')return false;return this.command({type:'meridian-team',team,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  meridianHandoff(){const r=this._room,p=r?.players.find(p=>p.id===this.selfId);if(r?.meridian?.settings.mode!=='relay-endurance'||r.phase!=='racing'||!r.matchId||!p?.meridian?.active)return false;return this.command({type:'meridian-handoff',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,driverGeneration:p.meridian.generation,seq:++this.arenaSeq});}
+  meridianNext(){const r=this._room;if(!r?.meridian||r.hostId!==this.selfId||!r.hostManagement||r.phase!=='results')return false;return this.command({type:'meridian-next-stage',roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision,meridianRevision:r.meridian.revision});}
+  meridianClose(){const r=this._room;if(!r?.meridian||r.hostId!==this.selfId||!r.hostManagement)return false;return this.command({type:'meridian-close',roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  exportCheckpoint(){const r=this._room;if(!r?.hostManagement||r.hostId!==this.selfId||this.isSpectator)return false;return this.command({type:'checkpoint-export',roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision,...(r.meridian?{meridianRevision:r.meridian.revision}:{}),...(r.cup?{cupRevision:r.cup.revision}:{})});}
+  async restoreCheckpoint(ticket:string,kind?:CheckpointKind){if(this._room)throw Error('請先離開目前房間再恢復原席。');const proof=this.checkpoints.proof(ticket,kind);if(!proof)throw Error('沒有本機原席證明。');await this.enter('checkpoint-restore',{type:'checkpoint-restore',...identity,...proof});}
 
   get status() { return this._status; }
   get error() { return this._error; }
@@ -337,7 +350,7 @@ export class MultiplayerClient {
     if (ready && room && !room.players.find(player => player.id === this._selfId)?.loaded) {
       this._error = '請等目前地圖載入完成後再準備。'; this.notify(); return false;
     }
-    return this.command({ type: 'ready', ready, trackRevision: room?.trackRevision ?? 0, trackStamp: room?.trackStamp ?? '',...(room?.cup?{cupReady:{cupId:room.cup.id,cupRevision:room.cup.revision,lobbyRevision:room.hostManagement?.lobbyRevision??0}}:{}) });
+    return this.command({ type: 'ready', ready, trackRevision: room?.trackRevision ?? 0, trackStamp: room?.trackStamp ?? '',...(room?.meridian?{meridianRevision:room.meridian.revision,lobbyRevision:room.hostManagement?.lobbyRevision??0}:{}),...(room?.cup?{cupReady:{cupId:room.cup.id,cupRevision:room.cup.revision,lobbyRevision:room.hostManagement?.lobbyRevision??0}}:{}) });
   }
   start() { return this.command({ type: 'start', trackRevision: this._room?.trackRevision ?? 0 }); }
   reset() { return this.command({ type: 'reset' }); }
@@ -367,7 +380,7 @@ export class MultiplayerClient {
   sendInput(steer: number, brake: boolean) {
     if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
     const self = this._room.players.find(player => player.id === this._selfId);
-    if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false || self?.cup?.active===false) return false;
+    if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false || self?.cup?.active===false||self?.meridian?.active===false) return false;
     if (!self || self.dnf || self.finishMs !== null || self.timeTrialDone) return false;
     if (this._room.evolution?.mode === 'pursuit' && this._room.startAt !== null
       && this.serverNow() < this._room.startAt + (this._room.evolution.releaseDelays[self.id] ?? 0) * 1000) return false;
@@ -378,7 +391,7 @@ export class MultiplayerClient {
       return false;
     }
     this.lastInputAt = now; this.lastInputBrake = brake;
-    return this.send({ type: 'input', matchId: this._room.matchId, trackRevision: this._room.trackRevision, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake });
+    return this.send({ type: 'input', matchId: this._room.matchId, trackRevision: this._room.trackRevision, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake,...(self.meridian?{driverGeneration:self.meridian.generation}:{}) });
   }
 
   leave() {
@@ -453,6 +466,7 @@ export class MultiplayerClient {
     if (typeof data !== 'string' || data.length > 131072) throw new Error('伺服器回傳的訊息格式不正確。');
     const raw: unknown = JSON.parse(data);
     if (!object(raw) || typeof raw.type !== 'string') throw new Error('伺服器回傳的訊息格式不正確。');
+    if(this.checkpoints.receive(raw))return;
     const message = raw as unknown as ServerMessage;
     if(message.type==='replay-part'){
       const p=this.replayPending;if(!p)return;
@@ -550,8 +564,9 @@ export class MultiplayerClient {
     const replayCap=object(room.capabilities)?room.capabilities.replay:undefined;
     if(replayCap!==undefined&&replayCap!==true||'replay' in room&&(replayCap!==true||room.replay!==null&&!validReplayDescriptor(room.replay)))throw Error('回放能力或錄製狀態格式不正確。');
     validateArenaSnapshot(room);
-    validateSummit(room);validateAtlas(room);validateExpedition(room);validateCupSnapshot(room);
-    const summit=object(room.summit)?room.summit:undefined,summitQual=summit?.stage==='qualifying',summitEndurance=!!summit&&!summitQual&&object(summit.settings)&&Number(summit.settings.endurance)>0,summitTimed=summitQual||summitEndurance;
+    validateSummit(room);validateAtlas(room);validateExpedition(room);validateCupSnapshot(room);validateMeridianRacing(room);
+    const meridianQual=object(room.meridian)&&room.meridian.stage==='qualifying';
+    const summit=object(room.summit)?room.summit:undefined,summitQual=summit?.stage==='qualifying'||meridianQual,summitEndurance=!!summit&&!summitQual&&object(summit.settings)&&Number(summit.settings.endurance)>0,summitTimed=summitQual||summitEndurance;
     const practice=object(room.voyager)&&object(room.voyager.settings)&&Number(room.voyager.settings.practiceSeconds)>0;
     const elimination=object(room.horizon)&&room.horizon.elimination===true;
     if ('hostManagement' in room && (!object(room.hostManagement) || !Number.isSafeInteger(room.hostManagement.lobbyRevision) || Number(room.hostManagement.lobbyRevision) < 1)) throw new Error('房主管理版本格式不正確，請重新連線。');
@@ -593,7 +608,7 @@ export class MultiplayerClient {
       // complete, bounded and internally consistent server timing record.
       if ('lapTimesMs' in player || 'bestLapMs' in player) {
         const times = player.lapTimesMs;
-        const validLaps=practice&&object(player.voyager)?player.voyager.validLaps:summitQual&&object(player.summit)?player.summit.validLaps:null;
+        const validLaps=practice&&object(player.voyager)?player.voyager.validLaps:meridianQual&&object(player.meridian)?player.meridian.validLaps:summitQual&&object(player.summit)?player.summit.validLaps:null;
         const bestTimes=summitQual||practice?validLaps:times;
         // Each authoritative lap and the total are independently rounded to 0.001 ms.
         const lapTotalTolerance = Math.max(0.003, (player.completedLaps + 1) * 0.0005) + 1e-7;

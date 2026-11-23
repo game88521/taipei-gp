@@ -26,12 +26,12 @@ export function practiceGhostAt(ghost:PracticeGhost,at:number):PracticePose{
  const t=Math.max(0,Math.min(ghost.durationMs,at));let lo=0,hi=ghost.frames.length-1;while(lo<hi){const mid=(lo+hi+1)>>1;if(ghost.frames[mid][0]<=t)lo=mid;else hi=mid-1;}const a=ghost.frames[lo],b=ghost.frames[Math.min(lo+1,ghost.frames.length-1)],u=(t-a[0])/(b[0]-a[0]||1),lerp=(index:number)=>a[index]+(b[index]-a[index])*u;
  return{x:lerp(1),z:lerp(2),y:lerp(3),h:angle(a[4]+angle(b[4]-a[4])*u),vx:lerp(5),vz:lerp(6),pitch:lerp(7),roll:lerp(8)};
 }
-export function practiceQuality(lead:PracticePose,follow:PracticePose,contact=false):PracticeReadout{
+export function practiceQuality(lead:PracticePose,follow:PracticePose,contact=false,minSlip=.14):PracticeReadout{
  const output:PracticeReadout={quality:0,reason:'invalid',gap:0,side:0,distance:0,slipDeg:0,headingDeg:0};if(!validPose(lead)||!validPose(follow))return output;
  const dx=lead.x-follow.x,dz=lead.z-follow.z,gap=dx*Math.sin(lead.h)+dz*Math.cos(lead.h),side=Math.abs(dx*Math.cos(lead.h)-dz*Math.sin(lead.h)),heading=Math.abs(angle(lead.h-follow.h)),forward=follow.vx*Math.sin(follow.h)+follow.vz*Math.cos(follow.h),lateral=follow.vx*Math.cos(follow.h)-follow.vz*Math.sin(follow.h),slip=Math.abs(Math.atan2(lateral,forward));
  Object.assign(output,{gap,side,distance:Math.hypot(dx,dz),slipDeg:slip*180/Math.PI,headingDeg:heading*180/Math.PI});
- output.reason=contact?'contact':Math.abs(lead.y-follow.y)>=1.8?'height':gap<0?'ahead':gap<3?'near':gap>25?'far':side>8?'side':heading>.7?'heading':Math.hypot(lead.vx,lead.vz)<7||Math.hypot(follow.vx,follow.vz)<7||forward<3?'slow':slip<.14?'lowSlip':slip>1.05?'highSlip':'good';
- if(output.reason==='good')output.quality=Math.max(0,Math.min(1,(1-Math.abs(gap-12)/22)*Math.min(1,slip/.5)*(1-side/12)));return output;
+ output.reason=contact?'contact':Math.abs(lead.y-follow.y)>=1.8?'height':gap<0?'ahead':gap<3?'near':gap>25?'far':side>8?'side':heading>.7?'heading':Math.hypot(lead.vx,lead.vz)<7||Math.hypot(follow.vx,follow.vz)<7||forward<3?'slow':slip<minSlip?'lowSlip':slip>1.05?'highSlip':'good';
+ if(output.reason==='good')output.quality=Math.max(0,Math.min(1,(1-Math.abs(gap-12)/22)*(minSlip===0?1:Math.min(1,slip/.5))*(1-side/12)));return output;
 }
 export class PracticeRecorder{
  elapsed=0;reason='';private frames:PracticeFrame[]=[];private last:PracticePose;private stopped=false;
@@ -48,8 +48,8 @@ export class PracticeFollower{
  elapsed=0;score=0;goodSeconds=0;combo=0;maxCombo=0;finished=false;readout:PracticeReadout|null=null;
  readonly reasons=Object.fromEntries(Object.keys(PRACTICE_REASONS).map(key=>[key,0])) as Record<PracticeReason,number>;
  private contactUntil=0;private invalid=false;private emitted=false;
- constructor(readonly ghost:PracticeGhost,readonly id=practiceId()){}
- step(dt:number,c:PracticePose,hit=0){if(this.finished)return;if(!num(dt,.000001,.100001)||!validPose(c)){this.invalid=true;this.finished=true;return;}const used=Math.min(dt,(this.ghost.durationMs-this.elapsed)/1000);this.elapsed=Math.min(this.ghost.durationMs,this.elapsed+used*1000);if(hit>2)this.contactUntil=this.elapsed+1000;const read=this.readout=practiceQuality(practiceGhostAt(this.ghost,this.elapsed),c,this.elapsed<this.contactUntil);this.reasons[read.reason]+=used;this.score+=read.quality*used*100;if(read.quality>0){this.goodSeconds+=used;this.combo+=used;this.maxCombo=Math.max(this.maxCombo,this.combo);}else this.combo=0;if(this.elapsed>=this.ghost.durationMs-.001)this.finished=true;}
+ constructor(readonly ghost:PracticeGhost,readonly id=practiceId(),readonly minSlip=.14){if(!num(minSlip,0,.14))throw Error('陪練滑角規則無效');}
+ step(dt:number,c:PracticePose,hit=0){if(this.finished)return;if(!num(dt,.000001,.100001)||!validPose(c)){this.invalid=true;this.finished=true;return;}const used=Math.min(dt,(this.ghost.durationMs-this.elapsed)/1000);this.elapsed=Math.min(this.ghost.durationMs,this.elapsed+used*1000);if(hit>2)this.contactUntil=this.elapsed+1000;const read=this.readout=practiceQuality(practiceGhostAt(this.ghost,this.elapsed),c,this.elapsed<this.contactUntil,this.minSlip);this.reasons[read.reason]+=used;this.score+=read.quality*used*100;if(read.quality>0){this.goodSeconds+=used;this.combo+=used;this.maxCombo=Math.max(this.maxCombo,this.combo);}else this.combo=0;if(this.elapsed>=this.ghost.durationMs-.001)this.finished=true;}
  invalidate(){this.invalid=true;this.finished=true;}
  result(at=Date.now()):PracticeResult|null{if(!this.finished||this.invalid||this.emitted)return null;const result={id:this.id,at,ghostId:this.ghost.id,seconds:this.elapsed/1000,score:this.score,goodSeconds:this.goodSeconds,maxCombo:this.maxCombo,reasons:{...this.reasons}};if(!parsePracticeResults([result]))return null;this.emitted=true;return result;}
 }

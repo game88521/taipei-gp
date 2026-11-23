@@ -11,10 +11,11 @@ import type {AtlasState,AtlasPlayer,AtlasSettings,AtlasPitService} from './atlas
 import type {SummitState,SummitPlayer,SummitSettings,SummitTyre} from './summit-racing';
 import type {OdysseyState,OdysseyPlayer,OdysseySettings} from './odyssey-racing';
 import type {ExpeditionRaceState,ExpeditionPenalty,ExpeditionSettings} from './expedition-racing';
-import type {FrontierCupState,CupIntent,CupCommand,CupReadyBinding,FRONTIER_CUP_VERSION} from './frontier-cup';
+import type {FrontierCupState,CupIntent,CupCommand,CupReadyBinding,FRONTIER_CUP_VERSION,AURORA_CUP_VERSION} from './frontier-cup';
 export { validSeries, validSeriesTracks } from './multiplayer-series.ts';
 
 export type { CarState };
+import type {MeridianSettings,MeridianRacingState,MeridianRacingPlayer} from './meridian-racing';
 export const PROTOCOL_VERSION = 2;
 // Collision response changes authority and prediction even though the wire
 // schema remains v2. Both peers must use the same physical rules.
@@ -71,6 +72,7 @@ export interface RoomPlayer {
   odyssey?:OdysseyPlayer;
   expedition?:ExpeditionPenalty;
   cup?:{active:boolean;seed:1|2|3|4};
+  meridian?:MeridianRacingPlayer;
   gridIndex?: number;
   eliminated?: boolean;
   eliminationWinner?: boolean;
@@ -89,7 +91,8 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
   /** Additive v2 capability; absent on older servers. Commands bind this lobby generation. */
   hostManagement?: { lobbyRevision: number };
   /** Optional additive capabilities. Older servers omit these controls. */
-  capabilities?: { lobbyOptions: true; championship: true; roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;seriesResume?: { persistent: boolean; ttlSeconds: number } };
+  capabilities?: { lobbyOptions: true; championship: true; meridianRacing?:true;roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION;seriesResume?: { persistent: boolean; ttlSeconds: number } };
+  meridian?:MeridianRacingState;
   cup?:FrontierCupState|null;
   replay?: ReplayDescriptor | null;
   arena?: ArenaState;
@@ -117,8 +120,16 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
 }
 
 type Request = { requestId?: string };
-type ClientCapabilities = { clientCapabilities?: { roomRules: true; evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION } };
+type ClientCapabilities = { clientCapabilities?: { roomRules: true; meridianRacing?:true;evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION } };
 export type ClientMessage =
+  | {type:'set-meridian';settings:MeridianSettings;roomCode:string;expectedLobbyRevision:number}
+  | {type:'meridian-team';team:'red'|'blue';roomCode:string;expectedLobbyRevision:number}
+  | {type:'meridian-next-stage';roomCode:string;expectedLobbyRevision:number;meridianRevision:number}
+  | {type:'meridian-close';roomCode:string;expectedLobbyRevision:number}
+  | {type:'meridian-handoff';roomCode:string;matchId:string;trackRevision:number;seq:number;driverGeneration:number}
+  | {type:'checkpoint-export';roomCode:string;expectedLobbyRevision:number;meridianRevision?:number;cupRevision?:number}
+  | {type:'checkpoint-ack';id:string;seatId:string;secret:string}
+  | ({type:'checkpoint-restore';ticket:string;seatId:string;secret:string}&Compatibility&Request&ClientCapabilities)
   | ({type:CupCommand}&CupIntent)
   | {type:'set-expedition';roomCode:string;expectedLobbyRevision:number;settings:ExpeditionSettings}
   | {type:'set-odyssey';roomCode:string;expectedLobbyRevision:number;settings:OdysseySettings}
@@ -156,14 +167,16 @@ export type ClientMessage =
   | { type: 'end-series'; roomCode: string; expectedLobbyRevision: number }
   | { type: 'next-series'; roomCode: string; matchId: string; expectedSeriesRevision: number }
   | ({ type: 'track-loaded' } & TrackSelection)
-  | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string;cupReady?:CupReadyBinding }
+  | { type: 'ready'; ready: boolean; trackRevision: number; trackStamp: string;cupReady?:CupReadyBinding;meridianRevision?:number;lobbyRevision?:number }
   | { type: 'start'; trackRevision: number }
   | { type: 'reset' }
   | { type: 'leave' }
-  | { type: 'input'; matchId: string; trackRevision: number; seq: number; steer: number; brake: boolean }
+  | { type: 'input'; matchId: string; trackRevision: number; seq: number; steer: number; brake: boolean;driverGeneration?:number }
   | { type: 'ping'; sentAt: number };
 
 export type ServerMessage =
+  | {type:'checkpoint-seat';v:'meridian-checkpoints-v1';ticket:string;seatId:string;secret:string;persistentSigning:boolean}
+  | {type:'checkpoint-state';v:'meridian-checkpoints-v1';id:string;acks:number;required:number;ready:boolean;persistentSigning:boolean;ticket:string|null}
   | { type: 'replay-part'; replayId: string; offset: number; totalChars: number; text: string }
   | ({ type: 'watching'; spectatorId: string; room: RoomSnapshot } & Request)
   | { type: 'series-checkpoint'; token: string; expiresAt: number; persistent: boolean }

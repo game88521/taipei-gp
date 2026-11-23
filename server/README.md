@@ -76,3 +76,15 @@ docker run --rm -p 4320:4320 -e ALLOWED_ORIGINS=https://your-game.example taipei
 700ms 無新 input 自動煞車；斷線十秒可持 token 重連；一般競速在第一人完賽後依房規給予 30／60／120 秒寬限，全場十分鐘為上限。限時最快圈則依所選 3／5 分鐘結束計時，期限前已開始的最後一圈可在房規寬限內完成。伺服器停頓超過五秒中止未完成者。此版本沒有行車輸入以外的完整反濫用或公平網路認證：不宣稱抵擋自動駕駛、修改客戶端輔助或惡意流量攻擊。
 
 測試可 import `createMultiplayerServer({now, autoTick:false, allowedOrigins})`，透過 `httpServer.listen(0,'127.0.0.1')` 取得隔離隨機埠，再以 `service.tick(now)` 快進。只有程式內測試能呼叫 tick／檢視房間；網路協定沒有作弊或跳終點指令。測完呼叫 `await close()`，不影響其他既有服務。
+# Meridian 新增能力與站間續局
+
+作者：Rex <game88521@gmail.com>。
+
+`/city-mission` 提供 NG3 2～4 人合作及單人／好友照片尋寶，沿用同一來源白名單、總連線限制與城市路網。前後端須一起建置；`/health` 的 `meridian`、`cityMission` 及 `/diagnostics` 可核對新版本。Docker COPY 與專用 ignore 必須保留 Meridian 模組；只靜態驗閉包不代表已執行容器測試。
+
+`MERIDIAN_CHECKPOINT_SECRET` 是僅供伺服器使用、固定保存的 **64 個小寫十六進位字元**。管理者可在自己的終端用 `node -p "require('node:crypto').randomBytes(32).toString('hex')"` 產生後存入服務的秘密環境變數；不要貼進對話、前端、Git、備份或測試報告。新建 Blueprint 已列為私密手動欄位，既有 Render 服務須在下次授權部署時設定。更換或遺失金鑰會使舊續局碼失效。
+
+缺少此設定仍可玩遊戲，但每次程序啟動會更換暫時簽章，介面會明示無法保證重啟後恢復；不能宣稱免費主機休眠／重啟後仍能跨日續局。持久金鑰只保證相容版本可驗真，不提供跨程序共享房間、持久資料庫或全域一次性兌換鎖。
+
+續局只在派對／好友盃／跨圖錦標賽的**站間**保存公開賽程與積分。每位原隊員還須保留同一瀏覽器的私密恢復證明並全員確認；不能代朋友佔席。整包備份只納入公開簽章摘要，刻意排除 `taipei-gp-meridian-private-continuation-v1`、token 與其他私席資料。公開續局碼不能取代各人的私密證明，也不會恢復行駛中的車輛。
+

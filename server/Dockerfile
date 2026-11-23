@@ -18,6 +18,8 @@ COPY shared/frontier-city-replay.ts /app/shared/
 COPY shared/frontier-city-resume.ts /app/shared/
 COPY shared/frontier-convoy.ts /app/shared/
 COPY shared/frontier-rally.ts shared/frontier-duty-missions.ts /app/shared/
+COPY server/aurora-social-service.mjs server/aurora-duty-service.mjs ./
+COPY shared/aurora-social.ts shared/aurora-duty.ts /app/shared/
 COPY src/data/track.json /app/src/data/
 COPY public/data/circuits/*.json /app/public/data/circuits/
 COPY server/summit-city-race-service.mjs server/summit-city-physics.mjs ./
@@ -33,3 +35,6 @@ COPY server/frontier-crown-service.mjs ./
 COPY shared/frontier-crown.ts /app/shared/
 COPY server/frontier-cup-service.mjs ./
 COPY shared/frontier-cup.ts /app/shared/
+
+COPY server/meridian-*.mjs ./
+COPY shared/meridian-*.ts /app/shared/
