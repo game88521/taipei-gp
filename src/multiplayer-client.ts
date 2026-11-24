@@ -14,6 +14,7 @@ import {AURORA_CUP_VERSION} from '../shared/frontier-cup';
 import {meridianSettings,validateMeridianRacing,type MeridianSettings} from '../shared/meridian-racing';
 import {MeridianCheckpointClient} from './meridian-checkpoint-client';
 import type {CheckpointKind} from '../shared/meridian-checkpoints';
+import {HARBOR_NETWORK_VERSION,harborNetworkFrozen,validateHarborNetwork} from '../shared/harbor-network-pause';
 
 export type MultiplayerConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 type StateListener = (client: MultiplayerClient) => void;
@@ -32,7 +33,7 @@ const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const SERIES_SEATS_KEY = 'taipei-gp-multiplayer-series-seats-v1';
 const CONNECT_TIMEOUT = 7000, ENTRY_TIMEOUT = 7000, RECONNECT_WINDOW = 10000;
 const HEARTBEAT_INTERVAL = 1500, HEARTBEAT_TIMEOUT = 6500;
-const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { meridianRacing:true as const,roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const,expeditionRacing:true as const,frontierCup:FRONTIER_CUP_VERSION as typeof FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION as typeof AURORA_CUP_VERSION } };
+const identity = { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP, clientCapabilities: { harborNetworkPause:HARBOR_NETWORK_VERSION as typeof HARBOR_NETWORK_VERSION,meridianRacing:true as const,roomRules: true as const, evolution: true as const, horizon: true as const, nexusArena: true as const,summit:true as const,atlasRacing:true as const,voyagerRacing:true as const,odysseyRacing:true as const,expeditionRacing:true as const,frontierCup:FRONTIER_CUP_VERSION as typeof FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION as typeof AURORA_CUP_VERSION } };
 const clock = () => performance.now();
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -82,6 +83,8 @@ export class MultiplayerClient {
   private preservedSeatKey = '';
   private spectatorId: string | null = null;
   private _horizonAvailable = false;
+  private capabilitySocket: WebSocket | null = null;
+  private roomPresetHandshake: {socket:WebSocket;promise:Promise<void>;timer:ReturnType<typeof setTimeout>;resolve:()=>void;reject:(error:Error)=>void}|null=null;
   private replayPending: { id: string; offset: number; total: number | null; chunks: string[]; timer: ReturnType<typeof setTimeout>; resolve: (value: MultiplayerReplay) => void; reject: (error: Error) => void } | null = null;
 
   constructor(url: string) {
@@ -92,6 +95,8 @@ export class MultiplayerClient {
     this.url = endpoint.href;
     this.checkpoints=new MeridianCheckpointClient(this.url,m=>this.send(m as ClientMessage),()=>this.notify());
   }
+  setHarborNetwork(enabled:boolean){const r=this._room;if(!r||r.capabilities?.harborNetworkPause!==HARBOR_NETWORK_VERSION||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-harbor-network',enabled,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
+  confirmHarborNetwork(){const r=this._room,n=r?.harborNetwork,p=r?.players.find(p=>p.id===this.selfId);if(!r||!n?.enabled||n.phase!=='waiting'||!r.matchId||!p?.loaded||p.dnf||!n.incidents.some(i=>i.playerId===p.id&&!i.confirmed&&i.deadlineAt>this.serverNow()))return false;return this.command({type:'harbor-network-confirm',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,trackStamp:r.trackStamp,epoch:n.epoch});}
   setMeridian(settings:MeridianSettings){const r=this._room,parsed=meridianSettings(settings);if(!parsed||!r?.capabilities?.meridianRacing||r.phase!=='lobby'||r.hostId!==this.selfId||!r.hostManagement||this.isSpectator)return false;return this.command({type:'set-meridian',settings:parsed,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
   meridianTeam(team:'red'|'blue'){const r=this._room;if(r?.meridian?.settings.mode!=='relay-endurance'||!r.hostManagement||r.phase!=='lobby')return false;return this.command({type:'meridian-team',team,roomCode:r.code,expectedLobbyRevision:r.hostManagement.lobbyRevision});}
   meridianHandoff(){const r=this._room,p=r?.players.find(p=>p.id===this.selfId);if(r?.meridian?.settings.mode!=='relay-endurance'||r.phase!=='racing'||!r.matchId||!p?.meridian?.active)return false;return this.command({type:'meridian-handoff',roomCode:r.code,matchId:r.matchId,trackRevision:r.trackRevision,driverGeneration:p.meridian.generation,seq:++this.arenaSeq});}
@@ -238,6 +243,7 @@ export class MultiplayerClient {
     if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve();
     if (this.connection) return this.connection;
     this.clearReconnectTimer();
+    this._horizonAvailable=false;this.capabilitySocket=null;
     this._status = this.reconnectDeadline ? 'reconnecting' : 'connecting';
     if (!this.reconnectDeadline) this._error = null;
     this.notify();
@@ -282,6 +288,26 @@ export class MultiplayerClient {
     socket.addEventListener('close', () => this.closed(socket));
     socket.addEventListener('error', () => this.failSocket(socket, '連線失敗，請確認伺服器已啟動及網路可用。'));
     return promise;
+  }
+
+  /** Wait for this socket's validated pong, not just open. A negative capability
+   * completes the handshake so createConfigured rejects without a retry or write. */
+  async connectRoomPresets():Promise<void>{
+    await this.connect();
+    const socket=this.socket;
+    if(!socket||socket.readyState!==WebSocket.OPEN)throw Error('連線已中斷，尚未確認房間範本功能。');
+    if(this.capabilitySocket===socket)return;
+    if(this.roomPresetHandshake?.socket===socket)return this.roomPresetHandshake.promise;
+    let resolve!:()=>void,reject!:(error:Error)=>void;
+    const promise=new Promise<void>((ok,fail)=>{resolve=ok;reject=fail;});
+    const timer=setTimeout(()=>this.failSocket(socket,'確認房間範本功能逾時，請重新連線後再試。'),CONNECT_TIMEOUT);
+    this.roomPresetHandshake={socket,promise,timer,resolve,reject};
+    return promise;
+  }
+  private settleRoomPresetHandshake(socket:WebSocket,error?:Error){
+    const pending=this.roomPresetHandshake;if(!pending||pending.socket!==socket)return;
+    this.roomPresetHandshake=null;clearTimeout(pending.timer);
+    if(error)pending.reject(error);else pending.resolve();
   }
 
   async create(name: string, laps: 1 | 3 | 5 = 3, trackId = DEFAULT_MULTIPLAYER_TRACK_ID) {
@@ -378,6 +404,7 @@ export class MultiplayerClient {
 
   /** 最多約 30 次／秒；緊急煞車不等待下一個傳送時槽。 */
   sendInput(steer: number, brake: boolean) {
+    if(harborNetworkFrozen(this._room))return false;
     if (!finite(steer) || !this.authenticated || this._status !== 'connected' || this._room?.phase !== 'racing' || !this._room.matchId || !this._room.players.find(player => player.id === this._selfId)?.loaded) return false;
     const self = this._room.players.find(player => player.id === this._selfId);
     if (self?.eliminated || self?.eliminationWinner || self?.block?.ghost || self?.arena?.active===false || self?.cup?.active===false||self?.meridian?.active===false) return false;
@@ -391,7 +418,7 @@ export class MultiplayerClient {
       return false;
     }
     this.lastInputAt = now; this.lastInputBrake = brake;
-    return this.send({ type: 'input', matchId: this._room.matchId, trackRevision: this._room.trackRevision, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake,...(self.meridian?{driverGeneration:self.meridian.generation}:{}) });
+    return this.send({ type: 'input', matchId: this._room.matchId, trackRevision: this._room.trackRevision, seq: ++this.inputSeq, steer: Math.max(-1, Math.min(1, steer)), brake,...(this._room.harborNetwork?.enabled?{harborEpoch:this._room.harborNetwork.epoch}:{}),...(self.meridian?{driverGeneration:self.meridian.generation}:{}) });
   }
 
   leave() {
@@ -492,6 +519,8 @@ export class MultiplayerClient {
       if (began === undefined) return;
       this.pings.delete(message.sentAt);
       this._horizonAvailable = message.capabilities?.horizon === true;
+      this.capabilitySocket=this.socket;
+      if(this.socket)this.settleRoomPresetHandshake(this.socket);
       const now = clock(), rtt = Math.max(0, now - began);
       const sample = { rtt, offset: message.serverTime - (message.sentAt + rtt / 2), at: now };
       this.clockSamples = [...this.clockSamples.filter(s => now - s.at < 15000), sample].slice(-8);
@@ -564,7 +593,7 @@ export class MultiplayerClient {
     const replayCap=object(room.capabilities)?room.capabilities.replay:undefined;
     if(replayCap!==undefined&&replayCap!==true||'replay' in room&&(replayCap!==true||room.replay!==null&&!validReplayDescriptor(room.replay)))throw Error('回放能力或錄製狀態格式不正確。');
     validateArenaSnapshot(room);
-    validateSummit(room);validateAtlas(room);validateExpedition(room);validateCupSnapshot(room);validateMeridianRacing(room);
+    validateSummit(room);validateAtlas(room);validateExpedition(room);validateCupSnapshot(room);validateMeridianRacing(room);validateHarborNetwork(room);
     const meridianQual=object(room.meridian)&&room.meridian.stage==='qualifying';
     const summit=object(room.summit)?room.summit:undefined,summitQual=summit?.stage==='qualifying'||meridianQual,summitEndurance=!!summit&&!summitQual&&object(summit.settings)&&Number(summit.settings.endurance)>0,summitTimed=summitQual||summitEndurance;
     const practice=object(room.voyager)&&object(room.voyager.settings)&&Number(room.voyager.settings.practiceSeconds)>0;
@@ -633,6 +662,8 @@ export class MultiplayerClient {
     this._horizonAvailable=room.capabilities?.horizon===true;
     if (this.credentials && room.code !== this.credentials.code) return;
     const previousRoom = this._room;
+    if(previousRoom?.matchId===room.matchId&&previousRoom?.harborNetwork&&room.harborNetwork&&room.harborNetwork.epoch<previousRoom.harborNetwork.epoch)return;
+    if(previousRoom?.harborNetwork?.epoch!==room.harborNetwork?.epoch){this.lastInputAt=-Infinity;this.lastInputBrake=true;}
     if (previousRoom?.hostManagement && room.hostManagement && room.hostManagement.lobbyRevision < previousRoom.hostManagement.lobbyRevision) return;
     if (previousRoom?.series && room.series?.id === previousRoom.series.id && room.series.revision < previousRoom.series.revision) return;
     if (previousRoom?.cup && room.cup?.id === previousRoom.cup.id && room.cup.revision < previousRoom.cup.revision) return;
@@ -682,6 +713,8 @@ export class MultiplayerClient {
   private closed(socket: WebSocket, reason = '連線中斷，正在重新連線。') {
     if (this.socket !== socket) return;
     this.socket = null; this.authenticated = false;
+    this._horizonAvailable=false;this.capabilitySocket=null;
+    this.settleRoomPresetHandshake(socket,new Error(reason));
     this.rejectReplay('連線已中斷，回放尚未取得。');
     this._connectionGeneration++;
     this.clearConnectTimer(); this.clearHeartbeat();

@@ -1,3 +1,39 @@
+<!-- harbor-release-20261124 -->
+# 2026-11-24 Harbor 新版發布準備
+
+作者：Rex <game88521@gmail.com>。使用者已授權「幫我上新版」；本次將已獨立套回驗證的 Harbor 51 檔，提交並正常推送 main 與 multiplayer-test。原網址 https://taipei-gp.vercel.app/ 與公開多人端點 wss://taipei-gp.onrender.com/ws 保持。實際提交、推送、Vercel 正式部署與 Render 狀態以 DCISI/taipei-harbor-release-receipt.json 與 TAIPEI_HARBOR_RELEASE.md 為準；本段不代替成功收據。
+
+功能包含：站間續局設定檢查、iPhone／Safari 生命週期與鍵盤處理、閱讀字級／modal 背景隔離、私人競速短斷線同步暫停、四玩法與 24 圖三步快速開房。封版 f15b569a01d7、122 PASS／0 FAIL、完整建置與固定三基準均已核對；四核心原始 bytes 未改。正式公開 WSS 設定的建置與新的固定三基準另記 release 收據，不改寫原功能驗證與原始 FAIL。發布只在 HANDOFF 加此前綴，不改產品來源或其他功能文件。
+
+Rex 已回覆兩個固定私密金鑰 MERIDIAN_CHECKPOINT_SECRET 與 SERIES_RESUME_SECRET「兩個都已設定並保留」；這是使用者設定確認，生效狀態仍以新版後端的 health 布林欄位核對。保留有效原值，金鑰不進前端、Git 或測試證據。固定簽章只提供站間驗簽，不代表行駛中持久化或跨程序防重播資料庫。
+
+Render 前次設定為手動部署；沒有成功部署證據前不能宣稱後端已更新。只讀公開部署中繼資料、靜態版本與 health，不在正式站開房或試玩。iPhone 17／Safari／VoiceOver 實機、外網真人與免費服務容量仍未驗。
+
+以下完整保留本輪 HANDOFF 原始 bytes；歷史「未提交／未部署／金鑰未確認」是當時狀態。
+
+---
+
+<!-- harbor-local-validation-f15b569a01d7 -->
+# 最新交接：Harbor 1–5（本機驗證完成，平台設定與實機待驗）
+
+Rex <game88521@gmail.com>
+
+build `f15b569a01d7`；本輪 **122 PASS／0 FAIL**，由原始案例動態加總並核對來源／runner／immutable raw hashes。固定三基準及四個模擬核心 bytes 保持原值。修前 build `fae95fac6d0e`。原專案 main/HEAD 仍為 `1e98cf6b60b7c5fb3eb389f434ed01edb117cf30`，本輪沒有 commit、push、部署或正式站測試。
+
+1. 站間續局部署設定與檢查已備妥；**Render 兩種固定金鑰（MERIDIAN_CHECKPOINT_SECRET、SERIES_RESUME_SECRET）的實際設定／生效尚未確認；既有有效值保留**，未宣稱公開持久續局已完成。
+2. iPhone 17／Safari 頁面、鍵盤與生命週期邏輯已本機驗證；真 Safari 沒驗證。
+3. 獨立閱讀 100／125／150、modal 背景隔離、焦點與 VoiceOver 基礎已實作；真 VoiceOver 沒驗證。
+4. 私人競速短斷線可選同步暫停，原席載圖確認與倒數恢復；真 loopback WS／Car 已驗證，跨網路與免費容量沒驗證。
+5. 三步快速開房支援四玩法、24 圖、相容預覽與明確原子建房；握手、取消、防雙送、不自動準備／起跑已驗證。
+
+完整結果：[HARBOR_PROGRESS.md](HARBOR_PROGRESS.md)、[HARBOR_VALIDATION.md](HARBOR_VALIDATION.md)、[HARBOR_VALIDATION.json](HARBOR_VALIDATION.json)。證據根目錄：`C:\Users\RexChiu\OneDrive - IBM\桌面\Investment\DCISI\taipei-gp-harbor-work\tools\dev-tests\harbor-validation-audit-evidence-1795486817130-e9e96543`。原始 FAIL 保留；工具／oracle 修正原因與 legacy 收據的封版快照限制均如實記載。手機最後再依 [HARBOR_PHONE_TEST_PLAN.md](HARBOR_PHONE_TEST_PLAN.md) 操作。
+
+原始證據絕對總根：`C:\Users\RexChiu\OneDrive - IBM\桌面\Investment\DCISI\taipei-gp-harbor-work\tools\dev-tests`。本次封版 audit 子目錄：`C:\Users\RexChiu\OneDrive - IBM\桌面\Investment\DCISI\taipei-gp-harbor-work\tools\dev-tests\harbor-validation-audit-evidence-1795486817130-e9e96543`。各 suite 原始報告分布於總根內的時間戳資料夾；時間戳證據不入原案套用包，請依總根與 JSON 的 absolutePath 讀取。此為套回前封版；原案套回結果依 DCISI/TAIPEI_HARBOR_DELIVERY.md 獨立收據。
+
+以下舊 HANDOFF 原始 bytes 全數保留，本節僅於最後加在最前面一次。
+
+---
+
 <!-- beacon-release-20261123 -->
 # 2026-11-23 Aurora／Meridian／Beacon 最新版發布
 

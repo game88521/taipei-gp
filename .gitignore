@@ -1,5 +1,10 @@
 node_modules
 dist
+.env
+.env.local
+.env.*.local
+server/.env
+server/.env.*
 tools/osm-raw.json
 tools/plan.svg
 tools/osm-cache/
@@ -30,6 +35,7 @@ tools/dev-tests/frontier-*-before*.json
 tools/dev-tests/aurora-*-evidence-*/
 tools/dev-tests/meridian-*-evidence-*/
 tools/dev-tests/beacon-*-evidence-*/
+tools/dev-tests/harbor-*-evidence-*/
 tools/dev-tests/atlas-*-evidence-*/
 tools/dev-tests/meridian-racing-browser-diagnosis-*/
 tools/dev-tests/*-build-final.txt

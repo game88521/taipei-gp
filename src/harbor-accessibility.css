@@ -1,0 +1,16 @@
+/* Rex <game88521@gmail.com>. Reading applies to menus and dialogs, never the driving HUD. */
+:root{--harbor-reading-body:14px;--harbor-reading-small:12px;--harbor-reading-title:20px}
+:root[data-harbor-reading="125"]{--harbor-reading-body:17.5px;--harbor-reading-small:15px;--harbor-reading-title:25px}
+:root[data-harbor-reading="150"]{--harbor-reading-body:21px;--harbor-reading-small:18px;--harbor-reading-title:30px}
+:root:is([data-harbor-reading="125"],[data-harbor-reading="150"]) [data-harbor-reading-surface] :is(p,li,td,th,label,summary,button,input,select,textarea,output,legend){font-size:var(--harbor-reading-body)!important;line-height:1.55!important;overflow-wrap:anywhere}
+:root:is([data-harbor-reading="125"],[data-harbor-reading="150"]) [data-harbor-reading-surface] :is(small,.help,.sub,.mp-note,.mp-hint){font-size:var(--harbor-reading-small)!important;line-height:1.6!important}
+:root:is([data-harbor-reading="125"],[data-harbor-reading="150"]) [data-harbor-reading-surface] :is(h1,h2,h3){font-size:var(--harbor-reading-title)!important;line-height:1.4!important;overflow-wrap:anywhere}
+:root:is([data-harbor-reading="125"],[data-harbor-reading="150"]) [data-harbor-reading-surface] :is(button,label,select,input,textarea){max-width:100%;min-width:0;white-space:normal}
+[data-harbor-reading-surface]{scroll-padding-block:16px}
+/* The old root touch-action:none also blocks pinch even when the viewport meta permits it. */
+html[data-harbor-navigation="true"],html[data-harbor-navigation="true"] body{touch-action:pan-x pan-y pinch-zoom}
+[data-harbor-modal-top]{scroll-padding-block:16px}
+[data-harbor-modal-top]:focus-visible{outline:3px solid #ffe078;outline-offset:-4px}
+:root[data-harbor-keyboard="true"] [data-harbor-modal-top][data-harbor-modal-fixed]{top:var(--harbor-vv-top,0px)!important;bottom:auto!important;max-height:var(--harbor-vv-height,100dvh)!important;height:var(--harbor-vv-height,100dvh)!important;overflow-y:auto!important;box-sizing:border-box}
+:root[data-harbor-keyboard="true"] [data-harbor-modal-top][data-harbor-modal-fixed]>:not(canvas){max-height:calc(var(--harbor-vv-height,100dvh) - max(28px,env(safe-area-inset-top)) - env(safe-area-inset-bottom))!important;overflow-y:auto;box-sizing:border-box}
+#harbor-reading-setting{display:flex;flex-wrap:wrap;align-items:center;gap:8px}#harbor-reading-scale{min-height:44px;font:inherit;max-width:100%}#harbor-reading-status{overflow-wrap:anywhere}

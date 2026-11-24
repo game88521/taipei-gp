@@ -1,12 +1,13 @@
 // True client source, isolated sockets/storage and controllable clock. Importing does not run cases.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import {pureUrl} from './pure-module-loader.mjs';
 import * as protocol from '../../shared/multiplayer-protocol.ts';
 import * as registry from '../../shared/multiplayer-tracks.ts';
 import * as roomRules from '../../shared/multiplayer-room-rules.ts';
@@ -22,16 +23,32 @@ const identity = { version: protocol.PROTOCOL_VERSION, physics: protocol.PHYSICS
 const SESSION_KEY = 'taipei-gp-multiplayer-session-v2';
 const stamp = 1_700_000_000_000;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const compile = source => stripTypeScriptTypes(source, { mode: 'transform' })
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-protocol['"];?/, 'const {PROTOCOL_VERSION,PHYSICS_VERSION,validSeries,validSeriesTracks}=protocol;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-tracks['"];?/, 'const {CATALOG_STAMP,DEFAULT_MULTIPLAYER_TRACK_ID,getMultiplayerTrack}=registry;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-room-rules['"];?/, 'const {parseRoomRules}=roomRules;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-horizon['"];?/, 'const {parseRoomPreset,parseHorizon,validateHorizonSnapshot}=horizon;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/multiplayer-arena['"];?/, 'const {validateArenaSnapshot}=arena;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/nexus-replay['"];?/, 'const {decodeMultiplayerReplay,validReplayDescriptor,REPLAY_MAX_CHARS,REPLAY_CHUNK_CHARS}=nexusReplay;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/summit-racing['"];?/, 'const {summitSettings,validateSummit}=summit;')
-  .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\.\/shared\/atlas-racing['"];?/, 'const {ATLAS_PIT_SERVICES,atlasSettings,validateAtlas}=atlas;')
-    .replace('export class MultiplayerClient', 'class MultiplayerClient') + '\nglobalThis.Client=MultiplayerClient;';
+// Rex <game88521@gmail.com>. Discover the real named imports instead of maintaining
+// a partial export list. Only import bindings change; client logic remains intact.
+const namedImports=/\bimport\s*\{([^}]+)\}\s*from\s*(['"])([^'"]+)\2\s*;?/g;
+const dependencyKey=(sourceRoot,spec)=>{if(!spec.startsWith('.'))throw Error('Client harness requires a relative named import: '+spec);return path.resolve(sourceRoot,'src',path.extname(spec)?spec:spec+'.ts');};
+const dependencies=new Map();
+for(const sourceRoot of[project,...(existsSync(path.join(before,'src/multiplayer-client.ts'))?[before]:[])]){
+ const code=stripTypeScriptTypes(await readFile(path.join(sourceRoot,'src/multiplayer-client.ts'),'utf8'),{mode:'transform'});
+ for(const match of code.matchAll(namedImports)){
+  const key=dependencyKey(sourceRoot,match[3]);
+  if(!dependencies.has(key))dependencies.set(key,await import(await pureUrl(sourceRoot,key)));
+ }
+}
+function compile(source,sourceRoot){
+ const code=stripTypeScriptTypes(source,{mode:'transform'}).replace(namedImports,(_all,names,_quote,spec)=>{
+  const key=dependencyKey(sourceRoot,spec),module=dependencies.get(key);
+  if(!module)throw Error('Client harness dependency was not preloaded: '+spec);
+  const bindings=names.split(',').map(name=>name.trim()).filter(Boolean).map(name=>{
+   const match=/^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/.exec(name);
+   if(!match||!Object.hasOwn(module,match[1]))throw Error('Client harness named export is unavailable: '+name+' from '+spec);
+   return match[1]+(match[2]?':'+match[2]:'');
+  });
+  return 'const {'+bindings.join(',')+'}=__clientDependencies.get('+JSON.stringify(key)+');';
+ });
+ if(/\bimport\s/.test(code))throw Error('Client harness only supports named runtime imports.');
+ return code.replace('export class MultiplayerClient','class MultiplayerClient')+'\nglobalThis.Client=MultiplayerClient;';
+}
 export class Storage {
   data = new Map(); writes = []; removals = [];
   getItem(key) { return this.data.get(key) ?? null; }
@@ -68,13 +85,13 @@ export function environment(options = {}) {
   }
   const schedule = (fn, ms, interval = 0) => { const id = next++; timers.set(id, { fn, at: now + ms, interval }); return id; };
   class FakeDate extends Date { static now() { return stamp + now; } }
-  const context = vm.createContext({ protocol, registry, roomRules, horizon, arena, nexusReplay, summit, atlas, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now },
+  const context = vm.createContext({ protocol, registry, roomRules, horizon, arena, nexusReplay, summit, atlas,__clientDependencies:dependencies, URL, WebSocket: FakeSocket, Date: FakeDate, performance: { now: () => now },
     sessionStorage: storage, location: { protocol: 'http:' }, console,
     setTimeout: (fn, ms) => schedule(fn, ms), clearTimeout: id => timers.delete(id),
     setInterval: (fn, ms) => schedule(fn, ms, ms), clearInterval: id => timers.delete(id),
   });
   Object.defineProperty(context, 'localStorage', options.localStorage ? { value: options.localStorage } : { get() { throw new Error('must not touch player localStorage'); } });
-  vm.runInContext(compile(source), context, { filename: 'multiplayer-client.real.ts' });
+  vm.runInContext(compile(source,options.sourceRoot??project), context, { filename: 'multiplayer-client.real.ts' });
   const flush = async () => { for (let i = 0; i < 16; i++) await Promise.resolve(); };
   const advance = async ms => {
     const end = now + ms; let turns = 0;

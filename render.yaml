@@ -18,3 +18,5 @@ services:
         sync: false
       - key: MERIDIAN_CHECKPOINT_SECRET
         sync: false
+      - key: SERIES_RESUME_SECRET
+        sync: false

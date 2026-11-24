@@ -13,6 +13,7 @@ import {parseMultiplayerReplay} from '../shared/nexus-replay';
 import {parseModePreferences} from './atlas-modes';
 import {parseCoopHistory} from './atlas-coop-history';
 import {parseVoyagerComfort} from './voyager-comfort';
+import {parseHarborReading} from './harbor-accessibility-model';
 import {parseWorkshopGhostStorage} from './voyager-workshop-ghost';
 import {parsePadPreferences} from './odyssey-pad-settings';
 import {parseHudLayouts} from './expedition-hud';
@@ -49,6 +50,7 @@ export function validateAtlasBackup(b:AtlasBackup,main:(text:string)=>{ok:boolea
       case 'taipei-gp-summit-duty-v1':valid=!!parseDutyRecords(v);break;
       case 'taipei-gp-mode-browser-v1':valid=!!parseModePreferences(v);break;
       case 'taipei-gp-voyager-comfort-v1':valid=!!parseVoyagerComfort(v);break;
+      case 'taipei-gp-harbor-reading-v1':valid=!!parseHarborReading(v);break;
       case 'taipei-gp-voyager-workshop-ghost-v1':valid=!!parseWorkshopGhostStorage(v);break;
       case 'taipei-gp-odyssey-pad-v1':valid=!!parsePadPreferences(v);break;
       case 'taipei-gp-odyssey-road-duty-v1':valid=!!parseRoadDutyRecords(v);break;

@@ -1,0 +1,8 @@
+// Rex <game88521@gmail.com>. Before-control: an absent wizard is the expected result.
+import assert from 'node:assert/strict';
+import {FrontierBrowserHarness,ORIGIN,focus} from './frontier-browser-harness.mjs';
+const h=new FrontierBrowserHarness('harbor-quick-room-before-browser',new URL(import.meta.url),['src/harbor-quick-room.ts','src/harbor-quick-room.css','shared/harbor-quick-room.ts'],{server:{autoTick:false}});let error;
+try{
+ await h.start(1);h.report.limitations.push('修前對照，必須對1e98cf6來源所建舊dist執行；PASS表示重現沒有三步快速開房，不是新版驗收。受測build另記於report.build。');
+ await h.test('修前只有原本建房／範本及分散的進階設定，尚無三步介面',async()=>{const p=h.pages[0];await focus(p);await p.send('Page.navigate',{url:ORIGIN+'/multiplayer.html'});await p.until('window.__mp?.ready&&__mp.client&&!document.getElementById("mp-create").disabled',180000);const found=await p.evaluate(`({quick:!!document.getElementById('harbor-quick-room'),quickOpen:!!document.getElementById('harbor-quick-open'),originalCreate:!!document.getElementById('mp-create'),preset:!!document.getElementById('mp-preset-create'),eventSettings:!!document.getElementById('mp-event-mode'),arena:!!document.getElementById('mp-arena-mode'),maps:document.getElementById('mp-track').options.length,room:!!__mp.client.room})`);assert.equal(found.quick,false);assert.equal(found.quickOpen,false);assert.equal(found.originalCreate,true);assert.equal(found.preset,true);assert.equal(found.eventSettings,true);assert.equal(found.maps,24);assert.equal(found.room,false);assert.equal(h.app.service.rooms.size,0);await h.shot(p,'before-room-entry.png');return found;});
+}catch(e){error=e;}finally{await h.finish(error);}

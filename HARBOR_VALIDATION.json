@@ -1,0 +1,839 @@
+{
+  "schema": 1,
+  "author": "Rex <game88521@gmail.com>",
+  "status": "LOCAL_VALIDATION_PASS_PLATFORM_AND_PHONE_PENDING",
+  "finishedAt": "2026-11-24T02:20:17.129Z",
+  "build": "f15b569a01d7",
+  "beforeBuild": "fae95fac6d0e",
+  "head": "1e98cf6b60b7c5fb3eb389f434ed01edb117cf30",
+  "branch": "main",
+  "workBranch": "feature/harbor-1to5",
+  "work": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work",
+  "target": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\Rex\\taipei-gp",
+  "evidenceRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-validation-audit-evidence-1795486817130-e9e96543",
+  "evidenceArchiveRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests",
+  "evidence": "tools/dev-tests/harbor-validation-audit-evidence-1795486817130-e9e96543",
+  "localOnly": true,
+  "realPhoneUsed": false,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "productionTested": false,
+  "summary": {
+    "PASS": 122,
+    "FAIL": 0,
+    "groups": {
+      "configurationNode": 21,
+      "newNode": 50,
+      "newBrowser": 17,
+      "mandatory": 3,
+      "legacyNode": 31
+    },
+    "countedSuites": 17,
+    "wrappersAndBeforeControlsCounted": false
+  },
+  "capture": {
+    "path": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-baseline.json",
+    "sha256": "d7ec1f400c88cc1f2184eda8f8d8576a83aa3816916a185a8a3bd937f77ddc07",
+    "capturedAt": "2026-11-23T09:57:57.587Z"
+  },
+  "buildReceipt": {
+    "path": "tools/dev-tests/harbor-build-result.json",
+    "sha256": "aeb9f98466799c72d8726098fc23e3cd2669b555f617d1a9bd1bd3e744f11dac",
+    "immutable": {
+      "path": "tools/dev-tests/harbor-build-evidence-1795485090753/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-build-evidence-1795485090753\\report.json",
+      "sha256": "aeb9f98466799c72d8726098fc23e3cd2669b555f617d1a9bd1bd3e744f11dac",
+      "bytes": 72862,
+      "preservedAt": "2026-11-24T01:51:30.753Z",
+      "preservation": "timestamped raw receipt retained by runner"
+    },
+    "script": {
+      "path": "../build-harbor-local.mjs",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\build-harbor-local.mjs",
+      "sha256": "6f9c2b0aa4737d36ddcd964db438c212a34935e9a9f2964d148aeeeb1785e419",
+      "binding": "run-receipt-sha256"
+    },
+    "sourceHashesChecked": 610,
+    "fullInputMapChecked": true
+  },
+  "core": [
+    {
+      "path": "src/car.ts",
+      "sha256": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+      "bytes": 5605,
+      "unchangedFromCapture": true,
+      "byteEqualOriginal": true
+    },
+    {
+      "path": "src/track.ts",
+      "sha256": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+      "bytes": 13424,
+      "unchangedFromCapture": true,
+      "byteEqualOriginal": true
+    },
+    {
+      "path": "src/rivals.ts",
+      "sha256": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+      "bytes": 57505,
+      "unchangedFromCapture": true,
+      "byteEqualOriginal": true
+    },
+    {
+      "path": "src/pitlane.ts",
+      "sha256": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32",
+      "bytes": 51000,
+      "unchangedFromCapture": true,
+      "byteEqualOriginal": true
+    }
+  ],
+  "rows": [
+    {
+      "name": "resume-config",
+      "category": "configurationNode",
+      "status": "PASS",
+      "cases": 5,
+      "receipt": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/resume-config-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\resume-config-result.json",
+      "receiptSha256": "5c0085f48daa99b6d0b2090d234c76a37246bd24f41f28bd11881e3c5ef45c89",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/resume-config-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\resume-config-result.json",
+        "sha256": "5c0085f48daa99b6d0b2090d234c76a37246bd24f41f28bd11881e3c5ef45c89",
+        "bytes": 699,
+        "preservation": "timestamped raw child receipt retained by root-check runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-resume-config-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-resume-config-node.mjs",
+        "sha256": "8644963a0802ad83246f63576a8617cda15ca174b38331e0a806d9d3da6cb64b",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 0,
+      "verifiedBy": "tools/dev-tests/harbor-root-checks-result.json"
+    },
+    {
+      "name": "server-status",
+      "category": "configurationNode",
+      "status": "PASS",
+      "cases": 2,
+      "receipt": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/server-status-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\server-status-result.json",
+      "receiptSha256": "e369fdb17a33efc5af9fbfae15e1f28a2f46e33ac9e1004e32926b81360936d8",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/server-status-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\server-status-result.json",
+        "sha256": "e369fdb17a33efc5af9fbfae15e1f28a2f46e33ac9e1004e32926b81360936d8",
+        "bytes": 425,
+        "preservation": "timestamped raw child receipt retained by root-check runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-server-status-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-server-status-node.mjs",
+        "sha256": "7d2b35ef6373fa51b8a5cb76d465faedfddd0f1519ffe07526e3f72beb7bb6fe",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 0,
+      "verifiedBy": "tools/dev-tests/harbor-root-checks-result.json"
+    },
+    {
+      "name": "backup",
+      "category": "configurationNode",
+      "status": "PASS",
+      "cases": 3,
+      "receipt": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/backup-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\backup-result.json",
+      "receiptSha256": "2bda387c386964c8599a7cb81c67fbe6d0d5b6b850acb200976175745137992d",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/backup-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\backup-result.json",
+        "sha256": "2bda387c386964c8599a7cb81c67fbe6d0d5b6b850acb200976175745137992d",
+        "bytes": 521,
+        "preservation": "timestamped raw child receipt retained by root-check runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-backup-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-backup-node.mjs",
+        "sha256": "72bc6f36aea7ed8f7952bfbcf1e2777f08018eea28fcab056722b917f4aa1925",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 0,
+      "verifiedBy": "tools/dev-tests/harbor-root-checks-result.json"
+    },
+    {
+      "name": "legacy-backup",
+      "category": "configurationNode",
+      "status": "PASS",
+      "cases": 4,
+      "receipt": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/legacy-backup-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\legacy-backup-result.json",
+      "receiptSha256": "dd5137dbe91354f23d188e406f159e943e4febb3997d4a8df81b231fc951d02f",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/legacy-backup-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\legacy-backup-result.json",
+        "sha256": "dd5137dbe91354f23d188e406f159e943e4febb3997d4a8df81b231fc951d02f",
+        "bytes": 1055,
+        "preservation": "timestamped raw child receipt retained by root-check runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/meridian-backup-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\meridian-backup-node.mjs",
+        "sha256": "caad3545d2f7b17c90f6684a9db5bc242d0f89c2fdd0637a77dd154c2d879353",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 2,
+      "verifiedBy": "tools/dev-tests/harbor-root-checks-result.json"
+    },
+    {
+      "name": "legacy-checkpoints",
+      "category": "configurationNode",
+      "status": "PASS",
+      "cases": 7,
+      "receipt": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/legacy-checkpoints-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\legacy-checkpoints-result.json",
+      "receiptSha256": "e4cf619e5d34c67bde1d402c4829451f5a77aa98fb906e5910689efca851fb12",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/legacy-checkpoints-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\legacy-checkpoints-result.json",
+        "sha256": "e4cf619e5d34c67bde1d402c4829451f5a77aa98fb906e5910689efca851fb12",
+        "bytes": 1473,
+        "preservation": "timestamped raw child receipt retained by root-check runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/meridian-checkpoints-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\meridian-checkpoints-node.mjs",
+        "sha256": "b6fc93fc56bad3eb8ce0d110ee274befb7008230792e87c3014f95ced4d7bcd2",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 2,
+      "verifiedBy": "tools/dev-tests/harbor-root-checks-result.json"
+    },
+    {
+      "name": "harbor-accessibility-node",
+      "category": "newNode",
+      "status": "PASS",
+      "cases": 12,
+      "receipt": "tools/dev-tests/harbor-accessibility-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-accessibility-node-result.json",
+      "receiptSha256": "9695289a924db2e44b1c1606395dd472dbf20f360045d564920ece788f70e1d3",
+      "startedAt": "2026-11-24T01:42:30.086Z",
+      "finishedAt": "2026-11-24T01:42:30.549Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-accessibility-node-evidence-1795484550055-8ca83d25/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-accessibility-node-evidence-1795484550055-8ca83d25\\report.json",
+        "sha256": "9695289a924db2e44b1c1606395dd472dbf20f360045d564920ece788f70e1d3",
+        "bytes": 2897,
+        "preservedAt": "2026-11-24T01:42:30.055Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-accessibility-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-accessibility-node.mjs",
+        "sha256": "2ea54318e341791b7da3150e99a7a23a5169442bb62d5a855c3492ca047c8d7b",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 6,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-mobile-node",
+      "category": "newNode",
+      "status": "PASS",
+      "cases": 7,
+      "receipt": "tools/dev-tests/harbor-mobile-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-mobile-node-result.json",
+      "receiptSha256": "f1924a2164d733f359b2172cfeb27613295227e7ffa332322539111f1745affd",
+      "startedAt": "2026-11-24T01:42:23.791Z",
+      "finishedAt": "2026-11-24T01:42:24.104Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-mobile-node-evidence-1795484543760-b71f61ba/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-mobile-node-evidence-1795484543760-b71f61ba\\report.json",
+        "sha256": "f1924a2164d733f359b2172cfeb27613295227e7ffa332322539111f1745affd",
+        "bytes": 2790,
+        "preservedAt": "2026-11-24T01:42:23.760Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-mobile-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-mobile-node.mjs",
+        "sha256": "8c4d0706905085b7e5036cbf91f6d0cdfa8c2e87be717660610a5fcf63396e6f",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 8,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-quick-room-node",
+      "category": "newNode",
+      "status": "PASS",
+      "cases": 10,
+      "receipt": "tools/dev-tests/harbor-quick-room-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-node-result.json",
+      "receiptSha256": "f39c7d1d1df6a914d3a93608258c37458c4b25b03f82e133f73bdce9c449cf42",
+      "startedAt": "2026-11-24T01:36:36.193Z",
+      "finishedAt": "2026-11-24T01:36:48.080Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-quick-room-node-evidence-1795484196183/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-node-evidence-1795484196183\\report.json",
+        "sha256": "f39c7d1d1df6a914d3a93608258c37458c4b25b03f82e133f73bdce9c449cf42",
+        "bytes": 4021,
+        "preservedAt": "2026-11-24T01:36:36.183Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-quick-room-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-node.mjs",
+        "sha256": "5ab983b98d707d12a86a71c9aeb017a2b86f5a333f9efc8bcb56f629335460f1",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 9,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-preset-handshake-node",
+      "category": "newNode",
+      "status": "PASS",
+      "cases": 7,
+      "receipt": "tools/dev-tests/harbor-preset-handshake-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-preset-handshake-node-result.json",
+      "receiptSha256": "4791f1049d3e6e2c7e55b8657bb00a5e1d1f984dacfca3f501a20335d6cbea02",
+      "startedAt": "2026-11-24T01:49:51.207Z",
+      "finishedAt": "2026-11-24T01:49:51.337Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-preset-handshake-node-evidence-1795484991203-1b0504/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-preset-handshake-node-evidence-1795484991203-1b0504\\report.json",
+        "sha256": "4791f1049d3e6e2c7e55b8657bb00a5e1d1f984dacfca3f501a20335d6cbea02",
+        "bytes": 3970,
+        "preservedAt": "2026-11-24T01:49:51.203Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-preset-handshake-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-preset-handshake-node.mjs",
+        "sha256": "6412aff365d01ba8f4eb000e28e79fce6c89f9b660867964cad1261e9b41d92a",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 6,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-multiplayer-node",
+      "category": "newNode",
+      "status": "PASS",
+      "cases": 14,
+      "receipt": "tools/dev-tests/harbor-multiplayer-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-node-result.json",
+      "receiptSha256": "4664ffaad0ea597dc8205ee59dee50d23ccb8eb512eb0b287ba3aaaf87298f2c",
+      "startedAt": "2026-11-24T01:51:24.518Z",
+      "finishedAt": "2026-11-24T01:51:25.970Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-multiplayer-node-evidence-1795485084517-673881/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-node-evidence-1795485084517-673881\\report.json",
+        "sha256": "4664ffaad0ea597dc8205ee59dee50d23ccb8eb512eb0b287ba3aaaf87298f2c",
+        "bytes": 7254,
+        "preservedAt": "2026-11-24T01:51:24.517Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-multiplayer-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-node.mjs",
+        "sha256": "9e0ae30d1e1687742558c0715695be397deddbdfc9e5944391d1012b31a8b84a",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 12,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-reading-browser",
+      "category": "newBrowser",
+      "status": "PASS",
+      "cases": 6,
+      "receipt": "tools/dev-tests/harbor-reading-browser-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser-result.json",
+      "receiptSha256": "072e404180cdb61edad56f58f1cf162dc7bf4af146432f9e0d87943d3cddaf68",
+      "startedAt": "2026-11-24T02:09:00.615Z",
+      "finishedAt": "2026-11-24T02:09:50.582Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-reading-browser-evidence-1795486140622/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser-evidence-1795486140622\\report.json",
+        "sha256": "072e404180cdb61edad56f58f1cf162dc7bf4af146432f9e0d87943d3cddaf68",
+        "bytes": 5342,
+        "preservedAt": "2026-11-24T02:09:00.622Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-reading-browser.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser.mjs",
+        "sha256": "24743439abb5ef6939be9454896f6b43880b627837b27f8a7ea71b0456921dca",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 6,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-quick-room-browser",
+      "category": "newBrowser",
+      "status": "PASS",
+      "cases": 7,
+      "receipt": "tools/dev-tests/harbor-quick-room-browser-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-result.json",
+      "receiptSha256": "04aa8d229879ace87b00db0915ad041656a1fb56578ace76f2654607a9e2fec4",
+      "startedAt": "2026-11-24T02:11:51.756Z",
+      "finishedAt": "2026-11-24T02:12:29.105Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-quick-room-browser-evidence-1795486311763/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-evidence-1795486311763\\report.json",
+        "sha256": "04aa8d229879ace87b00db0915ad041656a1fb56578ace76f2654607a9e2fec4",
+        "bytes": 15238,
+        "preservedAt": "2026-11-24T02:11:51.763Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-quick-room-browser.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser.mjs",
+        "sha256": "6926c470424f31df27693ad0766ae69d380fe625d5e566d12233a2ee679efdd4",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 9,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-multiplayer-browser-4",
+      "category": "newBrowser",
+      "status": "PASS",
+      "cases": 4,
+      "receipt": "tools/dev-tests/harbor-multiplayer-browser-4-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-browser-4-result.json",
+      "receiptSha256": "d68f0e8dd31161ece6541b99ac5167ace8d03ca87950e60409cd54ac2466a4df",
+      "startedAt": "2026-11-24T02:05:53.621Z",
+      "finishedAt": "2026-11-24T02:08:27.779Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-multiplayer-browser-4-evidence-1795485953625/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-browser-4-evidence-1795485953625\\report.json",
+        "sha256": "d68f0e8dd31161ece6541b99ac5167ace8d03ca87950e60409cd54ac2466a4df",
+        "bytes": 6811,
+        "preservedAt": "2026-11-24T02:05:53.625Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/harbor-multiplayer-browser.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-browser.mjs",
+        "sha256": "3a96312671fc0ddfd2f82a74a7356eb126b3905fa47904224e8b6aa38e47e0c9",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 9,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "harbor-chain-stab",
+      "category": "mandatory",
+      "status": "PASS",
+      "cases": 3,
+      "receipt": "tools/dev-tests/harbor-chain-stab-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-chain-stab-result.json",
+      "receiptSha256": "45534d90620401677627a84070950fab7f3c09ad0edc9f7bd4ed5f7a39faa5ca",
+      "startedAt": "2026-11-24T02:01:06.971Z",
+      "finishedAt": "2026-11-24T02:02:42.729Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-chain-stab-evidence-1795485666960/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-chain-stab-evidence-1795485666960\\report.json",
+        "sha256": "45534d90620401677627a84070950fab7f3c09ad0edc9f7bd4ed5f7a39faa5ca",
+        "bytes": 1420,
+        "preservedAt": "2026-11-24T02:01:06.960Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "../run-harbor-chain.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\run-harbor-chain.mjs",
+        "sha256": "ea6362de299497ee66fa0a5b599006465b8c5ea851916c61e394631e0b441d55",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 7,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "meridian-racing-node",
+      "category": "legacyNode",
+      "status": "PASS",
+      "cases": 11,
+      "receipt": "tools/dev-tests/meridian-racing-node-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\meridian-racing-node-result.json",
+      "receiptSha256": "b17c00bcadb6bc3c35eb7beb77bd62cb551358ec6039e8fc74f2be21eb2d2d0a",
+      "startedAt": "2026-11-24T01:34:41.073Z",
+      "finishedAt": "2026-11-24T01:34:45.508Z",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-validation-audit-evidence-1795486817130-e9e96543/legacy-meridian-racing-node-raw.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-validation-audit-evidence-1795486817130-e9e96543\\legacy-meridian-racing-node-raw.json",
+        "sha256": "b17c00bcadb6bc3c35eb7beb77bd62cb551358ec6039e8fc74f2be21eb2d2d0a",
+        "bytes": 2562,
+        "preservedAt": "2026-11-24T02:20:17.129Z",
+        "preservation": "seal-time snapshot only; legacy runner did not emit an immutable wrapper"
+      },
+      "script": {
+        "path": "tools/dev-tests/meridian-racing-node.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\meridian-racing-node.mjs",
+        "sha256": "0816183eaaccf9fa52f0b5ffbaffe1448f07564365ed7d862272affd2f0edc4d",
+        "binding": "unchanged-from-capture; no runner hash in legacy raw receipt"
+      },
+      "sourceHashesChecked": 0,
+      "sourceBinding": "legacy receipt has no source hash map; final full build map and protected source check are separate evidence"
+    },
+    {
+      "name": "multiplayer-server",
+      "category": "legacyNode",
+      "status": "PASS",
+      "cases": 14,
+      "receipt": "tools/dev-tests/multiplayer-server-summary.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\multiplayer-server-summary.json",
+      "receiptSha256": "57db469876346c841a28af5088ad873f03393a870c9aaba794048c35d3bb2970",
+      "startedAt": "2026-11-24T01:34:31.987Z",
+      "finishedAt": "2026-11-24T01:35:25.251Z",
+      "immutable": {
+        "path": "tools/dev-tests/multiplayer-server-evidence-1795484125258-eae0cfc6/multiplayer-server-summary.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\multiplayer-server-evidence-1795484125258-eae0cfc6\\multiplayer-server-summary.json",
+        "sha256": "57db469876346c841a28af5088ad873f03393a870c9aaba794048c35d3bb2970",
+        "bytes": 7668,
+        "preservedAt": "2026-11-24T01:35:25.258Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/multiplayer-server-regression.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\multiplayer-server-regression.mjs",
+        "sha256": "7a717bf7a37a1b2c35861e34628e22ab8656ab53481cff948101f95003284c23",
+        "binding": "unchanged-from-capture; no runner hash in legacy raw receipt"
+      },
+      "sourceHashesChecked": 4,
+      "sourceBinding": "current sources match hashes in run receipt"
+    },
+    {
+      "name": "tenpack-multiplayer-client",
+      "category": "legacyNode",
+      "status": "PASS",
+      "cases": 6,
+      "receipt": "tools/dev-tests/tenpack-multiplayer-client-result.json",
+      "receiptAbsolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\tenpack-multiplayer-client-result.json",
+      "receiptSha256": "182681069c0dfa106c69a44d6e0492497bdc8627c3b99aa1db47114bad5e9afe",
+      "startedAt": null,
+      "finishedAt": null,
+      "immutable": {
+        "path": "tools/dev-tests/harbor-legacy-harness-evidence-1795485211186/after-tenpack-multiplayer-client-result.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-legacy-harness-evidence-1795485211186\\after-tenpack-multiplayer-client-result.json",
+        "sha256": "182681069c0dfa106c69a44d6e0492497bdc8627c3b99aa1db47114bad5e9afe",
+        "bytes": 2310,
+        "preservedAt": "2026-11-24T01:53:31.186Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "tools/dev-tests/tenpack-multiplayer-client.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\tenpack-multiplayer-client.mjs",
+        "sha256": "fbce345a1b87c9340de122596a3ba7aa45dfb09516ac91381e22300351935d97",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 12,
+      "sourceBinding": "current sources match hashes in run receipt"
+    }
+  ],
+  "supportingArtifacts": [
+    {
+      "name": "harbor-root-checks-wrapper",
+      "counted": false,
+      "receipt": "tools/dev-tests/harbor-root-checks-result.json",
+      "sha256": "5a1bf28c9392cd3a3bdc9b1b53550ef31c01507cc46edbe054ea1f085e377cf4",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-root-checks-evidence-1795484811450/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-root-checks-evidence-1795484811450\\report.json",
+        "sha256": "5a1bf28c9392cd3a3bdc9b1b53550ef31c01507cc46edbe054ea1f085e377cf4",
+        "bytes": 3197,
+        "preservedAt": "2026-11-24T01:46:51.450Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "script": {
+        "path": "../run-harbor-root-checks.mjs",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\run-harbor-root-checks.mjs",
+        "sha256": "34fb10b87a7463d41302f3e90b76a1d73de188081925ab4c90c19fbe8b4b4220",
+        "binding": "run-receipt-sha256"
+      },
+      "sourceHashesChecked": 8,
+      "rawChildCases": 21
+    },
+    {
+      "name": "mandatory-chain-raw",
+      "counted": false,
+      "path": "tools/dev-tests/harbor-chain-stab-evidence-1795485666960/chain-stab-out.txt",
+      "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a"
+    },
+    {
+      "name": "legacy-client-harness-repair",
+      "counted": false,
+      "receipt": "tools/dev-tests/harbor-legacy-harness-evidence-1795485211186/receipt.json",
+      "sha256": "7d5950a6a69e1ed5beeaa4e16f458b7854dbfb302793daacf6ff297e36b2f127",
+      "retainedHashes": {
+        "before-tenpack-multiplayer-client-result.json": "14bc8887f03de13c927502ae407a3063fae212d8cf486b9eb9b64db20781fe14",
+        "after-tenpack-multiplayer-client-result.json": "182681069c0dfa106c69a44d6e0492497bdc8627c3b99aa1db47114bad5e9afe",
+        "before-lobbybrake-client.mjs": "37a36ffce718fd430e18fbb0714181d7438dd717eb7b0e7fe1e9349deb76d256",
+        "after-lobbybrake-client.mjs": "92d60969b63e52e9081163fac8730d7d3646fd51f0fae4df88f15a026c8b6aff",
+        "tenpack-multiplayer-client.mjs": "fbce345a1b87c9340de122596a3ba7aa45dfb09516ac91381e22300351935d97"
+      },
+      "loaderSha256": "92d60969b63e52e9081163fac8730d7d3646fd51f0fae4df88f15a026c8b6aff",
+      "originalAssertionsUnchanged": true,
+      "runTimeEvidence": "Timestamped harness evidence directory; original legacy client report has no startedAt/finishedAt fields."
+    }
+  ],
+  "beforeControls": [
+    {
+      "name": "harbor-quick-room-before-browser",
+      "cases": 1,
+      "countedInPassTotal": false,
+      "receipt": "tools/dev-tests/harbor-quick-room-before-browser-result.json",
+      "sha256": "9ca4763b62b2a2c2221432ab3f2be29ce570d0abd2a2e2e332e89d9827b373e9",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-quick-room-before-browser-evidence-1795428495150/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-before-browser-evidence-1795428495150\\report.json",
+        "sha256": "9ca4763b62b2a2c2221432ab3f2be29ce570d0abd2a2e2e332e89d9827b373e9",
+        "bytes": 2338,
+        "preservedAt": "2026-11-23T10:08:15.150Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "build": "fae95fac6d0e",
+      "script": "harbor-quick-room-before-browser.mjs",
+      "recordedScriptSha256": "5f9731ebe4ab382a5c675061df3b79caea75ecf690079d5659e86610e745051f",
+      "sourceHashesCheckedAgainstFinal": false,
+      "reason": "Historical before control: old dist is intentional; recorded sources/runner are preserved rather than required to equal final versions."
+    },
+    {
+      "name": "harbor-reading-browser-before",
+      "cases": 2,
+      "countedInPassTotal": false,
+      "receipt": "tools/dev-tests/harbor-reading-browser-before-result.json",
+      "sha256": "be4717a3a1d12f7a244b820cb468330f38032d58500fa9424c1dc1807babc809",
+      "immutable": {
+        "path": "tools/dev-tests/harbor-reading-browser-before-evidence-1795428891832/report.json",
+        "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser-before-evidence-1795428891832\\report.json",
+        "sha256": "be4717a3a1d12f7a244b820cb468330f38032d58500fa9424c1dc1807babc809",
+        "bytes": 3228,
+        "preservedAt": "2026-11-23T10:14:51.832Z",
+        "preservation": "timestamped raw receipt retained by runner"
+      },
+      "build": "fae95fac6d0e",
+      "script": "harbor-reading-browser.mjs",
+      "recordedScriptSha256": "0fe1a54fd6c237578928e95d7621a9d29b166367317a73017876fd188c0d488b",
+      "sourceHashesCheckedAgainstFinal": false,
+      "reason": "Historical before control: old dist is intentional; recorded sources/runner are preserved rather than required to equal final versions."
+    }
+  ],
+  "historicalFailures": [
+    {
+      "path": "tools/dev-tests/harbor-legacy-harness-evidence-1795485211186/before-tenpack-multiplayer-client-result.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-legacy-harness-evidence-1795485211186\\before-tenpack-multiplayer-client-result.json",
+      "sha256": "14bc8887f03de13c927502ae407a3063fae212d8cf486b9eb9b64db20781fe14",
+      "bytes": 8058,
+      "summary": {
+        "passed": 0,
+        "failed": 6
+      },
+      "startedAt": null,
+      "fatal": null,
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-multiplayer-browser-4-evidence-1795485507137/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-browser-4-evidence-1795485507137\\report.json",
+      "sha256": "d0e345cd7fafae0927544826126bb8f8cbef5bbd8da7c9c8ff2014e4a73a4e9a",
+      "bytes": 6747,
+      "summary": {
+        "PASS": 0,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T01:58:27.119Z",
+      "fatal": "Error: harbor-multiplayer-browser-4-0: {\"exceptionId\":1,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":105,\"scriptId\":\"95\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"95\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":111},{\"functionName\":\"\",\"scriptId\":\"95\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":266}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"Error\",\"description\":\"Error: button unavailable:mp-create\\n    at <anonymous>:1:112\\n    at <anonymous>:1:267\",\"objectId\":\"-6320263036831339380.3.2\"}}\n    at CdpConnection.evaluate (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:39:42)\n    at async click (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:67:17)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-multiplayer-browser.mjs:13:43\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-multiplayer-browser.mjs:11:2",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-multiplayer-node-evidence-1795428793371-f2e579/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-multiplayer-node-evidence-1795428793371-f2e579\\report.json",
+      "sha256": "fa15cd2283da5fd17560d971ad4b7816cd20cd5a9b1b4a47ffddabce8022441b",
+      "bytes": 7185,
+      "summary": {
+        "PASS": 11,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-23T10:13:13.371Z",
+      "fatal": null,
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-browser-evidence-1795484273294/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-evidence-1795484273294\\report.json",
+      "sha256": "79ecb522b03c7d0e0385b178b106eeb7f8d95158385f6e119ca1af99301c4398",
+      "bytes": 14132,
+      "summary": {
+        "PASS": 2,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T01:37:53.151Z",
+      "fatal": "Error: harbor-quick-room-browser-0: condition timeout: __mp.client.room?.phase===\"lobby\"&&__mp.client.room.players.length===2\n    at CdpConnection.until (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:45:11)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:24:342\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:23:2",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-browser-evidence-1795485205034/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-evidence-1795485205034\\report.json",
+      "sha256": "56176394df484b3e91450e47028d97ab74e11c1f058d15408c24c8176e72a220",
+      "bytes": 14182,
+      "summary": {
+        "PASS": 2,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T01:53:25.025Z",
+      "fatal": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n... Skipped lines\n\n  {\n    ai: 1,\n    damage: true,\n    grace: 120,\n    laps: 5,\n...\n    quickDisabled: true,\n+   ready: true,\n-   ready: false,\n    track: 'taipei',\n    weather: 'rain'\n  }\n\n    at file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:24:869\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:23:2",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-browser-evidence-1795485820994/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-evidence-1795485820994\\report.json",
+      "sha256": "8c6006867aeea26a9ff60f8da61a5e604908c2331fd6c33d7e1b18d3fe302986",
+      "bytes": 16355,
+      "summary": {
+        "PASS": 3,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T02:03:40.990Z",
+      "fatal": "Error: harbor-quick-room-browser-0: {\"exceptionId\":1,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":115,\"scriptId\":\"126\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"126\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":121},{\"functionName\":\"\",\"scriptId\":\"126\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":276}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"Error\",\"description\":\"Error: button unavailable:harbor-quick-create\\n    at <anonymous>:1:122\\n    at <anonymous>:1:277\",\"objectId\":\"159464766395225548.3.2\"}}\n    at CdpConnection.evaluate (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:39:42)\n    at async click (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:67:17)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:29:358\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:28:53",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-browser-evidence-1795486227844/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-browser-evidence-1795486227844\\report.json",
+      "sha256": "7b494396deec55cab71426bdd3a65f0b2204de9e297615ce6468f18634d3246a",
+      "bytes": 17201,
+      "summary": {
+        "PASS": 4,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T02:10:27.839Z",
+      "fatal": "Error: harbor-quick-room-browser-0: {\"exceptionId\":1,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":114,\"scriptId\":\"118\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"118\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":120},{\"functionName\":\"\",\"scriptId\":\"118\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":275}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"Error\",\"description\":\"Error: button unavailable:harbor-quick-reset\\n    at <anonymous>:1:121\\n    at <anonymous>:1:276\",\"objectId\":\"74203756238225016.3.2\"}}\n    at CdpConnection.evaluate (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:39:42)\n    at async click (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:67:17)\n    at async third (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:11:20)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:33:3\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:32:53",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-node-startup-failure-1795500000000.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-node-startup-failure-1795500000000.json",
+      "sha256": "3afaa8c694544a1dc4fa1fde7f3c765cda81a1b6fe50d2e8ac06bae6c174de85",
+      "bytes": 529,
+      "originalStatus": "STARTUP_FAIL",
+      "summary": null,
+      "fatal": "Default Node strip-only mode rejects the TypeScript constructor parameter property. Re-run with --experimental-transform-types; product TypeScript is valid.",
+      "preservation": "original startup failure; zero executed product cases, excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-quick-room-ready-oracle-evidence-1795485417326/before-browser-result.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-quick-room-ready-oracle-evidence-1795485417326\\before-browser-result.json",
+      "sha256": "56176394df484b3e91450e47028d97ab74e11c1f058d15408c24c8176e72a220",
+      "bytes": 14182,
+      "summary": {
+        "PASS": 2,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T01:53:25.025Z",
+      "fatal": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n... Skipped lines\n\n  {\n    ai: 1,\n    damage: true,\n    grace: 120,\n    laps: 5,\n...\n    quickDisabled: true,\n+   ready: true,\n-   ready: false,\n    track: 'taipei',\n    weather: 'rain'\n  }\n\n    at file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:24:869\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-quick-room-browser.mjs:23:2",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-reading-browser-evidence-1795485387026/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser-evidence-1795485387026\\report.json",
+      "sha256": "22968b82d9417aabd157d9d732f913133521c1e9e923b62fdf4ed994742b8be1",
+      "bytes": 3711,
+      "summary": {
+        "PASS": 0,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T01:56:27.022Z",
+      "fatal": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert.ok(value.includes('pinch-zoom'))\n\n    at file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-reading-browser.mjs:8:628\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-reading-browser.mjs:8:2",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    },
+    {
+      "path": "tools/dev-tests/harbor-reading-browser-evidence-1795485867652/report.json",
+      "absolutePath": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-harbor-work\\tools\\dev-tests\\harbor-reading-browser-evidence-1795485867652\\report.json",
+      "sha256": "30ecdc04730e0020b1bbce75c97a9f3ab8e85afc9aa1bbc540f46e43b15ef749",
+      "bytes": 6090,
+      "summary": {
+        "PASS": 4,
+        "FAIL": 1
+      },
+      "startedAt": "2026-11-24T02:04:27.649Z",
+      "fatal": "AssertionError [ERR_ASSERTION]: btn-free must be reachable\n+ actual - expected\n\n+ undefined\n- 'btn-free'\n\n    at click (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/multiplayer-ui-cdp.mjs:68:10)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-reading-browser.mjs:16:164\n    at async FrontierBrowserHarness.test (file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/frontier-browser-harness.mjs:41:77)\n    at async file:///C:/Users/RexChiu/OneDrive%20-%20IBM/%E6%A1%8C%E9%9D%A2/Investment/DCISI/taipei-gp-harbor-work/tools/dev-tests/harbor-reading-browser.mjs:16:3",
+      "preservation": "original retained FAIL bytes; excluded from final PASS cases"
+    }
+  ],
+  "corrections": [
+    {
+      "kind": "product",
+      "detail": "真瀏覽器揭露 socket open 早於能力 pong；產品新增當前 socket 的有效 pong 握手，7 秒單次上限並沿用 45 秒外層取消／連線重試，建房不自動重送。"
+    },
+    {
+      "kind": "test-oracle",
+      "detail": "public AI 位於 summit.ai；原測試誤用不存在的頂層 ai。保留原 FAIL 與真 RoomService 重現，後續分別嚴查真人未準備／AI 已準備。"
+    },
+    {
+      "kind": "test-harness",
+      "detail": "切換特殊玩法保留 AI／雨天／車損草稿是產品預期；後續獨立玩法案例只在存在真衝突時明確原生按重設，無衝突不按隱藏按鈕；草稿保留與阻擋仍有獨立完整斷言。"
+    },
+    {
+      "kind": "test-oracle",
+      "detail": "Chrome 的 touch-action: manipulation 語意包含 pan-x pan-y pinch-zoom；閱讀測試修正等價判斷，未放寬實際縮放要求。"
+    },
+    {
+      "kind": "test-harness",
+      "detail": "pagehide 的 writer guard 會結束該頁的偏好寫入生命週期；對照測試改用原生 reload 驗證真正離頁與重新初始化，原始 FAIL 保留，未把合成 pagehide 後繼續使用同頁當成產品行為。"
+    },
+    {
+      "kind": "test-harness",
+      "detail": "斷線 browser 在原生切圖後等待所選地圖 ready，並記錄 ready/disabled，再原生按建房；保留原先在載圖時按 disabled 按鈕的 FAIL。"
+    },
+    {
+      "kind": "test-harness",
+      "detail": "舊 VM loader 未綁新 named imports，六案在編譯前失敗；改從真模組取得具名 exports，原六個 assertion script 未變，修前／修後腳本與 raw 都保留。"
+    },
+    {
+      "kind": "test-invocation",
+      "detail": "quick-room Node 第一次缺 experimental-transform-types 而未執行任何案例；原啟動 FAIL 保留，不算為通過。"
+    }
+  ],
+  "platformConfiguration": {
+    "status": "PENDING",
+    "service": "Render",
+    "keys": [
+      "MERIDIAN_CHECKPOINT_SECRET",
+      "SERIES_RESUME_SECRET"
+    ],
+    "configuredOnLiveServiceVerified": false
+  },
+  "targetPhone": {
+    "model": "iPhone 17",
+    "browser": "Safari",
+    "osVersion": null,
+    "browserVersion": null,
+    "realDeviceValidated": false,
+    "voiceOverValidated": false
+  },
+  "limitations": [
+    "Render 兩種固定金鑰（MERIDIAN_CHECKPOINT_SECRET、SERIES_RESUME_SECRET）的實際設定／生效尚未確認；既有有效值保留。沒有管理連線，也未收到本輪設定確認。站間續局設定檢查與狀態揭露已本機驗證，未宣稱公開持久續局已可用。",
+    "iPhone 17、實體 Safari 與 VoiceOver 沒驗證。本機桌面 Chrome 尺寸、鍵盤與生命週期模擬不能代替實機；操作流程見 HARBOR_PHONE_TEST_PLAN.md。",
+    "沒有跨網路延遲／丟包、Render 免費服務容量或長時間負載驗證。暫停測試含真 loopback WebSocket 與真 Car，時間／完賽邊界 fixture 均由個案明示。",
+    "快速開房測試以真權威確認四玩法與 24 圖原子建房；不代表每種玩法完整實際完賽。讓秒追逐建房預設全員 0 秒，須入房後另設。",
+    "meridian-racing-node 的原始收據沒有 sourceHashes／scriptSha256 或獨立 evidence wrapper；本輪時間戳、原始 PASS 與 protectedSourcesUnchanged 均核對，封版才建立 raw snapshot，未冒稱測試當時有完整來源快照。最終來源另外由全量 build source map 核對。",
+    "tenpack-multiplayer-client 原始報告不含起訖時間；使用本輪 timestamped harness 目錄、完整 raw bytes、原 assertion script 與修正 loader hash 核對。",
+    "本輪沒有 commit、push、部署或正式站測試。此為套回前封版；原案套回結果依 DCISI/TAIPEI_HARBOR_DELIVERY.md 獨立收據。時間戳原始證據不入套用包，請依 evidenceArchiveRoot 的副本絕對總根讀取。"
+  ],
+  "handoff": {
+    "beforeSha256": "45954756203fe40506326e1201ebbc18e39351d6dabdd952acc30db01de8dc8b",
+    "originalBytes": 96593,
+    "prependOnce": true,
+    "originalSuffixPreservedByteForByte": true,
+    "afterSha256": "f2c393b5ccd5dbaa49de8ce09bcd71c09128a4b0404ef40f4160e0e38b9f66cf"
+  },
+  "aggregator": {
+    "path": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\finalize-harbor-validation.mjs",
+    "sha256": "25b43b86418d6e2889cad5f1c0abad1f256a0ceafcd9f1706dab8c19e2dd007f",
+    "runsTestsOrBuild": false,
+    "connectsToNetwork": false
+  }
+}

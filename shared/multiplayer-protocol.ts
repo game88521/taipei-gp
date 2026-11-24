@@ -16,6 +16,7 @@ export { validSeries, validSeriesTracks } from './multiplayer-series.ts';
 
 export type { CarState };
 import type {MeridianSettings,MeridianRacingState,MeridianRacingPlayer} from './meridian-racing';
+import type {HarborNetworkPause,HARBOR_NETWORK_VERSION} from './harbor-network-pause';
 export const PROTOCOL_VERSION = 2;
 // Collision response changes authority and prediction even though the wire
 // schema remains v2. Both peers must use the same physical rules.
@@ -86,12 +87,13 @@ export interface RoomPlayer {
 }
 
 export interface RoomSnapshot extends Compatibility, TrackSelection {
+  harborNetwork?:HarborNetworkPause;
   code: string;
   hostId: string;
   /** Additive v2 capability; absent on older servers. Commands bind this lobby generation. */
   hostManagement?: { lobbyRevision: number };
   /** Optional additive capabilities. Older servers omit these controls. */
-  capabilities?: { lobbyOptions: true; championship: true; meridianRacing?:true;roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION;seriesResume?: { persistent: boolean; ttlSeconds: number } };
+  capabilities?: { lobbyOptions: true; championship: true; harborNetworkPause?:typeof HARBOR_NETWORK_VERSION;meridianRacing?:true;roomRules?: true; evolution?: true; horizon?: true; replay?: true; nexusArena?: true; summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION;seriesResume?: { persistent: boolean; ttlSeconds: number } };
   meridian?:MeridianRacingState;
   cup?:FrontierCupState|null;
   replay?: ReplayDescriptor | null;
@@ -120,8 +122,10 @@ export interface RoomSnapshot extends Compatibility, TrackSelection {
 }
 
 type Request = { requestId?: string };
-type ClientCapabilities = { clientCapabilities?: { roomRules: true; meridianRacing?:true;evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION } };
+type ClientCapabilities = { clientCapabilities?: { roomRules: true; harborNetworkPause?:typeof HARBOR_NETWORK_VERSION;meridianRacing?:true;evolution?: true; horizon?: true; nexusArena?: true;summit?:true;atlasRacing?:true;voyagerRacing?:true;odysseyRacing?:true;expeditionRacing?:true;frontierCup?:typeof FRONTIER_CUP_VERSION;auroraCup?:typeof AURORA_CUP_VERSION } };
 export type ClientMessage =
+  | {type:'set-harbor-network';enabled:boolean;roomCode:string;expectedLobbyRevision:number}
+  | {type:'harbor-network-confirm';roomCode:string;matchId:string;trackRevision:number;trackStamp:string;epoch:number}
   | {type:'set-meridian';settings:MeridianSettings;roomCode:string;expectedLobbyRevision:number}
   | {type:'meridian-team';team:'red'|'blue';roomCode:string;expectedLobbyRevision:number}
   | {type:'meridian-next-stage';roomCode:string;expectedLobbyRevision:number;meridianRevision:number}
@@ -171,7 +175,7 @@ export type ClientMessage =
   | { type: 'start'; trackRevision: number }
   | { type: 'reset' }
   | { type: 'leave' }
-  | { type: 'input'; matchId: string; trackRevision: number; seq: number; steer: number; brake: boolean;driverGeneration?:number }
+  | { type: 'input'; matchId: string; trackRevision: number; seq: number; steer: number; brake: boolean;driverGeneration?:number;harborEpoch?:number }
   | { type: 'ping'; sentAt: number };
 
 export type ServerMessage =

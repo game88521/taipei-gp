@@ -26,6 +26,7 @@ import {reconciliationOffset,remotePresentation} from './expedition-network';
 import { arenaDriver, arenaCollision } from '../shared/multiplayer-arena';
 import {summitPredict} from '../shared/summit-racing';
 import {SummitRacingVisuals} from './summit-racing-visuals';
+import {harborNetworkFrozen} from '../shared/harbor-network-pause';
 
 type Sample = { at: number; car: CarState };
 type VisualCar = { model: CarModel; name: THREE.Sprite; samples: Sample[] };
@@ -287,6 +288,8 @@ export class MultiplayerScene {
   accept(room: RoomSnapshot, selfId: string, now: number) {
     if (!this.matchesMap(room) || room.players.some(player => !Number.isInteger(player.car.pos.i) || player.car.pos.i < 0 || player.car.pos.i >= this.track.N)) return;
     const newMatch = room.matchId !== this.matchId;
+    const harborChanged=room.harborNetwork?.epoch!==this.room?.harborNetwork?.epoch,harborFrozen=harborNetworkFrozen(room);
+    if(harborChanged||harborFrozen){this.inputHistory=[];this.lastSteer=0;this.lastBrake=true;this.accumulator=0;this.correction.set(0,0,0);}
     const arenaChanged=(room.arena?.revision??0)!==this.arenaRevision;this.arenaRevision=room.arena?.revision??0;
     const meridianChanged=room.players.find(p=>p.id===selfId)?.meridian?.generation!==this.room?.players.find(p=>p.id===selfId)?.meridian?.generation;
     if(arenaChanged||meridianChanged){this.inputHistory=[];this.accumulator=0;this.correction.set(0,0,0);}
@@ -323,12 +326,12 @@ export class MultiplayerScene {
         const name = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true })); name.scale.set(6.4, 1, 1);
         this.scene.add(model.root, name); visual = { model, name, samples: [] }; this.cars.set(player.id, visual);
       }
-      if (newMatch || room.phase === 'lobby') visual.samples = [];
+      if (newMatch || room.phase === 'lobby'||harborFrozen||harborChanged) visual.samples = [];
       visual.samples.push({ at: room.serverTime, car: player.car });
       visual.samples = visual.samples.filter(s => s.at >= room.serverTime - 1000).slice(-24);
       if (player.id === selfId) {
         const oldX = this.car.x + this.correction.x, oldZ = this.car.z + this.correction.z;
-        const racing = room.phase === 'racing' && horizonCollisionEligible(player) && arenaDriver(player) && !(player.summit?.pitUntil&&player.summit.pitUntil>room.serverTime) && !player.timeTrialDone
+        const racing = !harborFrozen && room.phase === 'racing' && horizonCollisionEligible(player) && arenaDriver(player) && !(player.summit?.pitUntil&&player.summit.pitUntil>room.serverTime) && !player.timeTrialDone
           && !(room.evolution?.mode === 'pursuit' && room.startAt !== null && room.serverTime < room.startAt + (room.evolution.releaseDelays[player.id] ?? 0) * 1000);
         if (racing && room.roomRules?.collisions !== false && authoritativeCollisionChanged(this.track, this.authoritativeSelf, room.serverTime, player, room.players)) {
           this.collisionRecoveryUntil = now + MULTIPLAYER_COLLISION_FEEDBACK_MS;
@@ -347,7 +350,7 @@ export class MultiplayerScene {
           this.predict(Math.max(0, now - at) / 1000, control.steer, control.brake, now);
         }
         this.inputHistory = this.inputHistory.filter(s => s.at >= now - 500);
-        const offset = reconciliationOffset(oldX-this.car.x, oldZ-this.car.z, collisionCorrection || this.predictionContact, newMatch || arenaChanged || !!player.summit?.pitUntil);
+        const offset = reconciliationOffset(oldX-this.car.x, oldZ-this.car.z, collisionCorrection || this.predictionContact, newMatch || arenaChanged || harborChanged || harborFrozen || !!player.summit?.pitUntil);
         this.correction.set(offset.x, 0, offset.z); this.correctionRate=offset.rate;
         this.authoritativeSelf = { at: room.serverTime, car: player.car };
         if (newMatch || !this.cameraReady) { this.resetCamera(); this.cameraReady = true; }
@@ -371,6 +374,7 @@ export class MultiplayerScene {
     this.frame(dt,room.serverTime,0,true,false,true,dt);return true;
   }
   private predict(dt: number, steer: number, brake: boolean, now: number) {
+    if(harborNetworkFrozen(this.room))return;
     const self=this.room?.players.find(p => p.id === this.selfId);
     if (self?.timeTrialDone || self?.block?.ghost || self?.eliminated || self?.eliminationWinner || self?.arena?.active===false || self?.cup?.active===false||self?.meridian?.active===false || self?.summit?.pitUntil&&self.summit.pitUntil>this.predictionAt || this.room?.spectators?.some(v=>v.id===this.selfId)) return;
     let remaining = Math.min(.18, Math.max(0, dt));

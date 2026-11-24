@@ -12,6 +12,8 @@ import {mountExpeditionHud} from './expedition-hud-ui';
 import {mountExpeditionDaily} from './expedition-daily';
 import './voyager-platform.css';
 import {getVoyagerComfort,mountVoyagerComfort} from './voyager-comfort';
+import './harbor-accessibility.css';
+import {installHarborMobile} from './harbor-mobile';
 import {mountVoyagerOfflinePacks} from './voyager-offline-packs';
 import {VoyagerPhoto,mountResultCard} from './voyager-photo';
 import {mountAtlasPlatform} from './atlas-platform';
@@ -490,6 +492,7 @@ type Mode = 'free' | 'race';
 let mode: Mode = 'free';
 const veh = () => (mode === 'race' ? car : fcar);
 const input = new Input($('pad'), $('pad-dot'), $('brake'), $('gas'), $('steer-l'), $('steer-r'), $('btn-drift'));
+installHarborMobile({release:()=>input.release()});
 mountControlSettings($('control-settings'), input);
 mountOdysseyGamepad({ host: $('control-settings'), input, onBack: () => { goBack(); } });
 const drift = new DriftScore(); // 甩尾計分（drift.ts）

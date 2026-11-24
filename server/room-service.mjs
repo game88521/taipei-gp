@@ -24,6 +24,8 @@ import {meridianReceive,meridianAdded,meridianJoinError,meridianStartError,merid
 import {checkpointAck,checkpointForget} from './meridian-room-checkpoints.mjs';
 import {meridianChampionshipCheckpoints} from './meridian-championship-checkpoints.mjs';
 import {meridianCupReceive} from './meridian-cup-checkpoints.mjs';
+import {HARBOR_NETWORK_VERSION} from '../shared/harbor-network-pause.ts';
+import {harborNetworkReceive,harborNetworkDisconnect,harborNetworkStart,harborNetworkTick,harborNetworkPublic,harborNetworkClock} from './harbor-network-pause-service.mjs';
 
 export const TICK_MS = 1000 / 60;
 export const SNAPSHOT_MS = 1000 / 20;
@@ -168,6 +170,7 @@ export class RoomService {
       if (typeof message.sentAt !== 'number' || !Number.isFinite(message.sentAt)) return this.fail(client, 'BAD_MESSAGE', message);
       this.send(client, { type: 'pong', sentAt: message.sentAt, serverTime: now, capabilities: { horizon: true } }); return;
     }
+    if(harborNetworkReceive(this,client,message,now))return;
     if(checkpointAck(this,client,message))return;
     if(meridianCupReceive(this,client,message,now))return;
     if(meridianChampionshipCheckpoints(this,client,message,now))return;
@@ -376,6 +379,7 @@ export class RoomService {
         prepareArena(room);
         summitStart(room,room.startAt);voyagerStart(room);
         meridianStart(room);
+        harborNetworkStart(room);
         this.broadcast(room, 'room', now); return;
       case 'reset':
         if (room.hostId !== player.id) return this.fail(client, 'HOST_ONLY', message);
@@ -564,6 +568,7 @@ export class RoomService {
       completedLaps: 0, distance: 0, nextGate: 1, finishMs: null, lapTimesMs: [], bestLapMs: null, lastLapElapsedMs: 0,
       dnf: false, dnfReason: null, joinedAt: now };
     player.supportsHorizon = request.clientCapabilities?.horizon === true;
+    player.supportsHarborNetwork = request.clientCapabilities?.harborNetworkPause === HARBOR_NETWORK_VERSION;
     player.supportsArena = request.clientCapabilities?.nexusArena === true;
     player.supportsAtlas = request.clientCapabilities?.atlasRacing === true;
     player.supportsSummit = request.clientCapabilities?.summit === true;
@@ -629,6 +634,7 @@ export class RoomService {
     player.supportsEvolution = request.clientCapabilities?.evolution === true;
     player.supportsMeridian = request.clientCapabilities?.meridianRacing === true;
     player.supportsHorizon = request.clientCapabilities?.horizon === true;
+    player.supportsHarborNetwork = request.clientCapabilities?.harborNetworkPause === HARBOR_NETWORK_VERSION;
     player.supportsArena = request.clientCapabilities?.nexusArena === true;
     player.supportsAtlas = request.clientCapabilities?.atlasRacing === true;
     player.supportsSummit = request.clientCapabilities?.summit === true;
@@ -641,6 +647,8 @@ export class RoomService {
     // Action sequences belong to this replacement socket; the retired socket is detached above.
     player.summitSeq = -1; player.arenaUsedSeq = -1;player.voyagerSeq=-1;player.meridianSeq=-1;
     client.room = room; client.player = player; room.emptySince = null; room.updatedAt = now;
+    // Reload/socket replacement also needs a bounded pause before this seat reloads its track.
+    harborNetworkDisconnect(this,room,player,now);
     if (!room.players.get(room.hostId)?.connected && room.hostId !== player.id) { room.hostId = player.id; room.lobbyRevision++; }
     this.welcome(client, request, now); this.broadcast(room, 'room', now);
   }
@@ -683,6 +691,7 @@ export class RoomService {
     if (!room || !player || player.client !== client) return;
     const now = this.now(); player.client = null; player.connected = false; player.ready = false; player.loaded = false;
     player.disconnectedAt = now; player.input = { steer: 0, brake: true }; player.lastInputAt = now;
+    harborNetworkDisconnect(this,room,player,now);
     this.electHost(room); room.updatedAt = now;
     if (![...room.players.values()].some((p) => p.connected&&!p.isAi)) room.emptySince ??= now;
     if (room.phase === 'countdown') this.toLobby(room, now);
@@ -832,8 +841,10 @@ export class RoomService {
   tick(at = this.now()) {
     if (this.closed || !Number.isFinite(at)) return;
     for (const room of [...this.rooms.values()]) {
+      const harborPaused=harborNetworkTick(this,room,at);
       this.expireDisconnected(room, at);
       if ((room.emptySince !== null && at - room.emptySince >= this.emptyRoomMs) || (['lobby', 'results'].includes(room.phase) && at - room.updatedAt >= this.idleRoomMs)) { this.destroyRoom(room); continue; }
+      if(harborPaused&&room.phase==='racing'){if(at-room.lastSnapshotAt>=SNAPSHOT_MS-1e-6){room.lastSnapshotAt=at;this.broadcast(room,'snapshot',at);}continue;}
       if (room.phase === 'countdown' && at >= room.startAt) { room.phase = 'racing'; room.updatedAt = at; this.broadcast(room, 'room', at); }
       if (room.phase === 'racing') {
         // A busy server must not run an unbounded catch-up loop. A prolonged
@@ -857,6 +868,7 @@ export class RoomService {
   }
 
   snapshot(room, now = this.now()) {
+    harborNetworkClock(room,now);
     odysseyFinalize(room,now);
     arenaSync(room);
     const voyager=voyagerVisible(room)?voyagerPublic(room):null;
@@ -915,13 +927,13 @@ export class RoomService {
     return { version: PROTOCOL_VERSION, physics: PHYSICS_VERSION, catalogStamp: CATALOG_STAMP,
       trackId: room.trackId, trackStamp: room.trackStamp, trackRevision: room.trackRevision,
       code: room.code, hostId: room.hostId, hostManagement: { lobbyRevision: room.lobbyRevision }, arena: arenaPublic(room), replay,
-      cup:room.cup?structuredClone(room.cup):null,
+      cup:room.cup?structuredClone(room.cup):null,harborNetwork:harborNetworkPublic(room,now),
       ...(room.meridian?{meridian:meridianPublic(room)}:{}),
       ...(atlasVisible(room)?{atlas:structuredClone(atlasEnsure(room))}:{}),...(voyager?{voyager}:{}),
       ...(odysseyActive(room)?{odyssey:odysseyPublic(room)}:{}),
       ...(expeditionEnabled(room)?{expedition:structuredClone(room.expedition)}:{}),
       ...(summitEventsEnabled(room)?{summit:summitPublic(room)}:{}),capabilities: { lobbyOptions: true, championship: true, roomRules: true, horizon: true, replay: true, nexusArena: true,
-        meridianRacing:true,expeditionRacing:true,odysseyRacing:true,frontierCup:FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
+        harborNetworkPause:HARBOR_NETWORK_VERSION,meridianRacing:true,expeditionRacing:true,odysseyRacing:true,frontierCup:FRONTIER_CUP_VERSION,auroraCup:AURORA_CUP_VERSION,...(summitEventsEnabled(room)?{summit:true}:{}),...(voyager?{voyagerRacing:true}:{}),...(atlasVisible(room)?{atlasRacing:true}:{}),
         ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: true, seriesResume: this.checkpoints.capability() } : {}) }, roomRules: { ...room.roomRules },
       ...([...room.players.values()].some(p => p.supportsEvolution) ? { evolution: { ...structuredClone(room.evolution), teamStandings: this.teamStandings(room) } } : {}),
       horizon: { ...room.horizon }, spectators: [...room.spectators.values()].map(v => ({ id: v.id, name: v.name, loaded: v.loaded })),

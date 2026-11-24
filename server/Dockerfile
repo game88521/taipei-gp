@@ -38,3 +38,5 @@ COPY shared/frontier-cup.ts /app/shared/
 
 COPY server/meridian-*.mjs ./
 COPY shared/meridian-*.ts /app/shared/
+COPY server/harbor-network-pause-service.mjs ./
+COPY shared/harbor-network-pause.ts /app/shared/

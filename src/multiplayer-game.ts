@@ -5,6 +5,9 @@ import {ExpeditionResolution} from './expedition-performance';
 import {networkFeel,NETWORK_FEELS,NETWORK_FEEL_KEY} from './expedition-network';
 import './voyager-platform.css';
 import {mountVoyagerComfort} from './voyager-comfort';
+import './harbor-accessibility.css';
+import {installHarborMobile} from './harbor-mobile';
+import {mountHarborQuickRoom} from './harbor-quick-room';
 import {mountResultCard} from './voyager-photo';
 import {multiplayerResultCardData} from './voyager-result-data';
 import {acquireAtlasPageLease} from './atlas-storage-lease';
@@ -42,6 +45,8 @@ import {MeridianRacingPanel} from './meridian-racing-ui';
 import {cupMatchLabel} from '../shared/frontier-cup';
 import {mountAuroraTouch} from './aurora-touch-ui';
 import {mountRoomInvite} from './aurora-invite-ui';
+import {mountHarborNetworkPause} from './harbor-network-pause-ui';
+import {harborNetworkFrozen,harborNetworkNow} from '../shared/harbor-network-pause';
 
 await acquireAtlasPageLease();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -56,6 +61,7 @@ let client: MultiplayerClient | null = null;
 const commonInvite=mountRoomInvite($('mp-room'),()=>client?.room?{kind:'race',code:client.room.code,label:'賽道好友房',players:client.room.players.length,capacity:4}:null,'aurora-mp-invite');
 let scene: MultiplayerScene | null = null;
 let graphicsReady = false, busy = false, notice = '', soundEnabled = false;
+const harborNetworkPanel=mountHarborNetworkPause(()=>client,text=>{notice=text;renderUi();});
 type EntryAction = 'create' | 'join' | 'restore' | 'resume-series' | 'claim-series' | 'watch' | 'preset';
 let pendingRoomPreset: RoomPreset | null = null;
 let pendingSeriesToken = '', pendingSeriesSeat = '';
@@ -120,6 +126,31 @@ for (const id of ['mp-track', 'mp-room-track']) {
   select.value = DEFAULT_MULTIPLAYER_TRACK_ID;
 }
 const input = new Input($('mp-pad'), $('mp-pad-dot'), $('mp-brake'), $('mp-gas'), $('mp-left'), $('mp-right'));
+installHarborMobile({release:()=>{input.release();client?.sendInput(0,true);}});
+const harborQuickRoom=mountHarborQuickRoom($('mp-entry'),{
+  getState:()=>({hasRoom:!!client?.room,busy,ready:!!client&&graphicsReady&&!scene?.contextLost}),
+  initialTrackId:DEFAULT_MULTIPLAYER_TRACK_ID,
+  create:async preset=>{
+    const connection=client;
+    if(!connection||busy||connection.room)throw Error('請先完成目前操作或離開房間。');
+    const name=$<HTMLInputElement>('mp-name').value.trim().replace(/[\u0000-\u001f\u007f]/g,'');
+    if(!name||[...name].length>16)throw Error('請輸入 1～16 個字的車手名稱。');
+    if(!graphicsReady||scene?.contextLost)throw Error('請等賽道準備完成後再建立房間。');
+    busy=true;notice='';entryFeedback='';entryRetryKind=null;renderUi();
+    try{
+      await entryWait.open({connect:()=>connection.connectRoomPresets(),disconnect:()=>connection.disconnect()});
+      if(client!==connection||connection.room)throw Error('房間狀態已變更，請重新確認。');
+      if(!graphicsReady||scene?.contextLost)throw Error('賽道目前無法使用，請稍後重試。');
+      await connection.createConfigured(name,preset);
+      if(!connection.room)throw Error('尚未收到建房確認，請確認連線後再試。');
+      // The wizard has just been hidden; keep keyboard and screen-reader focus in the lobby.
+      const lobby=$('mp-room');lobby.tabIndex=-1;lobby.focus();
+    }catch(error){
+      entryFeedback=notice=error instanceof Error?error.message:'無法建立房間，請再試一次。';
+      throw error;
+    }finally{busy=false;renderUi();}
+  },
+});
 const arenaPanel=new MultiplayerArenaPanel(()=>client,input);
 const arenaVisuals=new MultiplayerArenaVisuals();
 const summitPanel=new SummitRacingPanel(()=>client);
@@ -159,7 +190,7 @@ feelLabel.append(feelSelect);voyagerComfortHost.append(feelLabel,feelNote);
 mountResultCard($('mp-results'),()=>multiplayerResultCardData(client?.room,client?.room?getMultiplayerTrack(client.room.trackId)?.name:undefined),'voyager-mp-result-card');
 mountControlHints(input, { multiplayer: true, steering: () => 'drag' });
 const sound = new Sound();
-const canDrive = () => !auroraTouch.opened && !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.cup?.active!==false&&p.meridian?.active!==false && p.finishMs === null) && focused && !document.hidden && expeditionHud.editor.hidden && !scene.contextLost;
+const canDrive = () => !harborNetworkFrozen(client?.room) && !auroraTouch.opened && !!client && client.status === 'connected' && client.room?.phase === 'racing' && releaseRemaining(client.room, client.selfId, client.serverNow()) === 0 && graphicsReady && !!scene?.matchesMap(client.room) && !!client.room.players.find(p => p.id === client?.selfId && p.loaded && !p.dnf && !p.timeTrialDone && !p.eliminated && !p.eliminationWinner && !p.block?.ghost && !(p.summit?.pitUntil&&p.summit.pitUntil>client!.serverNow()) && p.arena?.active!==false && p.cup?.active!==false&&p.meridian?.active!==false && p.finishMs === null) && focused && !document.hidden && expeditionHud.editor.hidden && !scene.contextLost;
 input.isDriving = canDrive;
 
 function desiredMap() {
@@ -217,6 +248,7 @@ function synchronizeMap(force = false) {
 }
 
 function renderUi() {
+  harborQuickRoom.refresh();
   commonInvite.update();
   if (!canDrive()) input.release();
   if (!client?.room?.cup&&!client?.room?.meridian&&recentHistory.capture(client?.room ?? null, client?.selfId ?? null)) historyPanel.render();
@@ -224,6 +256,7 @@ function renderUi() {
   const room = client?.room, me = room?.players.find(p => p.id === client?.selfId);
   const phase = room?.phase ?? '', active = phase === 'countdown' || phase === 'racing';
   const connected = client?.status === 'connected';
+  harborNetworkPanel.render(room??null,client?.selfId??null,connected,busy,client?.serverNow()??Date.now());
   const localMapReady = graphicsReady && !!room && !!scene?.matchesMap(room) && (!!me?.loaded || !!client?.isSpectator);
   seriesPanel.render(room ?? null, client?.selfId ?? null, connected, busy);
   evolutionPanel.render(room ?? null, client?.selfId ?? null, connected, busy);
@@ -397,7 +430,7 @@ function enterRoom(kind: EntryAction) {
       if (kind === 'create' && !graphicsReady) throw new Error('請等賽道準備完成後再建立房間。');
     } else if (!connection.hasSavedSession) { notice = '目前沒有可以恢復的房間。'; return; }
     try {
-      await entryWait.open(connection);
+      await entryWait.open(kind==='preset'||kind==='watch'?{connect:()=>connection.connectRoomPresets(),disconnect:()=>connection.disconnect()}:connection);
       // Only the handshake is retried. Each room request is sent once.
       if (kind === 'create') await connection.create(name, laps, trackId);
       else if (kind === 'join') await connection.join(code, name);
@@ -554,14 +587,15 @@ try {
       summitPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
       cupPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy);
       meridianPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,client?.serverNow()??Date.now());
+      harborNetworkPanel.render(room??null,client?.selfId??null,client?.status==='connected',busy,now);
       if(scene&&graphicsReady)arenaVisuals.update(scene.scene,scene.track,room??null,now);
       renderElapsed = 0;
       setText($('mp-countdown'), room?.phase === 'countdown' && room.startAt ? String(Math.max(1, Math.ceil((room.startAt - now) / 1000))) : '');
       const me = room?.players.find(p => p.id === client?.selfId);
       const releaseMs = releaseRemaining(room, client?.selfId, now);
       setText($('mp-release'), releaseMs > 0 ? `你的放行倒數 ${(releaseMs / 1000).toFixed(1)} 秒` : room?.evolution?.mode === 'pursuit' && room.phase === 'racing' ? '已放行 · 共同時鐘計名次' : '');
-      if (room?.startAt && room.phase !== 'countdown') setText($('mp-time'), time(me?.finishMs ?? now - room.startAt));
-      setText($('mp-deadline'), deadlineText(room, now));
+      if (room?.startAt && room.phase !== 'countdown') setText($('mp-time'), time(me?.finishMs ?? harborNetworkNow(room,now) - room.startAt));
+      setText($('mp-deadline'), deadlineText(room, harborNetworkNow(room,now)));
       setText($('mp-network-warning'), room?.phase === 'racing' ? scene?.network.warning(at) ?? '' : '');
       if (($('mp-awareness') as HTMLDetailsElement).open) awareness.update(graphicsReady ? scene?.track ?? null : null, room ?? null, scene?.spectatorId ?? client?.selfId ?? null, at);
       setText($('mp-speed'), String(Math.round((scene?.spectatorId ? scene.viewSpeed : scene?.car.v ?? 0) * 3.6)));
