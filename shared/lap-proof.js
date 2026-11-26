@@ -1,14 +1,18 @@
 import manifest from './taipei-track.json' with { type: 'json' };
+import lantern from './lantern-track-manifests.json' with { type: 'json' };
 
 export const RECORD_VERSION = 1;
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export const isBoard = (b) => b?.track === 'taipei' && (b.rules === 'classic' || b.rules === '2026') && b.version === RECORD_VERSION;
-export const boardKey = (b) => `taipei-gp:tt:v3:${b.track}:${b.rules}:${b.version}`;
+export const manifestFor = (id) => typeof id !== 'string' ? null : id === 'taipei' ? manifest : Object.hasOwn(lantern.tracks,id) ? lantern.tracks[id] : null;
+export const isBoard = (b) => !!b && !!manifestFor(b.track) && (b.rules === 'classic' || b.rules === '2026') && b.version === RECORD_VERSION;
+export const boardKey = (b) => b.track === 'taipei' ? `taipei-gp:tt:v3:${b.track}:${b.rules}:${b.version}` : `taipei-gp:tt:v4:${b.track}:${b.rules}:${b.version}:${manifestFor(b.track).sourceHash.slice(0,16)}`;
 export const trackManifest = manifest;
 
 /** 寬鬆的軌跡合理性檢查。無法證明軌跡確由遊戲產生，不是權威反作弊。 */
-export function validateLapProof(proof, time, rules) {
+export function validateLapProof(proof, time, rules, track = 'taipei') {
   const fail = (reason) => ({ ok: false, reason });
+  const manifest = manifestFor(track);
+  if (!manifest || !Number.isFinite(time) || time < 10 || time > 3600 || !['classic','2026'].includes(rules)) return fail('board');
   if (!proof || proof.v !== 1 || proof.trackStamp !== manifest.stamp || !Array.isArray(proof.samples)) return fail('schema');
   const points = proof.samples, n = points.length;
   if (n < 201 || n > 6500) return fail('samples');

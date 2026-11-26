@@ -16,7 +16,7 @@ export function mountAuroraParty(client:ExpeditionSocialClient){
  const scoring=document.createElement('p');scoring.textContent='王冠名次5／3／1分（同分同名次）；警匪勝方3、另一方1分；全隊巡遊完成各3分；巡航不計分。中斷／退出不加分。同票依巡航、巡遊、王冠、警匪固定順序決定。切場後全部重新準備。';
  root.append(title,note,status,enable,choice,vote,next,finish,download,end,standings,rounds,scoring);
  function render(){const r=client.room,p=r?.party,host=r?.hostId===client.selfId,idle=r&&['lobby','finished'].includes(r.phase),gated=client.controlGated||client.status!=='connected';root.hidden=!r;
-  enable.hidden=!!p||!host;enable.disabled=gated||!idle||!client.partySupported||r?.mode==='tandem'||(r?.players.length??0)<2;
+  enable.hidden=!!p||!host;enable.disabled=gated||!idle||!client.partySupported||!['cruise','convoy','crown','chase'].includes(r?.mode??'')||(r?.players.length??0)<2;
   for(const e of[choice,vote,next,finish,download,end,standings,rounds,scoring])e.hidden=!p;
   if(!p){status.textContent=client.partySupported?'先邀請2～4人進同房，再由房主啟用派對。雙人追走仍從原入口獨立進行。':'目前後端尚未宣告好友派對，原玩法仍可使用。';return;}
   const me=r!.players.find(q=>q.id===client.selfId),mine=p.votes.find(v=>v.slot===me?.slot),key=p.ballot+':'+(mine?.mode??'');if(key!==choiceKey){choiceKey=key;if(mine)choice.value=mine.mode;}

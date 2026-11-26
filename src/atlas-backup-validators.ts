@@ -1,3 +1,4 @@
+import {parseBranchSave} from './lantern-story-store';
 import {parseMeridianResumeSave} from './meridian-city-resume';
 import {parsePublicCheckpoints} from '../shared/meridian-checkpoints';
 import {parseCityMissionRecords} from '../shared/meridian-city';
@@ -73,6 +74,7 @@ export function validateAtlasBackup(b:AtlasBackup,main:(text:string)=>{ok:boolea
       case 'taipei-gp-meridian-navigator-results-v1':valid=!!parseNavigatorHistory(v);break;
       case 'taipei-gp-aurora-touch-v1':valid=!!parseTouchLayouts(v);break;
       case 'taipei-gp-aurora-bus-v1':valid=!!parseBusOperation(v);break;
+      case 'taipei-gp-lantern-story-v1':valid=!!parseBranchSave(v);break;
       case 'taipei-gp-aurora-story-v1':valid=!!parseStorySave(v);break;
       case 'taipei-gp-aurora-duty-results-v1':valid=!!parseAuroraDutyRecords(v);break;
       case 'taipei-gp-multiplayer-quality-v1':valid=['auto','standard','economy'].includes(String(v));break;

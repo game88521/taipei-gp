@@ -40,6 +40,9 @@ export const ATLAS_MODES: readonly AtlasMode[] = [
   { id:'story-coop', name:'NG3 好友合作劇本', group:'coop', players:'2～4人', devices:'鍵盤／觸控／手把', duration:'依自訂劇本', target:'btn-nexus-workshop', variant:'story-coop', keywords:'裝卸 領航 警戒 分工 城市任務' },
   { id:'hunt-solo', name:'城市照片尋寶・單人', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'三站線索，依找路速度', target:'btn-nexus-workshop', variant:'hunt-solo', keywords:'拍照 路牌 線索 探索 離線' },
   { id:'hunt-friends', name:'城市照片尋寶・好友合作', group:'coop', players:'1～4人', devices:'鍵盤／觸控／手把', duration:'三站線索，依找路速度', target:'btn-nexus-workshop', variant:'hunt-friends', keywords:'拍照 路牌 線索 探索' },
+  { id:'weekly-cup', name:'每週好友異步盃', group:'online', players:'1～16人（不同時間參賽）', devices:'鍵盤／觸控／手把', duration:'每週三站，截止前可分次挑戰', target:'btn-lantern-weekly', keywords:'異步 排行榜 每週 好友 不同時間 雲端 三站 積分' },
+  { id:'ctf', name:'2對2城市搶旗', group:'online', players:'4人', devices:'鍵盤／觸控／手把', duration:'3分鐘', target:'btn-expedition-social', variant:'ctf', keywords:'紅藍 搶旗 護送 基地' },
+  { id:'branch-story', name:'NG4 分支城市劇情', group:'solo', players:'1人', devices:'鍵盤／觸控／手把', duration:'依劇本，可中途續玩', target:'btn-nexus-workshop', variant:'branch-story', keywords:'二選一 劇情 結局 分支 NG4' },
 ];
 export interface AtlasModePreferences { v:1; favorites:string[]; recent:string[] }
 const ids = new Set(ATLAS_MODES.map(m=>m.id));
@@ -51,19 +54,20 @@ export function parseModePreferences(v:unknown):AtlasModePreferences|null {
   return {v:1,favorites:[...x.favorites],recent:[...x.recent]};
 }
 export interface AtlasModePlanning { players:number|null; minutes:number|null }
-const single=new Set(['free','taxi','street','gp','weekend','tt','season','drift','city-challenges','passport','school','workshop','duty','tandem-practice','rally','daily','story','hunt-solo']);
+const single=new Set(['free','taxi','street','gp','weekend','tt','season','drift','city-challenges','passport','school','workshop','duty','tandem-practice','rally','daily','story','hunt-solo','branch-story']);
 export function atlasPlayerRange(mode:AtlasMode):readonly[number,number] {
   if(single.has(mode.id))return[1,1];
   if(['split','tandem','navigator'].includes(mode.id))return[2,2];
-  if(['endurance','cup'].includes(mode.id))return[4,4];
+  if(['endurance','cup','ctf'].includes(mode.id))return[4,4];
   if(mode.id==='tandem-rotation')return[3,4];
+  if(mode.id==='weekly-cup')return[1,16];
   return ['race','cruise','hunt-friends'].includes(mode.id)?[1,4]:[2,4];
 }
 /** A planning aid, not a measured completion-time promise. Unknown rules remain unranked. */
 export function atlasPlanningMinutes(mode:AtlasMode,players:number|null):number|null {
   if(['free','tt','passport'].includes(mode.id))return 5; // Player may stop at any time.
   if(['drift','school','tandem-practice'].includes(mode.id))return 5;
-  if(['chase','crown','tandem'].includes(mode.id))return 5;
+  if(['chase','crown','tandem','ctf'].includes(mode.id))return 5;
   if(mode.id==='tandem-rotation')return players===3?10:20;
   if(['navigator','friend-rally','city-race'].includes(mode.id))return 15;
   if(mode.id==='endurance')return 15;

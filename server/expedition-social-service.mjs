@@ -6,6 +6,8 @@ import {CONVOY_VERSION} from '../shared/frontier-convoy.ts';
 import {createConvoy,resetConvoy,resetConvoyPlayer,convoySnapshot,stepConvoy} from './frontier-convoy-service.mjs';
 import {CROWN_VERSION,CROWN_DURATION_MS} from '../shared/frontier-crown.ts';
 import {createCrown,resetCrown,crownSnapshot,finishCrown,stepCrown} from './frontier-crown-service.mjs';
+import {CTF_VERSION,ctfTeam} from '../shared/lantern-ctf.ts';
+import {createCtf,resetCtf,ctfSnapshot,dropCtf,finishCtf,stepCtf} from './lantern-ctf-service.mjs';
 import {COOP_STATIONS} from '../shared/nexus-coop.ts';
 import {CityReplayRecorder} from './frontier-city-replay-service.mjs';
 import {CITY_REPLAY_VERSION} from '../shared/frontier-city-replay.ts';
@@ -29,7 +31,7 @@ export class ExpeditionSocialService {
   send(c,m){try{if(c.ws.readyState===1&&c.ws.bufferedAmount<262144)c.ws.send(JSON.stringify(m));else if(c.ws.bufferedAmount>=262144)c.ws.close(1013,'城市社交連線過慢');}catch{c.ws.terminate?.();}}
   accept(ws){
     if(this.closed||this.clients.size>=this.maxClients){ws.close(1013,'城市社交連線已滿');return null;}
-    const c={ws,room:null,player:null,observer:false,followSlot:0,lastWatchAt:-Infinity,alive:true,window:this.now(),count:0};this.clients.add(c);this.send(c,{type:'hello',v:SOCIAL_VERSION,capabilities:{cityWatchVersion:SOCIAL_WATCH_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:SOCIAL_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,partyVersion:PARTY_VERSION,rotationVersion:MERIDIAN_ROTATION_VERSION,checkpointVersion:MERIDIAN_CHECKPOINT_VERSION}});
+    const c={ws,room:null,player:null,observer:false,followSlot:0,lastWatchAt:-Infinity,alive:true,window:this.now(),count:0};this.clients.add(c);this.send(c,{type:'hello',v:SOCIAL_VERSION,capabilities:{cityWatchVersion:SOCIAL_WATCH_VERSION,cityReplayVersion:CITY_REPLAY_VERSION,autoResumeVersion:SOCIAL_AUTO_RESUME_VERSION,convoyVersion:CONVOY_VERSION,crownVersion:CROWN_VERSION,ctfVersion:CTF_VERSION,partyVersion:PARTY_VERSION,rotationVersion:MERIDIAN_ROTATION_VERSION,checkpointVersion:MERIDIAN_CHECKPOINT_VERSION}});
     ws.on('pong',()=>c.alive=true);
     ws.on('message',bytes=>{if(this.closed||!this.clients.has(c))return;const now=this.now();if(now-c.window>=1000){c.window=now;c.count=0;}if(++c.count>90||bytes.length>73728){ws.close(1008,'訊息超限');return;}
       let m;try{m=JSON.parse(String(bytes));if(!obj(m)||typeof m.type!=='string')throw Error('訊息格式無效');if(bytes.length>4096&&m.type!=='checkpoint-restore')throw Error('訊息超限');this.receive(c,m,now);}catch(e){this.send(c,{type:'error',message:String(e.message).slice(0,150),...e.code?{code:e.code}:{}});}
@@ -49,10 +51,11 @@ export class ExpeditionSocialService {
       if(m.type==='resume'){
         r=this.rooms.get(m.code);if(!r)throw seatError('ROOM_GONE','原房間已結束，請重新加入');p=r.players.get(m.selfId);
         if(r.convoy&&m.convoyVersion!==CONVOY_VERSION)throw seatError('VERSION_MISMATCH','車隊巡遊需要同步更新前後端');
+        if(r.ctf&&m.ctfVersion!==CTF_VERSION)throw seatError('VERSION_MISMATCH','城市搶旗需要同步更新前後端');
         if(r.crown&&m.crownVersion!==CROWN_VERSION)throw seatError('VERSION_MISMATCH','移動王冠需要同步更新前後端');
         if(r.rotation&&m.rotationVersion!==MERIDIAN_ROTATION_VERSION)throw seatError('VERSION_MISMATCH','多人輪賽需要同步更新前後端');
         if(r.party&&(m.partyVersion!==PARTY_VERSION||m.convoyVersion!==CONVOY_VERSION||m.crownVersion!==CROWN_VERSION))throw seatError('VERSION_MISMATCH','好友派對需要同步更新前後端');
-        if(!p||p.outcome==='left'||m.resumeKey!==undefined&&(typeof m.resumeKey!=='string'||!/^[a-f0-9]{24}$/.test(m.resumeKey))||Object.keys(m).some(k=>!['type','v','code','selfId','token','endpoint','resumeKey','convoyVersion','crownVersion','partyVersion','rotationVersion'].includes(k)))throw seatError('SEAT_REJECTED','原席位憑證或續接要求無效');
+        if(!p||p.outcome==='left'||m.resumeKey!==undefined&&(typeof m.resumeKey!=='string'||!/^[a-f0-9]{24}$/.test(m.resumeKey))||Object.keys(m).some(k=>!['type','v','code','selfId','token','endpoint','resumeKey','convoyVersion','crownVersion','partyVersion','rotationVersion','ctfVersion'].includes(k)))throw seatError('SEAT_REJECTED','原席位憑證或續接要求無效');
         const grant=p.resumeGrant,grantRetry=!!grant&&m.resumeKey===grant.key&&(tokenMatches(m.token,grant.oldToken)||tokenMatches(m.token,grant.newToken));
         if(grant?!grantRetry&&!(!m.resumeKey&&tokenMatches(m.token,grant.newToken)):!tokenMatches(m.token,p.token))throw seatError('SEAT_REJECTED','原席位憑證或續接批次不符');
         if(p.client)throw seatError('SEAT_BUSY','原席位仍在另一條連線，請等候釋放');
@@ -68,10 +71,12 @@ export class ExpeditionSocialService {
           let code;do{code=Array.from(randomBytes(6),n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n%32]).join('');}while(this.rooms.has(code));
           if(m.mode==='convoy'&&m.convoyVersion!==CONVOY_VERSION)throw seatError('VERSION_MISMATCH','車隊巡遊需要同步更新前後端');
           if(m.mode==='crown'&&m.crownVersion!==CROWN_VERSION)throw seatError('VERSION_MISMATCH','移動王冠需要同步更新前後端');
+          if(m.mode==='ctf'&&m.ctfVersion!==CTF_VERSION)throw seatError('VERSION_MISMATCH','城市搶旗需要同步更新前後端');
           const convoy=m.mode==='convoy'?createConvoy(this.world().roads,m.convoyRoute):null;
           if(m.rotation!==undefined&&(m.rotation!==true||m.mode!=='tandem'||m.rotationVersion!==MERIDIAN_ROTATION_VERSION))throw Error('多人追走版本或設定無效');
-          r={rotation:m.rotation?createRotation():null,code,hostId:'',mode:m.mode,weather:m.weather,phase:'lobby',revision:1,locked:false,runId:id(12),round:0,leg:0,startAt:null,endsAt:null,reason:'',players:new Map(),observers:new Set(),watchHistory:[],recorder:new CityReplayRecorder({source:'social',mode:m.mode}),marks:[],updatedAt:now,simAt:now,lastBroadcast:0,convoy,crown:m.mode==='crown'?createCrown():null};this.rooms.set(code,r);
-        }else{if(!socialCode(m.code))throw Error('請填六碼房間碼');r=this.rooms.get(m.code);if(!r||r.phase!=='lobby'&&!(r.mode==='cruise'&&r.phase==='running'))throw Error('房間不存在或正在比賽');if(r.locked)throw Error('房主已鎖定新加入；原席位仍可續接');if(r.convoy&&m.convoyVersion!==CONVOY_VERSION)throw seatError('VERSION_MISMATCH','車隊巡遊需要同步更新前後端');if(r.crown&&m.crownVersion!==CROWN_VERSION)throw seatError('VERSION_MISMATCH','移動王冠需要同步更新前後端');}
+          r={rotation:m.rotation?createRotation():null,code,hostId:'',mode:m.mode,weather:m.weather,phase:'lobby',revision:1,locked:false,runId:id(12),round:0,leg:0,startAt:null,endsAt:null,reason:'',players:new Map(),observers:new Set(),watchHistory:[],recorder:new CityReplayRecorder({source:'social',mode:m.mode}),marks:[],updatedAt:now,simAt:now,lastBroadcast:0,convoy,crown:m.mode==='crown'?createCrown():null,ctf:m.mode==='ctf'?createCtf(this.world().roads):null};resetCtf(r);this.rooms.set(code,r);
+        }else{if(!socialCode(m.code))throw Error('請填六碼房間碼');r=this.rooms.get(m.code);if(!r||r.phase!=='lobby'&&!(r.mode==='cruise'&&r.phase==='running'))throw Error('房間不存在或正在比賽');if(r.locked)throw Error('房主已鎖定新加入；原席位仍可續接');if(r.convoy&&m.convoyVersion!==CONVOY_VERSION)throw seatError('VERSION_MISMATCH','車隊巡遊需要同步更新前後端');if(r.ctf&&m.ctfVersion!==CTF_VERSION)throw seatError('VERSION_MISMATCH','城市搶旗需要同步更新前後端');
+        if(r.crown&&m.crownVersion!==CROWN_VERSION)throw seatError('VERSION_MISMATCH','移動王冠需要同步更新前後端');}
         if(r.party)throw Error('這次派對已鎖定原隊伍；請房主結束派對後再加入新隊員');
         if(r.rotation&&m.rotationVersion!==MERIDIAN_ROTATION_VERSION)throw Error('請更新後加入多人輪賽');
         if(r.players.size>=(r.mode==='tandem'&&!r.rotation?2:4))throw Error('房間已滿');
@@ -79,7 +84,7 @@ export class ExpeditionSocialService {
         p={id:id(10),token:id(32),resumeGrant:null,resumeExpiresAt:null,lastConfirmedResume:null,name:m.name.trim(),slot,vehicle:m.vehicle,client:null,ready:false,car:new FreeCar(),role:'driver',input:idle(),queue:[],received:0,ack:0,epoch:0,lastInputAt:now,disconnectedAt:null,points:0,combo:0,maxCombo:0,captureMs:0,outcome:'',contactUntil:0,lastMarkAt:-Infinity,recoverAt:-Infinity};
         p.partyCapable=m.partyVersion===PARTY_VERSION&&m.convoyVersion===CONVOY_VERSION&&m.crownVersion===CROWN_VERSION;resetConvoyPlayer(p);r.players.set(p.id,p);if(!r.hostId)r.hostId=p.id;this.place(r,p);r.revision++;if(r.phase==='lobby')for(const q of r.players.values())q.ready=false;
       }
-      p.client=c;if(r.rotation&&m.type==='resume')p.rotationConfirm=false;p.disconnectedAt=null;p.input=idle();p.queue=[];p.received=p.ack;c.player=p;c.room=r;r.updatedAt=now;
+      p.client=c;if(r.rotation&&m.type==='resume')p.rotationConfirm=false;if(r.ctf&&m.type==='resume')p.ctfConfirm=false;p.disconnectedAt=null;p.input=idle();p.queue=[];p.received=p.ack;c.player=p;c.room=r;r.updatedAt=now;
       if(r.phase==='running'){this.record(r,now);r.recorder.event(now,m.type==='resume'?'reconnect':'join',[p.id]);}
       this.send(c,{type:'welcome',selfId:p.id,token:p.token,room:this.snapshot(r,now),replay:r.recorder.descriptor()});this.broadcast(r,now);return;
     }
@@ -103,7 +108,7 @@ export class ExpeditionSocialService {
     if(m.type==='confirm-resume'){
       const previous=p.lastConfirmedResume,validKey=p.resumeGrant?m.resumeKey===p.resumeGrant.key:m.resumeKey===null||previous&&previous.key===m.resumeKey&&previous.runId===r.runId&&previous.epoch===p.epoch;
       if(Object.keys(m).length!==6||Object.keys(m).some(k=>!['type','code','selfId','resumeKey','runId','epoch'].includes(k))||m.code!==r.code||m.selfId!==p.id||m.runId!==r.runId||m.epoch!==p.epoch||!validKey)throw seatError('SEAT_REJECTED','續接場次已更新，請重新確認操控');
-      if(r.rotation)p.rotationConfirm=true;p.lastConfirmedResume={key:m.resumeKey,runId:r.runId,epoch:p.epoch};p.resumeGrant=null;p.resumeExpiresAt=null;this.send(c,{type:'resume-confirmed',runId:r.runId,epoch:p.epoch});return;
+      if(r.rotation)p.rotationConfirm=true;if(r.ctf)p.ctfConfirm=true;p.lastConfirmedResume={key:m.resumeKey,runId:r.runId,epoch:p.epoch};p.resumeGrant=null;p.resumeExpiresAt=null;this.send(c,{type:'resume-confirmed',runId:r.runId,epoch:p.epoch});return;
     }
     if(m.type==='manage'){
       const fields=['type','code','revision','hostId','targetId','action',...m.action==='lock'?['locked']:[]];
@@ -134,7 +139,7 @@ export class ExpeditionSocialService {
       this.broadcast(r,now);return;
     }
     if(m.type==='input'){
-      if(r.phase!=='running'||p.outcome||r.rotation?.paused||!rotationCanDrive(r,p)||p.rotationConfirm===false)return;
+      if(r.phase!=='running'||p.outcome||r.rotation?.paused||!rotationCanDrive(r,p)||p.rotationConfirm===false||r.ctf&&(p.resumeGrant||p.ctfConfirm===false))return;
       const allowed=['type','runId','epoch','seq','steer','throttle','brake','handbrake','active'];
       if(Object.keys(m).some(k=>!allowed.includes(k))||typeof m.runId!=='string'||!/^[a-f0-9]{24}$/.test(m.runId)||!Number.isSafeInteger(m.epoch)||m.epoch<0||m.epoch>1e9||!Number.isSafeInteger(m.seq)||m.seq<1||m.seq>1e9||!Number.isFinite(m.steer)||Math.abs(m.steer)>1||!['throttle','brake','handbrake','active'].every(k=>typeof m[k]==='boolean'))throw Error('只接受本場有效操控，不接受位置或分數');
       // An authoritative relocation can overtake controls already in flight. They must never move the new car or become a false cheating error.
@@ -147,12 +152,12 @@ export class ExpeditionSocialService {
     if(m.type==='ready'){if(r.phase!=='lobby'||m.revision!==r.revision||typeof m.ready!=='boolean')throw Error('房間已更新，請重新準備');p.ready=m.ready;this.broadcast(r,now);return;}
     if(m.type==='start'){
       if(r.party&&r.party.rounds.length>=PARTY_ROUND_LIMIT)throw Error('派對已完成20場，請先下載成績並結束派對');
-      if(p.id!==r.hostId||r.phase!=='lobby'||m.revision!==r.revision||r.players.size<(r.rotation?3:r.mode==='cruise'?1:2)||![...r.players.values()].every(q=>q.client&&q.ready))throw Error('需由房主等待所有人準備後起跑');
-      r.recorder.reset();r.recorder=new CityReplayRecorder({source:'social',mode:r.mode});r.round++;r.leg=0;r.runId=id(12);r.phase='countdown';r.startAt=now+3000;r.endsAt=r.startAt+(r.mode==='tandem'?60000:r.mode==='chase'||r.crown?CROWN_DURATION_MS:1800000);r.reason='';r.simAt=r.startAt;
-      rotationStart(r);resetConvoy(r);resetCrown(r,true);this.assign(r);for(const q of r.players.values()){q.points=q.combo=q.maxCombo=q.captureMs=0;q.outcome='';this.place(r,q);}this.record(r,now);r.recorder.event(now,'round');if(r.crown)r.recorder.event(now,'crown',[[...r.players.values()].find(q=>q.slot===r.crown.holderSlot).id],'crown-start');this.broadcast(r,now);return;
+      if(p.id!==r.hostId||r.phase!=='lobby'||m.revision!==r.revision||r.players.size<(r.ctf?4:r.rotation?3:r.mode==='cruise'?1:2)||![...r.players.values()].every(q=>q.client&&q.ready))throw Error('需由房主等待所有人準備後起跑');
+      r.recorder.reset();r.recorder=new CityReplayRecorder({source:'social',mode:r.mode});r.round++;r.leg=0;r.runId=id(12);r.phase='countdown';r.startAt=now+3000;r.endsAt=r.startAt+(r.mode==='tandem'?60000:r.mode==='chase'||r.crown||r.ctf?CROWN_DURATION_MS:1800000);r.reason='';r.simAt=r.startAt;
+      rotationStart(r);resetConvoy(r);resetCrown(r,true);resetCtf(r);this.assign(r);for(const q of r.players.values()){q.points=q.combo=q.maxCombo=q.captureMs=0;q.outcome='';this.place(r,q);}this.record(r,now);r.recorder.event(now,'round');if(r.crown)r.recorder.event(now,'crown',[[...r.players.values()].find(q=>q.slot===r.crown.holderSlot).id],'crown-start');this.broadcast(r,now);return;
     }
     if(m.type==='again'){if(p.id!==r.hostId||r.phase!=='finished')throw Error('結束後由房主再開一輪');r.recorder.reset();r.recorder=new CityReplayRecorder({source:'social',mode:r.mode});r.phase='lobby';r.runId=id(12);r.revision++;r.startAt=r.endsAt=null;r.reason='';r.leg=0;if(r.party){r.party.votes.clear();r.party.ballot++;}
-      if(r.rotation)r.rotation=createRotation();resetConvoy(r);resetCrown(r);for(const q of r.players.values()){q.ready=false;q.role='driver';q.points=q.combo=q.maxCombo=q.captureMs=0;q.outcome='';this.place(r,q);}this.broadcast(r,now);return;}
+      if(r.rotation)r.rotation=createRotation();resetConvoy(r);resetCrown(r);resetCtf(r);for(const q of r.players.values()){q.ready=false;q.role='driver';q.points=q.combo=q.maxCombo=q.captureMs=0;q.outcome='';this.place(r,q);}this.broadcast(r,now);return;}
     if(m.type==='mark'){
       const station=COOP_STATIONS.find(s=>s.id===m.stationId);
       if(r.mode!=='cruise'||!station||now-p.lastMarkAt<2000)throw Error('集合標記需間隔兩秒且只限巡航');
@@ -169,33 +174,33 @@ export class ExpeditionSocialService {
     if(rotationAssign(r))return;
     if(r.mode==='tandem')players.forEach((p,i)=>{p.role=i===(r.round+r.leg)%2?'follower':'leader';p.vehicle='muscle';});
     else if(r.mode==='chase'){const shift=r.round%players.length;players.forEach((p,i)=>{p.role=(i+shift)%players.length<Math.floor(players.length/2)?'pursuer':'runner';p.vehicle=p.role==='pursuer'?'police':'sedan';});}
-    else if(r.crown)for(const p of players){p.role='driver';p.vehicle='sedan';}
+    else if(r.crown||r.ctf)for(const p of players){p.role='driver';p.vehicle='sedan';}
     else for(const p of players)p.role='driver';
   }
   place(r,p){
-    const w=this.world(),s=r.convoy?r.convoy.legs[0].start:COOP_STATIONS[0];FreeCar.surface=w.surfaceAt;p.car.spec=w.spec(p.vehicle,r.weather==='rain');
+    const w=this.world(),s=r.ctf?r.ctf.bases[ctfTeam(p.slot)]:r.convoy?r.convoy.legs[0].start:COOP_STATIONS[0];FreeCar.surface=w.surfaceAt;p.car.spec=w.spec(p.vehicle,r.weather==='rain');
     const tandem=r.mode==='tandem',back=tandem?(p.role==='follower'?15:p.role==='driver'?45+p.slot*7:0):Math.floor(p.slot/2)*7,side=tandem?(p.role==='driver'?20:0):(p.slot%2?1.7:-1.7);
-    p.car.place(s.x+Math.cos(s.h)*side-Math.sin(s.h)*back,s.z-Math.sin(s.h)*side-Math.cos(s.h)*back,s.h,s.y+(r.convoy?0:ROAD_Y));
-    p.input=idle();p.queue=[];p.epoch++;p.lastConfirmedResume=null;p.received=p.ack=0;p.lastInputAt=this.now();
+    p.car.place(s.x+Math.cos(s.h)*side-Math.sin(s.h)*back,s.z-Math.sin(s.h)*side-Math.cos(s.h)*back,s.h,s.y+(r.convoy||r.ctf?0:ROAD_Y));
+    p.input=idle();p.queue=[];p.epoch++;p.lastConfirmedResume=null;if(r.ctf)p.ctfConfirm=true;p.received=p.ack=0;p.lastInputAt=this.now();
   }
   snapshot(r,now=this.now()){return{v:SOCIAL_VERSION,code:r.code,hostId:r.hostId,mode:r.mode,weather:r.weather,phase:r.phase,revision:r.revision,locked:r.locked,runId:r.runId,round:r.round,leg:r.leg,serverTime:now,startAt:r.startAt,endsAt:r.endsAt,reason:r.reason,...rotationSnapshot(r),...r.party?{party:partySnapshot(r)}:{},
-    players:[...r.players.values()].map(p=>({id:p.id,name:p.name,slot:p.slot,vehicle:p.vehicle,connected:!!p.client,ready:p.ready,role:p.role,pose:pose(p.car),ack:p.ack,epoch:p.epoch,points:Math.round(p.points*10)/10,combo:Math.round(p.combo*10)/10,maxCombo:Math.round(p.maxCombo*10)/10,captureMs:Math.min(2000,Math.round(p.captureMs)),outcome:p.outcome})),marks:r.marks.filter(m=>m.expiresAt>now),...r.convoy?{convoy:convoySnapshot(r)}:{},...r.crown?{crown:crownSnapshot(r)}:{}};}
+    players:[...r.players.values()].map(p=>({id:p.id,name:p.name,slot:p.slot,vehicle:p.vehicle,connected:!!p.client,ready:p.ready,role:p.role,pose:pose(p.car),ack:p.ack,epoch:p.epoch,points:Math.round(p.points*10)/10,combo:Math.round(p.combo*10)/10,maxCombo:Math.round(p.maxCombo*10)/10,captureMs:Math.min(2000,Math.round(p.captureMs)),outcome:p.outcome})),marks:r.marks.filter(m=>m.expiresAt>now),...r.convoy?{convoy:convoySnapshot(r)}:{},...r.crown?{crown:crownSnapshot(r)}:{},...r.ctf?{ctf:ctfSnapshot(r)}:{}};}
   watchSnapshot(r,c,now=this.now()){
     const delayed=!socialCooperative(r.mode)&&['countdown','running'].includes(r.phase),frame=delayed?[...r.watchHistory].reverse().find(frame=>frame.runId===r.runId&&frame.at<=now-SOCIAL_WATCH_DELAY_MS):null;
     const players=delayed?(frame?.players??[]):[...r.players.values()].map(p=>({name:p.name,slot:p.slot,vehicle:p.vehicle,connected:!!p.client,role:p.role,points:Math.round(p.points*10)/10,maxCombo:Math.round(p.maxCombo*10)/10,outcome:p.outcome,pose:pose(p.car)}));
     const publicPlayer=p=>({name:p.name,slot:p.slot,vehicle:p.vehicle,connected:p.connected,role:p.role,points:p.points,maxCombo:p.maxCombo,outcome:p.outcome});
     const followed=players.find(p=>p.slot===c.followSlot);
     const crown=r.crown?(delayed?frame?.crown??{holderSlot:null,protectedUntil:0}:{holderSlot:r.crown.holderSlot,protectedUntil:r.crown.protectedUntil}):null;
-    return{v:SOCIAL_VERSION,watchVersion:SOCIAL_WATCH_VERSION,code:r.code,mode:r.mode,weather:r.weather,phase:r.phase,runId:r.runId,serverTime:now,delayMs:socialCooperative(r.mode)?0:SOCIAL_WATCH_DELAY_MS,round:r.round,leg:r.leg,reason:r.reason,roster:players.map(publicPlayer),followSlot:c.followSlot,follow:followed?{...publicPlayer(followed),pose:{...followed.pose}}:null,...crown?{crown}:{}};
+    return{v:SOCIAL_VERSION,watchVersion:SOCIAL_WATCH_VERSION,code:r.code,mode:r.mode,weather:r.weather,phase:r.phase,runId:r.runId,serverTime:now,delayMs:socialCooperative(r.mode)?0:SOCIAL_WATCH_DELAY_MS,round:r.round,leg:r.leg,reason:r.reason,roster:players.map(publicPlayer),followSlot:c.followSlot,follow:followed?{...publicPlayer(followed),pose:{...followed.pose}}:null,...crown?{crown}:{},...r.ctf?{ctf:delayed?frame?.ctf??{scores:{red:0,blue:0},winner:null}:{scores:{...r.ctf.scores},winner:r.ctf.winner}}:{}};
   }
   record(r,now){r.recorder.sample(now,[...r.players.values()].map(p=>({key:p.id,slot:p.slot,vehicle:p.vehicle,pose:pose(p.car),epoch:p.epoch,connected:!!p.client,role:p.role,outcome:p.outcome})),{weather:r.weather});}
   closeObservers(r,message='最後一位車手已離房，觀戰已結束。'){for(const c of r.observers){c.room=null;c.observer=false;this.send(c,{type:'expired',message});}r.observers.clear();}
   broadcast(r,now=this.now()){
     for(const p of r.players.values())if(p.client)this.send(p.client,{type:'room',room:this.snapshot(r,now),replay:r.recorder.descriptor()});
-    if(!r.watchHistory.length||now-r.watchHistory.at(-1).at>=250){r.watchHistory.push({at:now,runId:r.runId,players:[...r.players.values()].map(p=>({name:p.name,slot:p.slot,vehicle:p.vehicle,connected:!!p.client,role:p.role,points:Math.round(p.points*10)/10,maxCombo:Math.round(p.maxCombo*10)/10,outcome:p.outcome,pose:pose(p.car)})),...r.crown?{crown:{holderSlot:r.crown.holderSlot,protectedUntil:r.crown.protectedUntil}}:{}});while(r.watchHistory.length>24)r.watchHistory.shift();}
+    if(!r.watchHistory.length||now-r.watchHistory.at(-1).at>=250){r.watchHistory.push({at:now,runId:r.runId,players:[...r.players.values()].map(p=>({name:p.name,slot:p.slot,vehicle:p.vehicle,connected:!!p.client,role:p.role,points:Math.round(p.points*10)/10,maxCombo:Math.round(p.maxCombo*10)/10,outcome:p.outcome,pose:pose(p.car)})),...r.crown?{crown:{holderSlot:r.crown.holderSlot,protectedUntil:r.crown.protectedUntil}}:{},...r.ctf?{ctf:{scores:{...r.ctf.scores},winner:r.ctf.winner}}:{}});while(r.watchHistory.length>24)r.watchHistory.shift();}
     for(const c of r.observers)if(now-c.lastWatchAt>=250){this.send(c,{type:'watch-state',room:this.watchSnapshot(r,c,now),replay:r.recorder.descriptor()});c.lastWatchAt=now;}r.lastBroadcast=now;
   }
-  finish(r,reason,now){finishCrown(r,reason);this.record(r,now);r.recorder.event(now,'finish',[],reason);r.recorder.finish(now,reason);r.phase='finished';r.reason=reason;scoreParty(r,reason);for(const p of r.players.values()){p.input=idle();p.queue=[];p.car.vx=p.car.vz=p.car.w=0;p.epoch++;}this.broadcast(r,now);}
+  finish(r,reason,now){finishCrown(r,reason);finishCtf(r,reason);this.record(r,now);r.recorder.event(now,'finish',[],reason);r.recorder.finish(now,reason);r.phase='finished';r.reason=reason;scoreParty(r,reason);for(const p of r.players.values()){p.input=idle();p.queue=[];p.car.vx=p.car.vz=p.car.w=0;p.epoch++;}this.broadcast(r,now);}
   simulate(r,at){
     const w=this.world(),old=r.convoy?new Map([...r.players.values()].map(p=>[p.id,{x:p.car.x,y:p.car.y,z:p.car.z}])):null;FreeCar.surface=w.surfaceAt;
     for(const p of r.players.values()){
@@ -208,7 +213,7 @@ export class ExpeditionSocialService {
         if(r.mode!=='cruise')p.outcome='left';this.place(r,p);
       }
     }
-    const active=[...r.players.values()].filter(p=>p.client&&!p.outcome&&rotationCanDrive(r,p)),contacts=[];if(r.crown)active.sort((a,b)=>a.slot-b.slot);
+    const active=[...r.players.values()].filter(p=>p.client&&!p.outcome&&rotationCanDrive(r,p)&&(!r.ctf||p.ctfConfirm!==false&&!p.resumeGrant)),contacts=[];if(r.crown)active.sort((a,b)=>a.slot-b.slot);
     if(!socialCooperative(r.mode)&&at>=r.startAt+3000)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){const a=active[i],b=active[j],hit=streetContact(a.car,b.car);if(hit.touch){contacts.push([a.id,b.id]);r.recorder.event(at,'contact',[a.id,b.id]);a.combo=b.combo=0;a.contactUntil=b.contactUntil=at+1000;}}
     if(r.mode==='chase'&&at>=r.startAt+10000){
       for(const p of active.filter(p=>p.role==='runner')){const near=active.some(q=>q.role==='pursuer'&&captureEligible(pose(p.car),pose(q.car)));
@@ -221,6 +226,7 @@ export class ExpeditionSocialService {
         if(q)follower.points+=q*(1+Math.min(3,follower.combo/5))*10/60;}
     }
     if(r.convoy)stepConvoy(r,old,at,(reason,time)=>this.finish(r,reason,time),(time,actors)=>r.recorder.event(time,'stage',actors));
+    if(r.ctf)stepCtf(r,contacts,at,(reason,time)=>this.finish(r,reason,time),(...args)=>r.recorder.event(...args));
     if(r.crown)stepCrown(r,contacts,at,(reason,time)=>this.finish(r,reason,time),(...args)=>r.recorder.event(...args));
     if(r.phase==='running')this.record(r,at);
   }
@@ -230,14 +236,14 @@ export class ExpeditionSocialService {
       r.marks=r.marks.filter(m=>m.expiresAt>now);
       for(const p of [...r.players.values()])if(!p.client&&p.disconnectedAt!==null&&now>seatExpires(p)){
         // Keep the completed convoy roster factual until the next lobby; expiry cannot rewrite who finished.
-        if(r.party||(r.convoy||r.crown||r.rotation)&&r.phase==='finished'){p.token='';p.resumeGrant=null;p.resumeExpiresAt=0;continue;}
+        if(r.party||(r.convoy||r.crown||r.rotation||r.ctf)&&r.phase==='finished'){p.token='';p.resumeGrant=null;p.resumeExpiresAt=0;continue;}
         if(r.phase==='running'&&r.mode!=='cruise'){if(p.outcome!=='left'){p.outcome='left';p.token='';p.resumeGrant=null;p.resumeExpiresAt=0;r.revision++;}}
         else{p.token='';p.resumeGrant=null;r.players.delete(p.id);r.revision++;if(r.phase==='lobby')for(const q of r.players.values())q.ready=false;}
       }
       r.marks=r.marks.filter(m=>r.players.has(m.playerId));
       if(!r.players.size||[...r.players.values()].every(p=>!p.client&&p.disconnectedAt!==null&&now>seatExpires(p))){this.closeObservers(r);partyCheckpointForget(this,r);this.rooms.delete(r.code);continue;}
       if(!r.restoredCheckpoint&&!r.players.get(r.hostId)?.client){const next=[...r.players.values()].find(p=>p.client)?.id??r.players.keys().next().value;if(next!==r.hostId){r.hostId=next;r.revision++;}}
-      if(r.phase==='countdown'&&![...r.players.values()].every(p=>p.client&&p.ready)){r.phase='lobby';r.startAt=r.endsAt=null;r.revision++;resetCrown(r);for(const p of r.players.values())p.ready=false;this.broadcast(r,now);}
+      if(r.phase==='countdown'&&![...r.players.values()].every(p=>p.client&&p.ready)){r.phase='lobby';r.startAt=r.endsAt=null;r.revision++;resetCrown(r);resetCtf(r);for(const p of r.players.values())p.ready=false;this.broadcast(r,now);}
       if(r.phase==='countdown'&&now>=r.startAt){r.phase='running';r.simAt=r.startAt;this.broadcast(r,now);}
       if(r.phase==='running'){
         if(r.mode==='tandem'&&[...r.players.values()].some(p=>!p.client)){this.finish(r,'left',now);continue;}
@@ -245,9 +251,9 @@ export class ExpeditionSocialService {
         if(now-r.simAt>1000){this.finish(r,'server-stall',now);continue;}
         let n=0;while(n++<12&&r.simAt+1000/60<=Math.min(now,r.endsAt)+.0001&&r.phase==='running'){r.simAt+=1000/60;this.simulate(r,r.simAt);}
         // Crown scoring is authoritative dt: drain a sub-second backlog instead of dropping its final held time.
-        if(r.phase==='running'&&(r.crown?r.simAt>=r.endsAt-.001:now>=r.endsAt)){
+        if(r.phase==='running'&&(r.crown||r.ctf?r.simAt>=r.endsAt-.001:now>=r.endsAt)){
           if(r.mode==='tandem'&&(r.rotation?rotationEndHeat(r):r.leg===0)){if(r.rotation)r.rotation.cursor++;r.leg=r.rotation?r.rotation.cursor%2:1;r.phase='countdown';r.startAt=now+3000;r.endsAt=r.startAt+60000;r.simAt=r.startAt;this.assign(r);for(const p of r.players.values()){p.combo=0;this.place(r,p);}r.recorder.event(now,'round');this.record(r,now);this.broadcast(r,now);}
-          else{if(r.mode==='chase')for(const p of r.players.values())if(p.role==='runner'&&!p.outcome)p.outcome='escaped';this.finish(r,r.mode==='tandem'||r.crown?'complete':'timeout',now);}
+          else{if(r.mode==='chase')for(const p of r.players.values())if(p.role==='runner'&&!p.outcome)p.outcome='escaped';this.finish(r,r.mode==='tandem'||r.crown||r.ctf?'complete':'timeout',now);}
         }
       }
       if(now-r.lastBroadcast>=50)this.broadcast(r,now);
@@ -255,13 +261,13 @@ export class ExpeditionSocialService {
     }
   }
   remove(c){
-    const r=c.room,p=c.player;if(!r||!p)return;if(r.phase==='running')r.recorder.event(this.now(),'leave',[p.id]);p.token='';p.resumeGrant=null;p.resumeExpiresAt=0;p.client=null;p.input=idle();p.queue=[];p.car.vx=p.car.vz=p.car.w=0;c.room=c.player=null;
-    if(r.party||r.phase==='finished'&&(r.convoy||r.crown||r.rotation)){p.disconnectedAt=this.now()-SOCIAL_GRACE_MS-1;r.revision++;}
+    const r=c.room,p=c.player;if(!r||!p)return;dropCtf(r,p,this.now());if(r.phase==='running')r.recorder.event(this.now(),'leave',[p.id]);p.token='';p.resumeGrant=null;p.resumeExpiresAt=0;p.client=null;p.input=idle();p.queue=[];p.car.vx=p.car.vz=p.car.w=0;c.room=c.player=null;
+    if(r.party||r.phase==='finished'&&(r.convoy||r.crown||r.rotation||r.ctf)){p.disconnectedAt=this.now()-SOCIAL_GRACE_MS-1;r.revision++;}
     else if(r.phase==='running'&&r.mode!=='cruise'){p.outcome='left';r.revision++;p.disconnectedAt=this.now()-SOCIAL_GRACE_MS-1;if(r.mode==='tandem')this.finish(r,'left',this.now());}
     else{r.players.delete(p.id);r.revision++;for(const q of r.players.values())q.ready=false;}
     r.marks=r.marks.filter(m=>m.playerId!==p.id);this.send(c,{type:'left'});this.tick();if(this.rooms.has(r.code))this.broadcast(r);
   }
-  drop(c){this.clients.delete(c);if(c.observer){c.room?.observers.delete(c);c.room=null;c.observer=false;return;}if(c.player?.client===c){if(c.room?.phase==='running')c.room.recorder.event(this.now(),'disconnect',[c.player.id]);c.player.client=null;if(c.room?.rotation)c.player.rotationConfirm=false;c.player.lastConfirmedResume=null;c.player.input=idle();c.player.queue=[];c.player.disconnectedAt=this.now();c.player.resumeExpiresAt=c.player.resumeGrant?.expiresAt??this.now()+SOCIAL_GRACE_MS;if(c.room){c.room.revision++;if(c.room.phase==='lobby')for(const q of c.room.players.values())q.ready=false;}}c.room=c.player=null;this.tick();}
+  drop(c){this.clients.delete(c);if(c.observer){c.room?.observers.delete(c);c.room=null;c.observer=false;return;}if(c.player?.client===c){if(c.room)dropCtf(c.room,c.player,this.now());if(c.room?.phase==='running')c.room.recorder.event(this.now(),'disconnect',[c.player.id]);c.player.client=null;if(c.room?.rotation)c.player.rotationConfirm=false;c.player.lastConfirmedResume=null;c.player.input=idle();c.player.queue=[];c.player.disconnectedAt=this.now();c.player.resumeExpiresAt=c.player.resumeGrant?.expiresAt??this.now()+SOCIAL_GRACE_MS;if(c.room){c.room.revision++;if(c.room.phase==='lobby')for(const q of c.room.players.values())q.ready=false;}}c.room=c.player=null;this.tick();}
   heartbeat(){for(const c of this.clients){if(!c.alive){c.ws.terminate();continue;}c.alive=false;c.ws.ping();}}
   close(){for(const r of this.rooms.values())partyCheckpointForget(this,r);this.closed=true;for(const c of this.clients){c.room=c.player=null;c.ws.terminate();}this.clients.clear();this.rooms.clear();this.worldRef=null;}
 }

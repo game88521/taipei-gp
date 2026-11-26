@@ -19,11 +19,11 @@ export class CdpConnection {
     this.ws.onclose = () => { for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(new Error(`${label}: CDP disconnected`)); } this.pending.clear(); };
   }
   on(name, handler) { const handlers = this.handlers.get(name) ?? []; handlers.push(handler); this.handlers.set(name, handlers); }
-  async send(method, params = {}) {
+  async send(method, params = {}, logParams = params) {
     await this.opened;
     return new Promise((resolve, reject) => {
       const id = ++this.sequence, startedAt = new Date().toISOString();
-      const command = { label: this.label, id, method, startedAt, params };
+      const command = { label: this.label, id, method, startedAt, params: logParams };
       (this.report.lastCdpCommands ??= {})[this.label] = command;
       const timer = setTimeout(() => {
         this.pending.delete(id);

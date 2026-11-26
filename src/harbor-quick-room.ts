@@ -2,6 +2,7 @@
 import {MULTIPLAYER_TRACKS} from '../shared/multiplayer-tracks.ts';
 import {HARBOR_QUICK_MODES,HarborQuickRoomFlow,type HarborQuickDraft,type HarborQuickRoomDependencies} from '../shared/harbor-quick-room.ts';
 import './harbor-quick-room.css';
+import {mountLanternTrackPicker} from './lantern-track-picker';
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='')=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const select=(id:string,rows:readonly(readonly[string,string])[])=>{const s=el('select');s.id=id;for(const[value,text]of rows){const o=el('option',text);o.value=value;s.append(o);}return s;};
 const field=(text:string,input:HTMLElement)=>{const label=el('label');label.append(el('span',text),input);return label;};
@@ -16,6 +17,7 @@ export function mountHarborQuickRoom(host:HTMLElement,dependencies:HarborQuickRo
   const panels=[el('fieldset'),el('fieldset'),el('fieldset')];panels.forEach((p,i)=>{p.id=`harbor-quick-step-${i+1}`;p.append(el('legend',['想玩什麼？','在哪一張地圖？','確認這次房間設定'][i]));wizard.append(p);});
   const mode=select('harbor-quick-mode',HARBOR_QUICK_MODES.map(m=>[m.id,m.name])),modeHelp=el('p');modeHelp.id='harbor-quick-mode-help';mode.setAttribute('aria-describedby',modeHelp.id);panels[0].append(field('玩法',mode),modeHelp);
   const track=select('harbor-quick-track',MULTIPLAYER_TRACKS.map(t=>[t.id,`${t.flag} ${t.name}`]));panels[1].append(field('比賽地圖',track),el('p','這一步只選擇草稿，不會切換目前賽道或建立房間。'));
+  const trackPicker=mountLanternTrackPicker(track);
   const humans=select('harbor-quick-humans',[['1','1 位真人'],['2','2 位真人'],['3','3 位真人'],['4','4 位真人']]),ai=select('harbor-quick-ai',[['0','不加入 AI'],['1','1 輛 AI'],['2','2 輛 AI'],['3','3 輛 AI']]);
   const laps=select('harbor-quick-laps',[['1','1 圈'],['3','3 圈'],['5','5 圈']]),duration=select('harbor-quick-duration',[['180','3 分鐘'],['300','5 分鐘']]),grace=select('harbor-quick-grace',[['30','30 秒'],['60','60 秒'],['120','120 秒']]);
   const weather=select('harbor-quick-weather',[['legacy','預設乾地'],['clear','固定晴天'],['rain','固定雨天'],['dry-rain','2 分鐘後轉雨']]),damage=el('input'),collisions=el('input');
@@ -39,7 +41,7 @@ export function mountHarborQuickRoom(host:HTMLElement,dependencies:HarborQuickRo
     availability.hidden=!availability.textContent;if(status.textContent!==flow.message)status.textContent=flow.message;heading.textContent=`第 ${flow.step} 步：${['選玩法','選地圖','核對房規'][flow.step-1]}`;
     stepItems.forEach((e,i)=>{if(i+1===flow.step)e.setAttribute('aria-current','step');else e.removeAttribute('aria-current');});
     panels.forEach((e,i)=>{e.hidden=i+1!==flow.step;e.disabled=locked||state.hasRoom;});
-    mode.value=d.mode;track.value=d.trackId;humans.value=String(d.plannedHumans);ai.value=String(d.ai);laps.value=String(d.laps);duration.value=String(d.durationSeconds);grace.value=String(d.finishGraceSeconds);weather.value=d.weather;damage.checked=d.damage;collisions.checked=d.mode==='time-trial'?false:d.collisions;
+    mode.value=d.mode;track.value=d.trackId;trackPicker.refresh();humans.value=String(d.plannedHumans);ai.value=String(d.ai);laps.value=String(d.laps);duration.value=String(d.durationSeconds);grace.value=String(d.finishGraceSeconds);weather.value=d.weather;damage.checked=d.damage;collisions.checked=d.mode==='time-trial'?false:d.collisions;
     modeHelp.textContent=HARBOR_QUICK_MODES.find(m=>m.id===d.mode)!.description;
     const special=d.mode!=='race';ai.disabled=weather.disabled=damage.disabled=locked||state.hasRoom||special;collisions.disabled=locked||state.hasRoom||d.mode==='time-trial';
     lapsField.hidden=d.mode==='time-trial';durationField.hidden=d.mode!=='time-trial';compatibility.hidden=!special;
@@ -57,5 +59,5 @@ export function mountHarborQuickRoom(host:HTMLElement,dependencies:HarborQuickRo
   submit.onclick=()=>{const pending=flow.submit();refresh();void pending.finally(()=>{refresh();if(flow.opened)status.focus();});};
   status.tabIndex=-1;root.addEventListener('keydown',event=>{if(event.key==='Escape'&&flow.opened&&!flow.submitting){event.preventDefault();event.stopPropagation();flow.cancel();refresh();launch.focus();}});
   refresh();
-  return{refresh,dispose(){flow.dispose();root.remove();}};
+  return{refresh,dispose(){flow.dispose();trackPicker.dispose();root.remove();}};
 }

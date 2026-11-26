@@ -1,4 +1,5 @@
 /** Rex <game88521@gmail.com>. Shared reading and modal ownership across lazy UI mounts. */
+import './lantern-reading';
 import {HarborReadingStore,HARBOR_READING_KEY,HARBOR_READING_SCALES,harborIsolationBranches,harborFocusTarget,type HarborReading} from './harbor-accessibility-model';
 export {parseHarborReading,HARBOR_READING_KEY} from './harbor-accessibility-model';
 const focusable='button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]';

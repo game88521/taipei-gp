@@ -92,6 +92,7 @@ import { mountControlHints, tutorialPages } from './horizon-controls';
 import { Sound } from './audio';
 import { physicsTest } from './physicstest';
 import { initLeaderboard, submitLap, cancelLeaderboardRequests } from './leaderboard-ui';
+import {captureLanternWeeklyLap,mountLanternWeeklyRun} from './lantern-weekly-run';
 import { sameRoadLevel, routeRemaining, routeDeviation, streetRecordKey } from './mission';
 import { touchScaleLabel } from './touch-layout';
 import { ROAD_Y } from './surface';
@@ -99,6 +100,7 @@ import { routeBends, routePreview } from './route-preview';
 import { recordTransaction, summarizeTransactions } from './economy';
 import { fetchJsonWithRetry } from './network';
 import { frameCap, RenderPacer, RenderMeter } from './frame-pacing';
+import { VisualWorkClock } from './lantern-streaming';
 import { showSaveRecovery } from './save-recovery-ui';
 import { showSaveWriterConflict } from './save-writer-ui';
 import { newPlayerProgress, visitLandmarks, explorationSummary, landmarkId, explorationRegion, togglePinned, pinnedTargets, equippedTitle, TITLES } from './player-progress';
@@ -532,6 +534,7 @@ timeSel.addEventListener('change', () => {
 });
 let frameCapPref = frameCap(save.opts['opt-frame-cap'], MOBILE);
 const framePacer = new RenderPacer(), renderMeter = new RenderMeter();
+const visualWorkClock = new VisualWorkClock();
 const frameCapSelect = $<HTMLSelectElement>('opt-frame-cap');
 frameCapSelect.value = frameCapPref;
 frameCapSelect.addEventListener('change', () => {
@@ -539,7 +542,7 @@ frameCapSelect.addEventListener('change', () => {
   save.opts['opt-frame-cap'] = frameCapPref;
   writeSave(); framePacer.reset(); renderMeter.reset(); fpsT = fpsN = slowWin = 0;
 });
-document.addEventListener('visibilitychange', () => { framePacer.reset(); renderMeter.reset(); fpsT = fpsN = 0; });
+document.addEventListener('visibilitychange', () => { framePacer.reset(); renderMeter.reset(); visualWorkClock.reset(); fpsT = fpsN = 0; });
 // 轉向靈敏度、音量（滑桿；記在存檔）
 {
   const sens = $<HTMLInputElement>('opt-sens');
@@ -845,11 +848,12 @@ function completeLap() {
     save.ghost = rec;
     $('best').textContent = fmt(t);
     toast(first ? `完成第一圈！${fmt(t)}` : `最快圈！${fmt(t)}`, 'purple');
-    if (!BOT && !CIRCUIT) void submitLap(t); // 新的最快圈：上傳線上排行榜（只收台北信義街道賽）
+    if (!BOT) void submitLap(t); // 依目前賽道、規則及版本分榜。
     if (first && !BOT) void askPersist(); // 第一次有成績：請瀏覽器別在空間不夠時自動清掉存檔（不一定會給）
   } else {
     toast(`${fmt(t)}（${fmtDelta(t - save.best)}）`, '');
   }
+  if(!BOT&&raceKind==='tt'&&!practiceRun?.active&&!horizonSession&&!gpChallenge?.active)captureLanternWeeklyLap(t,rec,trackStamp(track));
   writeSave();
   if (BOT) document.title = `BOT lap${lap} ${t.toFixed(3)} hits=${botHits}`;
   lap++;
@@ -1360,14 +1364,27 @@ function updateBrakingAssist(reset = false) {
   const active = mode === 'race' && raceKind === 'gp' && !qualiRun && opts.assist && state !== 'replay';
   if (brakingAssist.update(active ? car.gripMul : 1, field.raceTime, active) || reset) world.updateAssist(brakingAssist.targets);
 }
-function updateVisuals(dt: number) {
-  nexusWorkshop?.refreshHud();
+function updateVisuals(dt: number, visualDt: number | null = dt) {
   updateBrakingAssist();
   // 車子
   // 街道賽、街頭比賽都開 F1；平常自由駕駛、計程車開選單選的車
   const f1Look = mode === 'race' || streetUsesF1();
   const visualVehicle = streetVehicle();
   const pv = pcar(), vc = veh(), model = f1Look ? carModel : pv.model;
+  // 事件來源保持每次callback：維修聲、水花、列車停站、倒木恢復與自由模式提示不可跟著繪圖略過。
+  if (mode === 'race' && raceKind === 'gp') {
+    field.render(dt);
+    for (const p of field.pitlane?.sounds ?? []) sound.pitSound(p.kind, p.x, p.z, car.x, car.z);
+  }
+  trains?.update(dt);
+  if (peds) { peds.raining = weather.raining; peds.rain01 = weather.rain01; }
+  if (rainfx) { rainfx.update(dt, mode === 'free' ? weather.rain01 : 0, fcar); if (rainfx.splash) sound.splash(rainfx.splash); }
+  breakables?.update(dt, vc.x, vc.z);
+  if (state === 'race' && raceKind === 'tt' && !practiceRun?.active && !horizonSession) ghostShareUi?.update(car.pos.s, car.v, lapTime);
+  if (state === 'free') updateFreeHud(dt);
+  if (visualDt === null) return;
+  dt = visualDt;
+  nexusWorkshop?.refreshHud();
   carModel.root.visible = f1Look && !summitDuty?.active && !expeditionOwned();
   for (const p of playerCars.values()) p.model.root.visible = !f1Look && p === pv && !summitDuty?.active && !expeditionOwned();
   if (pv.taxiSign) pv.taxiSign.visible = taxiOn(); // 開別台車載客：車頂加 TAXI 燈箱
@@ -1376,11 +1393,6 @@ function updateVisuals(dt: number) {
   if (traffic) {
     traffic.visible = mode === 'free' && !expeditionOwned() && !nexusWorkshop?.ownsDriving && !nexusCoop?.active && !nexusCoop?.busy && !summitCityRace?.active && !summitCityRace?.busy && !(typeof summitDuty !== 'undefined' && (summitDuty?.active || summitDuty?.busy));
     if (mode === 'free') traffic.render(dt);
-  }
-  if (mode === 'race' && raceKind === 'gp') {
-    field.render(dt);
-    // 維修區的聲音（扳手、千斤頂、放行），在停車格的位置發聲、照距離衰減（AI 的停站遠遠也聽得到一點）
-    for (const p of field.pitlane?.sounds ?? []) sound.pitSound(p.kind, p.x, p.z, car.x, car.z);
   }
   // 安全車：在領先者前面 35 m 帶隊，車頂黃燈閃
   const scOn = mode === 'race' && raceKind === 'gp' && field.sc.phase !== 'off' && (state === 'race' || state === 'paused');
@@ -1394,21 +1406,12 @@ function updateVisuals(dt: number) {
     scLights[1].color.set(on ? '#3a2600' : '#ffb000');
   }
   if (sr && mode === 'free') sr.render(dt);
-  trains?.update(dt);
-  // 下雨：路人撐傘、路上積水、開過去噴水花
-  if (peds) peds.raining = weather.raining;
-  if (peds) peds.rain01 = weather.rain01;
-  if (rainfx) {
-    rainfx.update(dt, mode === 'free' ? weather.rain01 : 0, fcar);
-    if (rainfx.splash) sound.splash(rainfx.splash);
-  }
   if (police) { if (mode === 'free') police.render(dt, performance.now() / 1000); else police.hide(); }
   // 街道賽封路：挑戰光柱、紅綠燈、賽道旁的路名牌都不出現（會擋視線）
   sr?.showMarkers(mode === 'free' && !taxiOn() && !nexusWorkshop?.ownsDriving && !nexusCoop?.active && !nexusCoop?.busy && !summitCityRace?.active && !summitCityRace?.busy && !(typeof summitDuty !== 'undefined' && (summitDuty?.active || summitDuty?.busy)));
   taxi?.render(performance.now() / 1000);
   if (traffic) traffic.signalsVisible = mode === 'free' && !summitDuty?.roadActive;
   for (const o of raceHide) { o.userData.off = mode !== 'free'; o.visible = !o.userData.off && o.userData.inRange !== false; }
-  breakables?.update(dt, vc.x, vc.z);
   if (peds) {
     peds.visible = mode === 'free' && !expeditionOwned() && !nexusWorkshop?.ownsDriving && !nexusCoop?.active && !nexusCoop?.busy && !summitCityRace?.active && !summitCityRace?.busy && !(typeof summitDuty !== 'undefined' && (summitDuty?.active || summitDuty?.busy));
     if (mode === 'free') peds.render();
@@ -1424,7 +1427,6 @@ function updateVisuals(dt: number) {
 
   // 影子車
   const g = ghostShareUi?.active ?? save.ghost;
-  if (state === 'race' && raceKind === 'tt' && !practiceRun?.active && !horizonSession) ghostShareUi?.update(car.pos.s, car.v, lapTime);
   const showGhost = opts.ghost && g && g.t.length > 1 && state === 'race' && raceKind === 'tt' && !practiceRun?.active && !horizonSession;
   ghostModel.root.visible = !!showGhost;
   if (showGhost && g) {
@@ -1503,7 +1505,6 @@ function updateVisuals(dt: number) {
   }
 
   // HUD
-  if (state === 'free') updateFreeHud(dt);
   if (state === 'race' || state === 'countdown') {
     $('time').textContent = fmt(lapTime);
     $('time').title = lapValid ? '本圈可更新個人紀錄' : '本圈使用重置／扶正，不更新個人紀錄';
@@ -4938,11 +4939,13 @@ renderer.setAnimationLoop(() => {
     if (state === 'countdown') updateCountdown(dt);
   }
   if (streetResultOpen()) dt = 0; // 結算同一幀起凍結列車、輪胎、天氣與城市動畫，仍持續繪製結果。
+  if (dt === 0) visualWorkClock.reset();
+  const visualDt = visualWorkClock.sample(dt, drawFrame && !holdRender);
   tickRain(dt); // 正賽的雨強度跟著 raceTime／rainAt／wet 慢慢推（先於 updateVisuals，雨絲、雨聲、座艙吃到的是這一格的值）
   weather.stepPicked(dt, applyWeather); // 設定選了雨天／雨夜：雨慢慢下大，不是一選就整組換
   summitCityRace?.frame(renderNow, rawDelta);
   frontierRally?.frame(renderNow,rawDelta);
-  if (state === 'replay') replayFrame(dt); else updateVisuals(dt);
+  if (state === 'replay') replayFrame(dt); else updateVisuals(dt, visualDt);
   nexusCoop?.frame(renderNow, dt);
   summitDuty?.frame(dt);
   expeditionSocial?.frame(dt);
@@ -4951,9 +4954,9 @@ renderer.setAnimationLoop(() => {
   frontierCityReplay?.frame(dt);
   if(frontierCityReplay?.active){camera.copy(frontierCityReplay.camera);world.sky.position.copy(camera.position);world.mountains.position.y=-camera.position.y;const picked=frontierCityReplay.weather==='dry'?'day':frontierCityReplay.weather;if(picked!==timeKind){timeKind=picked;weather.pick(timeKind,true);applyWeather();}}
   if (state === 'podium') { podiumFrame(dt); circuitEnv?.crowd.cheer(1); }
-  circuitEnv?.crowd.tick(dt, camera.position.x, camera.position.z); // 看台觀眾：鏡頭靠近時興奮一點
+  if (visualDt !== null) circuitEnv?.crowd.tick(visualDt, camera.position.x, camera.position.z); // 純畫面隨繪圖上限更新。
   if (state === 'race' && raceKind === 'gp' && !SIM) { radioTick(dt); radio.update(dt); }
-  cityStream?.tick(dt); // 新載入的城市區塊長起來
+  if (visualDt !== null) cityStream?.tick(visualDt); // 新載入的城市區塊長起來
   // 車庫分頁看得到時才畫 3D 預覽；烤漆照遊戲裡那台
   garage3d?.frame(drawDt, drawFrame && !menu.classList.contains('hidden') && !!document.querySelector('.m-pane.on[data-pane="garage"]'), pendingPaint?.id === preview.id ? previewPaintColor.set(pendingPaint.color) : (playerCars.get(preview.id as VehicleId)?.model.root.userData.paint as THREE.MeshStandardMaterial | undefined)?.color ?? null);
   // FPS 顯示（選單可開）：每 0.5 秒更新一次平均幀率與每幀毫秒數
@@ -4961,11 +4964,11 @@ renderer.setAnimationLoop(() => {
   if (cullAcc > 0.4 && cityCull) {
     cullAcc = 0;
     cityCull(camera.position.x, camera.position.z, Q.viewDist); // 遠的城市區塊不畫
-    if (cityReady) cityStream?.update(camera.position.x, camera.position.z, Q.viewDist); // 載入前方的區塊、卸掉遠的
+    if (cityReady) { const v = veh(); cityStream?.update(camera.position.x, camera.position.z, Q.viewDist, mode === 'free' && state === 'free' ? v.h : undefined, mode === 'free' && state === 'free' ? v.v : undefined); }
   }
   $('fps').style.display = opts.fps ? '' : 'none';
   if (state === 'race' || state === 'countdown') updateDrsButton();
-  weather.update(dt, camera.position);
+  if (visualDt !== null) weather.update(visualDt, camera.position);
   if (cityReady&&!frontierCityReplay?.active) tickCycle(dt);
   // 在隧道裡（頭頂有天花板）：太陽、天空光漸漸調暗，只剩隧道燈
   {
@@ -5041,6 +5044,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !BOT) {
 Object.defineProperties((window as unknown as { __gp: object }).__gp, { gpChallenge: { value: gpChallenge }, activeGhost: { get: () => ghostShareUi?.active ?? save.ghost } });
 Object.defineProperties((window as unknown as { __gp: object }).__gp, { practiceRun: { get: () => practiceRun }, practiceRewind: { value: practiceRewind }, horizonSession: { get: () => horizonSession } });
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'summitDuty', { get: () => summitDuty });
+Object.defineProperty((window as unknown as { __gp: object }).__gp, 'lanternPerformance', { get: () => ({ visualCallbacks: visualWorkClock.callbacks, visualDraws: visualWorkClock.draws, workYields: cityStream?.workYields ?? 0, cancelled: cityStream?.cancelled ?? 0 }) });
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'meridianTelemetry', { get: () => meridianTelemetry });
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'auroraStrategy', { get: () => auroraStrategy });
 Object.defineProperty((window as unknown as { __gp: object }).__gp, 'auroraTouch', { get: () => auroraTouch });
@@ -5052,3 +5056,4 @@ Object.defineProperty((window as unknown as {__gp:object}).__gp,'frontierCityRep
 Object.defineProperties((window as unknown as {__gp:object}).__gp,{frontierRally:{get:()=>frontierRally},frontierTandemPractice:{get:()=>frontierTandemPractice},expeditionSocial:{get:()=>expeditionSocial},expeditionDuty:{get:()=>expeditionDuty},expeditionPerformance:{value:expeditionPerformance},expeditionHud:{value:expeditionHud},expeditionDaily:{value:expeditionDaily},racingTools:{get:()=>racingTools}});
 if (new URLSearchParams(location.search).has('coop')) nexusCoop?.open();
 mountAtlasPlatform({flush:writeSave,parseMain:parseSaveFile,beginRestore:beginStorageRestore,openCityChallenges:requestCityChallenges});
+mountLanternWeeklyRun(text=>toast(text,'purple'));

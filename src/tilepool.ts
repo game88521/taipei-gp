@@ -1,6 +1,7 @@
 import { decodeTile } from './citydata';
 import { genTile, makeCtx, type GenCtx, type GenInit, type GenOut } from './tilegen';
 import { fetchJsonWithRetry } from './network';
+import { checkStreamingSignal, streamingAbort } from './lantern-streaming';
 
 // 幾個背景執行緒輪流算城市區塊（tileworker.ts）；開不了 Worker（很舊的瀏覽器）或 Worker 掛掉，就改在主執行緒算（結果一樣，只是比較會頓）
 
@@ -8,7 +9,7 @@ export class TilePool {
   private workers: Worker[] = [];
   private next = 0;
   private id = 0;
-  private wait = new Map<number, { res: (o: GenOut) => void; rej: (e: Error) => void; w: Worker }>();
+  private wait = new Map<number, { res: (o: GenOut) => void; rej: (e: Error) => void; w: Worker; cleanup: () => void }>();
   private local: GenCtx | null = null;
   private disposed = false;
   private controller = new AbortController();
@@ -36,6 +37,7 @@ export class TilePool {
     const p = this.wait.get(m.id);
     if (!p) return;
     this.wait.delete(m.id);
+    p.cleanup();
     if (m.error) p.rej(new Error(m.error)); else p.res(m.out!);
   }
 
@@ -43,7 +45,7 @@ export class TilePool {
   private drop(w: Worker) {
     this.workers = this.workers.filter((x) => x !== w);
     w.terminate();
-    for (const [id, p] of this.wait) if (p.w === w) { this.wait.delete(id); p.rej(new Error('Worker 失敗')); }
+    for (const [id, p] of this.wait) if (p.w === w) { this.wait.delete(id); p.cleanup(); p.rej(new Error('Worker 失敗')); }
   }
 
   /** 換地圖時停止背景工作；取消不走 Worker 失敗的主執行緒備援。 */
@@ -54,26 +56,45 @@ export class TilePool {
     for (const worker of this.workers) { worker.onmessage = null; worker.onerror = null; worker.terminate(); }
     this.workers = [];
     const error = new DOMException('城市載入已取消。', 'AbortError');
-    for (const pending of this.wait.values()) pending.rej(error);
+    for (const pending of this.wait.values()) { pending.cleanup(); pending.rej(error); }
     this.wait.clear();
     this.local = null;
   }
 
-  run(url: string, tag: number): Promise<GenOut> {
-    if (this.disposed) return Promise.reject(new DOMException('城市載入已取消。', 'AbortError'));
-    if (!this.workers.length) return this.runLocal(url, tag);
+  run(url: string, tag: number, signal?: AbortSignal): Promise<GenOut> {
+    if (this.disposed || signal?.aborted) return Promise.reject(streamingAbort());
+    if (!this.workers.length) return this.runLocal(url, tag, signal);
     const w = this.workers[this.next++ % this.workers.length], id = ++this.id;
     return new Promise<GenOut>((res, rej) => {
-      this.wait.set(id, { res, rej, w });
-      w.postMessage({ type: 'tile', id, url, tag });
-    }).catch((e) => (this.disposed || this.workers.length ? Promise.reject(e) : this.runLocal(url, tag)));
+      const cancel = () => {
+        if (!this.wait.delete(id)) return;
+        signal?.removeEventListener('abort', cancel);
+        try { w.postMessage({ type: 'cancel', id }); } catch { /* A dead worker is handled separately. */ }
+        rej(streamingAbort());
+      };
+      const cleanup = () => signal?.removeEventListener('abort', cancel);
+      this.wait.set(id, { res, rej, w, cleanup });
+      signal?.addEventListener('abort', cancel, { once: true });
+      try { w.postMessage({ type: 'tile', id, url, tag }); }
+      catch (error) { this.wait.delete(id); cleanup(); rej(error as Error); }
+    }).catch((e) => (this.disposed || signal?.aborted || e?.name === 'AbortError' || this.workers.length ? Promise.reject(e) : this.runLocal(url, tag, signal)));
   }
 
-  private async runLocal(url: string, tag: number): Promise<GenOut> {
-    if (this.disposed) throw new DOMException('城市載入已取消。', 'AbortError');
-    this.local ??= makeCtx(this.init);
-    const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(url, { label: '城市區塊', signal: this.controller.signal });
-    if (this.disposed) throw new DOMException('城市載入已取消。', 'AbortError');
-    return genTile(decodeTile(data), tag, this.local);
+  private async runLocal(url: string, tag: number, signal?: AbortSignal): Promise<GenOut> {
+    if (this.disposed) throw streamingAbort();
+    checkStreamingSignal(signal);
+    const request = new AbortController(), cancel = () => request.abort();
+    this.controller.signal.addEventListener('abort', cancel, { once: true });
+    signal?.addEventListener('abort', cancel, { once: true });
+    try {
+      this.local ??= makeCtx(this.init);
+      const data = await fetchJsonWithRetry<Parameters<typeof decodeTile>[0]>(url, { label: '城市區塊', signal: request.signal });
+      if (this.disposed) throw streamingAbort();
+      checkStreamingSignal(signal);
+      return genTile(decodeTile(data), tag, this.local);
+    } finally {
+      this.controller.signal.removeEventListener('abort', cancel);
+      signal?.removeEventListener('abort', cancel);
+    }
   }
 }

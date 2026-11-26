@@ -2,17 +2,18 @@ import {parseConvoyState,type ConvoyState,CONVOY_MIN_PLAYERS,convoyDefinition} f
 import {parseCrownState,validCrownWatch,crownZone,type CrownState,type CrownWatchState} from './frontier-crown.ts';
 import {parsePartyState,type PartyState} from './aurora-social.ts';
 import {parseRotation,type RotationState} from './meridian-social.ts';
+import {parseCtfState,parseCtfSummary,ctfTeam,type CtfState} from './lantern-ctf.ts';
 /** City social games have their own authority and never write official race progress. */
 export const SOCIAL_VERSION = 'frontier-social-v2';
 export const SOCIAL_MAX_PLAYERS = 4;
 export const SOCIAL_STEP = 1 / 30;
 export const SOCIAL_GRACE_MS = 15_000;
-export const SOCIAL_MODES = ['cruise', 'chase', 'tandem','convoy','crown'] as const;
+export const SOCIAL_MODES = ['cruise', 'chase', 'tandem','convoy','crown','ctf'] as const;
 export type SocialMode = typeof SOCIAL_MODES[number];
 export type SocialWeather = 'dry' | 'rain' | 'night';
 export type SocialPhase = 'lobby' | 'countdown' | 'running' | 'finished';
 export type SocialRole = 'driver' | 'pursuer' | 'runner' | 'leader' | 'follower';
-export const SOCIAL_LABELS: Record<SocialMode, string> = { cruise: '城市多人自由巡航', chase: '多人警匪追逐', tandem: '雙人追走甩尾',convoy:'車隊巡遊任務',crown:'移動王冠爭奪戰' };
+export const SOCIAL_LABELS: Record<SocialMode, string> = { cruise: '城市多人自由巡航', chase: '多人警匪追逐', tandem: '雙人追走甩尾',convoy:'車隊巡遊任務',crown:'移動王冠爭奪戰',ctf:'2對2城市搶旗' };
 export const SOCIAL_VEHICLES = ['sedan', 'taxi', 'muscle', 'f1', 'super', 'police', 'pickup'] as const;
 export interface SocialInput { steer: number; throttle: boolean; brake: boolean; handbrake: boolean; active: boolean }
 export interface SocialPose { x: number; z: number; y: number; h: number; vx: number; vz: number; w: number; vy: number; steer: number; pitch: number; roll: number }
@@ -27,7 +28,7 @@ export interface SocialRoom {
   phase: SocialPhase; revision: number; locked: boolean; runId: string; round: number; leg: number;
   serverTime: number; startAt: number | null; endsAt: number | null;
   reason: '' | 'timeout' | 'captured' | 'left' | 'complete' | 'server-stall';
-  players: SocialPlayer[]; marks: SocialMark[];convoy?:ConvoyState;crown?:CrownState;party?:PartyState;rotation?:RotationState;
+  players: SocialPlayer[]; marks: SocialMark[];convoy?:ConvoyState;crown?:CrownState;party?:PartyState;rotation?:RotationState;ctf?:CtfState;
 }
 export const SOCIAL_MAX_WATCHERS=4;
 export const SOCIAL_WATCH_DELAY_MS=5000;
@@ -39,7 +40,7 @@ export type SocialWatchPlayer=Pick<SocialPlayer,'name'|'slot'|'vehicle'|'connect
 export interface SocialWatchRoom{
   v:typeof SOCIAL_VERSION;watchVersion:typeof SOCIAL_WATCH_VERSION;code:string;mode:SocialMode;weather:SocialWeather;phase:SocialPhase;runId:string;
   serverTime:number;delayMs:number;round:number;leg:number;reason:SocialRoom['reason'];
-  roster:SocialWatchPlayer[];followSlot:number;follow:(SocialWatchPlayer&{pose:SocialPose})|null;crown?:CrownWatchState;
+  roster:SocialWatchPlayer[];followSlot:number;follow:(SocialWatchPlayer&{pose:SocialPose})|null;crown?:CrownWatchState;ctf?:Pick<CtfState,'scores'|'winner'>;
 }
 /** Captured when a host opens a confirmation; never rebind an old action to a newer room. */
 export type SocialManagement = {code:string;revision:number;hostId:string;targetId:string} &
@@ -53,7 +54,7 @@ const integer = (v: unknown, lo: number, hi: number): v is number => number(v, l
 const text = (v: unknown, size: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= size && !/[\x00-\x1f\x7f<>]/.test(v);
 export const socialCode = (v: unknown): v is string => typeof v === 'string' && /^[A-HJ-NP-Z2-9]{6}$/.test(v);
 export function parseSocialRoom(raw: unknown): SocialRoom | null {
-  if (!object(raw) || !exact(raw,['v','code','hostId','mode','weather','phase','revision','locked','runId','round','leg','serverTime','startAt','endsAt','reason','players','marks',...raw.mode==='convoy'?['convoy']:[],...raw.mode==='crown'?['crown']:[],...raw.party!==undefined?['party']:[],...raw.rotation!==undefined?['rotation']:[]]) || raw.v !== SOCIAL_VERSION || !socialCode(raw.code) || !text(raw.hostId, 40) || typeof raw.locked!=='boolean' ||
+  if (!object(raw) || !exact(raw,['v','code','hostId','mode','weather','phase','revision','locked','runId','round','leg','serverTime','startAt','endsAt','reason','players','marks',...raw.mode==='convoy'?['convoy']:[],...raw.mode==='crown'?['crown']:[],...raw.mode==='ctf'?['ctf']:[],...raw.party!==undefined?['party']:[],...raw.rotation!==undefined?['rotation']:[]]) || raw.v !== SOCIAL_VERSION || !socialCode(raw.code) || !text(raw.hostId, 40) || typeof raw.locked!=='boolean' ||
     !SOCIAL_MODES.includes(raw.mode as SocialMode) || !['dry','rain','night'].includes(String(raw.weather)) ||
     !['lobby','countdown','running','finished'].includes(String(raw.phase)) || !integer(raw.revision,1,1e9) ||
     !text(raw.runId,40) || !integer(raw.round,0,1e6) || !integer(raw.leg,0,1) || !number(raw.serverTime,0,1e16) ||
@@ -78,7 +79,7 @@ export function parseSocialRoom(raw: unknown): SocialRoom | null {
   }
   if (!ids.has(raw.hostId)) return null;
   if(raw.rotation!==undefined){const rot=parseRotation(raw.rotation,players.map(p=>p.slot),String(raw.phase));if(raw.mode!=='tandem'||!rot)return null;if(raw.phase!=='lobby'){const heat=rot.heats[rot.cursor];if(players.some(p=>p.role!==(p.slot===heat.leaderSlot?'leader':p.slot===heat.followerSlot?'follower':'driver')||p.vehicle!=='muscle'))return null;}}
-  if(raw.party!==undefined&&(!parsePartyState(raw.party,players.map(p=>p.slot))||raw.mode==='tandem'))return null;
+  if(raw.party!==undefined&&(!parsePartyState(raw.party,players.map(p=>p.slot))||!['cruise','convoy','crown','chase'].includes(String(raw.mode))))return null;
   const marks:SocialMark[]=[],markPlayers=new Set();
   for (const value of raw.marks) {
     if (!object(value)||!exact(value,['playerId','stationId','expiresAt'])||typeof value.playerId!=='string'||!ids.has(value.playerId)||markPlayers.has(value.playerId)||
@@ -93,10 +94,11 @@ export function parseSocialRoom(raw: unknown): SocialRoom | null {
     const c=parseCrownState(raw.crown),finished=raw.phase==='finished'&&raw.reason==='complete';if(!c||c.members.length!==players.length||c.holderSlot!==null&&!players.some(p=>p.slot===c.holderSlot)||players.some(p=>p.role!=='driver'||p.points>180)||players.reduce((s,p)=>s+p.points,0)>180.201||c.members.some(m=>{const p=players.find(p=>p.slot===m.slot);return !p||m.zone!==(p.outcome==='left'?'left':!p.connected?'offline':crownZone(p.pose));}))return null;
     if(raw.phase==='lobby'&&(c.lastChange!=='none'||players.some(p=>p.points))||raw.phase!=='lobby'&&c.lastChange==='none'||finished!==(c.winnerPoints!==null)||finished&&(c.winnerPoints!==Math.max(0,...players.filter(p=>!p.outcome).map(p=>p.points))||players.filter(p=>!p.outcome).length<2)||raw.phase!=='lobby'&&Number(raw.endsAt)-Number(raw.startAt)!==180000||c.protectedUntil>(Number(raw.startAt??raw.serverTime)+183000))return null;
   }
+  if(raw.mode==='ctf'){const c=parseCtfState(raw.ctf);if(!c||raw.party!==undefined||raw.rotation!==undefined||players.some(p=>p.role!=='driver'||!Number.isInteger(p.points))||['red','blue'].some(t=>players.filter(p=>ctfTeam(p.slot)===t).reduce((sum,p)=>sum+p.points,0)!==c.scores[t as 'red'|'blue'])||raw.phase!=='lobby'&&players.length!==4||raw.phase!=='lobby'&&Number(raw.endsAt)-Number(raw.startAt)!==180000||(raw.phase==='finished'&&raw.reason==='complete')!==(c.winner!==null)||c.flags.some(f=>f.carrierSlot!==null&&!players.some(p=>p.slot===f.carrierSlot&&p.connected&&!p.outcome&&ctfTeam(p.slot)!==f.team))||raw.phase==='lobby'&&(c.scores.red!==0||c.scores.blue!==0))return null;}
   return {...raw,players,marks} as unknown as SocialRoom;
 }
 export function parseSocialWatch(raw:unknown):SocialWatchRoom|null{
-  if(!object(raw)||!exact(raw,['v','watchVersion','code','mode','weather','phase','runId','serverTime','delayMs','round','leg','reason','roster','followSlot','follow',...raw.mode==='crown'?['crown']:[]])||raw.v!==SOCIAL_VERSION||raw.watchVersion!==SOCIAL_WATCH_VERSION||!socialCode(raw.code)||
+  if(!object(raw)||!exact(raw,['v','watchVersion','code','mode','weather','phase','runId','serverTime','delayMs','round','leg','reason','roster','followSlot','follow',...raw.mode==='crown'?['crown']:[],...raw.mode==='ctf'?['ctf']:[]])||raw.v!==SOCIAL_VERSION||raw.watchVersion!==SOCIAL_WATCH_VERSION||!socialCode(raw.code)||
     !SOCIAL_MODES.includes(raw.mode as SocialMode)||!['dry','rain','night'].includes(String(raw.weather))||!['lobby','countdown','running','finished'].includes(String(raw.phase))||
     !text(raw.runId,40)||!number(raw.serverTime,0,1e16)||!integer(raw.delayMs,0,SOCIAL_WATCH_DELAY_MS)||!integer(raw.round,0,1e6)||!integer(raw.leg,0,1)||!integer(raw.followSlot,0,3)||
     !['','timeout','captured','left','complete','server-stall'].includes(String(raw.reason))||!Array.isArray(raw.roster)||raw.roster.length>4)return null;
@@ -108,6 +110,7 @@ export function parseSocialWatch(raw:unknown):SocialWatchRoom|null{
     const v=p.pose;if(!exact(v,['x','z','y','h','vx','vz','w','vy','steer','pitch','roll'])||!number(v.x,-15000,15000)||!number(v.z,-15000,15000)||!number(v.y,-150,800)||!number(v.h,-Math.PI,Math.PI)||!['vx','vz','w','vy','steer','pitch','roll'].every(k=>number(v[k],-200,200)))return null;}
   if(socialCooperative(raw.mode as SocialMode)?raw.delayMs!==0:raw.delayMs!==SOCIAL_WATCH_DELAY_MS)return null;
   if(raw.mode==='crown'&&(!validCrownWatch(raw.crown)||raw.crown.holderSlot!==null&&!slots.has(raw.crown.holderSlot)))return null;
+  if(raw.mode==='ctf'&&!parseCtfSummary(raw.ctf))return null;
   return structuredClone(raw) as unknown as SocialWatchRoom;
 }
 /** Only actual poses from authority are used by these scoring predicates. */

@@ -665,8 +665,11 @@ html:not(.touch) #btn-horn { display: none; }
 /* ---------------- 線上排行榜 */
 #lb-page { z-index: 6; }
 #lb-page .card { max-height: 92vh; overflow-y: auto; }
-.lb-name { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+.lb-name { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; min-width: 0; }
 .lb-name input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.25); background: #1b1e28; color: var(--fg); font: inherit; }
+/* 常駐於排行榜；不依賴雲端工具的延遲載入CSS。 */
+#lb-page input, #lb-page select, #lb-page button { min-height: 44px; min-width: 0; max-width: 100%; box-sizing: border-box; }
+#lb-page .lb-name > input, #lb-page .lb-name > select { flex: 1; min-width: 0; font-size: max(1em, 16px); }
 #lb-list { list-style: none; margin: 6px 0 10px; padding: 0; }
 #lb-list li { display: flex; gap: 10px; align-items: center; padding: 5px 8px; border-radius: 6px; }
 #lb-list li:nth-child(odd) { background: rgba(255, 255, 255, 0.04); }
@@ -1534,7 +1537,7 @@ html.touch #drs, html.touch #pit, html.touch #btn-horn, html.touch #btn-drift { 
   .ach { flex-wrap: wrap; }
   .pin-ach { margin-left: 40px; }
 }
-#lb-board { min-height: 44px; max-width: 100%; padding: 8px 10px; border: 1px solid #636d84; border-radius: 8px; background: #151924; color: #f4f4f6; font: inherit; color-scheme: dark; }
+#lb-board, #lb-track { min-height: 44px; max-width: 100%; padding: 8px 10px; border: 1px solid #636d84; border-radius: 8px; background: #151924; color: #f4f4f6; font: inherit; color-scheme: dark; }
 #menu .m-stat { grid-template-columns: 52px 1fr 72px; }
 @media (max-height: 480px) {
   :root { --tc-scale: min(var(--tc-request-scale, 1), 1); }

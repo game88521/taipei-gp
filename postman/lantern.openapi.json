@@ -1,0 +1,1820 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Lantern個人同步與每週好友盃",
+    "version": "1.0.0",
+    "description": "同源、明確確認的雲端進度與私人異步比賽。完整規則見lantern-contract.md。私人同步金鑰不放URL、邀請或備份。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:4329"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "syncAccount": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Sync-Account"
+      },
+      "syncKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "32隨機bytes的base64url個人復原金鑰"
+      }
+    }
+  },
+  "paths": {
+    "/api/cloud": {
+      "post": {
+        "operationId": "createSyncAccount",
+        "summary": "建立個人同步帳戶；每來源60秒限制",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "const": "create"
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "readCloudProfile",
+        "security": [
+          {
+            "syncAccount": [],
+            "syncKey": []
+          }
+        ],
+        "summary": "讀取revision、updatedAt與backup（初始為null）",
+        "responses": {
+          "200": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "writeCloudProfile",
+        "security": [
+          {
+            "syncAccount": [],
+            "syncKey": []
+          }
+        ],
+        "summary": "預期版本原子上傳；同operationId收據保留24小時",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "backup": {
+                    "type": "object",
+                    "description": "AtlasBackup v1；白名單分類，最大3MB，完整前端逐類驗證。"
+                  }
+                },
+                "required": [
+                  "expectedRevision",
+                  "operationId",
+                  "backup"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSyncAccount",
+        "security": [
+          {
+            "syncAccount": [],
+            "syncKey": []
+          }
+        ],
+        "summary": "版本相符才刪除帳戶與雲端進度；本機不變",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "expectedRevision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weekly": {
+      "get": {
+        "operationId": "readWeeklyCup",
+        "summary": "依私人邀請碼讀取三站與榜單；90天保存",
+        "parameters": [
+          {
+            "name": "cup",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{8}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "changeWeeklyCup",
+        "security": [
+          {
+            "syncAccount": [],
+            "syncKey": []
+          }
+        ],
+        "summary": "建立／加入／啟用單次挑戰／提交有效圈",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "const": "create"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "driverName": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "name"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "const": "join"
+                      },
+                      "cup": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "cup",
+                      "name"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "const": "start"
+                      },
+                      "cup": {
+                        "type": "string"
+                      },
+                      "track": {
+                        "enum": [
+                          "taipei",
+                          "australia",
+                          "china",
+                          "japan",
+                          "miami",
+                          "canada",
+                          "monaco",
+                          "barcelona",
+                          "austria",
+                          "britain",
+                          "belgium",
+                          "hungary",
+                          "netherlands",
+                          "italy",
+                          "madrid",
+                          "azerbaijan",
+                          "malaysia",
+                          "singapore",
+                          "usa",
+                          "mexico",
+                          "brazil",
+                          "lasvegas",
+                          "qatar",
+                          "abudhabi"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "cup",
+                      "track"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "const": "submit"
+                      },
+                      "cup": {
+                        "type": "string"
+                      },
+                      "track": {
+                        "enum": [
+                          "taipei",
+                          "australia",
+                          "china",
+                          "japan",
+                          "miami",
+                          "canada",
+                          "monaco",
+                          "barcelona",
+                          "austria",
+                          "britain",
+                          "belgium",
+                          "hungary",
+                          "netherlands",
+                          "italy",
+                          "madrid",
+                          "azerbaijan",
+                          "malaysia",
+                          "singapore",
+                          "usa",
+                          "mexico",
+                          "brazil",
+                          "lasvegas",
+                          "qatar",
+                          "abudhabi"
+                        ]
+                      },
+                      "time": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 1200
+                      },
+                      "proof": {
+                        "type": "object",
+                        "required": [
+                          "v",
+                          "trackStamp",
+                          "samples"
+                        ],
+                        "properties": {
+                          "v": {
+                            "const": 1
+                          },
+                          "trackStamp": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "samples": {
+                            "type": "array",
+                            "minItems": 201,
+                            "maxItems": 6500,
+                            "items": {
+                              "type": "array",
+                              "prefixItems": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ],
+                              "minItems": 4,
+                              "maxItems": 4
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "attempt": {
+                        "type": "string"
+                      },
+                      "operationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "cup",
+                      "track",
+                      "time",
+                      "proof",
+                      "attempt",
+                      "operationId"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功；不自動變更任何本機存檔。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "已建立好友盃或單次挑戰；挑戰回傳attempt、serverTime、expiresAt與stamp。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "固定error代碼；409不覆寫，429依Retry-After稍後重試，503未設定／上游不可用，504期限已到。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

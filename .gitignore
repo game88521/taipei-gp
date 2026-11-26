@@ -43,3 +43,9 @@ tools/dev-tests/*-result-[0-9]*.json
 tools/dev-tests/aurora-qr-samples.json
 tools/dev-tests/meridian-telemetry-node-example.json
 tools/dev-tests/meridian-racing-node-reconstructed-initial-failure.json
+
+# Lantern 本機驗證原始紀錄與測試瀏覽器資料
+tools/dev-tests/lantern-*-evidence-*/
+tools/dev-tests/lantern-*-failure*.json
+tools/dev-tests/lantern-validation-*/
+tools/.lantern-manifest-*.mjs

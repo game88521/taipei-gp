@@ -20,7 +20,7 @@ export function collectFriendViews(room:Room|null,selfId:string,own:Position,age
   for(const p of room.players.slice(0,4).sort((a,b)=>a.slot-b.slot)){
     if(!p.connected||p.outcome==='left'||seenIds.has(p.id)||!Number.isInteger(p.slot)||p.slot<0||p.slot>3||seenSlots.has(p.slot)||![p.pose.x,p.pose.y,p.pose.z,p.pose.h].every(Number.isFinite))continue;
     seenIds.add(p.id);seenSlots.add(p.slot);
-    const distance=Math.hypot(p.pose.x-own.x,p.pose.z-own.z),dy=p.pose.y-own.y,competitive=room.mode==='crown'||room.mode==='chase'&&['pursuer','runner'].includes(self.role),opponent=competitive&&(room.mode==='crown'||p.role!==self.role);
+    const distance=Math.hypot(p.pose.x-own.x,p.pose.z-own.z),dy=p.pose.y-own.y,competitive=room.mode==='ctf'||room.mode==='crown'||room.mode==='chase'&&['pursuer','runner'].includes(self.role),opponent=competitive&&(room.mode==='ctf'?p.slot%2!==self.slot%2:room.mode==='crown'||p.role!==self.role);
     if(opponent&&(distance>FRIEND_OPPONENT_RANGE||Math.abs(dy)>=FRIEND_SAME_LEVEL))continue;
     views.push({id:p.id,x:p.pose.x,y:p.pose.y,z:p.pose.z,h:p.pose.h,color:FRIEND_SLOT_COLORS[p.slot],label:`${p.slot+1} ${friendDisplayName(p.name)}`,dy,slot:p.slot,distance,nameVisible:distance<=FRIEND_NAME_RANGE,relation:opponent?'opponent':competitive?'teammate':'friend',role:p.role});
   }

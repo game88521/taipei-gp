@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "npm run build:multiplayer:catalog && tsc --noEmit && vite build && npm run build:multiplayer",
-    "build:multiplayer:catalog": "node tools/build-multiplayer-catalog.mjs",
+    "build:multiplayer:catalog": "node tools/build-multiplayer-catalog.mjs && node tools/build-lantern-manifests.mjs && node tools/build-lantern-track-previews.mjs",
     "build:multiplayer": "node tools/build-multiplayer-physics.mjs",
     "multiplayer": "node server/index.mjs",
     "preview": "vite preview --host",

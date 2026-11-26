@@ -169,11 +169,12 @@ try {
   await saveModule.link(() => {}); await saveModule.evaluate();
   const proofModule = new SourceTextModule(stripTypeScriptTypes(readFileSync('src/lap-proof.ts', 'utf8'), { mode: 'transform' })); await proofModule.link(() => {}); await proofModule.evaluate();
   const identityModule = new SourceTextModule(stripTypeScriptTypes(readFileSync('src/identity.ts', 'utf8'), { mode: 'transform' })); await identityModule.link(() => {}); await identityModule.evaluate();
+  const circuitModule=new SyntheticModule(['CIRCUIT','CIRCUITS'],function(){this.setExport('CIRCUIT',null);this.setExport('CIRCUITS',[{id:'monaco',name:'摩納哥'}]);});await circuitModule.link(()=>{});await circuitModule.evaluate();
   globalThis.document = { getElementById: (id) => dom.get(id), createElement: (tag) => new Element(tag) };
   globalThis.addEventListener = () => {};
   globalThis.fetch = (url, init) => savedGlobals.fetch(new URL(url, origin), init);
   const ui = new SourceTextModule(stripTypeScriptTypes(readFileSync('src/leaderboard-ui.ts', 'utf8'), { mode: 'transform' }));
-  await ui.link((s) => s === './save' ? saveModule : s === './network' ? network : s === './identity' ? identityModule : proofModule); await ui.evaluate();
+  await ui.link((s) => s === './save' ? saveModule : s === './network' ? network : s === './identity' ? identityModule : s === './circuits' ? circuitModule : proofModule); await ui.evaluate();
   const until = async (predicate) => { for (let i = 0; i < 200; i++) { if (predicate()) return; await new Promise((r) => setTimeout(r, 5)); } throw new Error('UI scenario did not settle'); };
   try {
     ui.namespace.initLeaderboard((text) => messages.push(text), String);

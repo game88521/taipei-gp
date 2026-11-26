@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "author": "Rex <game88521@gmail.com>",
+  "status": "PASS",
+  "baseline": "e630d71e6abc17115c759fb38fb468c81949c853",
+  "branch": "main",
+  "build": "a16fb2c38497",
+  "createdAt": "2026-11-26T02:58:46.518Z",
+  "suiteCount": 16,
+  "sourceUnchangedDuringValidation": true,
+  "productSourceFingerprint": "345afb6a912be0dd185743626d5e274bbd0964e06bce5dbc2e2cdbad04c0fae6",
+  "coreHashes": {
+    "src/car.ts": "1364f4bb460c9c920ec9c1fe2e312f3d9c75f18a2fb789ed37e411eb4d1cc6cd",
+    "src/track.ts": "01510a93caca3fb9a49a0e221db4b30df92dd45738163e5da5ec96d01f4bdd96",
+    "src/rivals.ts": "6ca2489398723fbf500fda0b5cbe8644b0a4e899ed7bb6c48c24e0b2e4c12ee7",
+    "src/pitlane.ts": "cf8fd377c809d79a8f41c8295761036abd8bef35b3980b399e708b41e2cfee32"
+  },
+  "baselines": {
+    "timeTrial": {
+      "line": "BOT lap2 54.425 hits=0",
+      "aiHits": 0
+    },
+    "grandPrix": {
+      "driver": "陳冠宇",
+      "seconds": 162,
+      "aiHits": 8
+    },
+    "pitTest": {
+      "driver": "陳冠宇",
+      "seconds": 175.7,
+      "aiHits": 5
+    }
+  },
+  "localOnly": true,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "realPhoneUsed": false,
+  "deliveryReceipt": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lantern-delivery\\result.json",
+  "evidenceRoot": "C:\\Users\\RexChiu\\OneDrive - IBM\\桌面\\Investment\\DCISI\\taipei-gp-lantern-work",
+  "suites": [
+    {
+      "name": "build",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 24632,
+      "stdoutSha256": "b078eb6c6e020330c99035b35bff822ad06170fdb8c52763ae0ed1e1e022d7da",
+      "stderrSha256": "fefd7958ea0af7ac6f19aa68ccbb2e04ff5e657bbfd45d1b417f83a429a6bb2c"
+    },
+    {
+      "name": "lantern-ui",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 1725,
+      "stdoutSha256": "b8c6356ca78dbe8c8cfd367cd54aa2cd429a6ee582d0d2c8c2095be63055c2bc",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "lantern-performance-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 2095,
+      "stdoutSha256": "9e199ac6b3b732671609a1d0f682aab1e34db7f722620e2a1f23d88fc5b7a9ab",
+      "stderrSha256": "d6bec023ef9637d05caf37f3fecd4d17c419dc33d1859bb47249e8cfeaa7bb7a",
+      "result": "lantern-performance-node-result.json",
+      "summary": {
+        "PASS": 10,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "lantern-api-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 6208,
+      "stdoutSha256": "62991ad6a6fabac49831b05d135c5fdff11d612aa0998cf1b531ffd31b20b097",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-api-node-result.json",
+      "summary": {
+        "PASS": 13,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "lantern-api-deadline-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 9353,
+      "stdoutSha256": "07d2db0d39277127ed812a0fd7d7b26fc29e00fb83bc7b0a44eb7183727de944",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-api-deadline-node-result.json",
+      "summary": {
+        "PASS": 7,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "lantern-ctf-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 4262,
+      "stdoutSha256": "c0107018710b64e27133f8b2e7c2bf69597918c7da89b023f5468a5c523c58c2",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-ctf-result.json",
+      "summary": {
+        "PASS": 6,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "lantern-story-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 896,
+      "stdoutSha256": "9e731e8e000ad3dbc2d5c5b1c1105667bcc8bc519d5bd94ee98eaee834769eff",
+      "stderrSha256": "7735c4cb88478733f5ec82b6d7bdacb5a10616359979d275a18b60b438a81aef",
+      "result": "lantern-story-result.json",
+      "summary": {
+        "PASS": 8,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "beacon-modes-node",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 461,
+      "stdoutSha256": "b2cb5d3a818de41a279cf430bbef91c9b4fad516899ca7117ea33a7bc16552d0",
+      "stderrSha256": "62fea46265e4e319dff8ad42d5f7c4b823dfad5df1f1794eab4a3692f70ded72"
+    },
+    {
+      "name": "leaderboard-regression",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 2885,
+      "stdoutSha256": "d37a4b5a6fccf50d92af6e8f535616dfd36f9d56dcbdfc818393ff48cf05704c",
+      "stderrSha256": "af1e01ec066c19052eeb7607a18799f51a882b1afc33c95c3e9886621b20d339",
+      "result": "shots-leaderboard-regression.json",
+      "summary": {
+        "PASS": 12,
+        "FAIL": 0
+      }
+    },
+    {
+      "name": "lantern-ui-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 41499,
+      "stdoutSha256": "94191d09c364a645c06d64cd3e57dd4dc8979056ecb346e92d8dfe4f21f81da5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-ui-browser-result.json",
+      "summary": {
+        "PASS": 4,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "lantern-performance-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 14055,
+      "stdoutSha256": "e0e40129bd3e2f15527bb4fe10f9303e6bf2800188e534d506f578dc31b8a0f3",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-performance-browser-result.json",
+      "summary": {
+        "PASS": 3,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "lantern-modes-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 22911,
+      "stdoutSha256": "5da6b92da92d1473abb7710d2dc81a7909ea43efda34e2741f53e1cb04a6bb4f",
+      "stderrSha256": "a83be46f9f4b75e8ae44df6242578a74e4891e61ca6b0f6d30094c5dc532f1b9",
+      "result": "lantern-modes-browser-result.json",
+      "summary": {
+        "PASS": 5,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "lantern-online-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 26881,
+      "stdoutSha256": "301d78100eea46b9d3243a82adbb24a954b3c604c0e25054e055c05dc6fa89b5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "lantern-online-browser-result.json",
+      "summary": {
+        "PASS": 6,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "harbor-reading-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 19194,
+      "stdoutSha256": "73039bed5fed1b6aa23d288c9ef370d76056717c58832d11b24b4d0391b2c36e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "harbor-reading-browser-result.json",
+      "summary": {
+        "PASS": 6,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "harbor-quick-room-browser",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 12573,
+      "stdoutSha256": "e147ae9ad5b225d38807a7674928335bdbcf7334d063ccdffa370cea1a00c9a0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "harbor-quick-room-browser-result.json",
+      "summary": {
+        "PASS": 7,
+        "FAIL": 0
+      },
+      "build": "a16fb2c38497"
+    },
+    {
+      "name": "chain-stab",
+      "status": "PASS",
+      "exitCode": 0,
+      "milliseconds": 39135,
+      "stdoutSha256": "a6ca81fed738a905126f3406650b543ce9c476dd372604295318eb8cec503c21",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "chainEvidence": {
+    "path": "tools/dev-tests/lantern-validation-1795661679942/chain-stab-out.txt",
+    "sha256": "8c582839453136690c5c7a9a4f0c1df20308f5e6f27d4ebe03875b06a1a8fa7a"
+  },
+  "retainedFailedRuns": [
+    "tools/dev-tests/lantern-validation-1795660287146",
+    "tools/dev-tests/lantern-validation-1795660602649",
+    "tools/dev-tests/lantern-validation-1795661150644"
+  ],
+  "limitations": [
+    "雲端API經本機HTTP relay及有狀態Redis REST stand-in驗證，沒有真Redis Lua、Vercel函式或公開服務測試。",
+    "iPhone 17／Safari／VoiceOver、外網真人四人、免費服務容量、長時間GPU／耗電／溫度未驗證。",
+    "排行榜與每週盃使用軌跡合理性驗證，不是權威防作弊；部分到站／終局使用報告明示fixture。",
+    "雲端備份上限3MB；較大回放與鬼車請用既有40MB本機整包匯出。",
+    "NG4本輪為單人離線；CTF回放尚無完整旗幟動畫歷史。"
+  ],
+  "leaderboardTouchTargets": {
+    "beforeBuild": "0043b597f2b4",
+    "beforeHeights": {
+      "lb-name": 33,
+      "lb-track": 19,
+      "lb-submit": 43
+    },
+    "afterBuild": "a16fb2c38497",
+    "after": [
+      {
+        "id": "lb-name",
+        "width": 248,
+        "height": 44
+      },
+      {
+        "id": "lb-track",
+        "width": 276,
+        "height": 44
+      },
+      {
+        "id": "lb-board",
+        "width": 276,
+        "height": 44
+      },
+      {
+        "id": "lb-submit",
+        "width": 312,
+        "height": 44
+      },
+      {
+        "id": "lb-close",
+        "width": 312,
+        "height": 58
+      }
+    ]
+  }
+}

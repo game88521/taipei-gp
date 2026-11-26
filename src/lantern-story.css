@@ -1,0 +1,7 @@
+#lantern-story-editor,#lantern-story-stages>fieldset{min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+#lantern-story-stages{display:grid;gap:12px}#lantern-story-stages>fieldset{display:grid;gap:8px;padding:12px;border:1px solid #617d92;border-radius:10px}
+#lantern-story-editor label{display:grid;gap:5px;min-width:0}#lantern-story-editor input,#lantern-story-editor select,#lantern-story-editor textarea{width:100%;min-width:0;min-height:44px;box-sizing:border-box;font:inherit;padding:8px;background:#142536;color:#fff;border:1px solid #839eb2;border-radius:6px}
+#lantern-story-editor input[type=checkbox]{width:44px;min-width:44px;height:44px}#lantern-story-editor button{min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#lantern-story-hud{box-sizing:border-box;max-height:calc(100dvh - 100px);overflow:auto;overflow-wrap:anywhere;white-space:pre-line}#lantern-story-hud[hidden]{display:none!important}
+#lantern-story-hud button{min-height:44px;min-width:44px;max-width:100%;margin:4px;padding:8px;border:1px solid #91b5c2;border-radius:8px;background:#234359;color:#fff;white-space:normal;font:inherit}
+#lantern-story-choices{display:grid;gap:6px}@media(max-height:440px){#lantern-story-hud{top:8px!important;max-height:calc(100dvh - 16px);max-width:calc(100vw - 160px)!important}}

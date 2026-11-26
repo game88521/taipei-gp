@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
+import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import {createMultiplayerServer} from '../../server/index.mjs';
 import {CdpConnection,click,focus} from './multiplayer-ui-cdp.mjs';
@@ -21,6 +22,31 @@ export async function layout(page,stage,section,report,evidence){
 export const ROOT=fileURLToPath(new URL('../../',import.meta.url)),ORIGIN='http://127.0.0.1:4317',WS='ws://127.0.0.1:4320';
 export const protectedSave='JSON.stringify({best:__gp.save.best,gpBest:__gp.save.gpBest,records:__gp.save.records,taxi:__gp.save.taxi,stats:__gp.save.stats,freePos:__gp.save.freePos,damage:__gp.save.damage,progress:__gp.save.progress})';
 export const set=(p,id,value)=>p.evaluate(`(()=>{const e=document.getElementById(${JSON.stringify(id)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+function interceptLocalRequests(page,report,interceptRequest){
+ const failures=new Map();
+ page.on('Network.loadingFailed',event=>{failures.set(event.requestId,event);if(failures.size>256)failures.delete(failures.keys().next().value);});
+ page.on('Fetch.requestPaused',async event=>{
+  const{requestId,request,networkId}=event;
+  if(interceptRequest&&await interceptRequest(page,event))return;
+  const u=new URL(request.url),okay=[ORIGIN,WS.replace('ws:','http:')].includes(u.origin)||['about:','data:','blob:'].includes(u.protocol);
+  if(!okay)report.externalRequests.push(request.url);
+  try{await page.send(okay?'Fetch.continueRequest':'Fetch.failRequest',{requestId,...okay?{}:{errorReason:'BlockedByClient'}});}
+  catch(error){
+   const diagnostic={page:page.label,requestId,networkId:networkId??null,resourceType:event.resourceType,path:u.pathname,lastCompletedCase:report.cases.at(-1)?.name??'bootstrap',error:String(error)};
+   // Reload can cancel a paused request before continueRequest reaches Chrome.
+   // Require Chrome's cancellation for this exact networkId; an unknown/still-live
+   // interception, a blocked external request, or any other CDP error still fails.
+   if(!okay||!networkId||!String(error).endsWith('{"code":-32602,"message":"Invalid InterceptionId."}')){(report.unresolvedInterceptions??=[]).push(diagnostic);throw error;}
+   for(let i=0;i<10&&!failures.has(networkId);i++)await delay(25);
+   const failed=failures.get(networkId);
+   if(failed?.canceled!==true||failed.errorText!=='net::ERR_ABORTED'){
+    (report.unresolvedInterceptions??=[]).push({...diagnostic,failed:failed??null,recentFailures:[...failures.values()].slice(-4)});
+    throw error;
+   }
+   (report.canceledInterceptions??=[]).push({page:page.label,requestId,networkId,errorText:failed.errorText,canceled:true});
+  }
+ });
+}
 export class FrontierBrowserHarness{
  constructor(name,script,files,options={}){this.name=name;this.script=script;this.files=files;this.options=options;this.pages=[];this.contexts=[];this.report={status:'RUNNING',localOnly:true,realPhoneUsed:false,externalRequests:[],exceptions:[],cases:[],screenshots:[],layouts:[],limitations:['桌面Chrome獨立context與尺寸模擬，不是真機／跨網路或人工全程試駕；fixture由個案另外明示。']};}
  async start(count=2){
@@ -31,7 +57,7 @@ export class FrontierBrowserHarness{
   for(let i=0;i<count;i++){
    console.log(JSON.stringify({case:'bootstrap',page:i+1,total:count,phase:'started'}));
    const context=(await this.browser.send('Target.createBrowserContext')).browserContextId;this.contexts.push(context);const t=await this.browser.send('Target.createTarget',{url:'about:blank',browserContextId:context}),targets=await(await fetch(cdp+'/json')).json(),target=targets.find(q=>q.id===t.targetId),p=new CdpConnection(target.webSocketDebuggerUrl,this.name+'-'+i,this.report);this.pages.push(p);
-   p.on('Runtime.exceptionThrown',e=>this.report.exceptions.push(e.exceptionDetails));p.on('Fetch.requestPaused',async({requestId,request})=>{const u=new URL(request.url),okay=[ORIGIN,WS.replace('ws:','http:')].includes(u.origin)||['about:','data:','blob:'].includes(u.protocol);if(!okay)this.report.externalRequests.push(request.url);await p.send(okay?'Fetch.continueRequest':'Fetch.failRequest',{requestId,...okay?{}:{errorReason:'BlockedByClient'}});});p.on('Network.webSocketCreated',({url})=>{const u=new URL(url);if(u.origin!==WS)this.report.externalRequests.push(url);});
+   p.on('Runtime.exceptionThrown',e=>this.report.exceptions.push(e.exceptionDetails));interceptLocalRequests(p,this.report,this.options.interceptRequest);p.on('Network.webSocketCreated',({url})=>{const u=new URL(url);if(u.origin!==WS)this.report.externalRequests.push(url);});
    for(const method of['Page.enable','Runtime.enable','Network.enable'])await p.send(method);await p.send('Network.setBypassServiceWorker',{bypass:true});await p.send('Fetch.enable',{patterns:[{urlPattern:'*'}]});await p.send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
    await p.send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{if(location.origin!==${JSON.stringify(ORIGIN)})return;if(!sessionStorage.getItem('__frontierSeed')){localStorage.setItem('taipei-gp-v2',JSON.stringify({schema:3,best:null,sectors:[null,null,null],ghost:null,opts:{sound:false,quali:false},taxi:{money:12345,trips:2},quality:'low',touch:'off',tutDone:true,car:'sedan'}));sessionStorage.setItem('__frontierSeed','1');}window.__frontierWire=[];window.__frontierSockets=[];const Native=WebSocket;window.WebSocket=class extends Native{constructor(url,protocols){if(new URL(String(url),location.href).origin!==${JSON.stringify(WS)})throw Error('Frontier browser blocked nonlocal WS');super(url,protocols);__frontierSockets.push(this);const send=this.send.bind(this);this.send=value=>{try{__frontierWire.push(JSON.parse(value));if(__frontierWire.length>3000)__frontierWire.shift();}catch{}return send(value);};}};})()`});
    await p.send('Page.navigate',{url:ORIGIN+'/?q=low&notraffic'});await p.until('!!window.__gp&&!document.getElementById("btn-start").disabled&&!!document.getElementById("btn-expedition-social")',180000);await p.evaluate('__gp.renderer.setPixelRatio(.3);__gp.renderer.setSize(320,180,false);window.__frontierProtected='+protectedSave+';window.__frontierOriginal={x:__gp.fcar.x,z:__gp.fcar.z,y:__gp.fcar.y,h:__gp.fcar.h}');

@@ -34,6 +34,7 @@ export const ATLAS_BACKUP_SLOTS:readonly [string,string,number][]=[
   ['taipei-gp-meridian-tandem-rotation-v1','多人追走輪賽成績',65536],
   ['taipei-gp-meridian-navigator-results-v1','雙人領航拉力共用成績',32768],
   ['taipei-gp-harbor-reading-v1','選單與成績閱讀字級',1024],
+  ['taipei-gp-lantern-story-v1','NG4分支劇情與續玩',1400000],
 ];
 export interface AtlasBackup {type:'taipei-gp-full-backup';v:1;at:string;build:string;slots:{key:string;raw:string|null}[];replays:unknown[]}
 export interface AtlasStorage {getItem(k:string):string|null;setItem(k:string,v:string):void;removeItem(k:string):void}
@@ -51,7 +52,7 @@ function bounded(value:unknown,depth=0):boolean {
 export function parseAtlasBackup(text:string):AtlasBackup {
   if(typeof text!=='string'||text.length>ATLAS_BACKUP_LIMIT)throw Error('整包備份上限40MB。');
   const v:unknown=JSON.parse(text);
-  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,19,26,27,31,35,40,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
+  if(!obj(v)||v.type!=='taipei-gp-full-backup'||v.v!==1||typeof v.at!=='string'||!Number.isFinite(Date.parse(v.at))||typeof v.build!=='string'||!/^[a-f0-9]{12}$/.test(v.build)||!Array.isArray(v.slots)||![15,17,19,26,27,31,35,40,41,ATLAS_BACKUP_SLOTS.length].includes(v.slots.length)||!Array.isArray(v.replays)||v.replays.length>5)throw Error('不是支援的整包備份版本。');
   if(Object.keys(v).some(k=>!['type','v','at','build','slots','replays'].includes(k)))throw Error('整包備份含不支援的欄位。');
   const seen=new Set<string>();
   const slots=v.slots.map(row=>{if(!obj(row)||typeof row.key!=='string'||seen.has(row.key)||Object.keys(row).some(k=>!['key','raw'].includes(k)))throw Error('備份分類重複或無效。');const spec=ATLAS_BACKUP_SLOTS.find(s=>s[0]===row.key);if(!spec||!(row.raw===null||typeof row.raw==='string'&&slotFits(row.key,row.raw,spec[2])))throw Error('備份包含未允許的資料或分類過大。');seen.add(row.key);if(row.raw!==null){let value:unknown;try{value=['taipei-gp-multiplayer-quality-v1','taipei-gp-expedition-network-v1'].includes(row.key)?row.raw:JSON.parse(row.raw as string);}catch{throw Error(`${spec[1]}不是有效JSON，原資料尚未改動。`);}if(!bounded(value))throw Error(`${spec[1]}包含不支援的資料。`);}return {key:row.key,raw:row.raw as string|null};});
@@ -67,7 +68,7 @@ export async function captureAtlasBackup(storage:AtlasStorage,port:AtlasReplayPo
   if(JSON.stringify(value).length>ATLAS_BACKUP_LIMIT)throw Error('整包備份超過40MB，請分別匯出回放。');
   return value;
 }
-export class AtlasRestoreError extends Error {constructor(message:string,readonly rollbackComplete:boolean){super(message);}}
+export class AtlasRestoreError extends Error {readonly rollbackComplete:boolean;constructor(message:string,rollbackComplete:boolean){super(message);this.rollbackComplete=rollbackComplete;}}
 export async function restoreAtlasBackup(storage:AtlasStorage,port:AtlasReplayPort,incoming:AtlasBackup,before:AtlasBackup,options:{preserveJournal?:boolean;selectedKeys?:readonly string[];replays?:boolean}={}) {
   const selected=options.selectedKeys===undefined?incoming.slots:incoming.slots.filter(s=>options.selectedKeys!.includes(s.key));
   if(options.selectedKeys&&(new Set(options.selectedKeys).size!==options.selectedKeys.length||options.selectedKeys.some(k=>!incoming.slots.some(s=>s.key===k))))throw Error('還原分類不完整或重複；尚未改動。');

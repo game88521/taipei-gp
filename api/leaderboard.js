@@ -70,7 +70,7 @@ export function createLeaderboardHandler(options = {}) {
       if (req.method === 'GET') {
         const q = req.query ?? {};
         if (q.board === 'legacy') return res.status(200).json(await leaderboard('legacy', null, cleanName(q.name), deadline));
-        const board = { track: 'taipei', rules: q.rules ?? 'classic', version: Number(q.version ?? 1) };
+        const board = { track: q.track ?? 'taipei', rules: q.rules ?? 'classic', version: Number(q.version ?? 1) };
         if (!isBoard(board) || (q.playerId != null && (typeof q.playerId !== 'string' || !UUID.test(q.playerId))) || (q.board && q.board !== 'current')) return fail(400, 'board');
         return res.status(200).json(await leaderboard(board, q.playerId?.toLowerCase(), null, deadline));
       }
@@ -84,9 +84,9 @@ export function createLeaderboardHandler(options = {}) {
       const name = cleanName(b.name), playerId = typeof b.playerId === 'string' ? b.playerId.toLowerCase() : b.playerId, time = b.time, board = b.board, idem = header(req, 'idempotency-key').toLowerCase();
       if (!name) return fail(400, 'name');
       if (typeof playerId !== 'string' || !UUID.test(playerId) || !UUID.test(idem)) return fail(400, 'identity');
-      if (typeof time !== 'number' || !Number.isFinite(time) || time < 40 || time > 300) return fail(400, 'time');
+      if (typeof time !== 'number' || !Number.isFinite(time) || time < 10 || time > 1200) return fail(400, 'time');
       if (!isBoard(board)) return fail(400, 'board');
-      if (!validateLapProof(b.proof, time, board.rules).ok) return fail(400, 'proof');
+      if (!validateLapProof(b.proof, time, board.rules, board.track).ok) return fail(400, 'proof');
       const key = boardKey(board), ip = header(req, 'x-forwarded-for').split(',')[0].trim() || 'unknown';
       const ipHash = createHash('sha256').update(ip).digest('hex').slice(0, 32);
       const fingerprint = createHash('sha256').update(JSON.stringify({ playerId, name, time, board, proof: b.proof })).digest('hex');

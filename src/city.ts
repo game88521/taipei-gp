@@ -21,6 +21,7 @@ import type { Quality } from './quality';
 import { scooterParkedGeo } from './models';
 import { Breakables } from './breakables';
 import { releaseCityTile } from './beacon-mobile-resources';
+import { CityBuildBudget, CITY_BUILD_BUDGET_MS, CITY_URGENT_BUILD_BUDGET_MS, CITY_INSTANCE_BATCH, planCityTiles, checkStreamingSignal } from './lantern-streaming';
 
 const FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 const TILE = 300; // 城市分區塊的大小（m）
@@ -241,8 +242,10 @@ export interface CityStream {
   readonly loaded: number;
   readonly pending: number;
   readonly avgMs: number;
+  readonly workYields: number;
+  readonly cancelled: number;
   tick(dt: number): void;
-  update(x: number, z: number, r: number): void;
+  update(x: number, z: number, r: number, heading?: number, speed?: number): void;
   /** 停止串流與背景下載；場景的 GPU 資源由擁有者釋放。 */
   dispose(): void;
 }
@@ -417,20 +420,15 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   }
 
   type Cull = { o: THREE.Object3D; x: number; z: number; layer: Layer; pad: number };
-  let sliceStart = performance.now(), budget = Infinity, busyMs = 0, built = 0; // busyMs：蓋區塊實際花掉的時間（不含等下一格）
-  const slice = async () => {
-    checkActive();
-    if (performance.now() - sliceStart < budget) return;
-    busyMs += performance.now() - sliceStart;
-    await new Promise<void>((res) => {
+  let built = 0;
+  const workBudget = new CityBuildBudget(6, () => performance.now(), signal => new Promise<void>((res) => {
       let frameId = 0;
-      const finish = () => { cancelAnimationFrame(frameId); opts.signal?.removeEventListener('abort', finish); res(); };
+      const finish = () => { cancelAnimationFrame(frameId); opts.signal?.removeEventListener('abort', finish); signal?.removeEventListener('abort', finish); res(); };
       opts.signal?.addEventListener('abort', finish, { once: true });
+      signal?.addEventListener('abort', finish, { once: true });
       frameId = requestAnimationFrame(finish);
-    });
-    checkActive();
-    sliceStart = performance.now();
-  };
+    }));
+  const slice = async (signal?: AbortSignal) => { checkActive(); await workBudget.checkpoint(signal); checkActive(); };
 
   // 區塊的計算（外牆、屋頂、招牌的頂點…）在背景執行緒做（tilegen.ts、tileworker.ts），這裡只建網格
   const pool = tilePool = new TilePool({
@@ -444,10 +442,12 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   }, Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1)));
 
   /** 用算好的結果建一個區塊：網格、地標模型、頂樓、機車、行道樹，加上碰撞與可撞倒的東西 */
-  async function buildTile(out: GenOut, tag: number, group: THREE.Group, [ccx, ccz]: [number, number]) {
+  async function buildTile(out: GenOut, tag: number, group: THREE.Group, [ccx, ccz]: [number, number], signal?: AbortSignal) {
     const cl: Cull[] = [];
+    const treeInstances: { d: Float32Array; trunk: THREE.InstancedMesh; crown: THREE.InstancedMesh; blob: THREE.InstancedMesh }[] = [];
     const add = (o: THREE.Object3D, x: number, z: number, layer: Layer, pad = TILE * 0.71) => { group.add(o); cl.push({ o, x, z, layer, pad }); };
     for (const g of out.geos) {
+      await slice(signal);
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(g.pos, 3));
       geo.setAttribute('normal', new THREE.BufferAttribute(g.nor, 3));
@@ -459,39 +459,41 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     }
     // 有專屬造型的地標（國父紀念館、中正紀念堂、總統府…）
     for (const s of out.specials) {
+      await slice(signal);
       const m = buildSpecial(s.b);
       if (m) { m.position.y += s.b.y ?? 0; m.userData.ownMats = true; add(m, s.x, s.z, 'far', 200); } // 坡地上的地標墊高基座
     }
-    await slice();
+    await slice(signal);
 
     // ---- 頂樓水塔與鐵皮加蓋
     const T = out.tanks, nt = T.length / 4;
     if (nt) {
       const tank = new THREE.InstancedMesh(tankGeo, tankMat, nt), leg = new THREE.InstancedMesh(legGeo, legMat, nt);
+      add(tank, ccx, ccz, 'mid', BIG * 0.71); add(leg, ccx, ccz, 'mid', BIG * 0.71);
       const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
       for (let i = 0; i < nt; i++) {
+        if (i % CITY_INSTANCE_BATCH === 0) await slice(signal);
         m4.compose(pos.set(T[i * 4], T[i * 4 + 1], T[i * 4 + 2]), qq, sc.setScalar(T[i * 4 + 3]));
         tank.setMatrixAt(i, m4);
         leg.setMatrixAt(i, m4);
       }
       tank.computeBoundingSphere();
       leg.computeBoundingSphere();
-      add(tank, ccx, ccz, 'mid', BIG * 0.71);
-      add(leg, ccx, ccz, 'mid', BIG * 0.71);
     }
     const SH = out.sheds, ns = SH.length / 7;
     if (ns) {
       const shed = new THREE.InstancedMesh(shedGeo, shedMat, ns);
-      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      add(shed, ccx, ccz, 'mid', BIG * 0.71);
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), scale = new THREE.Vector3();
       for (let i = 0; i < ns; i++) {
+        if (i % CITY_INSTANCE_BATCH === 0) await slice(signal);
         const o = i * 7;
         qq.setFromAxisAngle(up, SH[o + 5]);
-        m4.compose(new THREE.Vector3(SH[o], SH[o + 1], SH[o + 2]), qq, new THREE.Vector3(SH[o + 4], 1, SH[o + 3]));
+        m4.compose(pos.set(SH[o], SH[o + 1], SH[o + 2]), qq, scale.set(SH[o + 4], 1, SH[o + 3]));
         shed.setMatrixAt(i, m4);
         shed.setColorAt(i, tin[SH[o + 6]]);
       }
       shed.computeBoundingSphere();
-      add(shed, ccx, ccz, 'mid', BIG * 0.71);
     }
 
     // ---- 路邊停的機車：依 300 m 小區塊分組，看不到的不畫
@@ -499,57 +501,63 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     if (q.parked && P.length) {
       const groups = new Map<string, number[]>();
       for (let i = 0; i < P.length / 4; i++) {
+        if (i % CITY_INSTANCE_BATCH === 0) await slice(signal);
         const key = `${Math.floor(P[i * 4] / TILE)},${Math.floor(P[i * 4 + 1] / TILE)}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(i);
       }
-      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+      const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
       for (const ids of groups.values()) {
         const body = new THREE.InstancedMesh(parkedGeo, parkedMat, ids.length);
-        ids.forEach((i, n) => {
+        add(body, (Math.floor(P[ids[0] * 4] / TILE) + 0.5) * TILE, (Math.floor(P[ids[0] * 4 + 1] / TILE) + 0.5) * TILE, 'near');
+        for (let n = 0; n < ids.length; n++) {
+          if (n % CITY_INSTANCE_BATCH === 0) await slice(signal);
+          const i = ids[n];
           qq.setFromAxisAngle(up, P[i * 4 + 2]);
-          m4.compose(new THREE.Vector3(P[i * 4], groundH(P[i * 4], P[i * 4 + 1]) - 0.25, P[i * 4 + 1]), qq, one);
+          m4.compose(pos.set(P[i * 4], groundH(P[i * 4], P[i * 4 + 1]) - 0.25, P[i * 4 + 1]), qq, one);
           body.setMatrixAt(n, m4);
           body.setColorAt(n, parkedCol[P[i * 4 + 3] % parkedCol.length]);
-        });
+        }
         body.computeBoundingSphere();
-        add(body, (Math.floor(P[ids[0] * 4] / TILE) + 0.5) * TILE, (Math.floor(P[ids[0] * 4 + 1] / TILE) + 0.5) * TILE, 'near');
       }
     }
 
     // ---- 碰撞、行道樹
-    collider.addEdges(out.edges, tag);
-    const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3(), bm = new THREE.Matrix4();
+    const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), s = new THREE.Vector3(), bm = new THREE.Matrix4(), pos = new THREE.Vector3(), shadowPos = new THREE.Vector3(), shadowScale = new THREE.Vector3();
     for (const grp of out.trees) {
-      await slice();
+      await slice(signal);
       const D = grp.d, n = D.length / 7;
       const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, n), crown = new THREE.InstancedMesh(crownGeo, crownMat, n);
       const blob = new THREE.InstancedMesh(blobGeo, blobMat, n);
+      add(trunk, grp.cx, grp.cz, 'near'); add(blob, grp.cx, grp.cz, 'near'); add(crown, grp.cx, grp.cz, 'mid');
       for (let i = 0; i < n; i++) {
+        if (i % CITY_INSTANCE_BATCH === 0) await slice(signal);
         const o = i * 7, x = D[o], z = D[o + 1], k = D[o + 2], ty = D[o + 5];
         qt.setFromAxisAngle(up, D[o + 3]);
         s.set(k, k * D[o + 4], k);
-        m.compose(new THREE.Vector3(x, -0.3 + ty, z), qt, s); // 山上的樹長在坡面上
+        m.compose(pos.set(x, -0.3 + ty, z), qt, s); // 山上的樹長在坡面上
         trunk.setMatrixAt(i, m);
         crown.setMatrixAt(i, m);
         // 影子長度 ≈ 樹高 × 影子比例（樹冠那團影子從樹幹往外一點開始）
         const len = 5.5 * k * sl * 0.8;
-        bm.compose(new THREE.Vector3(x + sdx * len * 0.55, 0.035, z + sdz * len * 0.55), bq, new THREE.Vector3(3.6 * k, 1, len));
+        bm.compose(shadowPos.set(x + sdx * len * 0.55, 0.035, z + sdz * len * 0.55), bq, shadowScale.set(3.6 * k, 1, len));
         if (ty > 0.5) bm.makeScale(0, 0, 0); // 坡上的樹不畫地面影子（平面影子貼不住坡）
         blob.setMatrixAt(i, bm);
-        breakables.addParts(x, z, 0.35, 0.82, [
-          { mesh: trunk, idx: i, base: m }, { mesh: crown, idx: i, base: m }, { mesh: blob, idx: i, base: bm, hide: true },
-        ], tag); // 撞到會倒，車速剩 82%；倒下後地上的樹影跟著消失
         crown.setColorAt(i, leaf[D[o + 6]]);
       }
       trunk.computeBoundingSphere();
       crown.computeBoundingSphere();
       blob.computeBoundingSphere();
-      add(trunk, grp.cx, grp.cz, 'near');
-      add(blob, grp.cx, grp.cz, 'near');
-      add(crown, grp.cx, grp.cz, 'mid');
+      treeInstances.push({ d: D, trunk, crown, blob });
     }
-    return { cull: cl, bb: out.bb };
+    // 碰撞與畫面一起提交；取消中的半成品不會留下看不見的牆或樹。
+    const commit = () => {
+      collider.addEdges(out.edges, tag);
+      for (const { d, trunk, crown, blob } of treeInstances) for (let i = 0; i < d.length / 7; i++) {
+        breakables.addParts(d[i * 7], d[i * 7 + 1], 0.35, 0.82, [{ mesh: trunk, idx: i }, { mesh: crown, idx: i }, { mesh: blob, idx: i, hide: true }], tag);
+      }
+    };
+    return { cull: cl, bb: out.bb, commit };
   }
 
   // ---- 串流：哪些區塊要載入、哪些要卸掉
@@ -559,26 +567,41 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
   const center = (i: number): [number, number] => [(TI.list[i][0] + 0.5) * S, (TI.list[i][1] + 0.5) * S];
   const d2 = (i: number, x: number, z: number) => { const [cx, cz] = center(i); return (cx - x) ** 2 + (cz - z) ** 2; };
   let want: number[] = [], busy = false, grow = false;
+  let needed = new Set<number>(), cancelled = 0, previousPosition: { x: number; z: number; at: number } | null = null;
+  const jobs = new Map<number, { controller: AbortController; promise: Promise<GenOut> }>();
   const growing: { g: THREE.Group; t: number }[] = [];
   const tileUrl = (i: number) => `/data/tiles/${TI.list[i][0]}_${TI.list[i][1]}.json`;
   /** pre：已經先送去背景算的結果（開場、串流都會先送下一塊） */
-  async function loadTile(i: number, pre?: Promise<GenOut>) {
+  async function loadTile(i: number, pre?: Promise<GenOut>, signal?: AbortSignal) {
     checkActive();
-    const out = await (pre ?? pool.run(tileUrl(i), i));
+    checkStreamingSignal(signal);
+    const out = await (pre ?? pool.run(tileUrl(i), i, signal));
     checkActive();
+    checkStreamingSignal(signal);
     if (loaded.has(i)) return;
-    sliceStart = performance.now();
+    workBudget.restart();
     const group = new THREE.Group();
-    const { cull: cl, bb } = await buildTile(out, i, group, center(i));
-    checkActive();
-    busyMs += performance.now() - sliceStart;
-    built++;
-    scene.add(group);
-    // 開場之後才載入的區塊：從地面長起來（0.9 秒），不會整片突然冒出來
-    if (grow) { group.scale.y = 0.02; growing.push({ g: group, t: 0 }); }
-    for (const c of cl) { cullables.add(c); cullOne(c); }
-    loaded.set(i, { group, cull: cl, bb });
-    stream.onAdd?.(group);
+    let cl: Cull[] = [];
+    try {
+      const result = await buildTile(out, i, group, center(i), signal);
+      cl = result.cull;
+      checkActive(); checkStreamingSignal(signal);
+      result.commit();
+      scene.add(group);
+      // 開場之後才載入的區塊：從地面長起來（0.9 秒），不會整片突然冒出來
+      if (grow) { group.scale.y = 0.02; growing.push({ g: group, t: 0 }); }
+      for (const c of cl) { cullables.add(c); cullOne(c); }
+      loaded.set(i, { group, cull: cl, bb: result.bb });
+      stream.onAdd?.(group);
+      built++;
+    } catch (error) {
+      loaded.delete(i);
+      for (const c of cl) cullables.delete(c);
+      const gi = growing.findIndex(item => item.g === group); if (gi >= 0) growing.splice(gi, 1);
+      releaseCityTile(group);
+      collider.removeTag(i, out.bb); breakables.removeTag(i, out.bb);
+      throw error;
+    } finally { workBudget.finish(); }
   }
   function unload(i: number) {
     const L = loaded.get(i)!;
@@ -596,22 +619,30 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     if (busy || stopped) return;
     busy = true;
     try {
-      let nextPre: { i: number; p: Promise<GenOut> } | null = null;
+      const ask = (id: number) => {
+        let task = jobs.get(id);
+        if (!task) {
+          const controller = new AbortController(), promise = pool.run(tileUrl(id), id, controller.signal);
+          promise.catch(() => {}); // 預載取消可能早於輪到 await。
+          task = { controller, promise }; jobs.set(id, task);
+        }
+        return task;
+      };
       while (want.length && !stopped) {
         const i = want.shift()!;
-        if (loaded.has(i)) continue;
-        const p = nextPre?.i === i ? nextPre.p : pool.run(tileUrl(i), i);
+        if (loaded.has(i) || !needed.has(i)) continue;
+        const task = ask(i);
         // 組這一塊的同時，下一塊先送去背景算
         const n = want.find((j) => !loaded.has(j));
-        nextPre = n === undefined ? null : { i: n, p: pool.run(tileUrl(n), n) };
-        nextPre?.p.catch(() => {}); // 沒用到（玩家轉向了）也不要變成未處理的錯誤
-        try { await loadTile(i, p); } catch (e) { if (stopped) break; console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); }
+        if (n !== undefined) ask(n);
+        try { await loadTile(i, task.promise, task.controller.signal); }
+        catch (e) { if (stopped) break; if ((e as Error)?.name !== 'AbortError') { console.warn('城市區塊載入失敗', e); await new Promise((res) => setTimeout(res, 2000)); } }
+        finally { if (jobs.get(i) === task) jobs.delete(i); }
       }
     } finally { busy = false; }
   }
   const inRadius = (x: number, z: number, r: number) => {
-    const R = r + S * 0.71 + 100;
-    return TI.list.map((_, i) => i).filter((i) => d2(i, x, z) < R * R).sort((a, b) => d2(a, x, z) - d2(b, x, z));
+    return planCityTiles(TI.list, S, x, z, r);
   };
   let keepAll = !!opts.all;
   const stream = {
@@ -620,7 +651,9 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
     total: TI.list.length,
     get loaded() { return loaded.size; },
     get pending() { return want.length + (busy ? 1 : 0); },
-    get avgMs() { return built ? busyMs / built : 0; }, // 測試用：平均蓋一塊花多少毫秒
+    get avgMs() { return built ? workBudget.busyMs / built : 0; }, // 測試用：CPU工作時間，不含等待下一格。
+    get workYields() { return workBudget.yields; },
+    get cancelled() { return cancelled; },
     /** 每格呼叫：新區塊長起來的動畫 */
     tick(dt: number) {
       if (stopped) return;
@@ -633,17 +666,29 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
       }
     },
     /** 每 0.4 秒呼叫：x, z = 鏡頭位置、r = 可視距離 */
-    update(x: number, z: number, r: number) {
+    update(x: number, z: number, r: number, heading?: number, speed?: number) {
       if (keepAll || stopped) return;
+      const now = performance.now(), previous = previousPosition;
+      previousPosition = { x, z, at: now };
+      let motion: { heading: number; speed: number } | undefined;
+      if (heading !== undefined && speed !== undefined && Number.isFinite(heading) && Number.isFinite(speed)) motion = { heading: heading + (speed < 0 ? Math.PI : 0), speed: Math.abs(speed) };
+      else if (previous && now > previous.at && now - previous.at < 2000) {
+        const dx = x - previous.x, dz = z - previous.z, distance = Math.hypot(dx, dz);
+        if (distance < S * 2) motion = { heading: Math.atan2(dx, dz), speed: distance * 1000 / (now - previous.at) };
+      }
       const drop = (r + S * 0.71 + 550) ** 2; // 比載入範圍多 450 m 才卸掉，在邊界來回開不會一直重蓋
       for (const i of [...loaded.keys()]) if (d2(i, x, z) > drop) unload(i);
-      want = inRadius(x, z, r).filter((i) => !loaded.has(i));
-      // 身邊的區塊還沒載入（剛傳送過去）：每一格畫面多花一點時間趕快蓋好
-      budget = want.length && d2(want[0], x, z) < (S * 1.2) ** 2 ? 25 : 6;
+      const plan = planCityTiles(TI.list, S, x, z, r, motion);
+      needed = new Set(plan);
+      for (const [id, job] of jobs) if (!needed.has(id)) { job.controller.abort(); jobs.delete(id); cancelled++; }
+      want = plan.filter((i) => !loaded.has(i));
+      // 近處也分細批，避免用25ms整批搶占一個60FPS畫面。
+      workBudget.milliseconds = want.length && d2(want[0], x, z) < (S * 1.2) ** 2 ? CITY_URGENT_BUILD_BUDGET_MS : CITY_BUILD_BUDGET_MS;
       void pump();
     },
     dispose() {
       stop();
+      for (const job of jobs.values()) job.controller.abort(); jobs.clear(); needed.clear();
       opts.signal?.removeEventListener('abort', stop);
       want = []; growing.length = 0; cullables.clear(); loaded.clear();
       stream.onAdd = stream.onRemove = null;
@@ -666,7 +711,7 @@ export async function loadCity(scene: THREE.Scene, t: Track, q: Quality, opts: {
       await loadTile(ids[k], pre.get(k));
       pre.delete(k);
     }
-    budget = 6;
+    workBudget.milliseconds = CITY_BUILD_BUDGET_MS;
     grow = !keepAll;
   }
 

@@ -1,0 +1,181 @@
+{
+  "info": {
+    "name": "Lantern本機契約",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "只含localhost預設；請使用Postman秘密變數填入自己的同步憑證，勿提交真值。狀態化邊界與故障的可執行證據由lantern-api-node/deadline-node覆蓋。"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:4329"
+    },
+    {
+      "key": "syncAccount",
+      "value": ""
+    },
+    {
+      "key": "syncKey",
+      "value": ""
+    },
+    {
+      "key": "cup",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "建立個人同步帳戶",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/cloud",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"create\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"JSON與固定狀態\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect([200,201,400,401,403,404,409,410,413,429,503,504]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "讀取雲端版本",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Sync-Account",
+            "value": "{{syncAccount}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{syncKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/cloud"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"JSON與固定狀態\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect([200,201,400,401,403,404,409,410,413,429,503,504]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "讀取台北榜",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/leaderboard?track=taipei&rules=classic&version=1"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"JSON與固定狀態\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect([200,201,400,401,403,404,409,410,413,429,503,504]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "建立本週好友盃",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Sync-Account",
+            "value": "{{syncAccount}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{syncKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/weekly",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"create\",\n  \"name\": \"本機好友盃\",\n  \"driverName\": \"車手\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"JSON與固定狀態\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect([200,201,400,401,403,404,409,410,413,429,503,504]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "讀取好友盃",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/weekly?cup={{cup}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"JSON與固定狀態\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); pm.expect([200,201,400,401,403,404,409,410,413,429,503,504]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

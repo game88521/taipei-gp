@@ -40,3 +40,5 @@ COPY server/meridian-*.mjs ./
 COPY shared/meridian-*.ts /app/shared/
 COPY server/harbor-network-pause-service.mjs ./
 COPY shared/harbor-network-pause.ts /app/shared/
+COPY server/lantern-ctf-service.mjs ./
+COPY shared/lantern-ctf.ts /app/shared/

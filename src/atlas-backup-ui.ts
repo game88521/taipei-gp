@@ -7,6 +7,8 @@ import {parseSaveFile} from './save';
 import {planSelectiveRestore,type SelectiveRestoreOptions} from './aurora-backup';
 import {mountRestoreSelection} from './aurora-backup-ui';
 const make=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',id='')=>{const e=document.createElement(tag);e.textContent=text;if(id)e.id=id;return e;};
+const cloudStages=new WeakMap<HTMLElement,(backup:AtlasBackup)=>Promise<boolean>>();
+export async function previewAtlasCloudBackup(host:HTMLElement,h:AtlasPlatformHooks,backup:AtlasBackup){mountAtlasBackup(host,h);const stage=cloudStages.get(host);if(!stage||!await stage(backup))throw Error('備份工具忙碌或預覽未完成，請先完成目前操作再重試。');}
 function download(value:unknown,name:string){const url=URL.createObjectURL(new Blob([JSON.stringify(value)],{type:'application/json'})),a=make('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function buildId(){const text=await(await fetch('/sw.js',{cache:'no-store'})).text(),v=text.match(/const VERSION = '([a-f0-9]{12})'/)?.[1];if(!v)throw Error('無法確認目前建置版本，請重新載入後重試。');return v;}
 export function mountAtlasBackup(host:HTMLElement,h:AtlasPlatformHooks) {
@@ -23,10 +25,12 @@ export function mountAtlasBackup(host:HTMLElement,h:AtlasPlatformHooks) {
   const invalidate=()=>{generation++;incoming=before=null;selection=null;preview.replaceChildren();confirm.checked=false;apply.disabled=old.disabled=true;};
   const busyState=(on:boolean)=>{busy=on;file.disabled=exportButton.disabled=on;apply.disabled=on||!incoming||!confirm.checked;old.disabled=on||!before;};
   exportButton.onclick=async()=>{if(busy)return;busyState(true);try{if(!h.flush())throw Error('存檔尚未保存，請先處理儲存提示。');const value=await captureAtlasBackup(localStorage,db,await buildId());download(value,'taipei-gp-full-backup.json');status.textContent='已產生整包備份下載；請確認檔案已保存。';}catch(e){status.textContent=String(e);}finally{busyState(false);}};
-  file.onchange=async()=>{if(busy)return;invalidate();const token=generation,f=file.files?.[0];if(!f)return;busyState(true);try{if(f.size>ATLAS_BACKUP_LIMIT)throw Error('整包備份上限40MB。');const value=parseAtlasBackup(await f.text());validateAtlasBackup(value,h.parseMain);if(token!==generation)return;if(!h.flush())throw Error('目前存檔尚未保存，已停止預覽。');const current=await captureAtlasBackup(localStorage,db,await buildId());if(token!==generation)return;
+  const stage=async(text:()=>Promise<string>):Promise<boolean>=>{if(busy)return false;invalidate();const token=generation;busyState(true);try{const value=parseAtlasBackup(await text());validateAtlasBackup(value,h.parseMain);if(token!==generation)return false;if(!h.flush())throw Error('目前存檔尚未保存，已停止預覽。');const current=await captureAtlasBackup(localStorage,db,await buildId());if(token!==generation)return false;
       incoming=value;before=current;
-      selection=mountRestoreSelection(preview,value,current,()=>{confirm.checked=false;apply.disabled=true;});status.textContent='格式檢查通過。可逐類或逐場選擇還原，請核對清單並先下載還原前備份。';
-    }catch(e){status.textContent=String(e);incoming=before=null;}finally{busyState(false);}};
+      selection=mountRestoreSelection(preview,value,current,()=>{confirm.checked=false;apply.disabled=true;});status.textContent='格式檢查通過。可逐類或逐場選擇還原，請核對清單並先下載還原前備份。';return true;
+    }catch(e){status.textContent=String(e);incoming=before=null;return false;}finally{busyState(false);}};
+  file.onchange=async()=>{const f=file.files?.[0];if(!f)return;await stage(async()=>{if(f.size>ATLAS_BACKUP_LIMIT)throw Error('整包備份上限40MB。');return f.text();});};
+  cloudStages.set(host,value=>stage(async()=>JSON.stringify(value)));
   confirm.onchange=()=>{apply.disabled=busy||!incoming||!confirm.checked||preview.querySelector<HTMLElement>('#aurora-backup-selection-status')?.dataset.valid==='false';};old.onclick=()=>{if(before)download(before,'taipei-gp-before-full-restore.json');};
   apply.onclick=async()=>{if(busy||!incoming||!before||!confirm.checked)return;busyState(true);const value=incoming,original=before;let guard:ReturnType<AtlasPlatformHooks['beginRestore']>=null;
     try{if(!selection)throw Error('請重新預覽備份。');const plan=planSelectiveRestore(value,original,selection());validateAtlasBackup(plan.backup,h.parseMain);await withAtlasRestoreLease(async()=>{guard=h.beginRestore();if(!guard)throw Error('存檔寫入權已變更，請重新載入。');try{await restoreAtlasBackup(localStorage,db,plan.backup,original,{selectedKeys:plan.selectedKeys,replays:plan.replaceReplays});guard.finish(true,false);}catch(e){guard.finish(false,e instanceof AtlasRestoreError&&e.rollbackComplete);throw e;}});status.textContent='所選分類還原完成，正在重新載入。';location.reload();}

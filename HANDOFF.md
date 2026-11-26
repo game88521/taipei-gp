@@ -1,3 +1,33 @@
+<!-- lantern-release-20261126 -->
+# 2026-11-26 Lantern 新版發布
+
+作者：Rex <game88521@gmail.com>。使用者已明確授權「幫我上新版」，本次提交並正常推送已套回驗證的Lantern 99檔至main與multiplayer-test。沿用原網址https://taipei-gp.vercel.app/及多人端點wss://taipei-gp.onrender.com/ws。
+
+封版功能build a16fb2c38497、16套驗證與原案三基準通過；發布另外以正式公開WSS在本機建置並fresh執行固定三基準，不改寫原始功能收據。四核心raw bytes保持。實際提交、推送、Vercel正式部署與Render狀態，只以DCISI/taipei-lantern-release-*.json及TAIPEI_LANTERN_RELEASE.md為準；本段不代替部署成功證據。
+
+新CTF需新版前後端；Render設定autoDeploy:false，沒有確認同提交Live前不能宣稱新版後端已更新。保留ALLOWED_ORIGINS與既有MERIDIAN_CHECKPOINT_SECRET、SERIES_RESUME_SECRET。雲端／全圖榜／每週盃沿用Vercel持久Redis REST設定，沒有設定會明確503；不新增付費服務、不讀印秘密，未獨立確認控制台配置。私人同步代碼請勿分享給朋友。
+
+只讀公開部署中繼資料、靜態檔與health，不在正式站開房／試玩。真Redis Lua、iPhone17／Safari／VoiceOver、外網真人四人、服務容量與長時間溫度耗電尚未驗證。以下完整保留本輪HANDOFF bytes，其中歷史未提交／未部署是當時狀態。
+
+---
+
+<!-- lantern-local-a16fb2c38497 -->
+# 2026-11-26 最新：Lantern 十二項實作與本機驗證
+
+作者：Rex <game88521@gmail.com>。承接main `e630d71e6abc17115c759fb38fb468c81949c853`，本機封版 **a16fb2c38497**，16套驗證通過，固定54.425／162.0／175.7及aiHits0／8／5保持，car／track／rivals／pitlane四核心raw bytes未改。
+
+固定編號已實作：1手機分頁與真正固定操作列、2二十四圖真路線縮圖、3保留文字層級的閱讀放大、4玩法規則卡／階段提示、5城市分幀建模、6前向預取與取消、7省電純視覺節流、8持有私碼的跨裝置雲端進度、9全GP圖版本隔離榜、10四人2對2城市搶旗、11單人NG4分支劇情、12每週最多16帳戶三站異步盃。
+
+先讀[LANTERN_PROGRESS.md](./LANTERN_PROGRESS.md)、[LANTERN_VALIDATION.md](./LANTERN_VALIDATION.md)及[JSON](./LANTERN_VALIDATION.json)；介面／效能／玩法／雲端設定分別見LANTERN_UI、LANTERN_PERFORMANCE、LANTERN_MODES、LANTERN_ONLINE文件。雲端沿用伺服器持久Redis REST設定，無設定503，不用記憶體假雲端；私碼不進備份或對話。雲端3MB上限，大回放改本機40MB備份。CTF需前後端同版，能力lantern-ctf-v1；NG4本輪僅單人離線。
+
+本段是封版交接，**實際套回原專案只以DCISI/taipei-gp-lantern-delivery/result.json的APPLIED_BUILD_VERIFIED／verified:true為準**。外層deliver-taipei-lantern.mjs先核對clean main／HEAD及before hashes，備份全部待覆寫檔，逐檔CAS套入、離線build、驗來源與其餘檔保留；失敗不整包自動回滾，有備份及applied清單，不可直接重跑歷史apply。actualBuild與workBuild分列，環境設定不同可能影響前端產物。
+
+本輪授權是實作，**沒有commit、push或部署**；main與公開網址不會因本機修改自動更新。正式環境8／9／12需持久Redis REST，實際平台設定未獨立查控制台。本輪只測本機4317／loopback，API下游是有狀態stand-in，未跑真Redis Lua。iPhone17／Safari／VoiceOver、外網真人四人、免費主機容量及長時間溫度／耗電未驗證，最後依[LANTERN_PHONE_TEST_PLAN.md](./LANTERN_PHONE_TEST_PLAN.md)補驗。不保證FPS，合理性榜不等於權威防作弊，CTF回放尚無完整旗幟動畫歷史。
+
+所有原始失敗保留在DCISI/taipei-gp-lantern-work/tools/dev-tests，沿用成功封版收據有carriedFrom；勿把測試fixture當真人全程。以下完整保留原HANDOFF bytes，歷史發布狀態只適用當時。
+
+---
+
 <!-- harbor-release-20261124 -->
 # 2026-11-24 Harbor 新版發布準備
 
